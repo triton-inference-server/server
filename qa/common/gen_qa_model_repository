@@ -131,7 +131,6 @@ nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --form
 nvidia-smi || true
 echo \e[34mGenerating OpenVINO models\e[0m
 set -e
-set -x
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && \
     apt-get install -y --no-install-recommends build-essential cmake libprotobuf-dev \
@@ -176,7 +175,6 @@ nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --form
 nvidia-smi || true
 echo \e[34mGenerating ONNX models\e[0m
 set -e
-set -x
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && \
         apt-get install -y --no-install-recommends build-essential cmake libprotobuf-dev \
@@ -241,7 +239,6 @@ nvidia-smi || true
 echo \e[34mGenerating PyTorch models\e[0m
 pip3 install onnxscript
 set -e
-set -x
 PATH=$PATH:/usr/local/cuda-13.0/bin
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --models_dir=$TRITON_MDLS_QA_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch-pt2 --models_dir=$TRITON_MDLS_QA_MODEL
@@ -299,7 +296,6 @@ nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --form
 nvidia-smi || true
 echo \e[34mGenerating TensorRT models\e[0m
 set -e
-set -x
 dpkg -l | grep TensorRT
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
 # Models using shape tensor i/o
