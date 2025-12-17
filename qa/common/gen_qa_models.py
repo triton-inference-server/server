@@ -1882,6 +1882,7 @@ def create_models(
 ):
     model_version = 1
     if FLAGS.tensorrt:
+        print("\033[35mTensorRT model generation requested\033[0m")
         # max-batch 8
         suffix = ()
         if (
@@ -1972,6 +1973,7 @@ def create_models(
             )
 
     if FLAGS.onnx:
+        print("\033[35mONNX model generation requested\033[0m")
         # max-batch 8
         create_onnx_modelconfig(
             models_dir,
@@ -2024,6 +2026,7 @@ def create_models(
         )
 
     if FLAGS.libtorch:
+        print("\033[35mPyTorch: PT model generation requested\033[0m")
         # max-batch 8
         create_libtorch_modelconfig(
             models_dir,
@@ -2076,6 +2079,7 @@ def create_models(
         )
 
     if FLAGS.libtorch_pt2:
+        print("\033[35mPyTorch: PT2 model generation requested\033[0m")
         create_libtorch_pt2_modelconfig(
             models_dir,
             0,
@@ -2102,6 +2106,7 @@ def create_models(
         )
 
     if FLAGS.torch_aoti:
+        print("\033[35mPyTorch: AOTI model generation requested\033[0m")
         # max-batch 8
         create_torch_aoti_modelconfig(
             models_dir,
@@ -2129,6 +2134,7 @@ def create_models(
         )
 
     if FLAGS.openvino:
+        print("\033[35mOpenVINO model generation requested\033[0m")
         # max-batch 8
         create_openvino_modelconfig(
             models_dir,
@@ -2181,6 +2187,7 @@ def create_models(
         )
 
     if FLAGS.ensemble:
+        print("\033[35mEnsemble model generation requested\033[0m")
         for pair in emu.platform_types_and_validation():
             if not pair[1](
                 input_dtype,
