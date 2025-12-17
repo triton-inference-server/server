@@ -1281,7 +1281,12 @@ def create_libtorch_modelfile(
                 )
                 return op0, op1
 
-    addSubModel = AddSubNet((torch_output0_dtype, torch_output1_dtype, swap,))
+    addSubModel = AddSubNet(
+        (
+            torch_output0_dtype,
+            torch_output1_dtype, swap,
+        )
+    )
     traced = torch.jit.script(addSubModel)
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
@@ -1345,7 +1350,11 @@ def create_libtorch_pt2_modelfile(
             return op0, op1
 
     ep = torch.export.export(
-        AddSubNet(swap), (torch.randn(*input_shape), torch.randn(*input_shape),),
+        AddSubNet(swap),
+        (
+            torch.randn(*input_shape),
+            torch.randn(*input_shape),
+        ),
     )
     torch.export.save(ep, model_version_dir + "/model.pt2")
 
@@ -1401,10 +1410,15 @@ def create_torch_aoti_modelfile(
             return op0, op1
 
     ep = torch.export.export(
-        AddSubNet(swap), (torch.randn(*input_shape), torch.randn(*input_shape),),
+        AddSubNet(swap),
+        (
+            torch.randn(*input_shape),
+            torch.randn(*input_shape),
+        ),
     )
     torch._inductor.aoti_compile_and_package(
-        ep, package_path=model_version_dir + "/model.pt2",
+        ep,
+        package_path=model_version_dir + "/model.pt2",
     )
 
 
