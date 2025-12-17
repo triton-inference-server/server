@@ -129,6 +129,7 @@ cat > $OPENVINOSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
+echo \e[34mGenerating OpenVINO models\e[0m
 set -e
 set -x
 export DEBIAN_FRONTEND=noninteractive
@@ -173,6 +174,7 @@ cat > $ONNXSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
+echo \e[34mGenerating ONNX models\e[0m
 set -e
 set -x
 export DEBIAN_FRONTEND=noninteractive
@@ -236,14 +238,17 @@ cat > $TORCHSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
+echo \e[34mGenerating PyTorch models\e[0m
 pip3 install onnxscript
 set -e
 set -x
 PATH=$PATH:/usr/local/cuda-13.0/bin
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --models_dir=$TRITON_MDLS_QA_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch-pt2 --models_dir=$TRITON_MDLS_QA_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --torch-aoti --models_dir=$TRITON_MDLS_QA_MODEL
 chmod -R 777 $TRITON_MDLS_QA_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
+python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch-pt2 --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --torch-aoti --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
 chmod -R 777 $TRITON_MDLS_QA_VARIABLE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --libtorch --models_dir=$TRITON_MDLS_QA_IDENTITY_MODEL
@@ -292,6 +297,7 @@ cat > $TRTSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
+echo \e[34mGenerating TensorRT models\e[0m
 set -e
 set -x
 dpkg -l | grep TensorRT
@@ -437,7 +443,11 @@ if which docker ; then
             $UBUNTU_IMAGE \
             bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
 
-        if [ $? -ne 0 ]; then
+        exit_code=$?
+
+        rm $OPENVINOSCRIPT
+
+        if [ $exit_code -ne 0 ]; then
             log_message.error "docker run: ${OPENVINOSCRIPT} failed"
             exit 1
         fi
@@ -454,7 +464,11 @@ if which docker ; then
         $UBUNTU_IMAGE \
         bash -xe $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
 
-    if [ $? -ne 0 ]; then
+    exit_code=$?
+
+    rm $ONNXSCRIPT
+
+    if [ $exit_code -ne 0 ]; then
         log_message.error "docker run: ${ONNXSCRIPT} failed"
         exit 1
     fi
@@ -473,7 +487,11 @@ if which docker ; then
         $PYTORCH_IMAGE \
         bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
 
-    if [ $? -ne 0 ]; then
+    exit_code=$?
+
+    rm $TORCHSCRIPT
+
+    if [ $exit_code -ne 0 ]; then
         log_message.error "docker run: ${TORCHSCRIPT} failed"
         exit 1
     fi
@@ -494,7 +512,11 @@ if which docker ; then
             $TENSORRT_IMAGE \
             bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
 
-        if [ $? -ne 0 ]; then
+        exit_code=$?
+
+        rm $TRTSCRIPT
+
+        if [ $exit_code -ne 0 ]; then
             log_message.error "docker run: ${TRTSCRIPT} failed"
             exit 1
         fi
