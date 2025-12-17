@@ -45,6 +45,10 @@ FLAGS = None
 np_dtype_string = np.dtype(object)
 from typing import List, Tuple
 
+_color_green = "\033[32m"
+_color_magenta = "\033[35m"
+_color_reset = "\033[0m"
+
 
 def create_plan_dynamic_rf_modelfile(
     models_dir,
@@ -348,7 +352,7 @@ def create_plan_dynamic_modelfile(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating model {model_name}\033[0m")
+    print(f"{_color_green}Creating model {model_name}{_color_reset}")
     if min_dim != 1 or max_dim != 32:
         model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
 
@@ -468,7 +472,7 @@ def create_plan_fixed_rf_modelfile(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating model {model_name}\033[0m")
+    print(f"{_color_green}Creating model {model_name}{_color_reset}")
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -556,7 +560,7 @@ def create_plan_fixed_modelfile(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating model {model_name}\033[0m")
+    print(f"{_color_green}Creating model {model_name}{_color_reset}")
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -729,7 +733,7 @@ def create_plan_modelconfig(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating config for {model_name}\033[0m")
+    print(f"{_color_green}Creating config for {model_name}{_color_reset}")
     if min_dim != 1 or max_dim != 32:
         model_name = "{}-{}-{}".format(model_name, min_dim, max_dim)
 
@@ -883,7 +887,7 @@ def create_onnx_modelfile(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating model {model_name}\033[0m")
+    print(f"{_color_green}Creating model {model_name}{_color_reset}")
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     batch_dim = [] if max_batch == 0 else [None]
@@ -989,7 +993,7 @@ def create_onnx_modelconfig(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating config for {model_name}\033[0m")
+    print(f"{_color_green}Creating config for {model_name}{_color_reset}")
     config_dir = models_dir + "/" + model_name
 
     # [TODO] move create_general_modelconfig() out of emu as it is general
@@ -1054,7 +1058,7 @@ def create_libtorch_modelfile(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating model {model_name}\033[0m")
+    print(f"{_color_green}Creating model {model_name}{_color_reset}")
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     input_shape = [abs(ips) for ips in input_shape]
 
@@ -1319,7 +1323,7 @@ def create_libtorch_pt2_modelfile(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating model {model_name}\033[0m")
+    print(f"{_color_green}Creating model {model_name}{_color_reset}")
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     input_shape = [abs(ips) for ips in input_shape]
 
@@ -1375,7 +1379,7 @@ def create_torch_aoti_modelfile(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating model {model_name}\033[0m")
+    print(f"{_color_green}Creating model {model_name}{_color_reset}")
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     input_shape = [abs(ips) for ips in input_shape]
 
@@ -1446,7 +1450,7 @@ def create_libtorch_modelconfig(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating config for {model_name}\033[0m")
+    print(f"{_color_green}Creating config for {model_name}{_color_reset}")
     config_dir = models_dir + "/" + model_name
     config = """
 backend: "pytorch"
@@ -1548,7 +1552,7 @@ def create_libtorch_pt2_modelconfig(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating config for {model_name}\033[0m")
+    print(f"{_color_green}Creating config for {model_name}{_color_reset}")
     config_dir = models_dir + "/" + model_name
     config = """
 backend: "pytorch"
@@ -1652,7 +1656,7 @@ def create_torch_aoti_modelconfig(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating config for {model_name}\033[0m")
+    print(f"{_color_green}Creating config for {model_name}{_color_reset}")
     config_dir = models_dir + "/" + model_name
     config = """
 backend: "pytorch"
@@ -1742,7 +1746,7 @@ def create_openvino_modelfile(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating model {model_name}\033[0m")
+    print(f"{_color_green}Creating model {model_name}{_color_reset}")
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     in0 = ov.opset1.parameter(
@@ -1807,7 +1811,7 @@ def create_openvino_modelconfig(
         output0_dtype,
         output1_dtype,
     )
-    print(f"\033[32mCreating config for {model_name}\033[0m")
+    print(f"{_color_green}Creating config for {model_name}{_color_reset}")
     config_dir = models_dir + "/" + model_name
 
     # platform is empty and backend is 'openvino' for openvino model
@@ -1881,7 +1885,7 @@ def create_models(
 ):
     model_version = 1
     if FLAGS.tensorrt:
-        print("\033[35mTensorRT model generation requested\033[0m")
+        print(f"{_color_magenta}TensorRT model generation requested{_color_reset}")
         # max-batch 8
         suffix = ()
         if (
@@ -1972,7 +1976,7 @@ def create_models(
             )
 
     if FLAGS.onnx:
-        print("\033[35mONNX model generation requested\033[0m")
+        print(f"{_color_magenta}ONNX model generation requested{_color_reset}")
         # max-batch 8
         create_onnx_modelconfig(
             models_dir,
@@ -2025,7 +2029,7 @@ def create_models(
         )
 
     if FLAGS.libtorch:
-        print("\033[35mPyTorch: PT model generation requested\033[0m")
+        print(f"{_color_magenta}PyTorch: PT model generation requested{_color_reset}")
         # max-batch 8
         create_libtorch_modelconfig(
             models_dir,
@@ -2078,7 +2082,7 @@ def create_models(
         )
 
     if FLAGS.libtorch_pt2:
-        print("\033[35mPyTorch: PT2 model generation requested\033[0m")
+        print(f"{_color_magenta}PyTorch: PT2 model generation requested{_color_reset}")
         create_libtorch_pt2_modelconfig(
             models_dir,
             0,
@@ -2105,7 +2109,7 @@ def create_models(
         )
 
     if FLAGS.torch_aoti:
-        print("\033[35mPyTorch: AOTI model generation requested\033[0m")
+        print(f"{_color_magenta}PyTorch: AOTI model generation requested{_color_reset}")
         # max-batch 8
         create_torch_aoti_modelconfig(
             models_dir,
@@ -2133,7 +2137,7 @@ def create_models(
         )
 
     if FLAGS.openvino:
-        print("\033[35mOpenVINO model generation requested\033[0m")
+        print(f"{_color_magenta}OpenVINO model generation requested{_color_reset}")
         # max-batch 8
         create_openvino_modelconfig(
             models_dir,
@@ -2186,7 +2190,7 @@ def create_models(
         )
 
     if FLAGS.ensemble:
-        print("\033[35mEnsemble model generation requested\033[0m")
+        print(f"{_color_magenta}Ensemble model generation requested{_color_reset}")
         for pair in emu.platform_types_and_validation():
             if not pair[1](
                 input_dtype,

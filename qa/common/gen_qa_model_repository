@@ -50,10 +50,16 @@
 TRITON_MDLS_BASE_SCRIPT_DIR="$(dirname $(readlink -f $0))"
 TRITON_MDLS_BASE_SCRIPT_FILE="$(readlink -f $0)"
 
-log_message.info() { local message=$@ ; echo -e "\093[34m$(date +"%Y-%m-%d %H:%M:%S") - [ INFO ] - ${message} \033[0m"; } ;
-log_message.status() { local message=$@ ; echo -e "\033[37m$(date +"%Y-%m-%d %H:%M:%S") - [ STATUS ] - ${message} \033[0m"; } ;
-log_message.warning() { local message=$@ ; echo -e "\033[33m$(date +"%Y-%m-%d %H:%M:%S") - [ WARNING ] - ${message} \033[0m"; } ;
-log_message.error() { local message=$@ ; echo -e "\033[31m$(date +"%Y-%m-%d %H:%M:%S") - [ ERROR ] - ${message} \033[0m"; } ;
+COLOR_ERROR="\033[31m"
+COLOR_INFO="\033[94m"
+COLOR_RESET="\033[0m"
+COLOR_STATUS="\033[36m"
+COLOR_WARNING="\033[33m"
+
+log_message.info() { local message=$@ ; echo -e "${COLOR_INFO}$(date +"%Y-%m-%d %H:%M:%S") - [ INFO ] - ${message} ${COLOR_RESET}"; } ;
+log_message.status() { local message=$@ ; echo -e "${COLOR_STATUS}$(date +"%Y-%m-%d %H:%M:%S") - [ STATUS ] - ${message} ${COLOR_RESET}"; } ;
+log_message.warning() { local message=$@ ; echo -e "${COLOR_WARNING}$(date +"%Y-%m-%d %H:%M:%S") - [ WARNING ] - ${message} ${COLOR_RESET}"; } ;
+log_message.error() { local message=$@ ; echo -e "${COLOR_ERROR}$(date +"%Y-%m-%d %H:%M:%S") - [ ERROR ] - ${message} ${COLOR_RESET}"; } ;
 
 log_message.status "Changing working directory to the script directory to: " "${TRITON_MDLS_BASE_SCRIPT_DIR}"
 
@@ -129,7 +135,7 @@ cat > $OPENVINOSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
-echo -e "\093[34mGenerating OpenVINO models\033[0m"
+echo -e "${COLOR_INFO}Generating OpenVINO models${COLOR_RESET}"
 set -e
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && \
@@ -173,7 +179,7 @@ cat > $ONNXSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
-echo -e "\093[34mGenerating ONNX models\033[0m"
+echo -e "${COLOR_INFO}Generating ONNX models${COLOR_RESET}"
 set -e
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && \
@@ -236,7 +242,7 @@ cat > $TORCHSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
-echo -e "\093[34mGenerating PyTorch models\033[0m"
+echo -e "${COLOR_INFO}Generating PyTorch models${COLOR_RESET}"
 pip3 install onnxscript
 set -e
 PATH=$PATH:/usr/local/cuda-13.0/bin
@@ -263,7 +269,7 @@ chmod -R 777 $TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 if [ -z "$MODEL_TYPE" ] || [ "$MODEL_TYPE" != "igpu" ]; then
-  nvidia-smi --query-gpu=compute_cap | grep -qz 12.1 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for Torch TensorRT' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_torchtrt_models.py --models_dir=$TRITON_MDLS_QA_TORCHTRT_MODEL
+  nvidia-smi --query-gpu=compute_cap | grep -qz 12.1 && echo -e '${COLOR_WARNING}[WARNING]${COLOR_RESET} Skipping model generation for Torch TensorRT${COLOR_RESET}' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_torchtrt_models.py --models_dir=$TRITON_MDLS_QA_TORCHTRT_MODEL
   chmod -R 777 $TRITON_MDLS_QA_TORCHTRT_MODEL
 fi
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --libtorch --models_dir=$TRITON_MDLS_QA_RAGGED_MODEL
@@ -294,7 +300,7 @@ cat > $TRTSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
-echo -e "\093[34mGenerating TensorRT models\033[0m"
+echo -e "${COLOR_INFO}Generating TensorRT models${COLOR_RESET}"
 set -e
 dpkg -l | grep TensorRT
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
@@ -330,7 +336,7 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --tensorrt --models_dir=$TR
 chmod -R 777 $TRITON_MDLS_QA_RAGGED_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_format_models.py --models_dir=$TRITON_MDLS_QA_TRT_FORMAT_MODEL
 chmod -R 777 $TRITON_MDLS_QA_TRT_FORMAT_MODEL
-nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '\033[33m[WARNING]\033[0m Skipping model generation for data dependent shape' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
+nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '${COLOR_WARNING}[WARNING]${COLOR_RESET} Skipping model generation for data dependent shape${COLOR_RESET}' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
 chmod -R 777 $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
 # Make shared library for custom Hardmax plugin.
 if [ -d "/usr/src/tensorrt/samples/python/onnx_custom_plugin" ]; then
@@ -371,6 +377,7 @@ if which docker ; then
     docker pull $UBUNTU_IMAGE
 
     log_message.status "docker volume: create destination directory on volume"
+    log_message.info "docker run -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $UBUNTU_IMAGE mkdir -p gen_srcdir ${TRITON_VERSION}"
     docker run \
         --rm \
         --label RUNNER_ID=$RUNNER_ID \
@@ -380,6 +387,7 @@ if which docker ; then
         $UBUNTU_IMAGE \
         mkdir -p gen_srcdir ${TRITON_VERSION}
 
+    log_message.status "docker volume: create model directories on volume"
     docker run \
         --rm \
         --label RUNNER_ID=$RUNNER_ID \
@@ -415,6 +423,7 @@ if which docker ; then
         $TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL
 
     log_message.status "docker container: create container $DOCKER_VOLUME_CONTAINER"
+    log_message.info "docker create --name $DOCKER_VOLUME_CONTAINER -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $UBUNTU_IMAGE"
     docker create \
         --label RUNNER_ID=$RUNNER_ID \
         --label PROJECT_NAME=$PROJECT_NAME \
@@ -429,6 +438,7 @@ if which docker ; then
     if [[ "aarch64" != $(uname -m) ]] ; then
 
         log_message.status "docker run: $OPENVINOSCRIPT"
+        log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $UBUNTU_IMAGE bash -e $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT"
         docker run \
             --rm \
             --label RUNNER_ID=$RUNNER_ID \
@@ -437,7 +447,7 @@ if which docker ; then
             -v $DOCKER_VOLUME:/mnt \
             -t \
             $UBUNTU_IMAGE \
-            bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
+            bash -e $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
 
         exit_code=$?
 
@@ -450,6 +460,7 @@ if which docker ; then
     fi # [[ "aarch64" != $(uname -m) ]]
 
     log_message.status "docker run: $ONNXSCRIPT"
+    log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $UBUNTU_IMAGE bash -e $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT"
     docker run \
         --rm \
         --label RUNNER_ID=$RUNNER_ID \
@@ -458,7 +469,7 @@ if which docker ; then
         -v $DOCKER_VOLUME:/mnt \
         -t \
         $UBUNTU_IMAGE \
-        bash -xe $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
+        bash -e $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
 
     exit_code=$?
 
@@ -470,9 +481,11 @@ if which docker ; then
     fi
 
     log_message.status "docker pull: $PYTORCH_IMAGE"
+    log_message.info "docker pull $PYTORCH_IMAGE"
     docker pull $PYTORCH_IMAGE
 
     log_message.status "docker run: $TORCHSCRIPT"
+    log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $PYTORCH_IMAGE bash -e $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT"
     docker run \
         --rm \
         --label RUNNER_ID=$RUNNER_ID \
@@ -481,7 +494,7 @@ if which docker ; then
         -v $DOCKER_VOLUME:/mnt \
         -t \
         $PYTORCH_IMAGE \
-        bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
+        bash -e $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
 
     exit_code=$?
 
@@ -497,6 +510,7 @@ if which docker ; then
         docker pull $TENSORRT_IMAGE
 
         log_message.status "docker run: $TRTSCRIPT"
+        log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $TENSORRT_IMAGE bash -e $TRITON_MDLS_SRC_DIR/$TRTSCRIPT"
         docker run \
             --rm \
             --label RUNNER_ID=$RUNNER_ID \
@@ -506,7 +520,7 @@ if which docker ; then
             -t \
             -e TRT_VERBOSE \
             $TENSORRT_IMAGE \
-            bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
+            bash -e $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
 
         exit_code=$?
 
