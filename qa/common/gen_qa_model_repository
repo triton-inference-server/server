@@ -129,7 +129,7 @@ cat > $OPENVINOSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
-echo \e[34mGenerating OpenVINO models\e[0m
+echo -e "\033[34mGenerating OpenVINO models\033[0m"
 set -e
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && \
@@ -173,7 +173,7 @@ cat > $ONNXSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
-echo \e[34mGenerating ONNX models\e[0m
+echo -e "\033[34mGenerating ONNX models\033[0m"
 set -e
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && \
@@ -236,7 +236,7 @@ cat > $TORCHSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
-echo \e[34mGenerating PyTorch models\e[0m
+echo -e "\033[34mGenerating PyTorch models\033[0m"
 pip3 install onnxscript
 set -e
 PATH=$PATH:/usr/local/cuda-13.0/bin
@@ -294,7 +294,7 @@ cat > $TRTSCRIPT <<EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
-echo \e[34mGenerating TensorRT models\e[0m
+echo -e "\033[34mGenerating TensorRT models\033[0m"
 set -e
 dpkg -l | grep TensorRT
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
