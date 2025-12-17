@@ -112,7 +112,7 @@ class DataCompressor {
     RETURN_MSG_IF_ERR(
         AllocEVBuffer(
             expected_compressed_size, compressed_data, &current_reserved_space),
-        "unexpected error allocating output buffer for compression: ");
+        "unexpected error allocating output buffer for compression");
     stream.next_out =
         reinterpret_cast<unsigned char*>(current_reserved_space.iov_base);
     stream.avail_out = expected_compressed_size;
@@ -131,12 +131,12 @@ class DataCompressor {
               CommitEVBuffer(
                   compressed_data, &current_reserved_space,
                   expected_compressed_size),
-              "unexpected error committing output buffer for compression: ");
+              "unexpected error committing output buffer for compression");
           RETURN_MSG_IF_ERR(
               AllocEVBuffer(
                   expected_compressed_size, compressed_data,
                   &current_reserved_space),
-              "unexpected error allocating output buffer for compression: ");
+              "unexpected error allocating output buffer for compression");
           stream.next_out =
               reinterpret_cast<unsigned char*>(current_reserved_space.iov_base);
           stream.avail_out = expected_compressed_size;
@@ -156,7 +156,7 @@ class DataCompressor {
           CommitEVBuffer(
               compressed_data, &current_reserved_space,
               expected_compressed_size - stream.avail_out),
-          "unexpected error committing output buffer for compression: ");
+          "unexpected error committing output buffer for compression");
     }
     return nullptr;  // success
   }
@@ -176,6 +176,8 @@ class DataCompressor {
                                     ? source_byte_size
                                     : (1 << 20 /* 1MB */);
 
+    // Cap the initial buffer allocation to the decompression limit.
+    // This avoids over-allocating when a decompression limit is set.
     if (max_decompressed_size > 0 &&
         output_buffer_size > max_decompressed_size) {
       output_buffer_size = max_decompressed_size;
@@ -228,7 +230,7 @@ class DataCompressor {
               AllocEVBuffer(
                   output_buffer_size, decompressed_data,
                   &current_reserved_space),
-              "unexpected error allocating output buffer for decompression: ");
+              "unexpected error allocating output buffer for decompression");
           stream.next_out =
               reinterpret_cast<unsigned char*>(current_reserved_space.iov_base);
           stream.avail_out = output_buffer_size;
@@ -252,7 +254,7 @@ class DataCompressor {
 
                 // Check decompression size limit before allocating memory
                 if (max_decompressed_size > 0 &&
-                    total_decompressed >= max_decompressed_size) {
+                    total_decompressed > max_decompressed_size) {
                   return TRITONSERVER_ErrorNew(
                       TRITONSERVER_ERROR_INVALID_ARG,
                       ("Decompressed data size exceeds the maximum allowed "
@@ -268,7 +270,7 @@ class DataCompressor {
                         decompressed_data, &current_reserved_space,
                         current_buffer_size),
                     "unexpected error committing output buffer for "
-                    "decompression: ");
+                    "decompression");
 
                 // Calculate next buffer size, capped by remaining limit
                 current_buffer_size = output_buffer_size;
@@ -285,7 +287,7 @@ class DataCompressor {
                         current_buffer_size, decompressed_data,
                         &current_reserved_space),
                     "unexpected error allocating output buffer for "
-                    "decompression: ");
+                    "decompression");
                 stream.next_out = reinterpret_cast<unsigned char*>(
                     current_reserved_space.iov_base);
                 stream.avail_out = current_buffer_size;
@@ -319,7 +321,7 @@ class DataCompressor {
                     decompressed_data, &current_reserved_space,
                     final_chunk_size),
                 "unexpected error committing output buffer for "
-                "decompression: ");
+                "decompression");
           }
           break;
         }
