@@ -311,6 +311,11 @@ class DataCompressor {
                     "encountered inconsistent stream state during "
                     "decompression");
               }
+              // Break if decompression is complete, even if buffer is exactly
+              // full
+              if (ret == Z_STREAM_END) {
+                break;
+              }
             } while (stream.avail_out == 0);
           }
           // Make sure the last buffer is committed
