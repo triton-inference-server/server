@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,7 +44,7 @@ INF_COUNTER_PATTERNS = [
     "nv_inference_compute_infer_duration",
     "nv_inference_compute_output_duration",
 ]
-INF_HISTOGRAM_DECOUPLED_PATTERNS = ["nv_inference_first_response_histogram_ms"]
+INF_HISTOGRAM_PATTERNS = ["nv_inference_first_response_histogram_ms"]
 INF_SUMMARY_PATTERNS = [
     "nv_inference_request_summary",
     "nv_inference_queue_summary",
@@ -99,15 +99,15 @@ class MetricsConfigTest(tu.TestResultCollector):
             self.assertNotIn(metric, metrics)
 
     # Histograms
-    def test_inf_histograms_decoupled_exist(self):
+    def test_inf_histograms_exist(self):
         metrics = self._get_metrics()
-        for metric in INF_HISTOGRAM_DECOUPLED_PATTERNS:
+        for metric in INF_HISTOGRAM_PATTERNS:
             for suffix in ["_count", "_sum", "_bucket"]:
                 self.assertIn(metric + suffix, metrics)
 
-    def test_inf_histograms_decoupled_missing(self):
+    def test_inf_histograms_missing(self):
         metrics = self._get_metrics()
-        for metric in INF_HISTOGRAM_DECOUPLED_PATTERNS:
+        for metric in INF_HISTOGRAM_PATTERNS:
             self.assertNotIn(metric, metrics)
 
     # Summaries
