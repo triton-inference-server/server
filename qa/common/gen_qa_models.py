@@ -1412,8 +1412,8 @@ def create_torch_aoti_modelfile(
     ep = torch.export.export(
         AddSubNet(swap),
         (
-            torch.randn(*input_shape),
-            torch.randn(*input_shape),
+            torch.randn(*input_shape, device="cuda"),
+            torch.randn(*input_shape, device="cuda"),
         ),
     )
     torch._inductor.aoti_compile_and_package(
