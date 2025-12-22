@@ -1352,8 +1352,8 @@ def create_libtorch_pt2_modelfile(
     ep = torch.export.export(
         AddSubNet(swap),
         (
-            torch.randn(*input_shape),
-            torch.randn(*input_shape),
+            torch.randn(*input_shape, device="cuda"),
+            torch.randn(*input_shape, device="cuda"),
         ),
     )
     torch.export.save(ep, model_version_dir + "/model.pt2")
@@ -2097,6 +2097,32 @@ def create_models(
 
     if FLAGS.libtorch_pt2:
         print(f"{_color_magenta}PyTorch: PT2 model generation requested{_color_reset}")
+        # max-batch 8
+        create_libtorch_pt2_modelconfig(
+            models_dir,
+            8,
+            model_version,
+            input_shape,
+            output0_shape,
+            output1_shape,
+            input_dtype,
+            output0_dtype,
+            output1_dtype,
+            output0_label_cnt,
+            version_policy,
+        )
+        create_libtorch_pt2_modelfile(
+            models_dir,
+            8,
+            model_version,
+            input_shape,
+            output0_shape,
+            output1_shape,
+            input_dtype,
+            output0_dtype,
+            output1_dtype,
+        )
+        # max-batch 0
         create_libtorch_pt2_modelconfig(
             models_dir,
             0,
@@ -2112,7 +2138,7 @@ def create_models(
         )
         create_libtorch_pt2_modelfile(
             models_dir,
-            8,
+            0,
             model_version,
             input_shape,
             output0_shape,
