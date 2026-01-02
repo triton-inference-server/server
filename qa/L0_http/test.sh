@@ -775,14 +775,14 @@ fi
 
 set +e
 # Run test to verify that large inputs fail with default limit
-python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_rejection_raw_binary >> $CLIENT_LOG 2>&1
+python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_raw_binary >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for raw binary input\n***"
     RET=1
 fi
 
-python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_rejection_json >> $CLIENT_LOG 2>&1
+python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_json >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for JSON input\n***"
@@ -793,6 +793,13 @@ python http_input_size_limit_test.py InferSizeLimitTest.test_large_string_in_jso
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for large string in JSON\n***"
+    RET=1
+fi
+
+python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_compressed >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Default Input Size Limit Test Failed for compressed input\n***"
     RET=1
 fi
 set -e
@@ -824,6 +831,13 @@ python http_input_size_limit_test.py InferSizeLimitTest.test_large_input_json >>
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Input Size Limit Test Failed for JSON input with increased limits\n***"
+    RET=1
+fi
+
+python http_input_size_limit_test.py InferSizeLimitTest.test_large_input_compressed >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Input Size Limit Test Failed for compressed input with increased limits\n***"
     RET=1
 fi
 set -e

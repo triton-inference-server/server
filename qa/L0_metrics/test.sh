@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -276,7 +276,7 @@ SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
@@ -286,47 +286,12 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee
 check_unit_test
 kill_server
 
-# Check default settings: Histograms should be always disabled in non-decoupled model.
+# Enable histograms
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config histogram_latencies=true"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_missing 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
-kill_server
-
-# Check default settings: Histograms should be disabled in decoupled model
-decoupled_model="async_execute_decouple"
-mkdir -p "${MODELDIR}/${decoupled_model}/1/"
-cp ../python_models/${decoupled_model}/model.py ${MODELDIR}/${decoupled_model}/1/
-cp ../python_models/${decoupled_model}/config.pbtxt ${MODELDIR}/${decoupled_model}/
-
-SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=${decoupled_model}"
-run_and_check_server
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_missing 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
-kill_server
-
-# Enable histograms in decoupled model
-SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=${decoupled_model} --metrics-config histogram_latencies=true"
-run_and_check_server
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
@@ -465,6 +430,7 @@ SERVER_LOG="./histogram_ensemble_decoupled_server.log"
 CLIENT_LOG="./histogram_ensemble_decoupled_client.log"
 SERVER_ARGS="--model-repository=${MODELDIR} --metrics-config histogram_latencies=true --log-verbose=1"
 mkdir -p "${MODELDIR}"/ensemble/1
+rm -rf "${MODELDIR}"/async_execute
 cp -r "${MODELDIR}"/async_execute_decouple "${MODELDIR}"/async_execute
 sed -i "s/model_transaction_policy { decoupled: True }//" "${MODELDIR}"/async_execute/config.pbtxt
 
@@ -510,7 +476,7 @@ kill_server
 PYTHON_TEST="metrics_config_test.py"
 SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit --load-model=${decoupled_model} --metrics-config histogram_latencies=false --log-verbose=1"
 run_and_check_server
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_decoupled_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill_server
 
