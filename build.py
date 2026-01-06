@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -73,10 +73,10 @@ import requests
 DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.65.0dev",
     "triton_container_version": "26.01dev",
-    "upstream_container_version": "25.11",
+    "upstream_container_version": "25.12",
     "ort_version": "1.23.2",
-    "ort_openvino_version": "2025.4.0",
-    "standalone_openvino_version": "2025.4.0",
+    "ort_openvino_version": "2025.4.1",
+    "standalone_openvino_version": "2025.4.1",
     "dcgm_version": "4.4.2-1",
     "vllm_version": "0.11.1",
     "rhel_py_version": "3.12.3",
