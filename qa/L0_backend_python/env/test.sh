@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,7 +50,7 @@ create_conda_env "3.12" "python-3-12"
 conda install -c conda-forge libstdcxx-ng=14 -y
 TORCH_VERSION="2.8.0"
 conda install numpy=1.26.4 -y
-if [ $TRITON_RHEL -eq 1 ]; then
+if [[ ${TRITON_RHEL} -eq "1" ]] && grep -qE 'rhel|centos|fedora' /etc/os-release; then
     TORCH_VERISON="2.17.0"
 fi
 conda install pytorch=${TORCH_VERSION} -y
