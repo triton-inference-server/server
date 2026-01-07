@@ -47,6 +47,8 @@ FLAGS = None
 np_dtype_string = np.dtype(object)
 from typing import List, Tuple
 
+
+_color_blue = "\033[94m"
 _color_green = "\033[32m"
 _color_magenta = "\033[35m"
 _color_red = "\033[31m"
@@ -1322,6 +1324,9 @@ def create_libtorch_pt2_modelfile(
     ):
         return
 
+    torch_output0_dtype = np_to_torch_dtype(output0_dtype)
+    torch_output1_dtype = np_to_torch_dtype(output1_dtype)
+
     model_name = tu.get_model_name(
         "libtorch_pt2",
         input_dtype,
@@ -1342,17 +1347,19 @@ def create_libtorch_pt2_modelfile(
         pass  # ignore existing dir
 
     class AddSubNet(nn.Module):
-        def __init__(self, swap):
+        def __init__(self, output0_dtype, output1_dtype, swap):
+            self.output0_dtype = output0_dtype
+            self.output1_dtype = output1_dtype
             self.swap = swap
             super(AddSubNet, self).__init__()
 
         def forward(self, INPUT0, INPUT1):
             op0 = (INPUT0 - INPUT1) if self.swap else (INPUT0 + INPUT1)
             op1 = (INPUT0 + INPUT1) if self.swap else (INPUT0 - INPUT1)
-            return op0, op1
+            return op0.to(self.output0_dtype), op1.to(self.output1_dtype)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = AddSubNet(swap)
+    model = AddSubNet(torch_output0_dtype, torch_output1_dtype, swap)
     model.to(device)
 
     input0 = torch.randn(*input_shape, device=device)
@@ -1387,6 +1394,9 @@ def create_torch_aoti_modelfile(
     ):
         return
 
+    torch_output0_dtype = np_to_torch_dtype(output0_dtype)
+    torch_output1_dtype = np_to_torch_dtype(output1_dtype)
+
     model_name = tu.get_model_name(
         "torch_aoti",
         input_dtype,
@@ -1406,17 +1416,19 @@ def create_torch_aoti_modelfile(
         pass  # ignore existing dir
 
     class AddSubNet(nn.Module):
-        def __init__(self, swap):
+        def __init__(self, output0_dtype, output1_dtype, swap):
+            self.output0_dtype = output0_dtype
+            self.output1_dtype = output1_dtype
             self.swap = swap
             super(AddSubNet, self).__init__()
 
         def forward(self, INPUT0, INPUT1):
             op0 = (INPUT0 - INPUT1) if self.swap else (INPUT0 + INPUT1)
             op1 = (INPUT0 + INPUT1) if self.swap else (INPUT0 - INPUT1)
-            return op0, op1
+            return op0.to(self.output0_dtype), op1.to(self.output1_dtype)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = AddSubNet(swap)
+    model = AddSubNet(torch_output0_dtype, torch_output1_dtype, swap)
     model.to(device)
 
     input0 = torch.randn(*input_shape, device=device)
@@ -1655,7 +1667,7 @@ output [
     dims: [ {tu.shape_to_dims_str(output1_shape)} ]
   }}
 ]
-instance_group [{{ kind: "{"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"}" }}]
+instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"} }}]
 """
 
     try:
@@ -1987,6 +1999,7 @@ def create_models(
     output0_label_cnt,
     version_policy=None,
 ):
+    print(f"{_color_blue}Creating models in {models_dir}{_color_reset}")
     model_version = 1
     if FLAGS.tensorrt:
         print(f"{_color_magenta}TensorRT model generation requested{_color_reset}")
@@ -2265,18 +2278,6 @@ def create_models(
             output0_dtype,
             output1_dtype,
         )
-
-    if FLAGS.torchvision_aoti:
-        print(f"{_color_magenta}TorchVision AOTI model generation requested{_color_reset}")
-        if create_torchvision_aoti_modelfile(
-                models_dir,
-                1,
-                model_version,
-            ):
-            create_torchvision_aoti_modelconfig(
-                models_dir,
-                1,
-            )
 
     if FLAGS.openvino:
         print(f"{_color_magenta}OpenVINO model generation requested{_color_reset}")
@@ -2692,24 +2693,6 @@ if __name__ == "__main__":
                     FLAGS.models_dir, 0, 3, (16,), (16,), (16,), vt, vt, vt, swap=True
                 )
 
-        if FLAGS.torch_aoti:
-            for vt in [np.float32, np.int32, np.int16, np.int8]:
-                create_torch_aoti_modelfile(
-                    FLAGS.models_dir, 8, 2, (16,), (16,), (16,), vt, vt, vt, swap=True
-                )
-                create_torch_aoti_modelfile(
-                    FLAGS.models_dir, 8, 3, (16,), (16,), (16,), vt, vt, vt, swap=True
-                )
-                create_torch_aoti_modelfile(
-                    FLAGS.models_dir, 0, 2, (16,), (16,), (16,), vt, vt, vt, swap=True
-                )
-                create_torch_aoti_modelfile(
-                    FLAGS.models_dir, 0, 3, (16,), (16,), (16,), vt, vt, vt, swap=True
-                )
-
-        if FLAGS.torchvision_aoti:
-            create_torchvision_aoti_modelfile(FLAGS.models_dir, 1, 1)
-
         if FLAGS.openvino:
             for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
                 create_openvino_modelfile(
@@ -2925,3 +2908,15 @@ if __name__ == "__main__":
             # to fixed size model is not safe but doable
             for model_shape in [(-1,), (-1, -1), (-1, -1, -1)]:
                 emu.create_nop_modelconfig(FLAGS.models_dir, model_shape, model_dtype)
+
+    if FLAGS.torchvision_aoti:
+        print(f"{_color_blue}TorchVision AOTI model generation requested{_color_reset}")
+        if create_torchvision_aoti_modelfile(
+                FLAGS.models_dir,
+                1,
+                1,
+            ):
+            create_torchvision_aoti_modelconfig(
+                FLAGS.models_dir,
+                1,
+            )
