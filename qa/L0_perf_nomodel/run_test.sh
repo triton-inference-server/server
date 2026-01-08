@@ -106,6 +106,12 @@ for BACKEND in $BACKENDS; do
         continue
     fi
 
+    # Skip high concurrency tests for custom backend to avoid resource exhaustion on CPU
+    # For more info: TRI-345 (Linear)
+    if [ "$BACKEND" == "custom" ] && [ $CONCURRENCY -gt 8 ]; then
+        continue
+    fi
+
     # plan and openvino models do not support 16MB I/O tests
     if ([ $BACKEND == "plan" ] || [ $BACKEND == "openvino" ]) && [ $TENSOR_SIZE != 1 ]; then
         continue
