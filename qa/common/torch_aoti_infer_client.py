@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,6 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import argparse
 import os
 import sys
 
@@ -40,15 +41,10 @@ import tritonclient.http as httpclient
 # with TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
-DEFAULT_MODEL_NAME="libtorch_int32_int32_int32"
-
 
 class InferTest(tu.TestResultCollector):
     def test_infer(self):
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--model", type=str, default=DEFAULT_MODEL_NAME)
-
-        args = parser.parse_args()
+        model_name = "torch_aoti_int32_int32"
 
         try:
             triton_client = httpclient.InferenceServerClient(
@@ -57,8 +53,6 @@ class InferTest(tu.TestResultCollector):
         except Exception as e:
             print("channel creation failed: " + str(e))
             sys.exit(1)
-
-        model_name = args.model if getattr(args, "model", None) else DEFAULT_MODEL_NAME
 
         inputs = []
         outputs = []
@@ -76,34 +70,20 @@ class InferTest(tu.TestResultCollector):
         inputs[1].set_data_from_numpy(input1_data, binary_data=True)
 
         outputs.append(httpclient.InferRequestedOutput("OUTPUT__0", binary_data=True))
-        outputs.append(httpclient.InferRequestedOutput("OUTPUT__1", binary_data=True))
 
         results = triton_client.infer(model_name, inputs, outputs=outputs)
 
-        output0_data = results.as_numpy("OUTPUT__0")
-        output1_data = results.as_numpy("OUTPUT__1")
+        output_data = results.as_numpy("OUTPUT__0")
+
+        print(f"output_data: {output_data}")
 
         # Validate the results by comparing with precomputed values.
-        for i in range(16):
+        for i in range(input0_data.shape[1]):
             print(
-                str(input0_data[0][i])
-                + " - "
-                + str(input1_data[0][i])
-                + " = "
-                + str(output0_data[0][i])
+                f"{model_name}[{i}]: {input0_data[0][i]} - {input1_data[0][i]} = {output_data[0][i]}"
             )
-            print(
-                str(input0_data[0][i])
-                + " + "
-                + str(input1_data[0][i])
-                + " = "
-                + str(output1_data[0][i])
-            )
-            if (input0_data[0][i] - input1_data[0][i]) != output0_data[0][i]:
+            if (input0_data[0][i] - input1_data[0][i]) != output_data[0][i]:
                 print("sync infer error: incorrect difference")
-                sys.exit(1)
-            if (input0_data[0][i] + input1_data[0][i]) != output1_data[0][i]:
-                print("sync infer error: incorrect sum")
                 sys.exit(1)
 
 

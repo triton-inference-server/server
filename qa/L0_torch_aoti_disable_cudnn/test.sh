@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,8 +40,8 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-LIBTORCH_INFER_CLIENT_PY=../common/libtorch_infer_client.py
-TRITONSERVER_MODEL=libtorch_int32_int32_int32
+INFER_CLIENT_PY=../common/torch_aoti_infer_client.py
+TRITONSERVER_MODEL=torch_aoti_int32_int32_int32
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 
@@ -59,7 +59,7 @@ for FLAG in true false; do
 
     echo """
     parameters: {
-        key: \"INFERENCE_MODE\"
+        key: \"DISABLE_CUDNN\"
         value: {
             string_value: \"$FLAG\"
         }
@@ -74,20 +74,20 @@ for FLAG in true false; do
 
     set +e
 
-    python $LIBTORCH_INFER_CLIENT_PY >> $CLIENT_LOG 2>&1
+    python $INFER_CLIENT_PY --model=$TRITONSERVER_MODEL >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    INFERMODE_LOG="Inference Mode is "
+    CUDNN_LOG="cuDNN is "
     if [ "$FLAG" == "true" ]; then
-        INFERMODE_LOG+=enabled
+        CUDNN_LOG+=disabled
     else
-        INFERMODE_LOG+=disabled
+        CUDNN_LOG+=enabled
     fi
 
-    if [ `grep -c "$INFERMODE_LOG" $SERVER_LOG` != "3" ]; then
-        echo -e "\n***\n*** Failed. Expected 3 $INFERMODE_LOG in log\n***"
+    if [ `grep -c "$CUDNN_LOG" $SERVER_LOG` != "3" ]; then
+        echo -e "\n***\n*** Failed. Expected 3 $CUDNN_LOG in log\n***"
         RET=1
     fi
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,8 +40,8 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-LIBTORCH_INFER_CLIENT_PY=../common/libtorch_infer_client.py
-TRITONSERVER_MODEL=libtorch_int32_int32_int32
+INFER_CLIENT_PY=../common/torch_aoti_infer_client.py
+TRITONSERVER_MODEL=torch_aoti_int32_int32_int32
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 
@@ -59,11 +59,11 @@ for FLAG in true false; do
 
     echo """
     parameters: {
-        key: \"INFERENCE_MODE\"
+        key: \"DISABLE_OPTIMIZED_EXECUTION\"
         value: {
             string_value: \"$FLAG\"
         }
-    }""" >> models/${TRITONSERVER_MODEL}/config.pbtxt
+    }""" >> models/$TRITONSERVER_MODEL/config.pbtxt
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -74,20 +74,20 @@ for FLAG in true false; do
 
     set +e
 
-    python $LIBTORCH_INFER_CLIENT_PY >> $CLIENT_LOG 2>&1
+    python $INFER_CLIENT_PY --model=$TRITONSERVER_MODEL >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    INFERMODE_LOG="Inference Mode is "
+    OPTIMIZED_LOG="Optimized execution is "
     if [ "$FLAG" == "true" ]; then
-        INFERMODE_LOG+=enabled
+        OPTIMIZED_LOG+=disabled
     else
-        INFERMODE_LOG+=disabled
+        OPTIMIZED_LOG+=enabled
     fi
 
-    if [ `grep -c "$INFERMODE_LOG" $SERVER_LOG` != "3" ]; then
-        echo -e "\n***\n*** Failed. Expected 3 $INFERMODE_LOG in log\n***"
+    if [ `grep -c "$OPTIMIZED_LOG" $SERVER_LOG` != "3" ]; then
+        echo -e "\n***\n*** Failed. Expected 3 $OPTIMIZED_LOG in log\n***"
         RET=1
     fi
 

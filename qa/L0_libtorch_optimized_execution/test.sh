@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,6 +41,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 LIBTORCH_INFER_CLIENT_PY=../common/libtorch_infer_client.py
+TRITONSERVER_MODEL=libtorch_int32_int32_int32
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 
@@ -54,7 +55,7 @@ RET=0
 
 for FLAG in true false; do
     rm -f *.log
-    mkdir -p models && cp -r $DATADIR/libtorch_int32_int32_int32 models/.
+    mkdir -p models && cp -r $DATADIR/${TRITONSERVER_MODEL} models/.
 
     echo """
     parameters: {
@@ -62,7 +63,7 @@ for FLAG in true false; do
         value: {
             string_value: \"$FLAG\"
         }
-    }""" >> models/libtorch_int32_int32_int32/config.pbtxt
+    }""" >> models/${TRITONSERVER_MODEL}/config.pbtxt
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
