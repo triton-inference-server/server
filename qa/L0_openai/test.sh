@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@ function download_tensorrt_llm_models {
     TENSORRTLLM_VERSION="$1"
     TENSORRTLLM_DIR="$2"
     rm -rf ${TENSORRTLLM_DIR} && mkdir ${TENSORRTLLM_DIR}
-    git clone --filter=blob:none --no-checkout https://github.com/NVIDIA/TensorRT-LLM.git ${TENSORRTLLM_DIR}
+    git clone --filter=blob:none --no-checkout https://github.com/triton-inference-server/TensorRT-LLM.git ${TENSORRTLLM_DIR}
     pushd ${TENSORRTLLM_DIR}
     git sparse-checkout set triton_backend/all_models
     git checkout ${TENSORRTLLM_VERSION}
