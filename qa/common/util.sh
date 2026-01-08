@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -363,7 +363,7 @@ function kill_server () {
     else
         # Non-windows...
         kill $SERVER_PID
-        wait $SERVER_PID
+        wait $SERVER_PID || true
     fi
 }
 
