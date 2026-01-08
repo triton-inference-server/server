@@ -40,8 +40,8 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-LIBTORCH_INFER_CLIENT_PY=../common/libtorch_infer_client.py
-TRITONSERVER_MODEL=libtorch_int32_int32_int32
+INFER_CLIENT_PY=../common/torch_aoti_infer_client.py
+TRITONSERVER_MODEL=torch_aoti_int32_int32_int32
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 
@@ -74,7 +74,7 @@ for FLAG in true false; do
 
     set +e
 
-    python $LIBTORCH_INFER_CLIENT_PY >> $CLIENT_LOG 2>&1
+    python $INFER_CLIENT_PY --model=$TRITONSERVER_MODEL >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi

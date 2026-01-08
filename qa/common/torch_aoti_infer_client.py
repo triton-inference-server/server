@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,6 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import argparse
 import os
 import sys
 
@@ -40,7 +41,7 @@ import tritonclient.http as httpclient
 # with TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
-DEFAULT_MODEL_NAME="libtorch_int32_int32_int32"
+DEFAULT_MODEL_NAME="torch_aoti_int32_int32_int32"
 
 
 class InferTest(tu.TestResultCollector):
