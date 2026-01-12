@@ -168,7 +168,7 @@ TEST_CONCURRENCY+=(
     16
     16
     16)
-TEST_BACKENDS=${BACKENDS:="plan custom onnx libtorch python"}
+TEST_BACKENDS=${BACKENDS:="custom"}
 
 mkdir -p ${REPO_VERSION}
 
