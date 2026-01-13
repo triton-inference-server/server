@@ -1324,8 +1324,39 @@ def create_libtorch_pt2_modelfile(
     ):
         return
 
-    torch_output0_dtype = np_to_torch_dtype(output0_dtype)
-    torch_output1_dtype = np_to_torch_dtype(output1_dtype)
+    if output0_dtype == np.int8:
+        torch_output0_dtype = torch.int8
+    elif output0_dtype == np.int16:
+        torch_output0_dtype = torch.int16
+    elif output0_dtype == np.int32:
+        torch_output0_dtype = torch.int32
+    elif output0_dtype == np.int64:
+        torch_output0_dtype = torch.int64
+    elif output0_dtype == np.float16:
+        torch_output0_dtype = torch.float16
+    elif output0_dtype == np.float32:
+        torch_output0_dtype = torch.float32
+    elif output0_dtype == np.float64:
+        torch_output0_dtype = torch.float64
+    else:
+        return
+
+    if output1_dtype == np.int8:
+        torch_output1_dtype = torch.int8
+    elif output1_dtype == np.int16:
+        torch_output1_dtype = torch.int16
+    elif output1_dtype == np.int32:
+        torch_output1_dtype = torch.int32
+    elif output1_dtype == np.int64:
+        torch_output1_dtype = torch.int64
+    elif output1_dtype == np.float16:
+        torch_output1_dtype = torch.float16
+    elif output1_dtype == np.float32:
+        torch_output1_dtype = torch.float32
+    elif output1_dtype == np.float64:
+        torch_output1_dtype = torch.float64
+    else:
+        return
 
     model_name = tu.get_model_name(
         "libtorch_pt2",
@@ -1347,7 +1378,12 @@ def create_libtorch_pt2_modelfile(
         pass  # ignore existing dir
 
     class AddSubNet(nn.Module):
-        def __init__(self, output0_dtype, output1_dtype, swap):
+        def __init__(
+            self,
+            output0_dtype: torch.dtype,
+            output1_dtype: torch.dtype,
+            swap: bool,
+        ):
             self.output0_dtype = output0_dtype
             self.output1_dtype = output1_dtype
             self.swap = swap
@@ -1394,8 +1430,39 @@ def create_torch_aoti_modelfile(
     ):
         return
 
-    torch_output0_dtype = np_to_torch_dtype(output0_dtype)
-    torch_output1_dtype = np_to_torch_dtype(output1_dtype)
+    if output0_dtype == np.int8:
+        torch_output0_dtype = torch.int8
+    elif output0_dtype == np.int16:
+        torch_output0_dtype = torch.int16
+    elif output0_dtype == np.int32:
+        torch_output0_dtype = torch.int32
+    elif output0_dtype == np.int64:
+        torch_output0_dtype = torch.int64
+    elif output0_dtype == np.float16:
+        torch_output0_dtype = torch.float16
+    elif output0_dtype == np.float32:
+        torch_output0_dtype = torch.float32
+    elif output0_dtype == np.float64:
+        torch_output0_dtype = torch.float64
+    else:
+        return
+
+    if output1_dtype == np.int8:
+        torch_output1_dtype = torch.int8
+    elif output1_dtype == np.int16:
+        torch_output1_dtype = torch.int16
+    elif output1_dtype == np.int32:
+        torch_output1_dtype = torch.int32
+    elif output1_dtype == np.int64:
+        torch_output1_dtype = torch.int64
+    elif output1_dtype == np.float16:
+        torch_output1_dtype = torch.float16
+    elif output1_dtype == np.float32:
+        torch_output1_dtype = torch.float32
+    elif output1_dtype == np.float64:
+        torch_output1_dtype = torch.float64
+    else:
+        return
 
     model_name = tu.get_model_name(
         "torch_aoti",
@@ -1416,7 +1483,12 @@ def create_torch_aoti_modelfile(
         pass  # ignore existing dir
 
     class AddSubNet(nn.Module):
-        def __init__(self, output0_dtype, output1_dtype, swap):
+        def __init__(
+            self,
+            output0_dtype: torch.dtype,
+            output1_dtype: torch.dtype,
+            swap: bool,
+        ):
             self.output0_dtype = output0_dtype
             self.output1_dtype = output1_dtype
             self.swap = swap
