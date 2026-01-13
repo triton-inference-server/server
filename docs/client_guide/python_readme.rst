@@ -1,5 +1,5 @@
 ..
-.. Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+.. Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 ..
 .. Redistribution and use in source and binary forms, with or without
 .. modification, are permitted provided that the following conditions
@@ -72,13 +72,17 @@ Clone Repository
 ^^^^^^^^^^^^^^^^
 
 .. code:: bash
+
    git clone https://github.com/triton-inference-server/tutorials.git
    cd tutorials/Triton_Inference_Server_Python_API
+
 Build ``triton-python-api:r24.01`` Image
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code:: bash
+
    ./build.sh
+
 Supported Backends
 ^^^^^^^^^^^^^^^^^^
 
@@ -110,19 +114,25 @@ The following command starts a container and volume mounts the current
 directory as ``workspace``.
 
 .. code:: bash
+
    ./run.sh
+
 Enter Python Shell
 ~~~~~~~~~~~~~~~~~~
 
 .. code:: bash
+
    python3
+
 Create and Start a Server Instance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: python
+
    import tritonserver
    server = tritonserver.Server(model_repository="/workspace/identity-models")
    server.start()
+
 List Models
 ~~~~~~~~~~~
 
@@ -137,13 +147,17 @@ Example Output
 their current state.
 
 .. code:: python
+
    {('identity', 1): {'name': 'identity', 'version': 1, 'state': 'READY'}}
+
 Send an Inference Request
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: python
+
    model = server.model("identity")
    responses = model.infer(inputs={"string_input":[["hello world!"]]})
+
 Iterate through Responses
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -151,15 +165,19 @@ Iterate through Responses
 results of an inference request.
 
 .. code:: python
+
    for response in responses:
        print(response.outputs["string_output"].to_string_array())
+
 .. _example-output-1:
 
 Example Output
 ^^^^^^^^^^^^^^
 
 .. code:: python
+
    [['hello world!']]
+
 Stable Diffusion
 ----------------
 
@@ -174,7 +192,9 @@ Please note the following command will take many minutes depending on
 your hardware configuration and network connection.
 
 .. code:: bash
-      ./build.sh --framework diffusion --build-models
+
+   ./build.sh --framework diffusion --build-models
+
 .. _supported-backends-1:
 
 Supported Backends
@@ -205,25 +225,31 @@ The following command starts a container and volume mounts the current
 directory as ``workspace``.
 
 .. code:: bash
+
    ./run.sh --framework diffusion
+
 .. _enter-python-shell-1:
 
 Enter Python Shell
 ~~~~~~~~~~~~~~~~~~
 
 .. code:: bash
+
    python3
+
 .. _create-and-start-a-server-instance-1:
 
 Create and Start a Server Instance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: python
+
    import tritonserver
    import numpy
    from PIL import Image
    server = tritonserver.Server(model_repository="/workspace/diffusion-models")
    server.start()
+
 .. _list-models-1:
 
 List Models
@@ -239,24 +265,30 @@ Example Output
 ^^^^^^^^^^^^^^
 
 .. code:: python
+
    {('stable_diffusion', 1): {'name': 'stable_diffusion', 'version': 1, 'state': 'READY'}, ('text_encoder', 1): {'name': 'text_encoder', 'version': 1, 'state': 'READY'}, ('vae', 1): {'name': 'vae', 'version': 1, 'state': 'READY'}}
+
 .. _send-an-inference-request-1:
 
 Send an Inference Request
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: python
+
    model = server.model("stable_diffusion")
    responses = model.infer(inputs={"prompt":[["butterfly in new york, realistic, 4k, photograph"]]})
+
 Iterate through Responses and save image
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code:: python
+
    for response in responses:
        generated_image = numpy.from_dlpack(response.outputs["generated_image"])
        generated_image = generated_image.squeeze().astype(numpy.uint8)
        image_ = Image.fromarray(generated_image)
        image_.save("sample_generated_image.jpg")
+
 .. _example-output-3:
 
 Example Output
