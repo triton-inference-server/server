@@ -262,14 +262,14 @@ pip3 install onnxscript
 set -e
 PATH=$PATH:/usr/local/cuda-13.0/bin
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --models_dir=$TRITON_MDLS_QA_MODEL
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch-pt2 --models_dir=$TRITON_MDLS_QA_MODEL
+#python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch-pt2 --models_dir=$TRITON_MDLS_QA_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --torch-aoti --models_dir=$TRITON_MDLS_QA_MODEL
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --torchvision-aoti --models_dir=$TRITON_MDLS_QA_MODEL
+#python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --torchvision-aoti --models_dir=$TRITON_MDLS_QA_MODEL
 chmod -R 777 $TRITON_MDLS_QA_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch-pt2 --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
+#python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --libtorch-pt2 --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --torch-aoti --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
-python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --torchvision-aoti --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
+#python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --torchvision-aoti --variable --models_dir=$TRITON_MDLS_QA_VARIABLE_MODEL
 chmod -R 777 $TRITON_MDLS_QA_VARIABLE_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_identity_models.py --libtorch --models_dir=$TRITON_MDLS_QA_IDENTITY_MODEL
 chmod -R 777 $TRITON_MDLS_QA_IDENTITY_MODEL

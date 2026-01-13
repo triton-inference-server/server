@@ -1397,6 +1397,7 @@ def create_libtorch_pt2_modelfile(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = AddSubNet(torch_output0_dtype, torch_output1_dtype, swap)
     model.to(device)
+    model = model.eval()
 
     input0 = torch.randn(*input_shape, device=device)
     input1 = torch.randn(*input_shape, device=device)
@@ -1502,6 +1503,7 @@ def create_torch_aoti_modelfile(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = AddSubNet(torch_output0_dtype, torch_output1_dtype, swap)
     model.to(device)
+    model = model.eval()
 
     input0 = torch.randn(*input_shape, device=device)
     input1 = torch.randn(*input_shape, device=device)
@@ -1539,22 +1541,21 @@ def create_torchvision_aoti_modelfile(
 
     print(f"{_color_green}Creating model {model_name}{_color_reset}")
 
-    model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+    model = model.to(device)
+    model = model.eval()
 
     # Example input tensor with batch size 1 and 3 color channels (RGB), height and width of 224
     input_tensor = torch.randn(max_batch, 3, 224, 224, device=device)
 
-    model = model.to(device)
-
     try:
         ep = torch.export.export(model, (input_tensor,))
 
-        torch.export.save(ep, f"{model_version_dir}/model.pt2")
-        # torch._inductor.aoti_compile_and_package(
-        #   ep,
-        #   package_path=f"{model_version_dir}/model.pt2",
-        # )
+        torch._inductor.aoti_compile_and_package(
+          ep,
+          package_path=f"{model_version_dir}/model.pt2",
+        )
     except Exception as e:
         print(
             f"{_color_red}error: Failed to create model {model_name}{_color_reset}",
