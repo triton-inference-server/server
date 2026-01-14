@@ -2249,6 +2249,9 @@ TritonParser::SetGlobalTraceArgs(
         }
         lparams.trace_rate_ = ParseOption<int>(value);
       }
+      if (setting == "honor-parent-sampling") {
+        lparams.trace_honor_parent_sampling_ = ParseOption<bool>(value);
+      }
       if (setting == "level") {
         if (trace_level_present) {
           std::cerr << "Warning: Overriding deprecated '--trace-level' "
