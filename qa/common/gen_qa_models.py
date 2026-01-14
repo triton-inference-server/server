@@ -1301,111 +1301,70 @@ def create_libtorch_modelfile(
     traced.save(f"{model_version_dir}/model.pt")
 
 
-def create_libtorch_pt2_modelfile(
-    models_dir,
-    max_batch,
-    model_version,
+def convert_output_type(output_dtype):
+    if output_dtype == np.int8:
+        return True, torch.int8
+    elif output_dtype == np.int16:
+        return True, torch.int16
+    elif output_dtype == np.int32:
+        return True, torch.int32
+    elif output_dtype == np.int64:
+        return True, torch.int64
+    elif output_dtype == np.float16:
+        return True, torch.float16
+    elif output_dtype == np.float32:
+        return True, torch.float32
+    elif output_dtype == np.float64:
+        return True, torch.float64
+    else:
+        return False, torch.float32
+
+def generate_sample_inputs(
     input_shape,
-    output0_shape,
-    output1_shape,
     input_dtype,
-    output0_dtype,
-    output1_dtype,
-    swap=False,
+    device,
 ):
-    if not tu.validate_for_libtorch_model(
-        input_dtype,
-        output0_dtype,
-        output1_dtype,
-        input_shape,
-        output0_shape,
-        output1_shape,
-        max_batch,
-    ):
-        return
-
-    if output0_dtype == np.int8:
-        torch_output0_dtype = torch.int8
-    elif output0_dtype == np.int16:
-        torch_output0_dtype = torch.int16
-    elif output0_dtype == np.int32:
-        torch_output0_dtype = torch.int32
-    elif output0_dtype == np.int64:
-        torch_output0_dtype = torch.int64
-    elif output0_dtype == np.float16:
-        torch_output0_dtype = torch.float16
-    elif output0_dtype == np.float32:
-        torch_output0_dtype = torch.float32
-    elif output0_dtype == np.float64:
-        torch_output0_dtype = torch.float64
-    else:
-        return
-
-    if output1_dtype == np.int8:
-        torch_output1_dtype = torch.int8
-    elif output1_dtype == np.int16:
-        torch_output1_dtype = torch.int16
-    elif output1_dtype == np.int32:
-        torch_output1_dtype = torch.int32
-    elif output1_dtype == np.int64:
-        torch_output1_dtype = torch.int64
-    elif output1_dtype == np.float16:
-        torch_output1_dtype = torch.float16
-    elif output1_dtype == np.float32:
-        torch_output1_dtype = torch.float32
-    elif output1_dtype == np.float64:
-        torch_output1_dtype = torch.float64
-    else:
-        return
-
-    model_name = tu.get_model_name(
-        "libtorch_pt2",
-        input_dtype,
-        output0_dtype,
-        output1_dtype,
-    )
-
-    print(f"{_color_green}Creating model {model_name}{_color_reset}")
-
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     input_shape = [abs(ips) for ips in input_shape]
 
-    model_version_dir = f"{models_dir}/{model_name}/{model_version}"
+    if input_dtype == np.int8:
+        input0 = torch.randint(-128, 127, input_shape, dtype=torch.int8, device=device)
+        input1 = torch.randint(-128, 127, input_shape, dtype=torch.int8, device=device)
+    elif input_dtype == np.int16:
+        input0 = torch.randint(-32768, 32767, input_shape, dtype=torch.int16, device=device)
+        input1 = torch.randint(-32768, 32767, input_shape, dtype=torch.int16, device=device)
+    elif input_dtype == np.int32:
+        input0 = torch.randint(-2147483648, 2147483647, input_shape, dtype=torch.int32, device=device)
+        input1 = torch.randint(-2147483648, 2147483647, input_shape, dtype=torch.int32, device=device)
+    elif input_dtype == np.int64:
+        input0 = torch.randint(-9223372036854775808, 9223372036854775807, input_shape, dtype=torch.int64, device=device)
+        input1 = torch.randint(-9223372036854775808, 9223372036854775807, input_shape, dtype=torch.int64, device=device)
+    elif input_dtype == np.float16:
+        input0 = torch.randn(*input_shape, dtype=torch.float16, device=device)
+        input1 = torch.randn(*input_shape, dtype=torch.float16, device=device)
+    elif input_dtype == np.float32:
+        input0 = torch.randn(*input_shape, dtype=torch.float32, device=device)
+        input1 = torch.randn(*input_shape, dtype=torch.float32, device=device)
+    elif input_dtype == np.float64:
+        input0 = torch.randn(*input_shape, dtype=torch.float64, device=device)
+        input1 = torch.randn(*input_shape, dtype=torch.float64, device=device)
+    elif input_dtype == np.uint8:
+        input0 = torch.randint(0, 255, input_shape, dtype=torch.uint8, device=device)
+        input1 = torch.randint(0, 255, input_shape, dtype=torch.uint8, device=device)
+    elif input_dtype == np.uint16:
+        input0 = torch.randint(0, 65535, input_shape, dtype=torch.uint16, device=device)
+        input1 = torch.randint(0, 65535, input_shape, dtype=torch.uint16, device=device)
+    elif input_dtype == np.uint32:
+        input0 = torch.randint(0, 4294967295, input_shape, dtype=torch.uint32, device=device)
+        input1 = torch.randint(0, 4294967295, input_shape, dtype=torch.uint32, device=device)
+    elif input_dtype == np.uint64:
+        input0 = torch.randint(0, 18446744073709551615, input_shape, dtype=torch.uint64, device=device)
+        input1 = torch.randint(0, 18446744073709551615, input_shape, dtype=torch.uint64, device=device)
+    else:
+        input0 = torch.randn(*input_shape, device=device)
+        input1 = torch.randn(*input_shape, device=device)
 
-    try:
-        os.makedirs(model_version_dir)
-    except OSError:
-        pass  # ignore existing dir
-
-    class AddSubNet(nn.Module):
-        def __init__(
-            self,
-            output0_dtype: torch.dtype,
-            output1_dtype: torch.dtype,
-            swap: bool,
-        ):
-            self.output0_dtype = output0_dtype
-            self.output1_dtype = output1_dtype
-            self.swap = swap
-            super(AddSubNet, self).__init__()
-
-        def forward(self, INPUT0, INPUT1):
-            op0 = (INPUT0 - INPUT1) if self.swap else (INPUT0 + INPUT1)
-            op1 = (INPUT0 + INPUT1) if self.swap else (INPUT0 - INPUT1)
-            return op0.to(self.output0_dtype), op1.to(self.output1_dtype)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = AddSubNet(torch_output0_dtype, torch_output1_dtype, swap)
-    model.to(device)
-    model = model.eval()
-
-    input0 = torch.randn(*input_shape, device=device)
-    input1 = torch.randn(*input_shape, device=device)
-
-    sample_input = (input0, input1,)
-
-    ep = torch.export.export(model, sample_input)
-    torch.export.save(ep, f"{model_version_dir}/model.pt2")
+    return (input0, input1)
 
 
 def create_torch_aoti_modelfile(
@@ -1429,41 +1388,17 @@ def create_torch_aoti_modelfile(
         output1_shape,
         max_batch,
     ):
-        return
+        return False
 
-    if output0_dtype == np.int8:
-        torch_output0_dtype = torch.int8
-    elif output0_dtype == np.int16:
-        torch_output0_dtype = torch.int16
-    elif output0_dtype == np.int32:
-        torch_output0_dtype = torch.int32
-    elif output0_dtype == np.int64:
-        torch_output0_dtype = torch.int64
-    elif output0_dtype == np.float16:
-        torch_output0_dtype = torch.float16
-    elif output0_dtype == np.float32:
-        torch_output0_dtype = torch.float32
-    elif output0_dtype == np.float64:
-        torch_output0_dtype = torch.float64
-    else:
-        return
+    success, torch_output0_dtype = convert_output_type(output0_dtype)
+    if not success:
+        print(f"{_color_red}error: Unsupported output0 dtype for AOTI model: {output0_dtype}{_color_reset}", file=sys.stderr)
+        return False
 
-    if output1_dtype == np.int8:
-        torch_output1_dtype = torch.int8
-    elif output1_dtype == np.int16:
-        torch_output1_dtype = torch.int16
-    elif output1_dtype == np.int32:
-        torch_output1_dtype = torch.int32
-    elif output1_dtype == np.int64:
-        torch_output1_dtype = torch.int64
-    elif output1_dtype == np.float16:
-        torch_output1_dtype = torch.float16
-    elif output1_dtype == np.float32:
-        torch_output1_dtype = torch.float32
-    elif output1_dtype == np.float64:
-        torch_output1_dtype = torch.float64
-    else:
-        return
+    success, torch_output1_dtype = convert_output_type(output1_dtype)
+    if not success:
+        print(f"{_color_red}error: Unsupported output1 dtype for AOTI model: {output1_dtype}{_color_reset}", file=sys.stderr)
+        return False
 
     model_name = tu.get_model_name(
         "torch_aoti",
@@ -1484,31 +1419,21 @@ def create_torch_aoti_modelfile(
         pass  # ignore existing dir
 
     class AddSubNet(nn.Module):
-        def __init__(
-            self,
-            output0_dtype: torch.dtype,
-            output1_dtype: torch.dtype,
-            swap: bool,
-        ):
-            self.output0_dtype = output0_dtype
-            self.output1_dtype = output1_dtype
+        def __init__(self, swap: bool):
             self.swap = swap
             super(AddSubNet, self).__init__()
 
         def forward(self, INPUT0, INPUT1):
             op0 = (INPUT0 - INPUT1) if self.swap else (INPUT0 + INPUT1)
             op1 = (INPUT0 + INPUT1) if self.swap else (INPUT0 - INPUT1)
-            return op0.to(self.output0_dtype), op1.to(self.output1_dtype)
+            return op0, op1
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = AddSubNet(torch_output0_dtype, torch_output1_dtype, swap)
+    model = AddSubNet(swap)
     model.to(device)
     model = model.eval()
 
-    input0 = torch.randn(*input_shape, device=device)
-    input1 = torch.randn(*input_shape, device=device)
-
-    sample_input = (input0, input1,)
+    sample_input = generate_sample_inputs(input_shape, input_dtype, device)
 
     try:
         ep = torch.export.export(model, sample_input)
@@ -1525,6 +1450,7 @@ def create_torch_aoti_modelfile(
         return False
 
     return True
+
 
 def create_torchvision_aoti_modelfile(
     models_dir: str,
@@ -1645,102 +1571,6 @@ output [
     dims: [ {tu.shape_to_dims_str(output1_shape)} ]
   }}
 ]
-"""
-
-    try:
-        os.makedirs(config_dir)
-    except OSError:
-        pass  # ignore existing dir
-
-    with open(f"{config_dir}/config.pbtxt", "w") as file:
-        file.write(config)
-        print(f"Created {config_dir}/config.pbtxt")
-
-    with open(f"{config_dir}/{label_filename}", "w") as file:
-        for l in range(output0_label_cnt):
-            file.write("label" + str(l) + "\n")
-        print(f"Created {config_dir}/{label_filename}")
-
-
-def create_libtorch_pt2_modelconfig(
-    models_dir,
-    max_batch,
-    model_version,
-    input_shape,
-    output0_shape,
-    output1_shape,
-    input_dtype,
-    output0_dtype,
-    output1_dtype,
-    output0_label_cnt,
-    version_policy,
-):
-    if not tu.validate_for_libtorch_model(
-        input_dtype,
-        output0_dtype,
-        output1_dtype,
-        input_shape,
-        output0_shape,
-        output1_shape,
-        max_batch,
-    ):
-        return
-
-    # Unpack version policy
-    version_policy_str = "{ latest { num_versions: 1 }}"
-    if version_policy is not None:
-        type, val = version_policy
-        if type == "latest":
-            version_policy_str = f"{{ latest {{ num_versions: {val} }} }}"
-        elif type == "specific":
-            version_policy_str = f"{{ specific {{ versions: {val} }} }}"
-        else:
-            version_policy_str = "{ all { }}"
-
-    # Use a different model name for the non-batching variant
-    model_name = tu.get_model_name(
-        "libtorch_pt2_nobatch" if max_batch == 0 else "libtorch_pt2",
-        input_dtype,
-        output0_dtype,
-        output1_dtype,
-    )
-
-    print(f"{_color_green}Creating config for {model_name}{_color_reset}")
-
-    label_filename = "output0_labels.txt"
-    config_dir = f"{models_dir}/{model_name}"
-    config = f"""
-backend: "pytorch"
-name: "{model_name}"
-platform: "pytorch_libtorch"
-max_batch_size: {max_batch}
-version_policy: {version_policy_str}
-input [
-  {{
-    name: "INPUT0"
-    data_type: {np_to_model_dtype(input_dtype)}
-    dims: [ {tu.shape_to_dims_str(input_shape)} ]
-  }},
-  {{
-    name: "INPUT1"
-    data_type: {np_to_model_dtype(input_dtype)}
-    dims: [ {tu.shape_to_dims_str(input_shape)} ]
-  }}
-]
-output [
-  {{
-    name: "OUTPUT__0"
-    data_type: {np_to_model_dtype(output0_dtype)}
-    dims: [ {tu.shape_to_dims_str(output0_shape)} ]
-    label_filename: "{label_filename}"
-  }},
-  {{
-    name: "OUTPUT__1"
-    data_type: {np_to_model_dtype(output1_dtype)}
-    dims: [ {tu.shape_to_dims_str(output1_shape)} ]
-  }}
-]
-instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"} }}]
 """
 
     try:
@@ -2271,63 +2101,10 @@ def create_models(
             output1_dtype,
         )
 
-    if FLAGS.libtorch_pt2:
-        print(f"{_color_magenta}PyTorch: PT2 model generation requested{_color_reset}")
-        # max-batch 8
-        create_libtorch_pt2_modelconfig(
-            models_dir,
-            8,
-            model_version,
-            input_shape,
-            output0_shape,
-            output1_shape,
-            input_dtype,
-            output0_dtype,
-            output1_dtype,
-            output0_label_cnt,
-            version_policy,
-        )
-        create_libtorch_pt2_modelfile(
-            models_dir,
-            8,
-            model_version,
-            input_shape,
-            output0_shape,
-            output1_shape,
-            input_dtype,
-            output0_dtype,
-            output1_dtype,
-        )
-        # max-batch 0
-        create_libtorch_pt2_modelconfig(
-            models_dir,
-            0,
-            model_version,
-            input_shape,
-            output0_shape,
-            output1_shape,
-            input_dtype,
-            output0_dtype,
-            output1_dtype,
-            output0_label_cnt,
-            version_policy,
-        )
-        create_libtorch_pt2_modelfile(
-            models_dir,
-            0,
-            model_version,
-            input_shape,
-            output0_shape,
-            output1_shape,
-            input_dtype,
-            output0_dtype,
-            output1_dtype,
-        )
-
     if FLAGS.torch_aoti:
         print(f"{_color_magenta}PyTorch: AOTI model generation requested{_color_reset}")
         # max-batch 8
-        create_torch_aoti_modelconfig(
+        if create_torch_aoti_modelfile(
             models_dir,
             8,
             model_version,
@@ -2337,20 +2114,21 @@ def create_models(
             input_dtype,
             output0_dtype,
             output1_dtype,
-            output0_label_cnt,
-            version_policy,
-        )
-        create_torch_aoti_modelfile(
-            models_dir,
-            8,
-            model_version,
-            input_shape,
-            output0_shape,
-            output1_shape,
-            input_dtype,
-            output0_dtype,
-            output1_dtype,
-        )
+        ):
+            create_torch_aoti_modelconfig(
+                models_dir,
+                8,
+                model_version,
+                input_shape,
+                output0_shape,
+                output1_shape,
+                input_dtype,
+                output0_dtype,
+                output1_dtype,
+                output0_label_cnt,
+                version_policy,
+            )
+
 
     if FLAGS.openvino:
         print(f"{_color_magenta}OpenVINO model generation requested{_color_reset}")
@@ -2545,12 +2323,6 @@ if __name__ == "__main__":
         help="Generate Pytorch LibTorch models",
     )
     parser.add_argument(
-        "--libtorch-pt2",
-        required=False,
-        action="store_true",
-        help="Generate Pytorch LibTorch PT2 models",
-    )
-    parser.add_argument(
         "--torch-aoti",
         required=False,
         action="store_true",
@@ -2588,7 +2360,7 @@ if __name__ == "__main__":
         import tensorrt as trt
     if FLAGS.onnx:
         import onnx
-    if FLAGS.libtorch or FLAGS.libtorch_pt2 or FLAGS.torch_aoti:
+    if FLAGS.libtorch or FLAGS.torch_aoti:
         import torch
         from torch import nn
     if FLAGS.torchvision_aoti:
@@ -2984,12 +2756,5 @@ if __name__ == "__main__":
 
     if FLAGS.torchvision_aoti:
         print(f"{_color_blue}TorchVision AOTI model generation requested{_color_reset}")
-        if create_torchvision_aoti_modelfile(
-                FLAGS.models_dir,
-                1,
-                1,
-            ):
-            create_torchvision_aoti_modelconfig(
-                FLAGS.models_dir,
-                1,
-            )
+        if create_torchvision_aoti_modelfile(FLAGS.models_dir, 1, 1):
+            create_torchvision_aoti_modelconfig(FLAGS.models_dir, 1)
