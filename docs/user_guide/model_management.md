@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -62,10 +62,6 @@ The model control mode determines how changes to the model repository are handle
   When attempting to reload an already loaded model, the existing model should be explicitly unloaded prior to the updated version being loaded.
 
 - This model control mode is enabled by specifying `--model-control-mode=explicit`.
-
-> [!IMPORTANT]
-> Changing the model repository while Triton is running must be done carefully, as explained in
-[Modifying the Model Repository](#modifying-the-model-repository).
 
 ### Using Alternate Memory Allocation Libraries
 
@@ -173,8 +169,7 @@ The state of a model can be determined by using the [model metadata](../customiz
 
 - When either a load request is received under [Model Control Mode EXPLICIT](#model-control-mode-explicit) or change to the [model configuration file](model_configuration.md) (config.pbtxt) is detected under [Model Control Mode POLL](#model-control-mode-poll).
 
-  - The new model configuration may also be passed to Triton via the
-    [load API](../protocol/extension_model_repository.md#load).
+  - The new model configuration may also be passed to Triton via the [load API](../protocol/extension_model_repository.md#load).
 
   - Some text editors create a swap file in the model directory when the [model configuration file](model_configuration.md) (config.pbtxt) is modified in place.
     The swap file is not part of the model configuration, so its presence in the model directory may be detected as a new file and cause the model to fully reload when only an update is expected.
