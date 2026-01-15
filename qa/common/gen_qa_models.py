@@ -53,6 +53,7 @@ _color_green = "\033[32m"
 _color_magenta = "\033[35m"
 _color_red = "\033[31m"
 _color_reset = "\033[0m"
+_color_yellow = "\033[33m"
 
 
 def create_plan_dynamic_rf_modelfile(
@@ -1282,13 +1283,7 @@ def create_libtorch_modelfile(
                 )
                 return op0, op1
 
-    addSubModel = AddSubNet(
-        (
-            torch_output0_dtype,
-            torch_output1_dtype,
-            swap,
-        )
-    )
+    addSubModel = AddSubNet((torch_output0_dtype, torch_output1_dtype, swap))
     traced = torch.jit.script(addSubModel)
 
     model_version_dir = f"{models_dir}/{model_name}/{model_version}"
@@ -1300,24 +1295,6 @@ def create_libtorch_modelfile(
 
     traced.save(f"{model_version_dir}/model.pt")
 
-
-def convert_output_type(output_dtype):
-    if output_dtype == np.int8:
-        return True, torch.int8
-    elif output_dtype == np.int16:
-        return True, torch.int16
-    elif output_dtype == np.int32:
-        return True, torch.int32
-    elif output_dtype == np.int64:
-        return True, torch.int64
-    elif output_dtype == np.float16:
-        return True, torch.float16
-    elif output_dtype == np.float32:
-        return True, torch.float32
-    elif output_dtype == np.float64:
-        return True, torch.float64
-    else:
-        return False, torch.float32
 
 def generate_sample_inputs(
     input_shape,
@@ -1367,6 +1344,35 @@ def generate_sample_inputs(
     return (input0, input1)
 
 
+def np_to_dtype(np_dtype):
+    if np_dtype == np.int8:
+        return torch.int8
+    elif np_dtype == np.int16:
+        return torch.int16
+    elif np_dtype == np.int32:
+        return torch.int32
+    elif np_dtype == np.int64:
+        return torch.int64
+    elif np_dtype == np.float16:
+        return torch.float16
+    elif np_dtype == np.float32:
+        return torch.float32
+    elif np_dtype == np.float64:
+        return torch.float64
+    elif np_dtype == np.uint8:
+        return torch.uint8
+    elif np_dtype == np.uint16:
+        return torch.uint16
+    elif np_dtype == np.uint32:
+        return torch.uint32
+    elif np_dtype == np.uint64:
+        return torch.uint64
+    else:
+        print(
+            f"{_color_yellow}warning: dtype {np_dtype} is unsupported; falling back to torch.int32{_color_reset}"
+        )
+        return torch.int32
+
 def create_torch_aoti_modelfile(
     models_dir,
     max_batch,
@@ -1390,16 +1396,6 @@ def create_torch_aoti_modelfile(
     ):
         return False
 
-    success, torch_output0_dtype = convert_output_type(output0_dtype)
-    if not success:
-        print(f"{_color_red}error: Unsupported output0 dtype for AOTI model: {output0_dtype}{_color_reset}", file=sys.stderr)
-        return False
-
-    success, torch_output1_dtype = convert_output_type(output1_dtype)
-    if not success:
-        print(f"{_color_red}error: Unsupported output1 dtype for AOTI model: {output1_dtype}{_color_reset}", file=sys.stderr)
-        return False
-
     model_name = tu.get_model_name(
         "torch_aoti",
         input_dtype,
@@ -1410,6 +1406,12 @@ def create_torch_aoti_modelfile(
 
     print(f"{_color_green}Creating model {model_name}{_color_reset}")
 
+    torch_input_dtype: torch.dtype = np_to_dtype(input_dtype)
+    torch_output0_dtype: torch.dtype = np_to_dtype(output0_dtype)
+    torch_output1_dtype: torch.dtype = np_to_dtype(output1_dtype)
+
+    print(f"{model_name}({torch_input_dtype} -> {torch_output0_dtype}, {torch_output1_dtype})")
+
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     input_shape = [abs(ips) for ips in input_shape]
 
@@ -1419,17 +1421,49 @@ def create_torch_aoti_modelfile(
         pass  # ignore existing dir
 
     class AddSubNet(nn.Module):
-        def __init__(self, swap: bool):
+        def __init__(
+            self,
+            swap: bool,
+            input_dtype: torch.dtype,
+            output0_dtype: torch.dtype,
+            output1_dtype: torch.dtype,
+        ) -> None:
             self.swap = swap
+            self.input_dtype = input_dtype
+            self.output0_dtype = output0_dtype
+            self.output1_dtype = output1_dtype
             super(AddSubNet, self).__init__()
 
-        def forward(self, INPUT0, INPUT1):
-            op0 = (INPUT0 - INPUT1) if self.swap else (INPUT0 + INPUT1)
-            op1 = (INPUT0 + INPUT1) if self.swap else (INPUT0 - INPUT1)
+        def forward(
+            self,
+            INPUT0: torch.Tensor,
+            INPUT1: torch.Tensor,
+        ) -> Tuple[torch.Tensor, torch.Tensor]:
+            if INPUT0.dtype != self.input_dtype:
+                raise TypeError(
+                    f"INPUT0 expected {self.input_dtype} vs. actual {INPUT0.dtype} type."
+                )
+            if INPUT1.dtype != self.input_dtype:
+                raise TypeError(
+                    f"INPUT1 expected {self.input_dtype} vs. actual {INPUT1.dtype} type."
+                )
+
+            op0 = (INPUT0 - INPUT1 if self.swap else INPUT0 + INPUT1).to(
+                self.output0_dtype
+            )
+            op1 = (INPUT0 + INPUT1 if self.swap else INPUT0 - INPUT1).to(
+                self.output1_dtype
+            )
             return op0, op1
 
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = AddSubNet(swap)
+    model = AddSubNet(
+        swap,
+        torch_input_dtype,
+        torch_output0_dtype,
+        torch_output1_dtype,
+    )
     model.to(device)
     model = model.eval()
 
