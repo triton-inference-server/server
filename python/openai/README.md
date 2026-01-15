@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -46,7 +46,7 @@
 docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
-  nvcr.io/nvidia/tritonserver:25.12-vllm-python-py3
+  nvcr.io/nvidia/tritonserver:26.01-vllm-python-py3
 ```
 
 2. Launch the OpenAI-compatible Triton Inference Server:
@@ -355,7 +355,7 @@ Currently, OpenAI-Compatible Frontend supports loading embedding models and embe
 docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
-  nvcr.io/nvidia/tritonserver:25.12-vllm-python-py3
+  nvcr.io/nvidia/tritonserver:26.01-vllm-python-py3
 ```
 
 2. Launch the OpenAI-compatible Triton Inference Server:
@@ -451,7 +451,7 @@ docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
   -e TRTLLM_ORCHESTRATOR=1 \
-  nvcr.io/nvidia/tritonserver:25.12-trtllm-python-py3
+  nvcr.io/nvidia/tritonserver:26.01-trtllm-python-py3
 ```
 
 2. Install dependencies inside the container:
