@@ -1375,42 +1375,26 @@ def np_to_dtype(np_dtype):
 
 def create_torch_aoti_modelfile(
     models_dir,
-    max_batch,
     model_version,
     input_shape,
-    output0_shape,
-    output1_shape,
     input_dtype,
-    output0_dtype,
-    output1_dtype,
+    output_dtype,
     swap=False,
 ):
-    if not tu.validate_for_libtorch_model(
-        input_dtype,
-        output0_dtype,
-        output1_dtype,
-        input_shape,
-        output0_shape,
-        output1_shape,
-        max_batch,
-    ):
-        return False
-
     model_name = tu.get_model_name(
         "torch_aoti",
         input_dtype,
-        output0_dtype,
-        output1_dtype,
+        output_dtype,
+        None,
     )
     model_version_dir = f"{models_dir}/{model_name}/{model_version}"
 
     print(f"{_color_green}Creating model {model_name}{_color_reset}")
 
     torch_input_dtype: torch.dtype = np_to_dtype(input_dtype)
-    torch_output0_dtype: torch.dtype = np_to_dtype(output0_dtype)
-    torch_output1_dtype: torch.dtype = np_to_dtype(output1_dtype)
+    torch_output_dtype: torch.dtype = np_to_dtype(output_dtype)
 
-    print(f"{model_name}({torch_input_dtype} -> {torch_output0_dtype}, {torch_output1_dtype})")
+    print(f"{model_name}({torch_input_dtype}) -> {torch_output_dtype}")
 
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     input_shape = [abs(ips) for ips in input_shape]
@@ -1425,20 +1409,14 @@ def create_torch_aoti_modelfile(
             self,
             swap: bool,
             input_dtype: torch.dtype,
-            output0_dtype: torch.dtype,
-            output1_dtype: torch.dtype,
+            output_dtype: torch.dtype,
         ) -> None:
             self.swap = swap
             self.input_dtype = input_dtype
-            self.output0_dtype = output0_dtype
-            self.output1_dtype = output1_dtype
+            self.output_dtype = output_dtype
             super(AddSubNet, self).__init__()
 
-        def forward(
-            self,
-            INPUT0: torch.Tensor,
-            INPUT1: torch.Tensor,
-        ) -> Tuple[torch.Tensor, torch.Tensor]:
+        def forward(self, INPUT0, INPUT1) -> Tuple[torch.Tensor, torch.Tensor]:
             if INPUT0.dtype != self.input_dtype:
                 raise TypeError(
                     f"INPUT0 expected {self.input_dtype} vs. actual {INPUT0.dtype} type."
@@ -1449,21 +1427,15 @@ def create_torch_aoti_modelfile(
                 )
 
             op0 = (INPUT0 - INPUT1 if self.swap else INPUT0 + INPUT1).to(
-                self.output0_dtype
+                self.output_dtype
             )
             op1 = (INPUT0 + INPUT1 if self.swap else INPUT0 - INPUT1).to(
-                self.output1_dtype
+                self.output_dtype
             )
             return op0, op1
 
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = AddSubNet(
-        swap,
-        torch_input_dtype,
-        torch_output0_dtype,
-        torch_output1_dtype,
-    )
+    model = AddSubNet(swap, torch_input_dtype, torch_output_dtype)
     model.to(device)
     model = model.eval()
 
@@ -1624,30 +1596,13 @@ output [
 
 def create_torch_aoti_modelconfig(
     models_dir,
-    max_batch,
-    model_version,
     input_shape,
-    output0_shape,
-    output1_shape,
+    output_shape,
     input_dtype,
-    output0_dtype,
-    output1_dtype,
-    output0_label_cnt,
+    output_dtype,
+    output_label_cnt,
     version_policy,
 ):
-    if max_batch <= 0:
-        raise ValueError("torch aot inductor model must have max_batch > 0")
-    if not tu.validate_for_libtorch_model(
-        input_dtype,
-        output0_dtype,
-        output1_dtype,
-        input_shape,
-        output0_shape,
-        output1_shape,
-        max_batch,
-    ):
-        return
-
     # Unpack version policy
     version_policy_str = "{ latest { num_versions: 1 }}"
     if version_policy is not None:
@@ -1663,19 +1618,19 @@ def create_torch_aoti_modelconfig(
     model_name = tu.get_model_name(
         "torch_aoti",
         input_dtype,
-        output0_dtype,
-        output1_dtype,
+        output_dtype,
+        None,
     )
 
     print(f"{_color_green}Creating config for {model_name}{_color_reset}")
 
-    label_filename = "output0_labels.txt"
+    label_filename = "output_labels.txt"
     config_dir = f"{models_dir}/{model_name}"
     config = f"""
 backend: "pytorch"
 name: "{model_name}"
 platform: "torch_aoti"
-max_batch_size: {max_batch}
+max_batch_size: 8
 version_policy: {version_policy_str}
 input [
   {{
@@ -1692,14 +1647,9 @@ input [
 output [
   {{
     name: "OUTPUT__0"
-    data_type: {np_to_model_dtype(output0_dtype)}
-    dims: [ {tu.shape_to_dims_str(output0_shape)} ]
+    data_type: {np_to_model_dtype(output_dtype)}
+    dims: [ {tu.shape_to_dims_str(output_shape)} ]
     label_filename: "{label_filename}"
-  }},
-  {{
-    name: "OUTPUT__1"
-    data_type: {np_to_model_dtype(output1_dtype)}
-    dims: [ {tu.shape_to_dims_str(output1_shape)} ]
   }}
 ]
 instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"} }}]
@@ -1715,7 +1665,7 @@ instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU
         print(f"Created {config_dir}/config.pbtxt")
 
     with open(f"{config_dir}/{label_filename}", "w") as file:
-        for l in range(output0_label_cnt):
+        for l in range(output_label_cnt):
             file.write(f"label{l}\n")
         print(f"Created {config_dir}/{label_filename}")
 
@@ -2136,32 +2086,25 @@ def create_models(
         )
 
     if FLAGS.torch_aoti:
-        print(f"{_color_magenta}PyTorch: AOTI model generation requested{_color_reset}")
-        # max-batch 8
-        if create_torch_aoti_modelfile(
-            models_dir,
-            8,
-            model_version,
-            input_shape,
-            output0_shape,
-            output1_shape,
-            input_dtype,
-            output0_dtype,
-            output1_dtype,
-        ):
-            create_torch_aoti_modelconfig(
+        if output0_dtype == output1_dtype:
+            print(f"{_color_magenta}PyTorch: AOTI model generation requested{_color_reset}")
+            # max-batch 8
+            if create_torch_aoti_modelfile(
                 models_dir,
-                8,
                 model_version,
                 input_shape,
-                output0_shape,
-                output1_shape,
                 input_dtype,
                 output0_dtype,
-                output1_dtype,
-                output0_label_cnt,
-                version_policy,
-            )
+            ):
+                create_torch_aoti_modelconfig(
+                    models_dir,
+                    input_shape,
+                    output0_shape,
+                    input_dtype,
+                    output0_dtype,
+                    output0_label_cnt,
+                    version_policy,
+                )
 
 
     if FLAGS.openvino:
