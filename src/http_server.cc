@@ -483,7 +483,7 @@ ReadDataFromJsonHelper(
   // Currently 'switch' is performed on each element even through all elements
   // have the same data type.
 
-  if (current_depth >= HTTP_MAX_JSON_NESTING_DEPTH) {
+  if (current_depth >= HTTP_MAX_JSON_NESTING_DEPTH || current_depth < 0) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         ("JSON nesting depth exceeds maximum allowed "
@@ -502,7 +502,7 @@ ReadDataFromJsonHelper(
     }
   } else {
     // Check if writing to 'serialized' is overrunning the expected byte_size
-    if (*counter >= expected_cnt) {
+    if (*counter < 0 || static_cast<int64_t>(*counter) >= expected_cnt) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
           "Shape does not match true shape of 'data' field");
