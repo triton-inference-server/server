@@ -60,7 +60,7 @@ log_message.status "Changing working directory to the script directory to: " "${
 cd ${TRITON_MDLS_BASE_SCRIPT_DIR}
 
 log_message.status "define: default values"
-TRITON_VERSION=${TRITON_VERSION:=25.11}
+TRITON_VERSION=${TRITON_VERSION:=25.12}
 ONNX_VERSION=1.16.1
 ONNX_OPSET=0
 OPENVINO_VERSION=2024.5.0
@@ -69,6 +69,8 @@ PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
 CUDA_DEVICE=${NV_GPU:=0}
 MODEL_TYPE=${MODEL_TYPE:-""}
+TRITON_MODELS_USE_DOCKER=${TRITON_MODELS_USE_DOCKER:-"1"}
+TRITON_MODELS_USE_ENROOT=${TRITON_MODELS_USE_ENROOT:-"1"}
 
 log_message.status "define: CI related parameters"
 CI_JOB_ID=${CI_JOB_ID:=$(date +%Y%m%d_%H%M)}
@@ -80,50 +82,54 @@ DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_qa_model_repository.${CI_JOB_ID}}
 DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
 DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
 
-log_message.status "define: model output directories"
-TRITON_MDLS_BLD_DIR=${TRITON_MDLS_BLD_DIR:=/mnt/$CI_JOB_ID}
-TRITON_MDLS_SRC_DIR=${TRITON_MDLS_SRC_DIR:=$TRITON_MDLS_BLD_DIR/gen_srcdir}
-TRITON_MDLS_QA_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_model_repository
-TRITON_MDLS_QA_VARIABLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_model_repository
-TRITON_MDLS_QA_IDENTITY_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_model_repository
-TRITON_MDLS_QA_IDENTITY_BIG_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
-TRITON_MDLS_QA_SHAPETENSOR_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
-TRITON_MDLS_QA_RESHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_reshape_model_repository
-TRITON_MDLS_QA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_model_repository
-TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
-TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
-TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
-TRITON_MDLS_QA_ENSEMBLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
-TRITON_MDLS_QA_NOSHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_noshape_model_repository
-TRITON_MDLS_QA_TRT_PLUGIN_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
-TRITON_MDLS_QA_RAGGED_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ragged_model_repository
-TRITON_MDLS_QA_TRT_FORMAT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
-TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
-TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
-TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
-TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
-TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
-TRITON_MDLS_QA_TORCHTRT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/torchtrt_model_store
-TRITON_MDLS_QA_SCALAR_MODELS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_scalar_models
-TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
-TRITON_MDLS_QA_CUSTOM_OPS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_custom_ops/libtorch_custom_ops
+function define_model_output_directories() {
+    log_message.status "define: model output directories"
+    TRITON_MDLS_BLD_DIR=${TRITON_MDLS_BLD_DIR:=/mnt/$CI_JOB_ID}
+    TRITON_MDLS_SRC_DIR=${TRITON_MDLS_SRC_DIR:=$TRITON_MDLS_BLD_DIR/gen_srcdir}
+    TRITON_MDLS_QA_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_model_repository
+    TRITON_MDLS_QA_VARIABLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_model_repository
+    TRITON_MDLS_QA_IDENTITY_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_model_repository
+    TRITON_MDLS_QA_IDENTITY_BIG_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
+    TRITON_MDLS_QA_SHAPETENSOR_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
+    TRITON_MDLS_QA_RESHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_reshape_model_repository
+    TRITON_MDLS_QA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_model_repository
+    TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
+    TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
+    TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
+    TRITON_MDLS_QA_ENSEMBLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
+    TRITON_MDLS_QA_NOSHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_noshape_model_repository
+    TRITON_MDLS_QA_TRT_PLUGIN_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
+    TRITON_MDLS_QA_RAGGED_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ragged_model_repository
+    TRITON_MDLS_QA_TRT_FORMAT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
+    TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
+    TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
+    TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
+    TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
+    TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
+    TRITON_MDLS_QA_TORCHTRT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/torchtrt_model_store
+    TRITON_MDLS_QA_SCALAR_MODELS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_scalar_models
+    TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
+    TRITON_MDLS_QA_CUSTOM_OPS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_custom_ops/libtorch_custom_ops
+}
 
-log_message.status "define: script names"
+function define_models_generation_scripts() {
+    log_message.status "define: script names"
+    SCRIPT_NAME_SUFFIX=${SCRIPT_NAME_SUFFIX:-v2}
 
-OPENVINOSCRIPT=gen.OpenVINO.gen_qa_model_repository.v2.sh
-log_message.info "OpenVINO script: " "${OPENVINOSCRIPT}"
+    OPENVINOSCRIPT=gen.OpenVINO.gen_qa_model_repository.${SCRIPT_NAME_SUFFIX}.sh
+    log_message.info "OpenVINO script: " "${OPENVINOSCRIPT}"
 
-ONNXSCRIPT=gen.ONNXRuntime.gen_qa_model_repository.v2.sh
-log_message.info "ONNX script: " "${ONNXSCRIPT}"
+    ONNXSCRIPT=gen.ONNXRuntime.gen_qa_model_repository.${SCRIPT_NAME_SUFFIX}.sh
+    log_message.info "ONNX script: " "${ONNXSCRIPT}"
 
-TORCHSCRIPT=gen.PyTorch.gen_qa_model_repository.v2.sh
-log_message.info "PyTorch script: " "${TORCHSCRIPT}"
+    TORCHSCRIPT=gen.PyTorch.gen_qa_model_repository.${SCRIPT_NAME_SUFFIX}.sh
+    log_message.info "PyTorch script: " "${TORCHSCRIPT}"
 
-TRTSCRIPT=gen.TensorRT.gen_qa_model_repository.v2.sh
-log_message.info "TensorRT script: " "${TRTSCRIPT}"
+    TRTSCRIPT=gen.TensorRT.gen_qa_model_repository.${SCRIPT_NAME_SUFFIX}.sh
+    log_message.info "TensorRT script: " "${TRTSCRIPT}"
 
-log_message.status "create: OpenVINO script - ${OPENVINOSCRIPT}"
-cat > $OPENVINOSCRIPT <<EOF
+    log_message.status "create: OpenVINO script - ${OPENVINOSCRIPT}"
+    cat > $OPENVINOSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
@@ -133,9 +139,18 @@ set -e
 set -x
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && \
-    apt-get install -y --no-install-recommends build-essential cmake libprotobuf-dev \
-            protobuf-compiler python3 python3-dev python3-pip wget gnupg2 \
-            software-properties-common
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        libprotobuf-dev \
+        protobuf-compiler \
+        python3 \
+        python3-dev \
+        python3-pip \
+        wget \
+        gnupg2 \
+        software-properties-common
+
 ln -s /usr/bin/python3 /usr/bin/python
 
 pip3 install  "numpy<=1.23.5" setuptools
@@ -157,16 +172,16 @@ chmod -R 777 $TRITON_MDLS_QA_RESHAPE_MODEL
 # chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 EOF
 
-log_message.status "run: chmod a+x ${OPENVINOSCRIPT}"
-chmod a+x $OPENVINOSCRIPT
+    log_message.status "run: chmod a+x ${OPENVINOSCRIPT}"
+    chmod a+x $OPENVINOSCRIPT
 
-if [ $? -ne 0 ]; then
-    log_message.error "failed: chmod ${OPENVINOSCRIPT}"
-    exit 1
-fi
+    if [ $? -ne 0 ]; then
+        log_message.error "failed: chmod ${OPENVINOSCRIPT}"
+        exit 1
+    fi
 
-log_message.status "create: ONNX script - ${ONNXSCRIPT}"
-cat > $ONNXSCRIPT <<EOF
+    log_message.status "create: ONNX script - ${ONNXSCRIPT}"
+    cat > $ONNXSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
@@ -220,15 +235,15 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --ensemble --variable --m
 chmod -R 777 $TRITON_MDLS_QA_ENSEMBLE_MODEL
 EOF
 
-log_message.status "run: chmod a+x ${ONNXSCRIPT}"
-chmod a+x ${ONNXSCRIPT}
-if [ $? -ne 0 ]; then
-    log_message.error "failed: chmod ${ONNXSCRIPT}"
-    exit 1
-fi
+    log_message.status "run: chmod a+x ${ONNXSCRIPT}"
+    chmod a+x ${ONNXSCRIPT}
+    if [ $? -ne 0 ]; then
+        log_message.error "failed: chmod ${ONNXSCRIPT}"
+        exit 1
+    fi
 
-log_message.status "create: PyTorch script - ${TORCHSCRIPT}"
-cat > $TORCHSCRIPT <<EOF
+    log_message.status "create: PyTorch script - ${TORCHSCRIPT}"
+    cat > $TORCHSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
@@ -265,22 +280,23 @@ chmod -R 777 $TRITON_MDLS_QA_RAGGED_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_image_models.py --resnet50 --resnet152 --vgg19 --models_dir=$TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL
 chmod -R 777 $TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL
 
-export TORCH_EXTENSIONS_DIR="/root/.cache/torch_extensions/"
+export TORCH_EXTENSIONS_DIR=/tmp/.cache/torch_extensions/
+mkdir -p \${TORCH_EXTENSIONS_DIR}
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$TRITON_MDLS_QA_CUSTOM_OPS
 mkdir -p $TRITON_MDLS_QA_CUSTOM_OPS/libtorch_modulo/
 cp \${TORCH_EXTENSIONS_DIR}/custom_modulo/custom_modulo.so $TRITON_MDLS_QA_CUSTOM_OPS/libtorch_modulo/.
 chmod -R 777 $TRITON_MDLS_QA_CUSTOM_OPS
 EOF
 
-log_message.status "run: chmod a+x ${TORCHSCRIPT}"
-chmod a+x ${TORCHSCRIPT}
-if [ $? -ne 0 ]; then
-    log_message.error "failed: chmod ${TORCHSCRIPT}"
-    exit 1
-fi
+    log_message.status "run: chmod a+x ${TORCHSCRIPT}"
+    chmod a+x ${TORCHSCRIPT}
+    if [ $? -ne 0 ]; then
+        log_message.error "failed: chmod ${TORCHSCRIPT}"
+        exit 1
+    fi
 
-log_message.status "create: TensorRT script - ${TRTSCRIPT}"
-cat > $TRTSCRIPT <<EOF
+    log_message.status "create: TensorRT script - ${TRTSCRIPT}"
+    cat > $TRTSCRIPT <<EOF
 #!/bin/bash
 # Make all generated files accessible outside of container
 umask 0000
@@ -328,7 +344,7 @@ chmod -R 777 $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
 if [ -d "/usr/src/tensorrt/samples/python/onnx_custom_plugin" ]; then
     cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
 else
-    git clone -b release/\${TRT_VERSION%.*.*} --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
+    git clone -b release/\$( echo \$TRT_VERSION | cut -d . -f -2) --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
     cd /workspace/TensorRT/samples/python/onnx_custom_plugin
 fi
 rm -rf build && mkdir build && \
@@ -337,16 +353,22 @@ LD_PRELOAD=$TRITON_MDLS_QA_TRT_PLUGIN_MODEL/libcustomHardmaxPlugin.so python3 $T
 chmod -R 777 $TRITON_MDLS_QA_TRT_PLUGIN_MODEL
 EOF
 
-log_message.status "run: chmod a+x ${TRTSCRIPT}"
-chmod a+x ${TRTSCRIPT}
-if [ $? -ne 0 ]; then
-    log_message.error "failed: chmod ${TRTSCRIPT}"
-    exit 1
-fi
+    log_message.status "run: chmod a+x ${TRTSCRIPT}"
+    chmod a+x ${TRTSCRIPT}
+    if [ $? -ne 0 ]; then
+        log_message.error "failed: chmod ${TRTSCRIPT}"
+        exit 1
+    fi
+
+}
 
 log_message.status "check: engine installation"
-if which -s docker ; then
+if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
     log_message.info "Docker is installed."
+
+    define_model_output_directories
+
+    SCRIPT_NAME_SUFFIX=docker.v2 define_models_generation_scripts
 
     if ! docker volume inspect $DOCKER_VOLUME > /dev/null 2>&1; then
         log_message.status "docker volume: $DOCKER_VOLUME does not exist. Creating..."
@@ -498,9 +520,99 @@ if which -s docker ; then
         docker volume rm $DOCKER_VOLUME
     fi # [ -z $CI ]
 
-elif which -s enroot ; then
+elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
     log_message.info "NVIDIA Enroot is installed." ;
+
+    TRITON_MDLS_BLD_DIR="/tmp/$CI_JOB_ID" define_model_output_directories
+
+    SCRIPT_NAME_SUFFIX=enroot.v1 define_models_generation_scripts
+
+    log_message.status "cleanup models folder if exists: $TRITON_MDLS_BLD_DIR"
+    rm -rf $TRITON_MDLS_BLD_DIR
+
+    log_message.status "create models directory structure in: $TRITON_MDLS_BLD_DIR"
+     mkdir -p \
+        $TRITON_MDLS_BLD_DIR \
+        $TRITON_MDLS_SRC_DIR \
+        $TRITON_MDLS_QA_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_MODEL \
+        $TRITON_MDLS_QA_IDENTITY_MODEL \
+        $TRITON_MDLS_QA_IDENTITY_BIG_MODEL \
+        $TRITON_MDLS_QA_SHAPETENSOR_MODEL \
+        $TRITON_MDLS_QA_RESHAPE_MODEL \
+        $TRITON_MDLS_QA_SEQUENCE_MODEL \
+        $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL \
+        $TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL \
+        $TRITON_MDLS_QA_ENSEMBLE_MODEL \
+        $TRITON_MDLS_QA_NOSHAPE_MODEL \
+        $TRITON_MDLS_QA_TRT_PLUGIN_MODEL \
+        $TRITON_MDLS_QA_RAGGED_MODEL \
+        $TRITON_MDLS_QA_TRT_FORMAT_MODEL \
+        $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL \
+        $TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL \
+        $TRITON_MDLS_QA_TORCHTRT_MODEL \
+        $TRITON_MDLS_QA_SCALAR_MODELS \
+        $TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL
+
+    log_message.status "copy scripts to: $TRITON_MDLS_SRC_DIR"
+    cp -rv $TRITON_MDLS_BASE_SCRIPT_DIR/* $TRITON_MDLS_SRC_DIR/
+
+    log_message.status "enroot import: $UBUNTU_IMAGE to ubuntu.$CI_JOB_ID.enroot.sqsh"
+    enroot import --output /tmp/ubuntu.$CI_JOB_ID.enroot.sqsh docker://$UBUNTU_IMAGE
+
+
+    log_message.status "enroot create: openvino.ubuntu.$CI_JOB_ID"
+    enroot create --name openvino.ubuntu.$CI_JOB_ID /tmp/ubuntu.$CI_JOB_ID.enroot.sqsh
+    log_message.info "enroot start: openvino.ubuntu.$CI_JOB_ID"
+    enroot start --root --rw -m /tmp:/tmp openvino.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
+    if [ $? -ne 0 ]; then
+        log_message.error "enroot start: ${OPENVINOSCRIPT} failed"
+        exit 1
+    fi
+
+
+    log_message.status "enroot create: onnxruntime.ubuntu.$CI_JOB_ID"
+    enroot create --name onnxruntime.ubuntu.$CI_JOB_ID /tmp/ubuntu.$CI_JOB_ID.enroot.sqsh
+    log_message.info "enroot start: onnxruntime.ubuntu.$CI_JOB_ID"
+    enroot start --root --rw -m /tmp:/tmp onnxruntime.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
+    if [ $? -ne 0 ]; then
+        log_message.error "enroot start: ${ONNXSCRIPT} failed"
+        exit 1
+    fi
+
+
+    log_message.status "enroot import: $PYTORCH_IMAGE to /tmp/pytorch.$CI_JOB_ID.enroot.sqsh"
+    enroot import --output /tmp/pytorch.$CI_JOB_ID.enroot.sqsh docker://$PYTORCH_IMAGE
+    if [ $? -ne 0 ]; then
+        log_message.error "enroot import: ${PYTORCH_IMAGE} failed"
+        exit 1
+    fi
+
+    log_message.status "enroot create: pytorch.$CI_JOB_ID"
+    enroot create --name pytorch.$CI_JOB_ID /tmp/pytorch.$CI_JOB_ID.enroot.sqsh
+    log_message.status "enroot start: pytorch.$CI_JOB_ID"
+    enroot start --rw -m /tmp:/tmp pytorch.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
+    if [ $? -ne 0 ]; then
+        log_message.error "enroot start: ${TORCHSCRIPT} failed"
+        exit 1
+    fi
+
+    log_message.status "enroot import: $TENSORRT_IMAGE to /tmp/tensorrt.$CI_JOB_ID.enroot.sqsh"
+    enroot import --output /tmp/tensorrt.$CI_JOB_ID.enroot.sqsh docker://$TENSORRT_IMAGE
+    log_message.status "enroot create: tensorrt.$CI_JOB_ID"
+    enroot create --name tensorrt.$CI_JOB_ID /tmp/tensorrt.$CI_JOB_ID.enroot.sqsh
+    log_message.status "enroot start: tensorrt.$CI_JOB_ID"
+    enroot start --rw -m /tmp:/tmp tensorrt.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
+    if [ $? -ne 0 ]; then
+        log_message.error "enroot start: ${TRTSCRIPT} failed"
+        exit 1
+    fi
+
 else
     log_message.warning "Neither Docker nor NVIDIA Enroot is installed." ;
-    log_message.warning "Please install either Docker or NVIDIA Enroot to generate the models." ;
+    log_message.warning "Please install Docker or NVIDIA Enroot to generate the models." ;
 fi

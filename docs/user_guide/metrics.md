@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -215,9 +215,9 @@ By default, the following
 [Histogram](https://prometheus.io/docs/concepts/metric_types/#histogram)
 metrics are used for latencies:
 
-|Category      |Metric          |Metric Name |Description                |Granularity|Frequency    |Model Type
-|--------------|----------------|------------|---------------------------|-----------|-------------|-------------|
-|Latency       |Request to First Response Time    |`nv_inference_first_response_histogram_ms` |Histogram of end-to-end inference request to the first response time |Per model  |Per request  | Decoupled |
+|Category      |Metric          |Metric Name |Description                |Granularity|Frequency    |
+|--------------|----------------|------------|---------------------------|-----------|-------------|
+|Latency       |Request to First Response Time    |`nv_inference_first_response_histogram_ms` |Histogram of end-to-end inference request to the first response time |Per model  |Per request  |
 
 To enable these metrics specifically, you can set `--metrics-config histogram_latencies=true`
 

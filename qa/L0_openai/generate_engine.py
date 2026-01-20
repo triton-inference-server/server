@@ -27,11 +27,19 @@ from argparse import ArgumentParser
 
 from tensorrt_llm import BuildConfig
 from tensorrt_llm._tensorrt_engine import LLM
+from tensorrt_llm.lora_manager import LoraConfig
 from tensorrt_llm.plugin import PluginConfig
 
 
 def generate_model_engine(model: str, engines_path: str):
     config = BuildConfig(plugin_config=PluginConfig.from_dict({"_gemm_plugin": "auto"}))
+
+    lora_config = LoraConfig(
+        lora_target_modules=["attn_q", "attn_k", "attn_v"],
+        max_lora_rank=8,
+        max_loras=4,
+        max_cpu_loras=8,
+    )
 
     engine = LLM(
         model,
@@ -39,6 +47,7 @@ def generate_model_engine(model: str, engines_path: str):
         max_batch_size=128,
         build_config=config,
         guided_decoding_backend="xgrammar",
+        lora_config=lora_config,
     )
 
     engine.save(engines_path)

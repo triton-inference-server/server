@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -71,14 +71,14 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.64.0dev",
-    "triton_container_version": "25.11dev",
-    "upstream_container_version": "25.11",
+    "release_version": "2.66.0dev",
+    "triton_container_version": "26.02dev",
+    "upstream_container_version": "25.12",
     "ort_version": "1.23.2",
-    "ort_openvino_version": "2025.3.0",
-    "standalone_openvino_version": "2025.3.0",
-    "dcgm_version": "4.4.0-1",
-    "vllm_version": "0.11.0",
+    "ort_openvino_version": "2025.4.1",
+    "standalone_openvino_version": "2025.4.1",
+    "dcgm_version": "4.4.2-1",
+    "vllm_version": "0.11.1",
     "rhel_py_version": "3.12.3",
 }
 
@@ -711,7 +711,7 @@ def onnxruntime_cmake_args(images, library_paths):
                     "onnxruntime",
                     "TRITON_BUILD_CONTAINER_VERSION",
                     None,
-                    FLAGS.triton_container_version,
+                    FLAGS.upstream_container_version,
                 )
             )
 
@@ -862,9 +862,10 @@ ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
+    && dnf makecache --refresh \\
     && dnf install --assumeyes \\
-                 datacenter-gpu-manager-4-core=1:{} \\
-                 datacenter-gpu-manager-4-devel=1:{}
+                 datacenter-gpu-manager-4-core-1:{} \\
+                 datacenter-gpu-manager-4-devel-1:{}
 """.format(
                     dcgm_version, dcgm_version, dcgm_version
                 )
@@ -874,9 +875,10 @@ ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
+    && dnf makecache --refresh \\
     && dnf install --assumeyes \\
-                 datacenter-gpu-manager-4-core=1:{} \\
-                 datacenter-gpu-manager-4-devel=1:{}
+                 datacenter-gpu-manager-4-core-1:{} \\
+                 datacenter-gpu-manager-4-devel-1:{}
 """.format(
                     dcgm_version, dcgm_version, dcgm_version
                 )
@@ -889,7 +891,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
         https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
-      && apt update \\
+      && apt update -qq \\
       && apt install --yes --no-install-recommends \\
                   datacenter-gpu-manager-4-core=1:{} \\
                   datacenter-gpu-manager-4-dev=1:{}
@@ -904,7 +906,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
           https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
-      && apt update \\
+      && apt update -qq \\
       && apt install --yes --no-install-recommends \\
                    datacenter-gpu-manager-4-core=1:{} \\
                    datacenter-gpu-manager-4-dev=1:{}
@@ -1517,18 +1519,14 @@ ENV TRITON_CUDACRT_PATH=/usr/local/cuda/include \\
 ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
 """
 
-    if target_platform() not in ["igpu", "windows", "rhel"]:
+    if target_platform() == "rhel":
         repo_arch = "sbsa" if target_machine == "aarch64" else "x86_64"
-        df += f"""
-RUN curl -o /tmp/cuda-keyring.deb \\
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/{repo_arch}/cuda-keyring_1.1-1_all.deb \\
-      && apt install /tmp/cuda-keyring.deb \\
-      && rm /tmp/cuda-keyring.deb \\
-      && apt update -qq \\
-      && apt install --yes --no-install-recommends libnvshmem3-cuda-13 \\
-      && rm -rf /var/lib/apt/lists/* \\
-      && dpkg -L libnvshmem3-cuda-13 | grep libnvshmem_host.so | sed -e 's/libnvshmem_host.*//g' | sort -u > /etc/ld.so.conf.d/libnvshmem3-cuda-13.conf \\
-      && ldconfig
+        df += """
+RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/{repo_arch}/cuda-rhel8.repo \\
+    && dnf clean expire-cache \\
+    && dnf install --assumeyes libnvshmem3-cuda-13
+
+RUN dirname  $(find /usr -name "libcudart*.so" -o  -name "libnvinf*.so" -o -name "libnvshm*" -type f) | sort -u > /etc/ld.so.conf.d/triton-cuda-libs.conf && ldconfig
 """.format(
             repo_arch=repo_arch
         )
@@ -1585,6 +1583,7 @@ COPY --from=min_container /usr/local/cuda/lib64/libnvJitLink.so.13 /usr/local/cu
 COPY --from=min_container /usr/local/cuda/lib64/libcufile.so.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libnvrtc.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libcusparseLt.so.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libnvshmem_host.so.3 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
 COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1
@@ -2882,12 +2881,11 @@ if __name__ == "__main__":
     # backends, repo-agents, and caches if a repo-tag is not given
     # explicitly. For release branches we use the release branch as
     # the default, otherwise we use 'main'.
-    default_repo_tag = "main"
-    cver = FLAGS.upstream_container_version
-    if cver is None:
-        cver = FLAGS.triton_container_version
-    if not cver.endswith("dev"):
-        default_repo_tag = "r" + cver
+    default_repo_tag = (
+        "main"
+        if FLAGS.triton_container_version.endswith("dev")
+        else "r" + FLAGS.triton_container_version
+    )
     log("default repo-tag: {}".format(default_repo_tag))
 
     # For other versions use the TRITON_VERSION_MAP unless explicitly
