@@ -607,9 +607,9 @@ ReadDataFromJsonHelper(
         size_t len{0};
         RETURN_IF_ERR(tensor_data.AsString(&cstr, &len));
         // Quick sanity check to ensure we don't write beyond `expected_cnt`.
-        int64_t tmp_cnt = static_cast<int64_t>(*counter)
-            + static_cast<int64_t>(len)
-            + static_cast<int64_t>(sizeof(uint32_t));
+        int64_t tmp_cnt = static_cast<int64_t>(*counter) +
+                          static_cast<int64_t>(len) +
+                          static_cast<int64_t>(sizeof(uint32_t));
         if (tmp_cnt < 0) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
