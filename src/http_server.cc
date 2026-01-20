@@ -1,4 +1,4 @@
-// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -603,21 +603,24 @@ ReadDataFromJsonHelper(
         break;
       }
       case TRITONSERVER_TYPE_BYTES: {
-        const char* cstr;
-        size_t len = 0;
+        const char* cstr{nullptr};
+        size_t len{0};
         RETURN_IF_ERR(tensor_data.AsString(&cstr, &len));
         // Quick sanity check to ensure we don't write beyond `expected_cnt`.
-        int32_t actual_cnt = *counter + len + sizeof(uint32_t);
-        if (actual_cnt < 0) {
+        int64_t tmp_cnt = static_cast<int64_t>(*counter)
+            + static_cast<int64_t>(len)
+            + static_cast<int64_t>(sizeof(uint32_t));
+        if (tmp_cnt < 0) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
               "Unable to parse 'data' field: string length is negative");
         }
-        if (static_cast<int64_t>(actual_cnt) > expected_cnt) {
+        if (tmp_cnt > expected_cnt) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
               "Shape does not match true shape of 'data' field");
         }
+        int32_t actual_cnt = static_cast<int32_t>(tmp_cnt);
         memcpy(
             base + *counter, reinterpret_cast<char*>(&len), sizeof(uint32_t));
         std::copy(cstr, cstr + len, base + *counter + sizeof(uint32_t));
