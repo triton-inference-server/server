@@ -615,15 +615,15 @@ ReadDataFromJsonHelper(
         int64_t tmp_cnt = static_cast<int64_t>(*counter) +
                           static_cast<int64_t>(len) +
                           static_cast<int64_t>(sizeof(uint32_t));
-        if (tmp_cnt < 0) {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INTERNAL,
-              "Unable to parse 'data' field: string length is negative");
-        }
-        if (tmp_cnt > expected_cnt) {
+        if (tmp_cnt < 0 || tmp_cnt > expected_cnt) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
               "Shape does not match true shape of 'data' field");
+        }
+        if (tmp_cnt > INT32_MAX) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
+              "Unable to parse 'data' field: string length exceeds INT32_MAX");
         }
         int32_t actual_cnt = static_cast<int32_t>(tmp_cnt);
         memcpy(
