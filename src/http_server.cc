@@ -609,7 +609,8 @@ ReadDataFromJsonHelper(
         if (len > INT64_MAX) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
-              "Unable to parse 'data' field: string length exceeds size limitation");
+              "Unable to parse 'data' field: string length exceeds size"
+              " limitation");
         }
         // Quick sanity check to ensure we don't write beyond `expected_cnt`.
         int64_t tmp_cnt = static_cast<int64_t>(*counter) +
