@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -996,6 +996,10 @@ class TritonLLMEngine(LLMEngine):
                 f"Received n={request.n}, but only single choice (n=1) is currently supported"
             )
 
+        if "best_of" in request.model_fields_set and metadata.backend == "vllm":
+            raise ClientError(
+                "best_of is not supported for the vLLM backend, removed from vLLM V1 engine"
+            )
         if request.best_of and request.best_of > 1:
             raise ClientError(
                 f"Received best_of={request.best_of}, but only single choice (best_of=1) is currently supported"
