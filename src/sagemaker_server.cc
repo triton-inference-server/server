@@ -1,4 +1,4 @@
-// Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -182,10 +182,13 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
         if (action == "/invoke") {
           LOG_VERBOSE(1) << "SageMaker request: INVOKE MODEL";
 
-          if (sagemaker_models_list_.find(multi_model_name.c_str()) ==
-              sagemaker_models_list_.end()) {
-            evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
-            return;
+          {
+            std::lock_guard<std::mutex> lock(models_list_mutex_);
+            if (sagemaker_models_list_.find(multi_model_name.c_str()) ==
+                sagemaker_models_list_.end()) {
+              evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
+              return;
+            }
           }
           LOG_VERBOSE(1) << "SageMaker MME Custom Invoke Model Path";
 
@@ -436,7 +439,8 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
       case DataCompressor::Type::GZIP: {
         decompressed_buffer = evbuffer_new();
         err = DataCompressor::DecompressData(
-            compression_type, req->buffer_in, decompressed_buffer);
+            compression_type, req->buffer_in, decompressed_buffer,
+            max_input_size_);
         break;
       }
       case DataCompressor::Type::UNKNOWN: {
@@ -646,6 +650,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
     target_model = model_name_hash;
   }
 
+  std::lock_guard<std::mutex> lock(models_list_mutex_);
   if (sagemaker_models_list_.find(model_name_hash) ==
       sagemaker_models_list_.end()) {
     LOG_VERBOSE(1) << "Model " << target_model << " with model hash "
@@ -730,7 +735,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
       server_.get(), repo_parent_path.c_str());
 
   if (unregister_err != nullptr) {
-    EVBufferAddErrorJson(req->buffer_out, unload_err);
+    EVBufferAddErrorJson(req->buffer_out, unregister_err);
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     LOG_ERROR << "Unable to unregister model repository for path: "
               << repo_parent_path << std::endl;
@@ -740,7 +745,6 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
 
   TRITONSERVER_ErrorDelete(unregister_err);
 
-  std::lock_guard<std::mutex> lock(models_list_mutex_);
   sagemaker_models_list_.erase(model_name_hash);
 }
 

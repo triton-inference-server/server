@@ -81,10 +81,23 @@ class TestCompletions:
         print("Response:", response.json())
 
         # FIXME: Add support and remove this check
-        unsupported_parameters = ["logprobs", "logit_bias"]
+        unsupported_parameters = ["logit_bias"]
         if sampling_parameter in unsupported_parameters:
             assert response.status_code == 400
-            assert response.json()["detail"] == "logit bias and log probs not supported"
+            assert response.json()["detail"] == "logit bias is not supported"
+            return
+
+        # TRT-LLM backend doesn't support logprobs
+        if (
+            sampling_parameter == "logprobs"
+            and value is not None
+            and model == "tensorrt_llm_bls"
+        ):
+            assert response.status_code == 400
+            assert (
+                "logprobs are currently available only for the vLLM backend"
+                in response.json()["detail"]
+            )
             return
 
         assert response.status_code == 200
@@ -367,6 +380,19 @@ class TestCompletions:
     def test_multi_lora(self):
         pass
 
+    @pytest.mark.parametrize("echo", [False, True])
+    def test_echo(self, client, model: str, prompt: str, echo: bool):
+        response = client.post(
+            "/v1/completions", json={"model": model, "prompt": prompt, "echo": echo}
+        )
+
+        response_text = response.json()["choices"][0]["text"].strip()
+        if echo:
+            assert response_text.startswith(prompt)
+        else:
+            # TODO: Consider using a different prompt. In TRT-LLM model, the second response may contain the prompt in the middle of the response even if echo is False, e.g. " Briefly explained.\nWhat is machine learning? She learns from data\nmachine learning".
+            assert prompt not in response_text
+
     def test_usage_response(self, client, model: str, prompt: str):
         response = client.post(
             "/v1/completions",
@@ -383,4 +409,99 @@ class TestCompletions:
         assert usage["completion_tokens"] > 0
         assert (
             usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
+        )
+
+    def test_completions_logprobs(self, client, backend: str, model: str, prompt: str):
+        """Test logprobs parameter for completions."""
+        response = client.post(
+            "/v1/completions",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "logprobs": 3,
+                "max_tokens": 10,
+            },
+        )
+
+        # Non-vLLM backends should raise an error
+        if backend != "vllm":
+            assert response.status_code == 400
+            assert (
+                "logprobs are currently available only for the vLLM backend"
+                in response.json()["detail"]
+            )
+            return
+
+        assert response.status_code == 200
+        response_json = response.json()
+
+        # Check that logprobs are present in the response
+        choice = response_json["choices"][0]
+        assert "logprobs" in choice
+        logprobs = choice["logprobs"]
+
+        assert logprobs is not None
+        assert "text_offset" in logprobs
+        assert "token_logprobs" in logprobs
+        assert "tokens" in logprobs
+        assert "top_logprobs" in logprobs
+
+        assert isinstance(logprobs["text_offset"], list)
+        assert isinstance(logprobs["token_logprobs"], list)
+        assert isinstance(logprobs["tokens"], list)
+        assert isinstance(logprobs["top_logprobs"], list)
+
+        # All lists should have the same length
+        num_tokens = len(logprobs["tokens"])
+        assert len(logprobs["text_offset"]) == num_tokens
+        assert len(logprobs["token_logprobs"]) == num_tokens
+        assert len(logprobs["top_logprobs"]) == num_tokens
+
+        # Validate each token
+        for i in range(num_tokens):
+            assert isinstance(logprobs["tokens"][i], str)
+            assert isinstance(logprobs["token_logprobs"][i], (int, float))
+            assert isinstance(logprobs["text_offset"][i], int)
+            assert isinstance(logprobs["top_logprobs"][i], dict)
+
+            # Validate top_logprobs dict contains token -> logprob mappings
+            for token, logprob in logprobs["top_logprobs"][i].items():
+                assert isinstance(token, str)
+                assert isinstance(logprob, (int, float))
+
+    def test_completions_logprobs_zero(self, client, model: str, prompt: str):
+        """Test that logprobs=0 returns no logprobs."""
+        response = client.post(
+            "/v1/completions",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "logprobs": 0,
+                "max_tokens": 10,
+            },
+        )
+
+        assert response.status_code == 200
+        response_json = response.json()
+
+        # logprobs should be None when logprobs=0
+        choice = response_json["choices"][0]
+        assert choice.get("logprobs") is None
+
+    def test_completions_logprobs_validation(self, client, model: str, prompt: str):
+        """Test that logprobs > 5 is rejected by schema validation."""
+        response = client.post(
+            "/v1/completions",
+            json={
+                "model": model,
+                "prompt": prompt,
+                "logprobs": 7,  # Exceeds maximum of 5
+                "max_tokens": 5,
+            },
+        )
+
+        # Should raise schema validation error
+        assert response.status_code == 422
+        assert "Input should be less than or equal to 5" in str(
+            response.json()["detail"]
         )

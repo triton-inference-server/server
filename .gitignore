@@ -16,4 +16,5 @@ cprofile
 # Test exclusions
 qa/L0_openai/openai
 tensorrtllm_models
+tensorrtllm_mistral_models/
 custom_tokenizer
