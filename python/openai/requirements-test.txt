@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,7 +26,7 @@
 
 
 # The latest stable version of anyio is 4.12.1 which caused segfault during tests. See TRI-620.
-anyio==4.12.0
+anyio==4.11.0
 
 # Testing
 pytest==8.1.1

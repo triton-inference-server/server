@@ -998,7 +998,7 @@ class TritonLLMEngine(LLMEngine):
 
         if "best_of" in request.model_fields_set and metadata.backend == "vllm":
             raise ClientError(
-                "best_of is not supported for the vLLM backend, removed from vLLM V1 engine"
+                "best_of is no longer supported in vLLM backend, removed from vLLM V1 engine"
             )
         if request.best_of and request.best_of > 1:
             raise ClientError(
