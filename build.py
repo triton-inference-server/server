@@ -2093,11 +2093,6 @@ def backend_build(
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
     if be == "tensorrtllm":
-        github_organization = (
-            "https://github.com/NVIDIA"
-            if "triton-inference-server" in FLAGS.github_organization
-            else FLAGS.github_organization
-        )
         repository_name = "TensorRT-LLM"
         cmake_script.gitclone(repository_name, tag, be, github_organization)
     else:
