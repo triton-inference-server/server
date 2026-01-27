@@ -1,4 +1,4 @@
-# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,10 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
 # Testing
 pytest==8.1.1
 pytest-asyncio==0.23.8
-
-# The latest stable version of scipy is 1.17.0 which caused segfault during tests. See TRI-620.
-scipy==1.16.3

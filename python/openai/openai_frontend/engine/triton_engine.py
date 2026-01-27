@@ -991,15 +991,16 @@ class TritonLLMEngine(LLMEngine):
         if not isinstance(request.prompt, str):
             raise ClientError("only single string input is supported")
 
+        if "best_of" in request.model_fields_set and metadata.backend == "vllm":
+            raise ClientError(
+                "best_of is no longer supported in vLLM backend, removed from vLLM V1 engine"
+            )
+
         if request.n and request.n > 1:
             raise ClientError(
                 f"Received n={request.n}, but only single choice (n=1) is currently supported"
             )
 
-        if "best_of" in request.model_fields_set and metadata.backend == "vllm":
-            raise ClientError(
-                "best_of is no longer supported in vLLM backend, removed from vLLM V1 engine"
-            )
         if request.best_of and request.best_of > 1:
             raise ClientError(
                 f"Received best_of={request.best_of}, but only single choice (best_of=1) is currently supported"
