@@ -24,10 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
-# The latest stable version of anyio is 4.12.1 which caused segfault during tests. See TRI-620.
-anyio==4.12.0
-
 # Testing
 pytest==8.1.1
 pytest-asyncio==0.23.8
