@@ -37,7 +37,7 @@
 
 **Replaced By**: \[Link of previous proposal if applicable\]
 
-**Sponsor**: \[Name of code owner or maintainer to shepard process\]
+**Sponsor**: \[Name of code owner or maintainer to shepherd process\]
 
 **Required Reviewers**: \[Names of technical leads that are required for acceptance\]
 
