@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import torch
+import torchvision
 import triton_python_backend_utils as pb_utils
 from torch.utils.dlpack import to_dlpack
 
@@ -35,13 +36,10 @@ class TritonPythonModel:
         This function initializes pre-trained ResNet50 model.
         """
         self.device = "cuda" if args["model_instance_kind"] == "GPU" else "cpu"
-        # Avoid the "HTTP Error 403: rate limit exceeded" error
-        torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
-        # Our tests currently depend on torchvision=0.17,
-        # to make sure `torch.hub` loads Resnet50 implementation
-        # compatible with torchvision=0.17, we need to provide tag
         self.model = (
-            torch.hub.load("pytorch/vision", "resnet50", weights="IMAGENET1K_V2")
+            torchvision.models.resnet50(
+                weights=torchvision.models.ResNet50_Weights.DEFAULT
+            )
             .to(self.device)
             .eval()
         )
