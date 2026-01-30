@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -214,6 +214,40 @@ if [ $? -ne 0 ]; then
 fi
 
 kill $SERVER_PID
+wait $SERVER_PID
+
+check_state_release $SERVER_LOG
+if [ $? -ne 0 ]; then
+  cat $SERVER_LOG
+  echo -e "\n***\n*** State Verification Failed for $TEST_NAME\n***"
+  RET=1
+fi
+
+set -e
+
+# Test for gRPC shutdown race condition (issue #6899)
+TEST_NAME=test_shutdown_during_active_requests
+SHUTDOWN_STRESS_TEST=shutdown_stress_test.py
+
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
+SERVER_LOG="./inference_server.$TEST_NAME.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+  echo -e "\n***\n*** Failed to start $SERVER\n***"
+  cat $SERVER_LOG
+  exit 1
+fi
+
+echo "Test: $TEST_NAME" >>$CLIENT_LOG
+
+set +e
+SERVER_PID=$SERVER_PID python $SHUTDOWN_STRESS_TEST ShutdownStressTest.$TEST_NAME >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+  echo -e "\n***\n*** Test $TEST_NAME Failed\n***" >>$CLIENT_LOG
+  echo -e "\n***\n*** Test $TEST_NAME Failed\n***"
+  RET=1
+fi
+
 wait $SERVER_PID
 
 check_state_release $SERVER_LOG
