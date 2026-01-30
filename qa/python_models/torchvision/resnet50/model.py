@@ -25,9 +25,9 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import torch
-import torchvision
 import triton_python_backend_utils as pb_utils
 from torch.utils.dlpack import to_dlpack
+from torchvision import models
 
 
 class TritonPythonModel:
@@ -37,9 +37,7 @@ class TritonPythonModel:
         """
         self.device = "cuda" if args["model_instance_kind"] == "GPU" else "cpu"
         self.model = (
-            torchvision.models.resnet50(
-                weights=torchvision.models.ResNet50_Weights.DEFAULT
-            )
+            models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
             .to(self.device)
             .eval()
         )
