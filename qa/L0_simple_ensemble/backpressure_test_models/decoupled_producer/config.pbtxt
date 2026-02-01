@@ -27,7 +27,7 @@
 
 name: "decoupled_producer"
 backend: "python"
-max_batch_size: 0
+max_batch_size: 1
 
 input [
   {
@@ -55,4 +55,3 @@ instance_group [
 model_transaction_policy {
   decoupled: true
 }
-
