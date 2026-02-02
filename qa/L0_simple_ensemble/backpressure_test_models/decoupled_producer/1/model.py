@@ -25,9 +25,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+import time
+
 import numpy as np
 import triton_python_backend_utils as pb_utils
-import time
 
 class TritonPythonModel:
     """
@@ -45,7 +46,7 @@ class TritonPythonModel:
 
             # Produce 'count' responses, each with 0.5 as the output value
             for i in range(count):
-                time.sleep(0.1) # Simulate some processing delay
+                time.sleep(0.1)  # Simulate some processing delay
                 response = pb_utils.InferenceResponse(output_tensors=[out_tensor])
                 response_sender.send(response)
 

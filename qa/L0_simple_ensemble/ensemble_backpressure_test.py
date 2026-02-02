@@ -30,8 +30,8 @@ import sys
 
 sys.path.append("../common")
 
-import threading
 import queue
+import threading
 import time
 import unittest
 from contextlib import ExitStack
