@@ -30,6 +30,7 @@ import time
 import numpy as np
 import triton_python_backend_utils as pb_utils
 
+
 class TritonPythonModel:
     """
     Decoupled model that produces N responses based on input value.
