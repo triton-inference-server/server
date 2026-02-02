@@ -1,4 +1,4 @@
-// Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -183,7 +183,7 @@ StartSagemakerService(
   TRITONSERVER_Error* err = triton::server::SagemakerAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.sagemaker_port_,
       g_triton_params.sagemaker_address_, g_triton_params.sagemaker_thread_cnt_,
-      service);
+      g_triton_params.http_max_input_size_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
