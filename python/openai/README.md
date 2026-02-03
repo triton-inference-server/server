@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -161,8 +161,8 @@ curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json'
 </details>
 
 5. Benchmark with `genai-perf`:
-- To install genai-perf in this container, see the instructions [here](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#install-perf-analyzer-ubuntu-python-38)
-- Or try using genai-perf from the [SDK container](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#install-perf-analyzer-ubuntu-python-38)
+- To install genai-perf in this container, see the instructions [here](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#install-genai-perf-ubuntu-2404-python-310)
+- Or try using genai-perf from the [SDK container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
 
 ```bash
 MODEL="llama-3.1-8b-instruct"

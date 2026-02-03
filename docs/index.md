@@ -1,5 +1,5 @@
 <!--
-# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -60,7 +60,7 @@ available for inferencing. Inference requests arrive at the server via
 either [HTTP/REST or GRPC](customization_guide/inference_protocols.md) or by the [C
 API](customization_guide/inference_protocols.md) and are then routed to the appropriate per-model
 scheduler. Triton implements [multiple scheduling and batching
-algorithms](#models-and-schedulers) that can be configured on a
+algorithms](./user_guide/architecture.md#models-and-schedulers) that can be configured on a
 model-by-model basis. Each model's scheduler optionally performs
 batching of inference requests and then passes the requests to the
 [backend](https://github.com/triton-inference-server/backend/blob/main/README.md)

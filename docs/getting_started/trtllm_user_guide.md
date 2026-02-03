@@ -1,5 +1,5 @@
 <!--
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,7 +50,7 @@ to prepare engines for your LLM models and serve them with Triton.
 ## How to use your custom TRT-LLM model
 
 All the supported models can be found in the
-[examples](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples) folder in
+[examples](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/models/core) folder in
 the TRT-LLM repo. Follow the examples to convert your models to TensorRT
 engines.
 
@@ -61,7 +61,7 @@ for Triton, and
 Only the *mandatory parameters* need to be set in the model config file. Feel free
 to modify the optional parameters as needed. To learn more about the
 parameters, model inputs, and outputs, see the
-[model config documentation](ttps://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/model_config.md) for more details.
+[model config documentation](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/model_config.md) for more details.
 
 ## Advanced Configuration Options and Deployment Strategies
 
@@ -95,7 +95,7 @@ to learn how to use GenAI-Perf to benchmark your LLM models.
 ## Performance Best Practices
 
 Check out the
-[Performance Best Practices guide](https://nvidia.github.io/TensorRT-LLM/performance/perf-best-practices.html)
+[Performance tuning guide](https://nvidia.github.io/TensorRT-LLM/performance/performance-tuning-guide/)
 to learn how to optimize your TensorRT-LLM models for better performance.
 
 ## Metrics

@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -117,8 +117,8 @@ model.
 
 Examples of stateless models are CNNs such as image classification and
 object detection. The [default
-scheduler](model_configuration.md#default-scheduler) or [dynamic
-batcher](model_configuration.md#dynamic-batcher) can be used as the
+scheduler](scheduler.md#default-scheduler) or [dynamic
+batcher](batcher.md#dynamic-batcher) can be used as the
 scheduler for these stateless models.
 
 RNNs and similar models which do have internal memory can be stateless
@@ -126,9 +126,9 @@ as long as the state they maintain does not span inference
 requests. For example, an RNN that iterates over all elements in a
 batch is considered stateless by Triton if the internal state is not
 carried between batches of inference requests. The [default
-scheduler](model_configuration.md#default-scheduler) can be used for
+scheduler](scheduler.md#default-scheduler) can be used for
 these stateless models. The [dynamic
-batcher](model_configuration.md#dynamic-batcher) cannot be used since
+batcher](batcher.md#dynamic-batcher) cannot be used since
 the model is typically not expecting the batch to represent multiple
 inference requests.
 
@@ -142,7 +142,7 @@ maintained by the model is correctly updated. Moreover, the model may
 require that Triton provide *control* signals indicating, for example,
 the start and end of the sequence.
 
-The [sequence batcher](model_configuration.md#sequence-batcher) must
+The [sequence batcher](batcher.md#sequence-batcher) must
 be used for these stateful models. As explained below, the sequence
 batcher ensures that all inference requests in a sequence get routed
 to the same model instance so that the model can maintain state
@@ -535,7 +535,7 @@ model. Over time the following happens:
 With the Oldest scheduling strategy the sequence batcher ensures that
 all inference requests in a sequence are routed to the same model
 instance and then uses the [dynamic
-batcher](model_configuration.md#dynamic-batcher) to batch together
+batcher](batcher.md#dynamic-batcher) to batch together
 multiple inferences from different sequences into a batch that
 inferences together.  With this strategy the model must typically use
 the CONTROL_SEQUENCE_CORRID control so that it knows which sequence

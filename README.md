@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -55,7 +55,7 @@ Major features include:
 - [Concurrent model
   execution](docs/user_guide/architecture.md#concurrent-model-execution)
 - [Dynamic batching](docs/user_guide/model_configuration.md#dynamic-batcher)
-- [Sequence batching](docs/user_guide/model_configuration.md#sequence-batcher) and
+- [Sequence batching](docs/user_guide/batcher.md#sequence-batcher) and
   [implicit state management](docs/user_guide/architecture.md#implicit-state-management)
   for stateful models
 - Provides [Backend API](https://github.com/triton-inference-server/backend) that
@@ -70,8 +70,8 @@ Major features include:
   protocols](docs/customization_guide/inference_protocols.md) based on the community
   developed [KServe
   protocol](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2)
-- A [C API](docs/customization_guide/inference_protocols.md#in-process-triton-server-api) and
-  [Java API](docs/customization_guide/inference_protocols.md#java-bindings-for-in-process-triton-server-api)
+- A [C API](docs/customization_guide/inprocess_c_api.md) and
+  [Java API](docs/customization_guide/inprocess_java_api.md)
   allow Triton to link directly into your application for edge and other in-process use cases
 - [Metrics](docs/user_guide/metrics.md) indicating GPU utilization, server
   throughput, server latency, and more
