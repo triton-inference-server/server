@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,9 +25,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-# [Triton Inference Server Release 25.12](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-25-12.html#rel-25-12)
+# [Triton Inference Server Release 26.01](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-26-01.html#rel-26-01)
 
-The Triton Inference Server container image, release 25.12, is available
+The Triton Inference Server container image, release 26.01, is available
 on [NGC](https://ngc.nvidia.com/catalog/containers/nvidia:tritonserver) and
 is open source
 on [GitHub](https://github.com/triton-inference-server/server). Release notes can
