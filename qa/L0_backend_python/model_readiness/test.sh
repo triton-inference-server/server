@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,7 +35,7 @@ RET=0
 rm -fr *.log ./models
 
 MODEL_NAME="identity_fp32"
-mkdir -p models/$MODEL_NAME/1/
+mkdir -p ./models/$MODEL_NAME/1/
 cp ../../python_models/$MODEL_NAME/model.py ./models/$MODEL_NAME/1/model.py
 cp ../../python_models/$MODEL_NAME/config.pbtxt ./models/$MODEL_NAME/config.pbtxt
 
@@ -47,7 +47,7 @@ cp ../../python_models/$MODEL_NAME/config.pbtxt ./models/$MODEL_NAME/config.pbtx
 for SIGNAL in 11 9; do
     echo -e "\n***\n*** Testing model_readiness with Signal $SIGNAL\n***"
     SERVER_LOG="./model_readiness_signal_${SIGNAL}_server.log"
-    CLIENT_LOG="./model_readiness_${SIGNAL}_client.log"
+    CLIENT_LOG="./model_readiness_signal_${SIGNAL}_client.log"
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -107,10 +107,67 @@ for SIGNAL in 11 9; do
     kill_server
 done
 
-if [ $RET -eq 0 ]; then
-  echo -e "\n***\n*** Test Passed\n***"
+#
+# Test User-Defined Model Readiness Function
+#
+echo -e "\n***\n*** Testing User-Defined is_model_ready() Function\n***"
+
+# Define all test models
+USER_READY_MODELS=(
+    "is_model_ready_fn_returns_true"
+    "is_model_ready_fn_returns_false"
+    "is_model_ready_fn_raises_error"
+    "is_model_ready_fn_returns_non_boolean"
+    "is_model_ready_fn_timeout"
+)
+
+# Create model directories and copy files
+for MODEL in "${USER_READY_MODELS[@]}"; do
+    mkdir -p ./models/$MODEL/1/
+    cp ./test_models/$MODEL/model.py ./models/$MODEL/1/model.py
+    cp ./models/identity_fp32/config.pbtxt ./models/$MODEL/config.pbtxt
+    sed -i "s/^name:.*/name: \"$MODEL\"/" ./models/$MODEL/config.pbtxt
+done
+
+# Start server with all models
+SERVER_ARGS="--model-repository=$(pwd)/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_LOG="./user_model_ready_server.log"
+CLIENT_LOG="./user_model_ready_client.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    exit 1
+fi
+
+set +e
+
+# Wait for models to load
+sleep 5
+
+# Run test suite for user-defined model readiness
+echo "Running TestUserDefinedModelReadinessFunction..."
+python3 -m unittest test_model_readiness.TestUserDefinedModelReadinessFunction -v >> ${CLIENT_LOG} 2>&1
+TEST_EXIT_CODE=$?
+
+if [ $TEST_EXIT_CODE -ne 0 ]; then
+    echo -e "\n***\n*** TestUserDefinedModelReadinessFunction FAILED\n***"
+    cat ${CLIENT_LOG}
+    RET=1
 else
-  echo -e "\n***\n*** Test FAILED\n***"
+    echo -e "\n***\n*** TestUserDefinedModelReadinessFunction PASSED\n***"
+fi
+
+set -e
+kill_server
+
+
+# Final result
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** All Model Readiness Tests Passed\n***"
+else
+  echo -e "\n***\n*** Model Readiness Tests FAILED\n***"
 fi
 
 exit $RET
