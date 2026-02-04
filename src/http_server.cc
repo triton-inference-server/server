@@ -1093,6 +1093,9 @@ CompressionTypeUsed(const std::string accept_encoding)
       try {
         type_weight = std::stod(encoding.substr(weight_pos + 3));
       }
+      catch (const std::out_of_range& oor) {
+        continue;
+      }
       catch (const std::invalid_argument& ia) {
         continue;
       }
