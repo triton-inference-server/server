@@ -54,7 +54,7 @@ Major features include:
   frameworks](https://github.com/triton-inference-server/fil_backend)
 - [Concurrent model
   execution](docs/user_guide/architecture.md#concurrent-model-execution)
-- [Dynamic batching](docs/user_guide/model_configuration.md#dynamic-batcher)
+- [Dynamic batching](docs/user_guide/batcher.md#dynamic-batcher)
 - [Sequence batching](docs/user_guide/batcher.md#sequence-batcher) and
   [implicit state management](docs/user_guide/architecture.md#implicit-state-management)
   for stateful models

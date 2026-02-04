@@ -58,7 +58,7 @@ architecture. The [model repository](user_guide/model_repository.md) is a
 file-system based repository of the models that Triton will make
 available for inferencing. Inference requests arrive at the server via
 either [HTTP/REST or GRPC](customization_guide/inference_protocols.md) or by the [C
-API](customization_guide/inference_protocols.md) and are then routed to the appropriate per-model
+API](customization_guide/inprocess_c_api.md) and are then routed to the appropriate per-model
 scheduler. Triton implements [multiple scheduling and batching
 algorithms](./user_guide/architecture.md#models-and-schedulers) that can be configured on a
 model-by-model basis. Each model's scheduler optionally performs
@@ -89,7 +89,7 @@ framework such as Kubernetes.
 Major features include:
 
 - [Supports multiple deep learning
-  frameworks](https://github.com/triton-inference-server/backend#where-can-i-find-all-the-backends-that-are-available-for-triton)
+  frameworks](backend/README.md#where-can-i-find-all-the-backends-that-are-available-for-triton)
 - [Supports multiple machine learning
   frameworks](https://github.com/triton-inference-server/fil_backend)
 - [Concurrent model
