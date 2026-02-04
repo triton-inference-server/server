@@ -136,7 +136,7 @@ for client_type in http grpc; do
       echo -e "\n***\n*** Test Failed - class_count_${client_type}_test_client\n***"
       RET=1
   else
-      check_test_results $TEST_RESULT_FILE 2
+      check_test_results $TEST_RESULT_FILE 3
       if [ $? -ne 0 ]; then
           cat $TEST_RESULT_FILE
           echo -e "\n***\n*** Test Result Verification Failed - class_count_${client_type}_test_client\n***"

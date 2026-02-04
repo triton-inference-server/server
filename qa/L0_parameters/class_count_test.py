@@ -100,6 +100,19 @@ class ClassificationParameterTest(tu.TestResultCollector):
             str(e.exception),
         )
 
+    def test_classification_output_tensor_too_large(self):
+        max_elements = 1_000_000
+        shape = (1, max_elements + 1)
+        dtype = "FP32"
+        model_name = "identity_fp32"
+        input_data = np.ones(shape, dtype=np.float32)
+
+        inputs, outputs = self._prepare_io(input_data, dtype)
+        with self.assertRaises(InferenceServerException) as e:
+            self.client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
+
+        self.assertIn("classification output tensor too large", str(e.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
