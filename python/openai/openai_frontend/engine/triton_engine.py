@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -990,6 +990,11 @@ class TritonLLMEngine(LLMEngine):
         # Currently only support single string as input
         if not isinstance(request.prompt, str):
             raise ClientError("only single string input is supported")
+
+        if "best_of" in request.model_fields_set and metadata.backend == "vllm":
+            raise ClientError(
+                "best_of is no longer supported in vLLM backend, removed from vLLM V1 engine"
+            )
 
         if request.n and request.n > 1:
             raise ClientError(
