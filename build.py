@@ -932,6 +932,9 @@ FROM ${BASE_IMAGE}
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
+
+# Override CUDA_ARCH_LIST from base container to include compute capability 10.3 (GB300)
+ENV CUDA_ARCH_LIST="8.0 8.6 9.0 10.0 10.3 11.0 12.0"
 """
     df += """
 # Install docker docker buildx
@@ -1049,6 +1052,9 @@ FROM ${BASE_IMAGE}
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
+
+# Override CUDA_ARCH_LIST from base container to include compute capability 10.3 (GB300)
+ENV CUDA_ARCH_LIST="8.0 8.6 9.0 10.0 10.3 11.0 12.0"
 """
     # Install the windows- or linux-specific buildbase dependencies
     if target_platform() == "windows":
@@ -1188,6 +1194,9 @@ FROM ${BASE_IMAGE}
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 
+# Override CUDA_ARCH_LIST from base container to include compute capability 10.3 (GB300)
+ENV CUDA_ARCH_LIST="8.0 8.6 9.0 10.0 10.3 11.0 12.0"
+
 COPY build/ci /workspace
 
 WORKDIR /workspace
@@ -1234,6 +1243,9 @@ FROM {} AS min_container
 ##  Production stage: Create container with just inference server executable
 ############################################################################
 FROM ${BASE_IMAGE}
+
+# Override CUDA_ARCH_LIST from base container to include compute capability 10.3 (GB300)
+ENV CUDA_ARCH_LIST="8.0 8.6 9.0 10.0 10.3 11.0 12.0"
 
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """
@@ -1658,6 +1670,9 @@ FROM ${{BASE_IMAGE}}
 
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
+
+# Override CUDA_ARCH_LIST from base container to include compute capability 10.3 (GB300)
+ENV CUDA_ARCH_LIST="8.0 8.6 9.0 10.0 10.3 11.0 12.0"
 
 ENV TRITON_SERVER_VERSION=${{TRITON_VERSION}}
 ENV NVIDIA_TRITON_SERVER_VERSION=${{TRITON_CONTAINER_VERSION}}
