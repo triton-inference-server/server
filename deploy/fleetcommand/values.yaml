@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,7 +27,7 @@
 replicaCount: 1
 
 image:
-  imageName: nvcr.io/nvidia/tritonserver:25.12-py3
+  imageName: nvcr.io/nvidia/tritonserver:26.01-py3
   pullPolicy: IfNotPresent
   numGpus: 1
   serverCommand: tritonserver
@@ -47,13 +47,13 @@ image:
     #
     # To set model control mode, uncomment and configure below
     # TODO: Fix the following url, it is invalid
-    # See https://github.com/triton-inference-server/server/blob/r25.12/docs/user_guide/model_management.md
+    # See https://github.com/triton-inference-server/server/blob/r26.01/docs/user_guide/model_management.md
     #  for more details
     #- --model-control-mode=explicit|poll|none
     #
     # Additional server args
     #
-    # see https://github.com/triton-inference-server/server/blob/r25.12/README.md
+    # see https://github.com/triton-inference-server/server/blob/r26.01/README.md
     #  for more details
 
 service:
