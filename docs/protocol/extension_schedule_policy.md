@@ -1,5 +1,5 @@
 <!--
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,9 +34,9 @@ parameters that influence how Triton handles and schedules the
 request. Because this extension is supported, Triton reports
 “schedule_policy” in the extensions field of its Server Metadata.
 Note the policies are specific to [dynamic
-batcher](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#dynamic-batcher)
+batcher](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/batcher.md#dynamic-batcher)
 and only experimental support to [sequence
-batcher](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#sequence-batcher)
+batcher](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/batcher.md#sequence-batcher)
 with the [direct](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/architecture.md#direct)
 scheduling strategy.
 
