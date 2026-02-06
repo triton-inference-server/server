@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,6 +27,7 @@
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -93,12 +94,26 @@ class OpenAIServer:
             ["python3", script_path] + cli_args,
             env=env,
             stdout=sys.stdout,
-            stderr=subprocess.PIPE,  # Capture stderr
+            stderr=subprocess.PIPE,
+            text=True,
         )
+        self.stderr_lines = []
+        threading.Thread(target=self._read_stderr, daemon=True).start()
         # Wait until health endpoint is responsive
         self._wait_for_server(
             url=self.url_for("health", "ready"), timeout=self.START_TIMEOUT
         )
+
+    def _read_stderr(self):
+        """Read stderr and print to console in real-time. Continues throughout server lifecycle."""
+        try:
+            if self.proc.stderr:
+                for line in iter(self.proc.stderr.readline, ""):
+                    self.stderr_lines.append(line.rstrip("\n\r"))
+                    sys.stderr.write(line)
+                    sys.stderr.flush()
+        except (OSError, ValueError, BrokenPipeError):
+            pass
 
     def __enter__(self):
         return self
@@ -121,23 +136,31 @@ class OpenAIServer:
             except Exception as err:
                 result = self.proc.poll()
                 if result is not None and result != 0:
-                    # Capture stderr output for better error messages
-                    stderr_output = ""
-                    try:
-                        stderr_output = self.proc.stderr.read().decode("utf-8").strip()
-                    except Exception:
-                        pass  # If we can't read stderr, just use the generic message
-
-                    if stderr_output:
-                        raise RuntimeError(
-                            f"Server exited unexpectedly: {stderr_output}"
-                        ) from err
-                    else:
-                        raise RuntimeError("Server exited unexpectedly.") from err
+                    stderr_text = (
+                        "\n".join(self.stderr_lines)
+                        if self.stderr_lines
+                        else "No stderr output"
+                    )
+                    error = RuntimeError(
+                        f"Server exited unexpectedly with return code {result}.\n"
+                        f"Stderr output:\n{stderr_text}"
+                    )
+                    error.stderr_lines = list(self.stderr_lines)
+                    raise error from err
 
                 time.sleep(0.5)
                 if time.time() - start > timeout:
-                    raise RuntimeError("Server failed to start in time.") from err
+                    stderr_text = (
+                        "\n".join(self.stderr_lines)
+                        if self.stderr_lines
+                        else "No stderr output"
+                    )
+                    error = RuntimeError(
+                        f"Server failed to start in time.\n"
+                        f"Stderr output:\n{stderr_text}"
+                    )
+                    error.stderr_lines = list(self.stderr_lines)
+                    raise error from err
 
     @property
     def url_root(self) -> str:
