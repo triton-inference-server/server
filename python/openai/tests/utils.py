@@ -112,8 +112,10 @@ class OpenAIServer:
                     self.stderr_lines.append(line.rstrip("\n\r"))
                     sys.stderr.write(line)
                     sys.stderr.flush()
-        except (OSError, ValueError, BrokenPipeError):
-            pass
+        except (OSError, ValueError, BrokenPipeError) as exc:
+            # Ignore expected errors during process shutdown, but log for debugging.
+            sys.stderr.write(f"[OpenAIServer] Error while reading stderr: {exc}\n")
+            sys.stderr.flush()
 
     def __enter__(self):
         return self
