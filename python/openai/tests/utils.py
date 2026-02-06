@@ -94,7 +94,7 @@ class OpenAIServer:
             ["python3", script_path] + cli_args,
             env=env,
             stdout=sys.stdout,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.PIPE,  # Capture stderr
             text=True,
         )
         self.stderr_lines = []
