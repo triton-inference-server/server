@@ -24,6 +24,10 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "sagemaker_server.h"
+#include <limits.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <dirent.h>
 
 namespace triton { namespace server {
 
@@ -894,6 +898,76 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   std::string repo_path = parse_map.at("url");
   std::string model_name_hash = parse_map.at("model_name_hash");
   std::string target_model = parse_map.at("target_model");
+  // ================= SECURITY CONFINEMENT FIX =================
+
+  // Model repository root must be configured
+  if (model_repository_path_.empty()) {
+    EVBufferAddErrorJson(
+        req->buffer_out,
+        TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INTERNAL,
+            "Model repository root is not configured"));
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+
+  // Canonicalize user-supplied path
+  char resolved_repo[PATH_MAX];
+  if (realpath(repo_path.c_str(), resolved_repo) == nullptr) {
+    EVBufferAddErrorJson(
+        req->buffer_out,
+        TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "Invalid model repository path"));
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+
+  std::string canonical_repo_path(resolved_repo);
+
+  // Canonicalize allowed root
+  char resolved_root[PATH_MAX];
+  if (realpath(model_repository_path_.c_str(), resolved_root) == nullptr) {
+    EVBufferAddErrorJson(
+        req->buffer_out,
+        TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INTERNAL,
+            "Failed to resolve model repository root"));
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+
+  std::string canonical_root(resolved_root);
+
+  // Enforce confinement: repo must be within root
+  if (canonical_repo_path.compare(0, canonical_root.size(), canonical_root) != 0 ||
+      (canonical_repo_path.size() > canonical_root.size() &&
+       canonical_repo_path[canonical_root.size()] != '/')) {
+    EVBufferAddErrorJson(
+        req->buffer_out,
+        TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "Model repository path escapes allowed root"));
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+
+  // Enforce directory-only repositories
+  struct stat st;
+  if (stat(canonical_repo_path.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
+    EVBufferAddErrorJson(
+        req->buffer_out,
+        TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "Model repository path must be a directory"));
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return;
+  }
+
+  // Use canonicalized path from here onward
+  repo_path = canonical_repo_path;
+
+  // ================= END SECURITY CONFINEMENT FIX =================
 
   /* Check subdirs for models and find ensemble model within the repo_path
    * If only 1 model, that will be selected as model_subdir
@@ -957,7 +1031,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     closedir(dir);
   }
 
-  if (!strcmp(ensemble_model_subdir.c_str(), "") == 0) {
+  if (!ensemble_model_subdir.empty()) {
     model_subdir = ensemble_model_subdir;
   }
 
