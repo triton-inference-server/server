@@ -60,7 +60,7 @@ log_message.status "Changing working directory to the script directory to: " "${
 cd ${TRITON_MDLS_BASE_SCRIPT_DIR}
 
 log_message.status "define: default values"
-TRITON_VERSION=${TRITON_VERSION:=25.12}
+TRITON_VERSION=${TRITON_VERSION:=26.01}
 ONNX_VERSION=1.20.1
 ONNX_OPSET=0
 OPENVINO_VERSION=2024.5.0

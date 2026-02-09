@@ -73,12 +73,12 @@ import requests
 DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.66.0dev",
     "triton_container_version": "26.02dev",
-    "upstream_container_version": "25.12",
+    "upstream_container_version": "26.01",
     "ort_version": "1.24.1",
     "ort_openvino_version": "2025.4.1",
     "standalone_openvino_version": "2025.4.1",
     "dcgm_version": "4.5.2-1",
-    "vllm_version": "0.11.1",
+    "vllm_version": "0.13.0",
     "rhel_py_version": "3.12.3",
 }
 
@@ -2093,11 +2093,6 @@ def backend_build(
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
     if be == "tensorrtllm":
-        github_organization = (
-            "https://github.com/NVIDIA"
-            if "triton-inference-server" in FLAGS.github_organization
-            else FLAGS.github_organization
-        )
         repository_name = "TensorRT-LLM"
         cmake_script.gitclone(repository_name, tag, be, github_organization)
     else:
