@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,7 +28,7 @@
 
 # Ragged Batching
 
-Triton provides [dynamic batching feature](model_configuration.md#dynamic-batcher),
+Triton provides [dynamic batching feature](batcher.md#dynamic-batcher),
 which combines multiple requests for the same model execution to provide larger
 throughput. By default, the requests can be dynamically batched only if
 each input has the same shape across the requests. In order to exploit dynamic

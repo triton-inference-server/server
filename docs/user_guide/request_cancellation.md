@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,7 +41,7 @@ resources.
 
 ### In-Process C API
 
-[In-Process Triton Server C API](../customization_guide/inference_protocols.md#in-process-triton-server-api) has been enhanced with `TRITONSERVER_InferenceRequestCancel`
+[In-Process Triton Server C API](../customization_guide/inprocess_c_api.md) has been enhanced with `TRITONSERVER_InferenceRequestCancel`
 and `TRITONSERVER_InferenceRequestIsCancelled` to issue cancellation and query
 whether cancellation has been issued on an inflight request respectively. Read more
 about the APIs in [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
@@ -60,14 +60,14 @@ finer details.
 ## Handling in Triton Core
 
 Triton core checks for requests that have been cancelled at some critical points
-when using [dynamic](./model_configuration.md#dynamic-batcher) or
-[sequence](./model_configuration.md#sequence-batcher) batching. The checking is
+when using [dynamic](batcher.md#dynamic-batcher) or
+[sequence](batcher.md#sequence-batcher) batching. The checking is
 also performed between each
-[ensemble](./model_configuration.md#ensemble-scheduler) steps and terminates
+[ensemble](./scheduler.md#ensemble-scheduler) steps and terminates
 further processing if the request is cancelled.
 
 On detecting a cancelled request, Triton core responds with CANCELLED status. If a request
-is cancelled when using [sequence_batching](./model_configuration.md#sequence-batcher),
+is cancelled when using [sequence_batching](batcher.md#sequence-batcher),
 then all the pending requests in the same sequence will also be cancelled. The sequence
 is represented by the requests that has identical sequence id.
 

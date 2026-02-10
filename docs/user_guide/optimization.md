@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,10 +53,10 @@ options, we will use a ONNX Inception model that you can obtain
 by following the [QuickStart](../getting_started/quickstart.md). As a baseline we use
 perf_analyzer to determine the performance of the model using a [basic
 model configuration that does not enable any performance
-features](../examples/model_repository/inception_graphdef/config.pbtxt).
+features](../examples/model_repository/inception_onnx/config.pbtxt).
 
 ```
-$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
+$ perf_analyzer -m inception_onnx --percentile=95 --concurrency-range 1:4
 ...
 Inferences/Second vs. Client p95 Batch Latency
 Concurrency: 1, throughput: 62.6 infer/sec, latency 21371 usec
@@ -81,7 +81,7 @@ latency.
 
 For most models, the Triton feature that provides the largest
 performance improvement is [dynamic
-batching](model_configuration.md#dynamic-batcher).
+batching](batcher.md#dynamic-batcher).
 [This example](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_2-improving_resource_utilization#dynamic-batching--concurrent-model-execution)
  sheds more light on conceptual details. If your model does not
 support batching then you can skip ahead to [Model
@@ -95,7 +95,7 @@ larger batch that will often execute much more efficiently than
 executing the individual requests independently. To enable the dynamic
 batcher stop Triton, add the following line to the end of the [model
 configuration file for
-inception_graphdef](../examples/model_repository/inception_graphdef/config.pbtxt),
+inception_onnx](../examples/model_repository/inception_onnx/config.pbtxt),
 and then restart Triton.
 
 ```
@@ -108,7 +108,7 @@ inference. To see this run perf_analyzer with request concurrency from
 1 to 8.
 
 ```
-$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:8
+$ perf_analyzer -m inception_onnx --percentile=95 --concurrency-range 1:8
 ...
 Inferences/Second vs. Client p95 Batch Latency
 Concurrency: 1, throughput: 66.8 infer/sec, latency 19785 usec
@@ -138,7 +138,7 @@ instance. So for maximum-batch-size 4 we want to run perf_analyzer
 with request concurrency of `2 * 4 * 1 = 8`.
 
 ```
-$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 8
+$ perf_analyzer -m inception_onnx --percentile=95 --concurrency-range 8
 ...
 Inferences/Second vs. Client p95 Batch Latency
 Concurrency: 8, throughput: 267.8 infer/sec, latency 35590 usec
@@ -158,12 +158,12 @@ utilization by allowing more inference work to be executed
 simultaneously on the GPU. Smaller models may benefit from more than
 two instances; you can use perf_analyzer to experiment.
 
-To specify two instances of the inception_graphdef model: stop Triton,
+To specify two instances of the inception_onnx model: stop Triton,
 remove any dynamic batching settings you may have previously added to
 the model configuration (we discuss combining dynamic batcher and
 multiple model instances below), add the following lines to the end of
 the [model configuration
-file](../examples/model_repository/inception_graphdef/config.pbtxt), and
+file](../examples/model_repository/inception_onnx/config.pbtxt), and
 then restart Triton.
 
 ```
@@ -173,7 +173,7 @@ instance_group [ { count: 2 }]
 Now run perf_analyzer using the same options as for the baseline.
 
 ```
-$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
+$ perf_analyzer -m inception_onnx --percentile=95 --concurrency-range 1:4
 ...
 Inferences/Second vs. Client p95 Batch Latency
 Concurrency: 1, throughput: 70.6 infer/sec, latency 19547 usec
@@ -199,7 +199,7 @@ When we run perf_analyzer with the same options used for just the
 dynamic batcher above.
 
 ```
-$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 16
+$ perf_analyzer -m inception_onnx --percentile=95 --concurrency-range 16
 ...
 Inferences/Second vs. Client p95 Batch Latency
 Concurrency: 16, throughput: 289.6 infer/sec, latency 59817 usec
