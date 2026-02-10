@@ -110,9 +110,9 @@
    :hidden:
    :caption: Perf benchmarking and tuning
 
-   GenAI Perf Analyzer <perf_benchmark/genai_perf>
-   Performance Analyzer <perf_benchmark/perf_analyzer>
-   Model Analyzer <perf_benchmark/model_analyzer>
+   GenAI Perf Analyzer <genai_perf/README>
+   Performance Analyzer <perf_analyzer/README>
+   Model Analyzer <model_analyzer/README>
    Model Navigator <model_navigator/README>
 
 .. toctree::

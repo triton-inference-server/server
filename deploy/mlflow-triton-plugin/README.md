@@ -1,5 +1,5 @@
 <!--
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -145,13 +145,13 @@ MLflow deployments create API deploys a model to the Triton target, which will
 download the model to Triton's model repository and request Triton to load the
 model.
 
-To create a MLflow deployment using CLI:
+To create a MLflow deployment using CLI
 
 ```
 mlflow deployments create -t triton --flavor triton --name model_name -m models:/model_name/1
 ```
 
-To create a MLflow deployment using Python API:
+To create a MLflow deployment using Python API
 
 ```
 from mlflow.deployments import get_deploy_client
@@ -171,7 +171,7 @@ To delete a MLflow deployment using CLI
 mlflow deployments delete -t triton --name model_name
 ```
 
-To delete a MLflow deployment using CLI
+To delete a MLflow deployment using Python API
 
 ```
 from mlflow.deployments import get_deploy_client
