@@ -116,7 +116,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         self.client_http = httpclient.InferenceServerClient(url=URL_HTTP)
         self.client_grpc = grpcclient.InferenceServerClient(url=URL_GRPC)
 
-    def xtest_is_model_ready_returns_true(self):
+    def test_is_model_ready_returns_true(self):
         model_name = "is_model_ready_fn_returns_true"
 
         # Send many sequential requests to ensure consistent behavior
@@ -135,7 +135,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         call_inference(model_name, "http", self.client_http)
         call_inference(model_name, "grpc", self.client_grpc)
 
-    def xtest_is_model_ready_returns_false(self):
+    def test_is_model_ready_returns_false(self):
         model_name = "is_model_ready_fn_returns_false"
 
         # Send many sequential requests to ensure consistent behavior
@@ -154,7 +154,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         call_inference(model_name, "http", self.client_http)
         call_inference(model_name, "grpc", self.client_grpc)
 
-    def xtest_is_model_ready_raises_exception(self):
+    def test_is_model_ready_raises_exception(self):
         model_name = "is_model_ready_fn_raises_error"
 
         # Send many sequential requests to ensure consistent behavior
@@ -185,7 +185,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         call_inference(model_name, "http", self.client_http)
         call_inference(model_name, "grpc", self.client_grpc)
 
-    def xtest_is_model_ready_returns_non_boolean(self):
+    def test_is_model_ready_returns_non_boolean(self):
         model_name = "is_model_ready_fn_returns_non_boolean"
 
         # Send many sequential requests to ensure consistent behavior
@@ -204,7 +204,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         call_inference(model_name, "http", self.client_http)
         call_inference(model_name, "grpc", self.client_grpc)
 
-    def xtest_is_model_ready_takes_longs_time(self):
+    def test_is_model_ready_takes_longs_time(self):
         model_name = "is_model_ready_fn_timeout"
 
         # Send many sequential requests to ensure consistent behavior
@@ -347,6 +347,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             print(
                 f"Inference grpc[{idx}]: {'OK' if success else 'FAIL'} ({elapsed:.3f}s)"
             )
+
 
 if __name__ == "__main__":
     unittest.main()
