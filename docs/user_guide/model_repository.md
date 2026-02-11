@@ -175,7 +175,9 @@ For a model repository residing in Azure Storage, the repository path must be pr
 $ tritonserver --model-repository=as://account_name/container_name/path/to/model/repository ...
 ```
 
-When using Azure Storage, you must set the `AZURE_STORAGE_ACCOUNT` and `AZURE_STORAGE_KEY` environment variables to an account that has access to the Azure Storage repository.
+##### Shared Key Authentication (Default)
+
+When using Azure Storage with shared key authentication, you must set the `AZURE_STORAGE_ACCOUNT` and `AZURE_STORAGE_KEY` environment variables to an account that has access to the Azure Storage repository.
 
 If you don't know your `AZURE_STORAGE_KEY` and have your Azure CLI correctly configured, here's an example of how to find a key corresponding to your `AZURE_STORAGE_ACCOUNT`:
 
@@ -183,6 +185,50 @@ If you don't know your `AZURE_STORAGE_KEY` and have your Azure CLI correctly con
 $ export AZURE_STORAGE_ACCOUNT="account_name"
 $ export AZURE_STORAGE_KEY=$(az storage account keys list -n $AZURE_STORAGE_ACCOUNT --query "[0].value")
 ```
+
+##### Azure Managed Identity Authentication
+
+Triton supports Azure Managed Identity (MI) as an alternative to shared key
+authentication. This eliminates the need to distribute or rotate storage account
+keys and aligns with enterprise security best practices on Azure.
+
+To enable Managed Identity authentication, set the `AZURE_STORAGE_AUTH_TYPE`
+environment variable:
+
+```bash
+$ export AZURE_STORAGE_ACCOUNT="account_name"
+$ export AZURE_STORAGE_AUTH_TYPE="managed_identity"
+$ tritonserver --model-repository=as://account_name/container_name/path/to/model/repository ...
+```
+
+For **user-assigned Managed Identity**, additionally specify the client ID:
+
+```bash
+$ export AZURE_STORAGE_AUTH_TYPE="managed_identity"
+$ export AZURE_STORAGE_CLIENT_ID="<your-managed-identity-client-id>"
+```
+
+You may also use `AZURE_STORAGE_AUTH_TYPE="default"` to activate the Azure
+`DefaultAzureCredential` chain, which probes multiple credential sources in
+order: environment variables, managed identity, Azure CLI, and others. This is
+useful during local development but has slightly higher startup latency due to
+the probing.
+
+**Prerequisites:**
+
+- The Managed Identity (system- or user-assigned) must be assigned the
+  **Storage Blob Data Reader** role (or broader) on the target storage
+  account or container.
+- The Triton host (AKS pod, VM, VMSS, App Service, etc.) must have the
+  Managed Identity assigned.
+- For AKS workloads, ensure that either pod identity or workload identity
+  federation is configured so that the pod can obtain AAD tokens.
+
+**Sovereign clouds:** The Azure Identity SDK respects the `AZURE_AUTHORITY_HOST`
+environment variable, so this authentication mode works for sovereign cloud
+endpoints as well.
+
+##### Local Model Directory
 
 By default, Triton makes a local copy of a remote model repository in a temporary folder, which is deleted after Triton server is shut down.
 If you would like to control where remote model repository is copied to, you may set the `TRITON_AZURE_MOUNT_DIRECTORY` environment variable to a path pointing to the existing folder on your local machine.
@@ -235,6 +281,11 @@ export TRITON_CLOUD_CREDENTIAL_PATH="cloud_credential.json"
     "as://Account-002/Container": {
       "account_str": "",
       "account_key": ""
+    },
+    "as://Account-MI/Container": {
+      "account_str": "AZURE_STORAGE_ACCOUNT",
+      "auth_type": "managed_identity",
+      "client_id": ""
     }
   }
 }
