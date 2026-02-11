@@ -64,7 +64,7 @@ set_target_properties(
   POSITION_INDEPENDENT_CODE ON
   OUTPUT_NAME triton_sequence
   LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtriton_sequence.ldscript
-  LINK_FLAGS "-Wl,--version-script libtriton_sequence.ldscript"
+  LINK_FLAGS "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libtriton_sequence.ldscript"
 )
 
 #
