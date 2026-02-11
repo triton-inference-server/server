@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,6 +27,17 @@
 
 ### Helpers ###
 
+function download_tensorrt_llm_models {
+    TENSORRTLLM_VERSION="$1"
+    TENSORRTLLM_DIR="$2"
+    rm -rf ${TENSORRTLLM_DIR} && mkdir ${TENSORRTLLM_DIR}
+    git clone --filter=blob:none --no-checkout https://github.com/triton-inference-server/TensorRT-LLM.git ${TENSORRTLLM_DIR}
+    pushd ${TENSORRTLLM_DIR}
+    git sparse-checkout set triton_backend/all_models
+    git checkout ${TENSORRTLLM_VERSION}
+    popd
+}
+
 function install_deps() {
     # Install python bindings for tritonserver and tritonfrontend
     # pip install /opt/tritonserver/python/triton*.whl
@@ -38,8 +49,13 @@ function install_deps() {
     pip install -r requirements-test.txt
 
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
-        prepare_tensorrtllm meta-llama/Meta-Llama-3.1-8B-Instruct tests/tensorrtllm_models /tmp/engines/llama/3.1-8b-instruct/
-        prepare_tensorrtllm mistralai/Mistral-Nemo-Instruct-2407 tests/tensorrtllm_mistral_models /tmp/engines/mistral/nemo-instruct-2407/
+        # TODO: Remove this when the next stable version of TRT-LLM is available
+        TENSORRTLLM_DIR="/workspace/TensorRT-LLM"
+        TENSORRTLLM_VERSION="v1.2.0rc2"
+        download_tensorrt_llm_models ${TENSORRTLLM_VERSION} ${TENSORRTLLM_DIR}
+
+        prepare_tensorrtllm meta-llama/Meta-Llama-3.1-8B-Instruct tests/tensorrtllm_models /tmp/engines/llama/3.1-8b-instruct/ ${TENSORRTLLM_DIR}
+        prepare_tensorrtllm mistralai/Mistral-Nemo-Instruct-2407 tests/tensorrtllm_mistral_models /tmp/engines/mistral/nemo-instruct-2407/ ${TENSORRTLLM_DIR}
     else
         prepare_vllm
     fi
@@ -57,21 +73,43 @@ function prepare_tensorrtllm() {
     MODEL="$1"
     MODEL_REPO="$2"
     ENGINE_PATH="$3"
+    TENSORRTLLM_DIR="$4"
+    TRITON_BACKEND=tensorrtllm
+    XGRAMMAR_TOKENIZER_INFO_PATH=tokenizer_info/${MODEL}/xgrammar_tokenizer_info.json
+    GUIDED_DECODING_BACKEND=xgrammar
 
     mkdir -p ${MODEL_REPO}
-    cp /app/all_models/inflight_batcher_llm/* "${MODEL_REPO}" -r
+    cp ${TENSORRTLLM_DIR}/triton_backend/all_models/inflight_batcher_llm/* "${MODEL_REPO}" -r
     # Ensemble model is not needed for the test
     rm -rf ${MODEL_REPO}/ensemble
 
     # 1. Generate the model's trt engines
     python3 ../generate_engine.py --model "${MODEL}" --engine_path "${ENGINE_PATH}"
 
-    # 2. Prepare model repository
+    # 2. Generate the model's xgrammar tokenizer info. In order to run on C++ backend, we need an extra step to extract tokenizer’s information into json format.
+    XGRAMMAR_TOKENIZER_INFO_DIR=tokenizer_info/${MODEL}
+    rm -rf ${XGRAMMAR_TOKENIZER_INFO_DIR}
+    python3 /app/examples/generate_xgrammar_tokenizer_info.py --model_dir ${MODEL} --output_dir ${XGRAMMAR_TOKENIZER_INFO_DIR}
+
+    # 3. Prepare model repository
     FILL_TEMPLATE="/app/tools/fill_template.py"
     python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/preprocessing/config.pbtxt tokenizer_dir:${ENGINE_PATH},triton_max_batch_size:64,preprocessing_instance_count:1,max_queue_size:0
     python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/postprocessing/config.pbtxt tokenizer_dir:${ENGINE_PATH},triton_max_batch_size:64,postprocessing_instance_count:1
-    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm_bls/config.pbtxt triton_max_batch_size:64,decoupled_mode:True,bls_instance_count:1,accumulate_tokens:False,logits_datatype:TYPE_FP32
-    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm/config.pbtxt triton_backend:tensorrtllm,triton_max_batch_size:64,decoupled_mode:True,max_beam_width:1,engine_dir:${ENGINE_PATH},batching_strategy:inflight_fused_batching,max_queue_size:0,max_queue_delay_microseconds:1000,encoder_input_features_data_type:TYPE_FP16,logits_datatype:TYPE_FP32,exclude_input_in_output:True
+    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm_bls/config.pbtxt triton_max_batch_size:64,decoupled_mode:True,bls_instance_count:1,accumulate_tokens:False,logits_datatype:TYPE_FP32,prompt_embedding_table_data_type:TYPE_FP16
+    python3 ${FILL_TEMPLATE} -i ${MODEL_REPO}/tensorrt_llm/config.pbtxt triton_backend:${TRITON_BACKEND},triton_max_batch_size:64,decoupled_mode:True,max_beam_width:1,engine_dir:${ENGINE_PATH},batching_strategy:inflight_fused_batching,max_queue_size:0,max_queue_delay_microseconds:1000,encoder_input_features_data_type:TYPE_FP16,logits_datatype:TYPE_FP32,exclude_input_in_output:True,prompt_embedding_table_data_type:TYPE_FP16,guided_decoding_backend:${GUIDED_DECODING_BACKEND},xgrammar_tokenizer_info_path:${XGRAMMAR_TOKENIZER_INFO_PATH}
+
+    # 4. Prepare lora adapters
+    # FIXME: Remove this WAR when it is fixed in the future stable version of TRT-LLM.
+    sed -i 's/dims: \[ -1, 3 \]/dims: \[ -1, 4 \]/' ${MODEL_REPO}/tensorrt_llm/config.pbtxt
+    sed -i 's/dims: \[ -1, 3 \]/dims: \[ -1, 4 \]/' ${MODEL_REPO}/tensorrt_llm_bls/config.pbtxt
+    pushd ${MODEL_REPO}/tensorrt_llm_bls/1
+    for lora_name in silk-road/luotuo-lora-7b-0.1 kunishou/Japanese-Alpaca-LoRA-7b-v0; do
+        name=$(basename $lora_name)
+        git clone https://huggingface.co/$lora_name
+        python3 /app/examples/hf_lora_convert.py -i $name -o $name-weights --storage-type float16
+        rm -rf $name
+    done
+    popd
 }
 
 function pre_test() {

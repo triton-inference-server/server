@@ -500,7 +500,8 @@ TritonParser::SetupOptions()
        "Number of threads handling HTTP requests."});
   http_options_.push_back(
       {OPTION_HTTP_MAX_INPUT_SIZE, "http-max-input-size", Option::ArgInt,
-       ("Maximum allowed HTTP request input size in bytes. Default is " +
+       ("Maximum allowed HTTP request input size in bytes. For compressed "
+        "requests, this also limits the decompressed size. Default is " +
         std::to_string(HTTP_DEFAULT_MAX_INPUT_SIZE) + " bytes (64MB).")});
   http_options_.push_back(
       {OPTION_HTTP_RESTRICTED_API, "http-restricted-api",

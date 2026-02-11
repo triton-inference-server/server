@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,6 +27,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import time
 import uuid
@@ -38,27 +39,37 @@ from typing import (
     Callable,
     Dict,
     List,
+    Literal,
     Optional,
     Tuple,
+    Union,
 )
 
+import numpy as np
 import tritonserver
 from engine.engine import LLMEngine
 from engine.utils.chat import load_chat_template, parse_chat_messages
 from engine.utils.tokenizer import get_tokenizer
 from engine.utils.tool_call_parsers import ToolCallParser, ToolParserManager
 from engine.utils.triton import (
-    _create_trtllm_inference_request,
-    _create_vllm_inference_request,
+    RequestKind,
+    TritonLoraConfig,
+    _create_trtllm_embedding_request,
+    _create_trtllm_generate_request,
+    _create_vllm_embedding_request,
+    _create_vllm_generate_request,
+    _get_openai_chat_format_logprobs_from_vllm_response,
+    _get_openai_completion_format_logprobs_from_vllm_response,
     _get_output,
     _get_usage_from_response,
-    _get_vllm_lora_names,
+    _parse_lora_configs,
     _StreamingUsageAccumulator,
     _validate_triton_responses_non_streaming,
 )
 from schemas.openai import (
     ChatCompletionChoice,
     ChatCompletionFinishReason,
+    ChatCompletionLogprobs,
     ChatCompletionMessageToolCall,
     ChatCompletionMessageToolCallChunk,
     ChatCompletionNamedToolChoice,
@@ -73,12 +84,16 @@ from schemas.openai import (
     CreateChatCompletionStreamResponse,
     CreateCompletionRequest,
     CreateCompletionResponse,
+    CreateEmbeddingRequest,
+    CreateEmbeddingResponse,
+    EmbeddingObject,
     FinishReason,
     Function1,
     Function2,
     Model,
     ObjectType,
 )
+from utils.utils import ClientError, ServerError
 
 
 # TODO: Improve type hints
@@ -93,11 +108,14 @@ class TritonModelMetadata:
     # Tokenizers used for chat templates
     tokenizer: Optional[Any]
     # LoRA names supported by the backend
-    lora_names: Optional[List[str]]
+    lora_configs: Optional[List[TritonLoraConfig]]
+    # Name of the input tensor enabling "echo" parameter in /v1/completions endpoint
+    echo_tensor_name: Optional[str]
     # Time that model was loaded by Triton
     create_time: int
     # Conversion format between OpenAI and Triton requests
-    request_converter: Callable
+    inference_request_converter: Callable
+    embedding_request_converter: Callable
 
 
 class TritonLLMEngine(LLMEngine):
@@ -143,11 +161,11 @@ class TritonLLMEngine(LLMEngine):
             if (
                 self.lora_separator is not None
                 and len(self.lora_separator) > 0
-                and metadata.lora_names is not None
+                and metadata.lora_configs is not None
             ):
-                for lora_name in metadata.lora_names:
+                for lora_config in metadata.lora_configs:
                     model_names.append(
-                        f"{metadata.name}{self.lora_separator}{lora_name}"
+                        f"{metadata.name}{self.lora_separator}{lora_config.name}"
                     )
 
             for model_name in model_names:
@@ -189,8 +207,13 @@ class TritonLLMEngine(LLMEngine):
 
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
-            metadata.request_converter(
-                metadata.model, prompt, request, lora_name, self.default_max_tokens
+            metadata.inference_request_converter(
+                metadata.model,
+                prompt,
+                request,
+                self._get_lora_config(model_name, lora_name),
+                metadata.echo_tensor_name,
+                self.default_max_tokens,
             )
         )
 
@@ -232,7 +255,18 @@ class TritonLLMEngine(LLMEngine):
             backend=metadata.backend,
         )
 
-        usage = _get_usage_from_response(response, metadata.backend)
+        usage = _get_usage_from_response(
+            response, metadata.backend, RequestKind.GENERATION
+        )
+
+        # Parse logprobs if requested
+        logprobs_data = None
+        if request.logprobs:
+            openai_logprobs = _get_openai_chat_format_logprobs_from_vllm_response(
+                response
+            )
+            if openai_logprobs:
+                logprobs_data = ChatCompletionLogprobs(content=openai_logprobs)
 
         return CreateChatCompletionResponse(
             id=request_id,
@@ -240,7 +274,7 @@ class TritonLLMEngine(LLMEngine):
                 ChatCompletionChoice(
                     index=0,
                     message=response_message,
-                    logprobs=None,
+                    logprobs=logprobs_data,
                     finish_reason=finish_reason,
                 )
             ],
@@ -311,11 +345,12 @@ class TritonLLMEngine(LLMEngine):
 
         # Convert to Triton request format and perform inference
         responses = metadata.model.async_infer(
-            metadata.request_converter(
+            metadata.inference_request_converter(
                 metadata.model,
                 request.prompt,
                 request,
-                lora_name,
+                self._get_lora_config(model_name, lora_name),
+                metadata.echo_tensor_name,
                 self.default_max_tokens,
             )
         )
@@ -334,12 +369,21 @@ class TritonLLMEngine(LLMEngine):
         response = responses[0]
         text = _get_output(response)
 
-        usage = _get_usage_from_response(response, metadata.backend)
+        usage = _get_usage_from_response(
+            response, metadata.backend, RequestKind.GENERATION
+        )
+
+        # Parse logprobs if requested
+        logprobs_data = None
+        if request.logprobs is not None and request.logprobs > 0:
+            logprobs_data = _get_openai_completion_format_logprobs_from_vllm_response(
+                response
+            )
 
         choice = Choice(
             finish_reason=FinishReason.stop,
             index=0,
-            logprobs=None,
+            logprobs=logprobs_data,
             text=text,
         )
         return CreateCompletionResponse(
@@ -352,6 +396,57 @@ class TritonLLMEngine(LLMEngine):
             usage=usage,
         )
 
+    async def embedding(
+        self, request: CreateEmbeddingRequest
+    ) -> CreateEmbeddingResponse:
+        # Validate request and convert to Triton format
+        model_name, _ = self._get_model_and_lora_name(request.model)
+        metadata = self.model_metadata.get(model_name)
+        self._validate_embedding_request(request, metadata)
+
+        # Convert to Triton request format and perform inference
+        responses = metadata.model.async_infer(
+            metadata.embedding_request_converter(
+                metadata.model,
+                request,
+            )
+        )
+
+        # Response validation with decoupled models in mind
+        responses = [response async for response in responses]
+        _validate_triton_responses_non_streaming(responses)
+        response = responses[0]
+
+        # Extract embedding from response (currently stored as JSON string in text_output)
+        embedding_json = _get_output(response)
+        embedding_list = json.loads(embedding_json)
+
+        usage = _get_usage_from_response(
+            response, metadata.backend, RequestKind.EMBEDDING
+        )
+
+        embedding = self._get_embedding(embedding_list, request.encoding_format)
+        embedding_obj = EmbeddingObject(
+            embedding=embedding, index=0, object="embedding"
+        )
+
+        return CreateEmbeddingResponse(
+            object="list",
+            data=[embedding_obj],
+            model=request.model,
+            usage=usage,
+        )
+
+    @staticmethod
+    def _get_embedding(
+        embedding: List[float], encoding_format: Literal["float", "base64"]
+    ) -> Union[list[float], str]:
+        if encoding_format == "float":
+            return embedding
+        else:
+            embedding_bytes = np.array(embedding, dtype="float32").tobytes()
+            return base64.b64encode(embedding_bytes).decode("utf-8")
+
     # TODO: This behavior should be tested further
     def _get_first_response_role(
         self, conversation: List[Dict], add_generation_prompt: bool, default_role: str
@@ -362,18 +457,24 @@ class TritonLLMEngine(LLMEngine):
         return conversation[-1]["role"]
 
     # TODO: Expose explicit flag to catch edge cases
-    def _determine_request_converter(self, backend: str):
+    def _determine_request_converter(self, backend: str, request_type: RequestKind):
         # Allow manual override of backend request format if provided by user
         if self.backend:
             backend = self.backend
 
         # Request conversion from OpenAI format to backend-specific format
         if backend == "vllm":
-            return _create_vllm_inference_request
+            if request_type == RequestKind.GENERATION:
+                return _create_vllm_generate_request
+            else:
+                return _create_vllm_embedding_request
 
         # Use TRT-LLM format as default for everything else. This could be
         # an ensemble, a python or BLS model, a TRT-LLM backend model, etc.
-        return _create_trtllm_inference_request
+        if request_type == RequestKind.GENERATION:
+            return _create_trtllm_generate_request
+        else:
+            return _create_trtllm_embedding_request
 
     def _get_model_and_lora_name(self, request_model_name: str):
         if self.lora_separator is None or len(self.lora_separator) == 0:
@@ -405,20 +506,36 @@ class TritonLLMEngine(LLMEngine):
                 backend = "ensemble"
             print(f"Found model: {name=}, {backend=}")
 
-            lora_names = None
-            if self.backend == "vllm" or backend == "vllm":
-                lora_names = _get_vllm_lora_names(
-                    self.server.options.model_repository, name, model.version
-                )
+            lora_configs = _parse_lora_configs(
+                self.server.options.model_repository,
+                name,
+                model.version,
+                backend if self.backend is None else self.backend,
+            )
+
+            echo_tensor_name = None
+            for input in model.config()["input"]:
+                if input["name"] in [
+                    "exclude_input_in_output",
+                    "sampling_param_exclude_input_from_output",
+                ]:
+                    echo_tensor_name = input["name"]
+                    break
 
             metadata = TritonModelMetadata(
                 name=name,
                 backend=backend,
                 model=model,
                 tokenizer=self.tokenizer,
-                lora_names=lora_names,
+                lora_configs=lora_configs,
+                echo_tensor_name=echo_tensor_name,
                 create_time=self.create_time,
-                request_converter=self._determine_request_converter(backend),
+                inference_request_converter=self._determine_request_converter(
+                    backend, RequestKind.GENERATION
+                ),
+                embedding_request_converter=self._determine_request_converter(
+                    backend, RequestKind.EMBEDDING
+                ),
             )
             model_metadata[name] = metadata
 
@@ -509,6 +626,15 @@ class TritonLLMEngine(LLMEngine):
             )
             previous_text = current_text
 
+            # Parse logprobs for this chunk if requested
+            chunk_logprobs = None
+            if request.logprobs:
+                openai_logprobs = _get_openai_chat_format_logprobs_from_vllm_response(
+                    response
+                )
+                if openai_logprobs:
+                    chunk_logprobs = ChatCompletionLogprobs(content=openai_logprobs)
+
             # if the response delta is None (e.g. because it was a
             # "control token" for tool calls or the parser otherwise
             # wasn't ready to send a token, then
@@ -522,7 +648,7 @@ class TritonLLMEngine(LLMEngine):
             choice = ChatCompletionStreamingResponseChoice(
                 index=0,
                 delta=response_delta,
-                logprobs=None,
+                logprobs=chunk_logprobs,
                 finish_reason=finish_reason,
             )
 
@@ -600,7 +726,8 @@ class TritonLLMEngine(LLMEngine):
             # check to make sure we haven't "forgotten" to stream
             # any tokens that were generated but previously
             # matched by partial json parsing, such as '}'.
-            # only happens if we are NOT using guided decoding
+            # only happens if we are NOT using structured outputs
+            # or guided decoding
             if (
                 self._should_check_for_unstreamed_tool_arg_tokens(
                     response_delta=response_delta,
@@ -663,46 +790,56 @@ class TritonLLMEngine(LLMEngine):
 
         # Reject missing internal information needed to do inference
         if not metadata:
-            raise Exception(f"Unknown model: {request.model}")
+            raise ClientError(f"Unknown model: {request.model}")
 
         if not metadata.tokenizer:
-            raise Exception("Unknown tokenizer")
+            raise ServerError("Unknown tokenizer")
 
         if not metadata.backend:
-            raise Exception("Unknown backend")
+            raise ServerError("Unknown backend")
 
-        if not metadata.request_converter:
-            raise Exception(f"Unknown request format for model: {request.model}")
+        if not metadata.inference_request_converter:
+            raise ServerError(
+                f"Unknown inference request format for model: {request.model}"
+            )
+
+        if not metadata.embedding_request_converter:
+            raise ServerError(
+                f"Unknown embedding request format for model: {request.model}"
+            )
 
         if (
-            metadata.lora_names is not None
+            metadata.lora_configs is not None
             and lora_name is not None
-            and lora_name not in metadata.lora_names
+            and lora_name
+            not in [lora_config.name for lora_config in metadata.lora_configs]
         ):
-            raise Exception(f"Unknown LoRA: {lora_name}; for model: {request.model}")
+            raise ClientError(f"Unknown LoRA: {lora_name}; for model: {request.model}")
 
         # Reject unsupported features if requested
         if request.n and request.n > 1:
-            raise Exception(
+            raise ClientError(
                 f"Received n={request.n}, but only single choice (n=1) is currently supported"
             )
 
-        if request.logit_bias is not None or request.logprobs:
-            raise Exception("logit bias and log probs not currently supported")
+        if request.logit_bias is not None:
+            raise ClientError("logit bias is not currently supported")
+
+        # Logprobs are only supported for vLLM backend currently
+        if metadata.backend != "vllm" and (
+            request.logprobs or request.top_logprobs is not None
+        ):
+            raise ClientError(
+                "logprobs are currently available only for the vLLM backend"
+            )
+
+        if request.top_logprobs is not None and not request.logprobs:
+            raise ClientError("`top_logprobs` can only be used when `logprobs` is True")
 
         self._verify_chat_tool_call_settings(request=request)
 
         if request.stream_options and not request.stream:
-            raise Exception("`stream_options` can only be used when `stream` is True")
-
-        if (
-            request.stream_options
-            and request.stream_options.include_usage
-            and metadata.backend != "vllm"
-        ):
-            raise Exception(
-                "`stream_options.include_usage` is currently only supported for the vLLM backend"
-            )
+            raise ClientError("`stream_options` can only be used when `stream` is True")
 
     def _verify_chat_tool_call_settings(self, request: CreateChatCompletionRequest):
         if (
@@ -710,7 +847,7 @@ class TritonLLMEngine(LLMEngine):
             and request.tool_choice.root == ChatCompletionToolChoiceOption1.required
             and not request.tools
         ):
-            raise Exception(
+            raise ClientError(
                 '"required" tool choice requires CreateChatCompletionRequest.tools to be provided'
             )
 
@@ -719,7 +856,7 @@ class TritonLLMEngine(LLMEngine):
             and isinstance(request.tool_choice.root, ChatCompletionNamedToolChoice)
             and not request.tools
         ):
-            raise Exception(
+            raise ClientError(
                 "Named tool choice requires CreateChatCompletionRequest.tools to be provided"
             )
 
@@ -728,14 +865,16 @@ class TritonLLMEngine(LLMEngine):
             and request.tool_choice.root == ChatCompletionToolChoiceOption1.auto
             and self.tool_call_parser is None
         ):
-            raise Exception('"auto" tool choice requires --tool-call-parser to be set')
+            raise ClientError(
+                '"auto" tool choice requires --tool-call-parser to be set'
+            )
 
         if (
             request.tool_choice is None
             and request.tools
             and self.tool_call_parser is None
         ):
-            raise Exception(
+            raise ClientError(
                 "having tools in the request requires --tool-call-parser to be set"
             )
 
@@ -750,16 +889,32 @@ class TritonLLMEngine(LLMEngine):
         model = request.model
         include_usage = request.stream_options and request.stream_options.include_usage
         usage_accumulator = _StreamingUsageAccumulator(backend)
+        current_offset = 0
 
         async for response in responses:
             if include_usage:
                 usage_accumulator.update(response)
 
             text = _get_output(response)
+
+            # Parse logprobs for this chunk if requested
+            chunk_logprobs = None
+            if request.logprobs is not None and request.logprobs > 0:
+                chunk_logprobs = (
+                    _get_openai_completion_format_logprobs_from_vllm_response(response)
+                )
+                # Adjust text offsets based on accumulated output
+                if chunk_logprobs and chunk_logprobs.text_offset:
+                    chunk_logprobs.text_offset = [
+                        offset + current_offset for offset in chunk_logprobs.text_offset
+                    ]
+
+            current_offset += len(text)
+
             choice = Choice(
                 finish_reason=FinishReason.stop if response.final else None,
                 index=0,
-                logprobs=None,
+                logprobs=chunk_logprobs,
                 text=text,
             )
             chunk = CreateCompletionResponse(
@@ -802,55 +957,95 @@ class TritonLLMEngine(LLMEngine):
         """
         # Reject missing internal information needed to do inference
         if not metadata:
-            raise Exception(f"Unknown model: {request.model}")
+            raise ClientError(f"Unknown model: {request.model}")
 
         if not metadata.backend:
-            raise Exception("Unknown backend")
+            raise ServerError("Unknown backend")
 
-        if not metadata.request_converter:
-            raise Exception(f"Unknown request format for model: {request.model}")
+        if not metadata.inference_request_converter:
+            raise ServerError(
+                f"Unknown inference request format for model: {request.model}"
+            )
+
+        if not metadata.embedding_request_converter:
+            raise ServerError(
+                f"Unknown embedding request format for model: {request.model}"
+            )
 
         if (
-            metadata.lora_names is not None
+            metadata.lora_configs is not None
             and lora_name is not None
-            and lora_name not in metadata.lora_names
+            and lora_name
+            not in [lora_config.name for lora_config in metadata.lora_configs]
         ):
-            raise Exception(f"Unknown LoRA: {lora_name}; for model: {request.model}")
+            raise ClientError(f"Unknown LoRA: {lora_name}; for model: {request.model}")
 
         # Reject unsupported features if requested
         if request.suffix is not None:
-            raise Exception("suffix is not currently supported")
+            raise ClientError("suffix is not currently supported")
 
         if not request.prompt:
-            raise Exception("prompt must be non-empty")
+            raise ClientError("prompt must be non-empty")
 
         # Currently only support single string as input
         if not isinstance(request.prompt, str):
-            raise Exception("only single string input is supported")
+            raise ClientError("only single string input is supported")
+
+        if "best_of" in request.model_fields_set and metadata.backend == "vllm":
+            raise ClientError(
+                "best_of is no longer supported in vLLM backend, removed from vLLM V1 engine"
+            )
 
         if request.n and request.n > 1:
-            raise Exception(
+            raise ClientError(
                 f"Received n={request.n}, but only single choice (n=1) is currently supported"
             )
 
         if request.best_of and request.best_of > 1:
-            raise Exception(
+            raise ClientError(
                 f"Received best_of={request.best_of}, but only single choice (best_of=1) is currently supported"
             )
 
-        if request.logit_bias is not None or request.logprobs is not None:
-            raise Exception("logit bias and log probs not supported")
+        if request.logit_bias is not None:
+            raise ClientError("logit bias is not supported")
 
-        if request.stream_options and not request.stream:
-            raise Exception("`stream_options` can only be used when `stream` is True")
-
+        # Logprobs are only supported for vLLM backend currently
         if (
-            request.stream_options
-            and request.stream_options.include_usage
+            request.logprobs is not None
+            and request.logprobs > 0
             and metadata.backend != "vllm"
         ):
-            raise Exception(
-                "`stream_options.include_usage` is currently only supported for the vLLM backend"
+            raise ClientError(
+                "logprobs are currently available only for the vLLM backend"
+            )
+
+        if request.stream_options and not request.stream:
+            raise ClientError("`stream_options` can only be used when `stream` is True")
+
+    def _validate_embedding_request(
+        self,
+        request: CreateEmbeddingRequest,
+        metadata: TritonModelMetadata,
+    ):
+        """
+        Validates an embedding request to align with currently supported features.
+        """
+
+        # Reject missing internal information needed to do inference
+        if not metadata:
+            raise ClientError(f"Unknown model: {request.model}")
+
+        if not metadata.backend:
+            raise ServerError("Unknown backend")
+
+        if not metadata.inference_request_converter:
+            raise ServerError(
+                f"Unknown inference request format for model: {request.model}"
+            )
+
+        if not metadata.embedding_request_converter:
+            raise ServerError(
+                f"Unknown embedding request format for model: {request.model}"
             )
 
     def _should_stream_with_auto_tool_parsing(
@@ -895,3 +1090,14 @@ class TritonLLMEngine(LLMEngine):
             tool_choice_required_function_name = None
 
         return tool_choice_function_name or tool_choice_required_function_name
+
+    def _get_lora_config(
+        self, model_name: str, lora_name: Optional[str]
+    ) -> TritonLoraConfig:
+        model_metadata = self.model_metadata.get(model_name)
+        if lora_name is None or model_metadata.lora_configs is None:
+            return None
+        for lora_config in model_metadata.lora_configs:
+            if lora_config.name == lora_name:
+                return lora_config
+        raise ClientError(f"Unknown LoRA: {lora_name}; for model: {model_name}")

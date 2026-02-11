@@ -35,15 +35,12 @@ from fastapi.testclient import TestClient
 from tests.utils import setup_fastapi_app, setup_server
 
 
-@pytest.mark.fastapi
 class TestChatCompletions:
     @pytest.fixture(scope="class")
     def client(self, fastapi_client_class_scope):
         yield fastapi_client_class_scope
 
-    def test_chat_completions_defaults(
-        self, client, model: str, messages: List[dict], backend: str
-    ):
+    def test_chat_completions_defaults(self, client, model: str, messages: List[dict]):
         response = client.post(
             "/v1/chat/completions",
             json={"model": model, "messages": messages},
@@ -55,10 +52,7 @@ class TestChatCompletions:
         assert message["role"] == "assistant"
 
         usage = response.json().get("usage")
-        if backend == "vllm":
-            assert usage is not None
-        else:
-            assert usage is None
+        assert usage is not None
 
     def test_chat_completions_system_prompt(self, client, model: str):
         # NOTE: Currently just sanity check that there are no issues when a
@@ -160,12 +154,22 @@ class TestChatCompletions:
         )
 
         # FIXME: Add support and remove this check
-        unsupported_parameters = ["logprobs", "logit_bias"]
+        unsupported_parameters = ["logit_bias"]
         if param_key in unsupported_parameters:
             assert response.status_code == 400
+            assert response.json()["detail"] == "logit bias is not currently supported"
+            return
+
+        # TRT-LLM backend doesn't support logprobs
+        if (
+            param_key == "logprobs"
+            and param_value is True
+            and model == "tensorrt_llm_bls"
+        ):
+            assert response.status_code == 400
             assert (
-                response.json()["detail"]
-                == "logit bias and log probs not currently supported"
+                "logprobs are currently available only for the vLLM backend"
+                in response.json()["detail"]
             )
             return
 
@@ -529,21 +533,10 @@ class TestChatCompletions:
         pass
 
     @pytest.mark.skip(reason="Not Implemented Yet")
-    def test_request_logprobs(self):
-        pass
-
-    @pytest.mark.skip(reason="Not Implemented Yet")
     def test_request_logit_bias(self):
         pass
 
-    def test_usage_response(
-        self, client, model: str, messages: List[dict], backend: str
-    ):
-        if backend != "vllm":
-            pytest.skip(
-                "Usage reporting is currently available only for the vLLM backend."
-            )
-
+    def test_usage_response(self, client, model: str, messages: List[dict]):
         response = client.post(
             "/v1/chat/completions",
             json={"model": model, "messages": messages},
@@ -561,10 +554,139 @@ class TestChatCompletions:
             usage["total_tokens"] == usage["prompt_tokens"] + usage["completion_tokens"]
         )
 
+    def test_chat_completions_logprobs(
+        self, client, backend: str, model: str, messages: List[dict]
+    ):
+        """Test logprobs parameter for chat completions."""
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "logprobs": True,
+                "top_logprobs": 2,
+                "max_tokens": 10,
+            },
+        )
+
+        # Non-vLLM backends should raise an error
+        if backend != "vllm":
+            assert response.status_code == 400
+            assert (
+                "logprobs are currently available only for the vLLM backend"
+                in response.json()["detail"]
+            )
+            return
+
+        assert response.status_code == 200
+        response_json = response.json()
+
+        # Check that logprobs are present in the response
+        choice = response_json["choices"][0]
+        assert "logprobs" in choice
+        logprobs = choice["logprobs"]
+
+        assert logprobs is not None
+        assert "content" in logprobs
+        content = logprobs["content"]
+        assert isinstance(content, list)
+        assert len(content) > 0
+
+        # Validate structure of each token logprob
+        for token_logprob in content:
+            assert "token" in token_logprob
+            assert "logprob" in token_logprob
+            assert "bytes" in token_logprob
+            assert "top_logprobs" in token_logprob
+
+            assert isinstance(token_logprob["token"], str)
+            assert isinstance(token_logprob["logprob"], (int, float))
+            assert isinstance(token_logprob["bytes"], list)
+            assert isinstance(token_logprob["top_logprobs"], list)
+
+            # Validate top_logprobs structure
+            for top_logprob in token_logprob["top_logprobs"]:
+                assert "token" in top_logprob
+                assert "logprob" in top_logprob
+                assert "bytes" in top_logprob
+
+    def test_chat_completions_logprobs_false(
+        self, client, model: str, messages: List[dict]
+    ):
+        """Test that logprobs=False returns no logprobs."""
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "logprobs": False,
+                "max_tokens": 10,
+            },
+        )
+
+        assert response.status_code == 200
+        response_json = response.json()
+
+        # logprobs should be None when logprobs=False
+        choice = response_json["choices"][0]
+        assert choice.get("logprobs") is None
+
+    @pytest.mark.parametrize("top_logprobs_value", [0, 5])
+    def test_chat_completions_top_logprobs_without_logprobs(
+        self,
+        client,
+        model: str,
+        messages: List[dict],
+        top_logprobs_value: int,
+        backend: str,
+    ):
+        """Test that top_logprobs without logprobs raises validation error."""
+        if backend != "vllm":
+            pytest.skip(
+                reason="logprobs are currently available only for the vLLM backend"
+            )
+
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "top_logprobs": top_logprobs_value,
+                "max_tokens": 10,
+            },
+        )
+
+        # Should raise validation error for any value when logprobs is not True
+        assert response.status_code == 400
+        assert (
+            "`top_logprobs` can only be used when `logprobs` is True"
+            in response.json()["detail"]
+        )
+
+    def test_chat_completions_top_logprobs_validation(
+        self, client, model: str, messages: List[dict]
+    ):
+        """Test that top_logprobs > 20 is rejected by schema validation."""
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": model,
+                "messages": messages,
+                "logprobs": True,
+                "top_logprobs": 25,  # Exceeds maximum of 20
+                "max_tokens": 5,
+            },
+        )
+
+        # Should raise schema validation error
+        assert response.status_code == 422
+        assert "Input should be less than or equal to 20" in str(
+            response.json()["detail"]
+        )
+
 
 # For tests that won't use the same pytest fixture for server startup across
 # the whole class test suite.
-@pytest.mark.fastapi
 class TestChatCompletionsTokenizers:
     # Re-use a single Triton server for different frontend configurations
     @pytest.fixture(scope="class")
@@ -590,7 +712,7 @@ class TestChatCompletionsTokenizers:
                 json={"model": model, "messages": messages},
             )
 
-        assert response.status_code == 400
+        assert response.status_code == 500
         assert response.json()["detail"] == "Unknown tokenizer"
 
     def test_chat_completions_custom_tokenizer(
@@ -604,7 +726,7 @@ class TestChatCompletionsTokenizers:
         # Tokenizers can be provided by a local file path to a directory containing
         # the relevant files such as tokenizer.json and tokenizer_config.json.
         custom_tokenizer_path = str(Path(__file__).parent / "custom_tokenizer")
-        download_cmd = f"huggingface-cli download --local-dir {custom_tokenizer_path} {tokenizer_model} --include *.json"
+        download_cmd = f"hf download --local-dir {custom_tokenizer_path} {tokenizer_model} --include *.json"
         print(f"Running download command: {download_cmd}")
         subprocess.run(download_cmd.split(), check=True)
 
@@ -677,7 +799,7 @@ class TestChatCompletionsTokenizers:
                 json={"model": model, "messages": messages},
             )
 
-        assert response.status_code == 400
+        assert response.status_code == 500
         # Error may vary based on transformers version
         expected_errors = [
             "cannot use apply_chat_template()",

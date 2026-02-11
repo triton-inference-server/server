@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -111,17 +111,17 @@ The Model Configuration ModelOptimizationPolicy property is used to specify opti
 
 #### Scheduling and Batching
 
-Triton supports batching individual inference requests to improve compute resource utilization. This is extremely important as individual requests typically will not saturate GPU resources thus not leveraging the parallelism provided by GPUs to its extent. Learn more about Triton's [Batcher and Scheduler](user_guide/model_configuration.md#scheduling-and-batching).
-- [Default Scheduler - Non-Batching](user_guide/model_configuration.md#default-scheduler)
-- [Dynamic Batcher](user_guide/model_configuration.md#dynamic-batcher)
+Triton supports batching individual inference requests to improve compute resource utilization. This is extremely important as individual requests typically will not saturate GPU resources thus not leveraging the parallelism provided by GPUs to its extent. Learn more about Triton's [Batcher and Scheduler](#scheduling-and-batching).
+- [Default Scheduler - Non-Batching](user_guide/scheduler.md#default-scheduler)
+- [Dynamic Batcher](user_guide/batcher.md#dynamic-batcher)
   - [How to Configure Dynamic Batcher](user_guide/model_configuration.md#recommended-configuration-process)
-    - [Delayed Batching](user_guide/model_configuration.md#delayed-batching)
+    - [Delayed Batching](user_guide/batcher.md#delayed-batching)
     - [Preferred Batch Size](user_guide/model_configuration.md#preferred-batch-sizes)
   - [Preserving Request Ordering](user_guide/model_configuration.md#preserve-ordering)
   - [Priority Levels](user_guide/model_configuration.md#priority-levels)
   - [Queuing Policies](user_guide/model_configuration.md#queue-policy)
   - [Ragged Batching](user_guide/ragged_batching.md)
-- [Sequence Batcher](user_guide/model_configuration.md#sequence-batcher)
+- [Sequence Batcher](user_guide/batcher.md#sequence-batcher)
   - [Stateful Models](user_guide/model_execution.md#stateful-models)
   - [Control Inputs](user_guide/model_execution.md#control-inputs)
   - [Implicit State - Stateful Inference Using a Stateless Model](user_guide/implicit_state_management.md#implicit-state-management)

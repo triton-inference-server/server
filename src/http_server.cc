@@ -1,4 +1,4 @@
-// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -483,7 +483,7 @@ ReadDataFromJsonHelper(
   // Currently 'switch' is performed on each element even through all elements
   // have the same data type.
 
-  if (current_depth >= HTTP_MAX_JSON_NESTING_DEPTH) {
+  if (current_depth >= HTTP_MAX_JSON_NESTING_DEPTH || current_depth < 0) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         ("JSON nesting depth exceeds maximum allowed "
@@ -502,7 +502,7 @@ ReadDataFromJsonHelper(
     }
   } else {
     // Check if writing to 'serialized' is overrunning the expected byte_size
-    if (*counter >= expected_cnt) {
+    if (*counter < 0 || static_cast<int64_t>(*counter) >= expected_cnt) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
           "Shape does not match true shape of 'data' field");
@@ -603,11 +603,19 @@ ReadDataFromJsonHelper(
         break;
       }
       case TRITONSERVER_TYPE_BYTES: {
-        const char* cstr;
-        size_t len = 0;
+        const char* cstr{nullptr};
+        size_t len{0};
         RETURN_IF_ERR(tensor_data.AsString(&cstr, &len));
-        if (static_cast<int64_t>(*counter + len + sizeof(uint32_t)) >
-            expected_cnt) {
+        if (len > INT64_MAX) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
+              "Tensor size is too large to be processed");
+        }
+        // Quick sanity check to ensure we don't write beyond `expected_cnt`.
+        int64_t actual_cnt = static_cast<int64_t>(*counter) +
+                             static_cast<int64_t>(len) +
+                             static_cast<int64_t>(sizeof(uint32_t));
+        if (actual_cnt < 0 || actual_cnt > expected_cnt) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
               "Shape does not match true shape of 'data' field");
@@ -1085,7 +1093,12 @@ CompressionTypeUsed(const std::string accept_encoding)
       try {
         type_weight = std::stod(encoding.substr(weight_pos + 3));
       }
+      catch (const std::out_of_range& oor) {
+        type_weight = 0;
+        continue;
+      }
       catch (const std::invalid_argument& ia) {
+        type_weight = 0;
         continue;
       }
     }
@@ -3220,7 +3233,8 @@ HTTPAPIServer::DecompressBuffer(
     case DataCompressor::Type::GZIP: {
       *decompressed_buffer = evbuffer_new();
       RETURN_IF_ERR(DataCompressor::DecompressData(
-          compression_type, req->buffer_in, *decompressed_buffer));
+          compression_type, req->buffer_in, *decompressed_buffer,
+          max_input_size_));
       break;
     }
     case DataCompressor::Type::UNKNOWN: {

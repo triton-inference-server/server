@@ -27,10 +27,15 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from utils.utils import StatusCode
 
 # Mapping of API to their corresponding HTTP endpoints
 ENDPOINT_MAPPING = {
-    "inference": ["POST /v1/chat/completions", "POST /v1/completions"],
+    "inference": [
+        "POST /v1/chat/completions",
+        "POST /v1/completions",
+        "POST /v1/embeddings",
+    ],
     "model-repository": ["GET /v1/models"],
     "metrics": ["GET /metrics"],
     "health": ["GET /health/ready"],
@@ -185,7 +190,7 @@ class APIRestrictionMiddleware(BaseHTTPMiddleware):
         else:
             # Authentication failed, return 401 error
             return JSONResponse(
-                status_code=401,
+                status_code=StatusCode.AUTHORIZATION_ERROR,
                 content={
                     "error": {
                         "message": auth_result["message"],

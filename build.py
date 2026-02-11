@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -71,14 +71,14 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.63.0dev",
-    "triton_container_version": "25.11dev",
-    "upstream_container_version": "25.09",
-    "ort_version": "1.23.1",
-    "ort_openvino_version": "2025.3.0",
-    "standalone_openvino_version": "2025.3.0",
-    "dcgm_version": "4.4.0-1",
-    "vllm_version": "0.10.1.1",
+    "release_version": "2.67.0dev",
+    "triton_container_version": "26.03dev",
+    "upstream_container_version": "26.01",
+    "ort_version": "1.24.1",
+    "ort_openvino_version": "2025.4.1",
+    "standalone_openvino_version": "2025.4.1",
+    "dcgm_version": "4.5.2-1",
+    "vllm_version": "0.13.0",
     "rhel_py_version": "3.12.3",
 }
 
@@ -660,6 +660,10 @@ def pytorch_cmake_args(images):
         cargs.append(
             cmake_backend_enable("pytorch", "TRITON_ENABLE_NVTX", FLAGS.enable_nvtx)
         )
+        if target_platform() == "igpu":
+            cargs.append(
+                cmake_backend_enable("pytorch", "TRITON_PYTORCH_NVSHMEM", False)
+            )
     return cargs
 
 
@@ -707,7 +711,7 @@ def onnxruntime_cmake_args(images, library_paths):
                     "onnxruntime",
                     "TRITON_BUILD_CONTAINER_VERSION",
                     None,
-                    FLAGS.triton_container_version,
+                    FLAGS.upstream_container_version,
                 )
             )
 
@@ -858,9 +862,10 @@ ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
+    && dnf makecache --refresh \\
     && dnf install --assumeyes \\
-                 datacenter-gpu-manager-4-core=1:{} \\
-                 datacenter-gpu-manager-4-devel=1:{}
+                 datacenter-gpu-manager-4-core-1:{} \\
+                 datacenter-gpu-manager-4-devel-1:{}
 """.format(
                     dcgm_version, dcgm_version, dcgm_version
                 )
@@ -870,9 +875,10 @@ ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo \\
     && dnf clean expire-cache \\
+    && dnf makecache --refresh \\
     && dnf install --assumeyes \\
-                 datacenter-gpu-manager-4-core=1:{} \\
-                 datacenter-gpu-manager-4-devel=1:{}
+                 datacenter-gpu-manager-4-core-1:{} \\
+                 datacenter-gpu-manager-4-devel-1:{}
 """.format(
                     dcgm_version, dcgm_version, dcgm_version
                 )
@@ -885,7 +891,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
         https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
-      && apt update \\
+      && apt update -qq \\
       && apt install --yes --no-install-recommends \\
                   datacenter-gpu-manager-4-core=1:{} \\
                   datacenter-gpu-manager-4-dev=1:{}
@@ -900,7 +906,7 @@ RUN curl -o /tmp/cuda-keyring.deb \\
           https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \\
       && apt install /tmp/cuda-keyring.deb \\
       && rm /tmp/cuda-keyring.deb \\
-      && apt update \\
+      && apt update -qq \\
       && apt install --yes --no-install-recommends \\
                    datacenter-gpu-manager-4-core=1:{} \\
                    datacenter-gpu-manager-4-dev=1:{}
@@ -998,14 +1004,16 @@ RUN pip3 install --upgrade pip \\
           virtualenv \\
           patchelf==0.17.2 \\
           cmake==4.0.3
-
+"""
+    df += f"""
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
-RUN wget -O /tmp/boost.tar.gz \\
-          https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz \\
+RUN wget -O /tmp/boost.tar.gz {FLAGS.boost_url} \\
+      && sha256sum /tmp/boost.tar.gz | grep {FLAGS.boost_sha256} \\
       && (cd /tmp && tar xzf boost.tar.gz) \\
       && mv /tmp/boost_1_80_0/boost /usr/include/boost
 """
+
     if FLAGS.enable_gpu:
         df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine())
     df += """
@@ -1109,14 +1117,15 @@ RUN pip3 install --upgrade \\
           virtualenv \\
           patchelf==0.17.2 \\
           cmake==4.0.3
+"""
 
+        df += f"""
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
-RUN wget -O /tmp/boost.tar.gz \\
-          https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz \\
+RUN wget -O /tmp/boost.tar.gz {FLAGS.boost_url} \\
+      && sha256sum /tmp/boost.tar.gz | grep {FLAGS.boost_sha256} \\
       && (cd /tmp && tar xzf boost.tar.gz) \\
       && mv /tmp/boost_1_80_0/boost /usr/include/boost
-
 """
 
         if FLAGS.enable_gpu:
@@ -1233,16 +1242,16 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
         argmap, backends, FLAGS.enable_gpu, target_machine()
     )
 
-    df += """
+    df += f"""
 WORKDIR /opt
 COPY --chown=1000:1000 build/install tritonserver
 
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonserver-*.whl" | xargs -I {} pip install --upgrade {}[all] && \\
+    "tritonserver-*.whl" | xargs -I {{}} pip install --upgrade {{}}[{FLAGS.triton_wheels_dependencies_group}] && \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonfrontend-*.whl" | xargs -I {} pip install --upgrade {}[all]
+    "tritonfrontend-*.whl" | xargs -I {{}} pip install --upgrade {{}}[{FLAGS.triton_wheels_dependencies_group}]
 
 RUN pip3 install -r python/openai/requirements.txt
 
@@ -1278,11 +1287,6 @@ RUN ldconfig && \\
     pip3 install --no-cache-dir  grpcio-tools==1.64.0 && \\
     pip3 uninstall -y setuptools
 ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
-
-# There are some ucc issues when spawning mpi processes with ompi v4.1.7a1.
-# Downgrade to ompi v4.1.5rc2 to avoid the issue.
-RUN rm -fr /opt/hpcx/ompi
-COPY --from=nvcr.io/nvidia/tritonserver:24.02-py3-min /opt/hpcx/ompi /opt/hpcx/ompi
 """
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -1461,14 +1465,6 @@ RUN apt-get update \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
 """
-    if "tensorrtllm" in backends:
-        df += """
-# Updating the openssh-client to fix for the CVE-2024-6387. This can be removed when trtllm uses a later CUDA container(12.5 or later)
-RUN apt-get update \\
-    && apt-get install -y --no-install-recommends \\
-        openssh-client \\
-    && rm -rf /var/lib/apt/lists/*
-    """
 
     if "vllm" in backends:
         df += f"""
@@ -1507,12 +1503,33 @@ RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
 ARG PYVER=3.12
 ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages/torch/lib:${{LD_LIBRARY_PATH}}
 """
+    if "tensorrtllm" in backends or "vllm" in backends:
+        df += """
+ENV TRITON_CUDACRT_PATH=/usr/local/cuda/include \\
+    TRITON_CUDART_PATH=/usr/local/cuda/include \\
+    TRITON_CUOBJDUMP_PATH=/usr/local/cuda/bin/cuobjdump \\
+    TRITON_CUPTI_PATH=/usr/local/cuda/include \\
+    TRITON_NVDISASM_PATH=/usr/local/cuda/bin/nvdisasm \\
+    TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
+"""
 
     if "dali" in backends:
         df += """
 # Update Python path to include DALI
 ENV PYTHONPATH=/opt/tritonserver/backends/dali/wheel/dali:$PYTHONPATH
 """
+
+    if target_platform() == "rhel":
+        repo_arch = "sbsa" if target_machine == "aarch64" else "x86_64"
+        df += """
+RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/{repo_arch}/cuda-rhel8.repo \\
+    && dnf clean expire-cache \\
+    && dnf install --assumeyes libnvshmem3-cuda-13
+
+RUN dirname  $(find /usr -name "libcudart*.so" -o  -name "libnvinf*.so" -o -name "libnvshm*" -type f) | sort -u > /etc/ld.so.conf.d/triton-cuda-libs.conf && ldconfig
+""".format(
+            repo_arch=repo_arch
+        )
 
     df += """
 WORKDIR /opt/tritonserver
@@ -1566,6 +1583,7 @@ COPY --from=min_container /usr/local/cuda/lib64/libnvJitLink.so.13 /usr/local/cu
 COPY --from=min_container /usr/local/cuda/lib64/libcufile.so.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libnvrtc.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libcusparseLt.so.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libnvshmem_host.so.3 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
 COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1
@@ -2075,11 +2093,6 @@ def backend_build(
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
     if be == "tensorrtllm":
-        github_organization = (
-            "https://github.com/NVIDIA"
-            if "triton-inference-server" in FLAGS.github_organization
-            else FLAGS.github_organization
-        )
         repository_name = "TensorRT-LLM"
         cmake_script.gitclone(repository_name, tag, be, github_organization)
     else:
@@ -2774,6 +2787,13 @@ if __name__ == "__main__":
         "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n\n"
         "Ensure that the required environment variables for these secrets are set before running the build.",
     )
+    parser.add_argument(
+        "--triton-wheels-dependencies-group",
+        required=False,
+        type=str,
+        default="all",
+        help="The group of dependencies for Triton wheels to be installed. Default value is 'all'.",
+    )
     FLAGS = parser.parse_args()
 
     if FLAGS.image is None:
@@ -2803,6 +2823,13 @@ if __name__ == "__main__":
     if FLAGS.build_secret is None:
         FLAGS.build_secret = []
 
+    FLAGS.boost_url = os.getenv(
+        "TRITON_BOOST_URL",
+        "https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz",
+    )
+    FLAGS.boost_sha256 = (
+        "4b2136f98bdd1f5857f1c3dea9ac2018effe65286cf251534b6ae20cc45e1847"
+    )
     # if --enable-all is specified, then update FLAGS to enable all
     # settings, backends, repo-agents, caches, file systems, endpoints, etc.
     if FLAGS.enable_all:
@@ -2849,12 +2876,11 @@ if __name__ == "__main__":
     # backends, repo-agents, and caches if a repo-tag is not given
     # explicitly. For release branches we use the release branch as
     # the default, otherwise we use 'main'.
-    default_repo_tag = "main"
-    cver = FLAGS.upstream_container_version
-    if cver is None:
-        cver = FLAGS.triton_container_version
-    if not cver.endswith("dev"):
-        default_repo_tag = "r" + cver
+    default_repo_tag = (
+        "main"
+        if FLAGS.triton_container_version.endswith("dev")
+        else "r" + FLAGS.triton_container_version
+    )
     log("default repo-tag: {}".format(default_repo_tag))
 
     # For other versions use the TRITON_VERSION_MAP unless explicitly
