@@ -119,14 +119,19 @@ USER_READY_MODELS=(
     "is_model_ready_fn_raises_error"
     "is_model_ready_fn_returns_non_boolean"
     "is_model_ready_fn_timeout"
+    "is_model_ready_fn_returns_true_decoupled"
 )
 
 # Create model directories and copy files
 for MODEL in "${USER_READY_MODELS[@]}"; do
     mkdir -p ./models/$MODEL/1/
     cp ./test_models/$MODEL/model.py ./models/$MODEL/1/model.py
-    cp ./models/identity_fp32/config.pbtxt ./models/$MODEL/config.pbtxt
-    sed -i "s/^name:.*/name: \"$MODEL\"/" ./models/$MODEL/config.pbtxt
+    if [ "$MODEL" == "is_model_ready_fn_returns_true_decoupled" ]; then
+        cp ./test_models/$MODEL/config.pbtxt ./models/$MODEL/config.pbtxt
+    else
+        cp ./models/identity_fp32/config.pbtxt ./models/$MODEL/config.pbtxt
+        sed -i "s/^name:.*/name: \"$MODEL\"/" ./models/$MODEL/config.pbtxt
+    fi
 done
 
 # Start server with all models

@@ -26,13 +26,29 @@
 
 import unittest
 import numpy as np
+import queue
 import time
 import threading
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
+from tritonclient.utils import InferenceServerException
+from functools import partial
 
 URL_HTTP = "localhost:8000"
 URL_GRPC = "localhost:8001"
+DEFAULT_RESPONSE_TIMEOUT = 60
+
+
+class UserData:
+    def __init__(self):
+        self._response_queue = queue.Queue()
+
+
+def callback(user_data, result, error):
+    if error:
+        user_data._response_queue.put(error)
+    else:
+        user_data._response_queue.put(result)
 
 
 def call_inference(model_name, protocol, client):
@@ -42,20 +58,58 @@ def call_inference(model_name, protocol, client):
 
     if protocol == "http":
         inputs = [httpclient.InferInput("INPUT0", input_data.shape, "FP32")]
-        inputs[0].set_data_from_numpy(input_data)
-        result = client.infer(model_name, inputs)
-        output_data = result.as_numpy("OUTPUT0")
     else:
         inputs = [grpcclient.InferInput("INPUT0", input_data.shape, "FP32")]
-        inputs[0].set_data_from_numpy(input_data)
-        result = client.infer(model_name, inputs)
-        output_data = result.as_numpy("OUTPUT0")
+
+    inputs[0].set_data_from_numpy(input_data)
+    result = client.infer(model_name, inputs)
+    output_data = result.as_numpy("OUTPUT0")
 
     np.testing.assert_array_almost_equal(
         input_data,
         output_data,
         err_msg=f"Inference output mismatch for {model_name}",
     )
+
+
+def prepare_infer_args_for_decoupled(input_value):
+    input_data = np.array([input_value], dtype=np.int32)
+    infer_input = [grpcclient.InferInput("IN", input_data.shape, "INT32")]
+    infer_input[0].set_data_from_numpy(input_data)
+    outputs = [grpcclient.InferRequestedOutput("OUT")]
+    return infer_input, outputs
+
+
+def collect_responses_for_decoupled(user_data):
+    """
+    Collect responses from user_data until the final response flag is seen.
+    """
+    errors = []
+    responses = []
+    while True:
+        try:
+            result = user_data._response_queue.get(timeout=DEFAULT_RESPONSE_TIMEOUT)
+        except queue.Empty:
+            raise Exception(
+                f"No response received within {DEFAULT_RESPONSE_TIMEOUT} seconds."
+            )
+
+        if type(result) == InferenceServerException:
+            errors.append(result)
+            # error responses are final - stream terminates
+            break
+
+        response = result.get_response()
+        # Add response to list if it has data (not empty final-only response)
+        if len(response.outputs) > 0:
+            responses.append(result)
+
+        # Check if this is the final response
+        final = response.parameters.get("triton_final_response")
+        if final and final.bool_param:
+            break
+
+    return errors, responses
 
 
 class TestModelReadiness(unittest.TestCase):
@@ -116,18 +170,107 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         self.client_http = httpclient.InferenceServerClient(url=URL_HTTP)
         self.client_grpc = grpcclient.InferenceServerClient(url=URL_GRPC)
 
+    def _run_inference_decoupled(self, index, model_name, expected_responses_count):
+        """
+        Helper function for streaming inference.
+        """
+        user_data = UserData()
+        with grpcclient.InferenceServerClient(URL_GRPC) as triton_client:
+            try:
+                inputs, outputs = prepare_infer_args_for_decoupled(
+                    expected_responses_count
+                )
+                triton_client.start_stream(callback=partial(callback, user_data))
+                triton_client.async_stream_infer(
+                    model_name=model_name, inputs=inputs, outputs=outputs
+                )
+
+                # Collect and verify responses
+                errors, responses = collect_responses_for_decoupled(user_data)
+                self.assertEqual(
+                    len(responses),
+                    expected_responses_count,
+                    f"Index: {index} - Expected {expected_responses_count} responses, got {len(responses)}",
+                )
+                self.assertEqual(
+                    len(errors),
+                    0,
+                    f"Index: {index} - Expected 0 errors, got {len(errors)}",
+                )
+
+                # Verify correctness of successful responses
+                for idx, resp in enumerate(responses):
+                    output = resp.as_numpy("OUT")
+                    self.assertAlmostEqual(
+                        output[0],
+                        expected_responses_count,
+                        places=5,
+                        msg=f"Response {idx} has incorrect value - {output[0]}",
+                    )
+            finally:
+                triton_client.stop_stream()
+
+    def test_multiple_concurrent_ready_and_infer_requests_decoupled(self):
+        """
+        Test BLS decoupled inference and readiness requests
+        """
+        model_name = "is_model_ready_fn_returns_true_decoupled"
+        num_requests = 16
+        response_count = num_requests
+        readiness_errors = []
+        infer_errors = []
+
+        def readiness_wrapper(index, model_name):
+            try:
+                with grpcclient.InferenceServerClient(url=URL_GRPC) as triton_client:
+                    is_ready = triton_client.is_model_ready(model_name)
+                    if not is_ready:
+                        raise AssertionError(
+                            f"Index: {index} - GRPC client - Model {model_name} should be READY"
+                        )
+            except Exception as e:
+                readiness_errors.append((index, str(e)))
+
+        def inference_wrapper(index, model_name):
+            try:
+                self._run_inference_decoupled(index, model_name, response_count)
+            except Exception as e:
+                infer_errors.append((index, str(e)))
+
+        # Launch concurrent threads
+        threads = []
+        for i in range(num_requests):
+            t1 = threading.Thread(
+                target=inference_wrapper, args=(i, model_name), name=f"infer-{i}"
+            )
+            t2 = threading.Thread(
+                target=readiness_wrapper, args=(i, model_name), name=f"ready-{i}"
+            )
+            threads.extend([t1, t2])
+            t1.start()
+            t2.start()
+
+        # Wait for all requests to complete
+        for t in threads:
+            t.join(timeout=120)
+
+        self.assertEqual(
+            len(readiness_errors), 0, f"Readiness errors: {readiness_errors}"
+        )
+        self.assertEqual(len(infer_errors), 0, f"Inference errors: {infer_errors}")
+
     def test_is_model_ready_returns_true(self):
         model_name = "is_model_ready_fn_returns_true"
 
-        # Send many sequential requests to ensure consistent behavior
+        # Send multiple sequential requests to ensure consistent behavior
         for i in range(10):
             self.assertTrue(
                 self.client_http.is_model_ready(model_name),
-                f"Model {model_name} should be READY",
+                f"iteration {i} - HTTP client - Model {model_name} should be READY",
             )
             self.assertTrue(
                 self.client_grpc.is_model_ready(model_name),
-                f"Model {model_name} should be READY",
+                f"iteration {i} - GRPC client - Model {model_name} should be READY",
             )
 
         # Inference should work
@@ -138,15 +281,15 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
     def test_is_model_ready_returns_false(self):
         model_name = "is_model_ready_fn_returns_false"
 
-        # Send many sequential requests to ensure consistent behavior
+        # Send multiple sequential requests to ensure consistent behavior
         for i in range(10):
             self.assertFalse(
                 self.client_http.is_model_ready(model_name),
-                f"Model {model_name} should be NOT READY",
+                f"iteration {i} - HTTP client - Model {model_name} should be NOT READY",
             )
             self.assertFalse(
                 self.client_grpc.is_model_ready(model_name),
-                f"Model {model_name} should be NOT READY",
+                f"iteration {i} - GRPC client - Model {model_name} should be NOT READY",
             )
 
         # Inference should still work
@@ -157,15 +300,15 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
     def test_is_model_ready_raises_exception(self):
         model_name = "is_model_ready_fn_raises_error"
 
-        # Send many sequential requests to ensure consistent behavior
+        # Send multiple sequential requests to ensure consistent behavior
         for i in range(10):
             self.assertFalse(
                 self.client_http.is_model_ready(model_name),
-                f"Model {model_name} should be NOT READY (exception)",
+                f"iteration {i} - HTTP client - Model {model_name} should be NOT READY (exception)",
             )
             self.assertFalse(
                 self.client_grpc.is_model_ready(model_name),
-                f"Model {model_name} should be NOT READY (exception)",
+                f"iteration {i} - GRPC client - Model {model_name} should be NOT READY (exception)",
             )
 
         # Test good model afterwards to ensure server is healthy
@@ -173,11 +316,11 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         for i in range(10):
             self.assertTrue(
                 self.client_http.is_model_ready(model_name),
-                f"Model {model_name} should be READY",
+                f"iteration {i} - HTTP client - Model {model_name} should be READY",
             )
             self.assertTrue(
                 self.client_grpc.is_model_ready(model_name),
-                f"Model {model_name} should be READY",
+                f"iteration {i} - GRPC client - Model {model_name} should be READY",
             )
 
         # Inference should still work
@@ -188,15 +331,15 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
     def test_is_model_ready_returns_non_boolean(self):
         model_name = "is_model_ready_fn_returns_non_boolean"
 
-        # Send many sequential requests to ensure consistent behavior
+        # Send multiple sequential requests to ensure consistent behavior
         for i in range(10):
             self.assertFalse(
                 self.client_http.is_model_ready(model_name),
-                f"Model {model_name} should be NOT READY (wrong return type)",
+                f"iteration {i} - HTTP client - Model {model_name} should be NOT READY (wrong return type)",
             )
             self.assertFalse(
                 self.client_grpc.is_model_ready(model_name),
-                f"Model {model_name} should be NOT READY (wrong return type)",
+                f"iteration {i} - GRPC client - Model {model_name} should be NOT READY (wrong return type)",
             )
 
         # Inference should still work
@@ -207,27 +350,31 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
     def test_is_model_ready_takes_longs_time(self):
         model_name = "is_model_ready_fn_timeout"
 
-        # Send many sequential requests to ensure consistent behavior
+        # Send multiple sequential requests to validate timeout.
         for i in range(10):
-            # Should timeout and return NOT ready
-            # Note: Stub will still continue execution in background
-            # even though request timeout after in built python backend 5s timeout for ready request
+            # This call should time out and return NOT READY.
+            # Note: the stub may keep executing is_model_ready() in the background
+            # after the backend-side readiness timeout expires.
             is_ready = self.client_http.is_model_ready(model_name)
             self.assertFalse(
-                is_ready, f"Model {model_name} should timeout and return NOT READY"
+                is_ready,
+                f"iteration {i} - HTTP client - Model {model_name} should timeout and return NOT READY",
             )
 
-            # Wait for stub to complete the execution in previous call
-            time.sleep(6)
+            # Wait few microseconds before calling inference
+            time.sleep(0.5)
             call_inference(model_name, "http", self.client_http)
 
+            # This call should wait on the in-flight readiness check
+            # (no new IPC) and return READY once it completes.
             is_ready = self.client_grpc.is_model_ready(model_name)
-            self.assertFalse(
-                is_ready, f"Model {model_name} should timeout and be NOT READY"
+            self.assertTrue(
+                is_ready,
+                f"iteration {i} - GRPC client - Model {model_name} should be READY",
             )
 
             # Wait again before calling inference
-            time.sleep(6)
+            time.sleep(0.5)
             call_inference(model_name, "grpc", self.client_grpc)
 
     def test_multiple_concurrent_ready_and_infer_requests(self):
