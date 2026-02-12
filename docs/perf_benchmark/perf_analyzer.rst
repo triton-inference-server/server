@@ -32,6 +32,7 @@ Performance Analyzer
 .. toctree::
    :maxdepth: 1
 
+   Overview <../perf_analyzer/README.md>
    Recommended Installation Method <../perf_analyzer/docs/install.md>
    Inference Load Modes <../perf_analyzer/docs/inference_load_modes.md>
    Input Data <../perf_analyzer/docs/input_data.md>

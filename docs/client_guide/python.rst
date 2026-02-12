@@ -32,5 +32,6 @@ Python
 .. toctree::
    :maxdepth: 1
 
+   Overview <../tutorials/Triton_Inference_Server_Python_API/README.md>
    Kafka I/O <../tutorials/Triton_Inference_Server_Python_API/examples/kafka-io/README.md>
    Rayserve <../tutorials/Triton_Inference_Server_Python_API/examples/rayserve/README.md>

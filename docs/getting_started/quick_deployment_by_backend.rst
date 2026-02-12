@@ -32,6 +32,7 @@ Quick Deployment Guide by backend
 .. toctree::
    :maxdepth: 1
 
+   Quickstart <quickstart.md>
    TRT-LLM <llm.md>
    vLLM <../tutorials/Popular_Models_Guide/Llama2/vllm_guide.md>
    Python with HuggingFace <../tutorials/Quick_Deploy/HuggingFaceTransformers/README.md>

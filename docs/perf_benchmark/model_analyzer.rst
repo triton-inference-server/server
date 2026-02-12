@@ -32,6 +32,7 @@ Model Analyzer
 .. toctree::
    :maxdepth: 1
 
+   Overview <../model_analyzer/README.md>
    Model Analyzer CLI <../model_analyzer/docs/cli.md>
    Launch Modes <../model_analyzer/docs/launch_modes.md>
    Table of Contents <../model_analyzer/docs/config.md>
