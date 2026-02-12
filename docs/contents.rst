@@ -1,5 +1,5 @@
 ..
-.. Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+.. Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 ..
 .. Redistribution and use in source and binary forms, with or without
 .. modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@
    :caption: Getting Started
 
    getting_started/quick_deployment_by_backend
-   LLM With TRT-LLM <getting_started/trtllm_user_guide.md>
+   LLM With TensorRT-LLM <getting_started/trtllm_user_guide.md>
    Multimodal model <../tutorials/Popular_Models_Guide/Llava1.5/llava_trtllm_guide.md>
    Stable diffusion <../tutorials/Popular_Models_Guide/StableDiffusion/README.md>
 
@@ -96,10 +96,10 @@
    :hidden:
    :caption: Backends
 
-   TRT-LLM <tensorrtllm_backend/README>
+   TensorRT-LLM <tensorrtllm_backend/README>
    vLLM <backend_guide/vllm>
    Python <python_backend/README>
-   Pytorch <pytorch_backend/README>
+   PyTorch <pytorch_backend/README>
    ONNX Runtime <onnxruntime_backend/README>
    TensorRT <tensorrt_backend/README>
    FIL <fil_backend/README>
