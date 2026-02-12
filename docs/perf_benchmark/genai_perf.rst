@@ -30,7 +30,8 @@ GenAI Performance Analyzer
 ####
 
 .. toctree::
-   :titlesonly:
+   :maxdepth: 1
+   :hidden:
 
    Overview <../perf_analyzer/genai-perf/README.md>
    Large language models <../perf_analyzer/genai-perf/docs/tutorial.md>

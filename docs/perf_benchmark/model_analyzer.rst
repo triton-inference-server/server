@@ -31,6 +31,7 @@ Model Analyzer
 
 .. toctree::
    :maxdepth: 1
+   :hidden:
 
    Overview <../model_analyzer/README.md>
    Documentation <../model_analyzer/docs/README.md>

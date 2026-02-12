@@ -31,6 +31,7 @@ Performance Analyzer
 
 .. toctree::
    :maxdepth: 1
+   :hidden:
 
    Overview <../perf_analyzer/README.md>
    Documentation <../perf_analyzer/docs/README.md>

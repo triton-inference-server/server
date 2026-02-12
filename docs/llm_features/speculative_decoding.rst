@@ -30,7 +30,8 @@ Speculative Decoding
 ####
 
 .. toctree::
-   :titlesonly:
+   :maxdepth: 1
+   :hidden:
 
    Overview <../tutorials/Feature_Guide/Speculative_Decoding/README.md>
    TRT-LLM <../tutorials/Feature_Guide/Speculative_Decoding/TRT-LLM/README.md>
