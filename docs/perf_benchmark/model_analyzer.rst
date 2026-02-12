@@ -30,7 +30,7 @@ Model Analyzer
 ####
 
 .. toctree::
-   :titlesonly:
+   :maxdepth: 1
 
    Overview <../model_analyzer/README.md>
    Model Analyzer CLI <../model_analyzer/docs/cli.md>

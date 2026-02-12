@@ -30,7 +30,7 @@ Performance Analyzer
 ####
 
 .. toctree::
-   :titlesonly:
+   :maxdepth: 1
 
    Overview <../perf_analyzer/README.md>
    Recommended Installation Method <../perf_analyzer/docs/install.md>
