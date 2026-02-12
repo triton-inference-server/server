@@ -1,5 +1,5 @@
 ..
-.. Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+.. Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 ..
 .. Redistribution and use in source and binary forms, with or without
 .. modification, are permitted provided that the following conditions
@@ -29,17 +29,23 @@
 Model Analyzer
 ####
 
-.. include:: model-analyzer-README.rst
-
 .. toctree::
    :maxdepth: 1
    :hidden:
 
-   ../model_analyzer/docs/cli.md
-   ../model_analyzer/docs/launch_modes.md
-   ../model_analyzer/docs/config.md
-   ../model_analyzer/docs/metrics.md
-   ../model_analyzer/docs/config_search.md
-   ../model_analyzer/docs/checkpoints.md
-   ../model_analyzer/docs/report.md
-   ../model_analyzer/docs/kubernetes_deploy.md
+   Overview <../model_analyzer/README.md>
+   Documentation <../model_analyzer/docs/README.md>
+   Quick Start <../model_analyzer/docs/quick_start.md>
+   Installation <../model_analyzer/docs/install.md>
+   CLI Reference <../model_analyzer/docs/cli.md>
+   Launch Modes <../model_analyzer/docs/launch_modes.md>
+   Configuration <../model_analyzer/docs/config.md>
+   Configuration Search <../model_analyzer/docs/config_search.md>
+   Metrics <../model_analyzer/docs/metrics.md>
+   Checkpointing <../model_analyzer/docs/checkpoints.md>
+   Reports <../model_analyzer/docs/report.md>
+   Kubernetes <../model_analyzer/docs/kubernetes_deploy.md>
+   Model Types <../model_analyzer/docs/model_types.md>
+   Ensemble Model <../model_analyzer/docs/ensemble_quick_start.md>
+   BLS Model <../model_analyzer/docs/bls_quick_start.md>
+   Multi-Model <../model_analyzer/docs/mm_quick_start.md>

@@ -36,7 +36,7 @@
    :hidden:
    :caption: Getting Started
 
-   getting_started/quick_deployment_by_backend
+   getting_started/quick_deployment
    LLM With TensorRT-LLM <getting_started/trtllm_user_guide.md>
    Multimodal model <../tutorials/Popular_Models_Guide/Llava1.5/llava_trtllm_guide.md>
    Stable diffusion <../tutorials/Popular_Models_Guide/StableDiffusion/README.md>
@@ -54,7 +54,7 @@
 
    Constrained Decoding <../tutorials/Feature_Guide/Constrained_Decoding/README.md>
    Function Calling <../tutorials/Feature_Guide/Function_Calling/README.md>
-   llm_features/speculative_decoding_by_backend_type
+   llm_features/speculative_decoding
 
 .. toctree::
    :hidden:
@@ -108,7 +108,7 @@
 
 .. toctree::
    :hidden:
-   :caption: Perf benchmarking and tuning
+   :caption: Performance benchmarking and tuning
 
    GenAI Perf Analyzer <perf_benchmark/genai_perf>
    Performance Analyzer <perf_benchmark/perf_analyzer>
