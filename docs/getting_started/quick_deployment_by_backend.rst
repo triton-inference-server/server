@@ -30,7 +30,7 @@ Quick Deployment Guide by backend
 ####
 
 .. toctree::
-   :maxdepth: 1
+   :titlesonly:
 
    Quickstart <quickstart.md>
    TRT-LLM <llm.md>
