@@ -29,12 +29,8 @@
 Python
 ####
 
-.. include:: ../tutorials/Triton_Inference_Server_Python_API/README.md
-   :parser: myst_parser.sphinx_
-
 .. toctree::
    :maxdepth: 1
-   :hidden:
 
    Kafka I/O <../tutorials/Triton_Inference_Server_Python_API/examples/kafka-io/README.md>
    Rayserve <../tutorials/Triton_Inference_Server_Python_API/examples/rayserve/README.md>

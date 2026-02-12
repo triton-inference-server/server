@@ -29,12 +29,8 @@
 Quick Deployment Guide by backend
 ####
 
-.. include:: quickstart.md
-   :parser: myst_parser.sphinx_
-
 .. toctree::
    :maxdepth: 1
-   :hidden:
 
    TRT-LLM <llm.md>
    vLLM <../tutorials/Popular_Models_Guide/Llama2/vllm_guide.md>

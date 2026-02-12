@@ -29,15 +29,10 @@
 Performance Analyzer
 ####
 
-.. include:: ../perf_analyzer/README.md
-   :parser: myst_parser.sphinx_
-
 .. toctree::
    :maxdepth: 1
-   :hidden:
 
-   ../perf_analyzer/docs/install.md
-   ../perf_analyzer/docs/CLI.md
-   ../perf_analyzer/docs/inference_load_modes.md
-   ../perf_analyzer/docs/input_data.md
-   ../perf_analyzer/docs/measurements_metrics.md
+   Recommended Installation Method <../perf_analyzer/docs/install.md>
+   Inference Load Modes <../perf_analyzer/docs/inference_load_modes.md>
+   Input Data <../perf_analyzer/docs/input_data.md>
+   Measurement Modes <../perf_analyzer/docs/measurements_metrics.md>

@@ -29,18 +29,14 @@
 Model Analyzer
 ####
 
-.. include:: ../model_analyzer/README.md
-   :parser: myst_parser.sphinx_
-
 .. toctree::
    :maxdepth: 1
-   :hidden:
 
-   ../model_analyzer/docs/cli.md
-   ../model_analyzer/docs/launch_modes.md
-   ../model_analyzer/docs/config.md
-   ../model_analyzer/docs/metrics.md
-   ../model_analyzer/docs/config_search.md
-   ../model_analyzer/docs/checkpoints.md
-   ../model_analyzer/docs/report.md
-   ../model_analyzer/docs/kubernetes_deploy.md
+   Model Analyzer CLI <../model_analyzer/docs/cli.md>
+   Launch Modes <../model_analyzer/docs/launch_modes.md>
+   Table of Contents <../model_analyzer/docs/config.md>
+   Model Analyzer Metrics <../model_analyzer/docs/metrics.md>
+   Table of Contents <../model_analyzer/docs/config_search.md>
+   Checkpointing in Model Analyzer <../model_analyzer/docs/checkpoints.md>
+   Model Analyzer Reports <../model_analyzer/docs/report.md>
+   Deploying Model Analyzer on a Kubernetes cluster <../model_analyzer/docs/kubernetes_deploy.md>

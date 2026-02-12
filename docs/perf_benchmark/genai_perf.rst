@@ -28,13 +28,9 @@
 ####
 GenAI Performance Analyzer
 ####
-.. include:: ../perf_analyzer/genai-perf/README.md
-   :parser: myst_parser.sphinx_
-
 
 .. toctree::
    :maxdepth: 1
-   :hidden:
 
    Large language models <../perf_analyzer/genai-perf/docs/tutorial.md>
    Visual language models <../perf_analyzer/genai-perf/docs/multi_modal.md>

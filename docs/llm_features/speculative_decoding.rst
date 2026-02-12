@@ -29,12 +29,8 @@
 Speculative Decoding
 ####
 
-.. include:: ../tutorials/Feature_Guide/Speculative_Decoding/README.md
-   :parser: myst_parser.sphinx_
-
 .. toctree::
    :maxdepth: 1
-   :hidden:
 
    TRT-LLM <../tutorials/Feature_Guide/Speculative_Decoding/TRT-LLM/README.md>
    vLLM <../tutorials/Feature_Guide/Speculative_Decoding/vLLM/README.md>
