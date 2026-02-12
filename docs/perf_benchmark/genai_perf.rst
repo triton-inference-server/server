@@ -28,7 +28,7 @@
 ####
 GenAI Performance Analyzer
 ####
-.. include:: ../genai_perf/README.md
+.. include:: ../perf_analyzer/genai-perf/README.md
    :parser: myst_parser.sphinx_
 
 
