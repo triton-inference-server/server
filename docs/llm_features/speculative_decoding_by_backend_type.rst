@@ -1,5 +1,5 @@
 ..
-.. Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+.. Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 ..
 .. Redistribution and use in source and binary forms, with or without
 .. modification, are permitted provided that the following conditions
@@ -29,7 +29,8 @@
 Speculative Decoding
 ####
 
-.. include:: speculative_decoding.rst
+.. include:: ../tutorials/Feature_Guide/Speculative_Decoding/README.md
+   :parser: myst_parser.sphinx_
 
 .. toctree::
    :maxdepth: 1

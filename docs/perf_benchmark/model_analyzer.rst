@@ -1,5 +1,5 @@
 ..
-.. Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+.. Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 ..
 .. Redistribution and use in source and binary forms, with or without
 .. modification, are permitted provided that the following conditions
@@ -29,7 +29,8 @@
 Model Analyzer
 ####
 
-.. include:: model-analyzer-README.rst
+.. include:: ../model_analyzer/README.md
+   :parser: myst_parser.sphinx_
 
 .. toctree::
    :maxdepth: 1
