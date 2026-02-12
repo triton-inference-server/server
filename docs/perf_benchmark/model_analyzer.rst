@@ -33,11 +33,18 @@ Model Analyzer
    :maxdepth: 1
 
    Overview <../model_analyzer/README.md>
-   Model Analyzer CLI <../model_analyzer/docs/cli.md>
+   Documentation <../model_analyzer/docs/README.md>
+   Quick Start <../model_analyzer/docs/quick_start.md>
+   Installation <../model_analyzer/docs/install.md>
+   CLI Reference <../model_analyzer/docs/cli.md>
    Launch Modes <../model_analyzer/docs/launch_modes.md>
-   Table of Contents <../model_analyzer/docs/config.md>
-   Model Analyzer Metrics <../model_analyzer/docs/metrics.md>
-   Table of Contents <../model_analyzer/docs/config_search.md>
-   Checkpointing in Model Analyzer <../model_analyzer/docs/checkpoints.md>
-   Model Analyzer Reports <../model_analyzer/docs/report.md>
-   Deploying Model Analyzer on a Kubernetes cluster <../model_analyzer/docs/kubernetes_deploy.md>
+   Configuration <../model_analyzer/docs/config.md>
+   Configuration Search <../model_analyzer/docs/config_search.md>
+   Metrics <../model_analyzer/docs/metrics.md>
+   Checkpointing <../model_analyzer/docs/checkpoints.md>
+   Reports <../model_analyzer/docs/report.md>
+   Kubernetes <../model_analyzer/docs/kubernetes_deploy.md>
+   Model Types <../model_analyzer/docs/model_types.md>
+   Ensemble Model <../model_analyzer/docs/ensemble_quick_start.md>
+   BLS Model <../model_analyzer/docs/bls_quick_start.md>
+   Multi-Model <../model_analyzer/docs/mm_quick_start.md>
