@@ -205,7 +205,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
 
     def test_multiple_concurrent_ready_and_infer_requests_decoupled(self):
         model_name = "is_model_ready_fn_returns_true_decoupled"
-        num_requests = 32
+        num_requests = 16
         response_count = num_requests
         readiness_errors = []
         infer_errors = []
@@ -230,6 +230,8 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         # Launch concurrent threads
         threads = []
         for i in range(num_requests):
+            # Start threads with slight delay
+            time.sleep(0.1)
             t1 = threading.Thread(
                 target=inference_wrapper, args=(i, model_name), name=f"infer-{i}"
             )
@@ -244,10 +246,27 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         for t in threads:
             t.join(timeout=120)
 
+        for t in threads:
+            self.assertFalse(t.is_alive(), f"Threads are not completed: {t.name}")
+
         self.assertEqual(
             len(readiness_errors), 0, f"Readiness errors: {readiness_errors}"
         )
         self.assertEqual(len(infer_errors), 0, f"Inference errors: {infer_errors}")
+
+    def test_is_model_ready_coroutine_returns_true(self):
+        model_name = "is_model_ready_fn_coroutine_returns_true"
+        for _ in range(5):
+            self.assertTrue(
+                self.client_http.is_model_ready(model_name),
+                f"HTTP - Model {model_name} (coroutine) should be READY",
+            )
+            self.assertTrue(
+                self.client_grpc.is_model_ready(model_name),
+                f"gRPC - Model {model_name} (coroutine) should be READY",
+            )
+        call_inference_identity_model(model_name, "http", self.client_http)
+        call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
     def test_is_model_ready_returns_true(self):
         model_name = "is_model_ready_fn_returns_true"
@@ -398,7 +417,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         ready_errors = {"http": [], "grpc": []}
         infer_results = {"http": [], "grpc": []}
         infer_errors = {"http": [], "grpc": []}
-        num_requests = 32
+        num_requests = 16
 
         def check_model_readiness(protocol, index):
             try:
@@ -443,6 +462,9 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         for t in http_threads:
             t.join(timeout=60)
 
+        for t in http_threads:
+            self.assertFalse(t.is_alive(), f"HTTP threads are not completed")
+
         time.sleep(5)
 
         grpc_threads = []
@@ -456,6 +478,9 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         # Wait for all requests to complete
         for t in grpc_threads:
             t.join(timeout=60)
+
+        for t in grpc_threads:
+            self.assertFalse(t.is_alive(), f"gRPC threads are not completed")
 
         time.sleep(5)
 

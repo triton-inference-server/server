@@ -119,6 +119,7 @@ USER_READY_MODELS=(
     "is_model_ready_fn_raises_error"
     "is_model_ready_fn_returns_non_boolean"
     "is_model_ready_fn_timeout"
+    "is_model_ready_fn_coroutine_returns_true"
     "is_model_ready_fn_returns_true_decoupled"
 )
 
