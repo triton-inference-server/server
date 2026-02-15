@@ -72,42 +72,37 @@ def call_inference(model_name, protocol, client):
     )
 
 
-def prepare_infer_args_for_decoupled(input_value):
-    input_data = np.array([input_value], dtype=np.int32)
+def prepare_infer_args(input_value):
+    """
+    Create InferInput/InferRequestedOutput lists
+    """
+    input_data = np.array([[input_value]], dtype=np.int32)
     infer_input = [grpcclient.InferInput("IN", input_data.shape, "INT32")]
     infer_input[0].set_data_from_numpy(input_data)
     outputs = [grpcclient.InferRequestedOutput("OUT")]
     return infer_input, outputs
 
 
-def collect_responses_for_decoupled(user_data):
+def collect_responses(user_data, expected_responses_count):
     """
     Collect responses from user_data until the final response flag is seen.
     """
     errors = []
     responses = []
-    while True:
+    recv_count = 0
+    while recv_count < expected_responses_count:
         try:
             result = user_data._response_queue.get(timeout=DEFAULT_RESPONSE_TIMEOUT)
         except queue.Empty:
             raise Exception(
                 f"No response received within {DEFAULT_RESPONSE_TIMEOUT} seconds."
             )
-
         if type(result) == InferenceServerException:
             errors.append(result)
-            # error responses are final - stream terminates
             break
-
-        response = result.get_response()
-        # Add response to list if it has data (not empty final-only response)
-        if len(response.outputs) > 0:
-            responses.append(result)
-
-        # Check if this is the final response
-        final = response.parameters.get("triton_final_response")
-        if final and final.bool_param:
-            break
+        else:
+            responses.append(result.as_numpy("OUT")[0])
+        recv_count = recv_count + 1
 
     return errors, responses
 
@@ -177,7 +172,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         user_data = UserData()
         with grpcclient.InferenceServerClient(URL_GRPC) as triton_client:
             try:
-                inputs, outputs = prepare_infer_args_for_decoupled(
+                inputs, outputs = prepare_infer_args(
                     expected_responses_count
                 )
                 triton_client.start_stream(callback=partial(callback, user_data))
@@ -186,7 +181,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 )
 
                 # Collect and verify responses
-                errors, responses = collect_responses_for_decoupled(user_data)
+                errors, responses = collect_responses(user_data, expected_responses_count)
                 self.assertEqual(
                     len(responses),
                     expected_responses_count,
@@ -199,13 +194,11 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 )
 
                 # Verify correctness of successful responses
-                for idx, resp in enumerate(responses):
-                    output = resp.as_numpy("OUT")
-                    self.assertAlmostEqual(
-                        output[0],
+                for idx, output in enumerate(responses):
+                    self.assertEqual(
+                        output,
                         expected_responses_count,
-                        places=5,
-                        msg=f"Response {idx} has incorrect value - {output[0]}",
+                        msg=f"Response {idx} has incorrect value - {output}",
                     )
             finally:
                 triton_client.stop_stream()

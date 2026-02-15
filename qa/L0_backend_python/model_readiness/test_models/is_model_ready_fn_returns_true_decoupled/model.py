@@ -39,15 +39,15 @@ class TritonPythonModel:
         for request in requests:
             # Get input - number of responses to produce
             in_tensor = pb_utils.get_input_tensor_by_name(request, "IN")
-            count = int(in_tensor.as_numpy()[0])
+            count = in_tensor.as_numpy().item()
 
             response_sender = request.get_response_sender()
+            out_tensor = pb_utils.Tensor("OUT", np.array([count], dtype=np.int32))
 
             # Produce 'count' responses, each with 'count' as the output value
             for i in range(count):
-                out_tensor = pb_utils.Tensor("OUT", np.array([count], dtype=np.int32))
+                time.sleep(0.1)  # Simulate some processing delay
                 response = pb_utils.InferenceResponse(output_tensors=[out_tensor])
-                time.sleep(0.5)
                 response_sender.send(response)
 
             # Send final flag
@@ -56,6 +56,6 @@ class TritonPythonModel:
         return None
     
     def is_model_ready(self) -> bool:
-        # Add some delay 500ms
-        time.sleep(0.5)  
+        # Simulate some processing delay
+        time.sleep(0.2)  
         return True
