@@ -51,27 +51,6 @@ def callback(user_data, result, error):
         user_data._response_queue.put(result)
 
 
-def call_inference(model_name, protocol, client):
-    """Helper to test inference functionality"""
-    shape = (1, 8)
-    input_data = np.ones(shape, dtype=np.float32)
-
-    if protocol == "http":
-        inputs = [httpclient.InferInput("INPUT0", input_data.shape, "FP32")]
-    else:
-        inputs = [grpcclient.InferInput("INPUT0", input_data.shape, "FP32")]
-
-    inputs[0].set_data_from_numpy(input_data)
-    result = client.infer(model_name, inputs)
-    output_data = result.as_numpy("OUTPUT0")
-
-    np.testing.assert_array_almost_equal(
-        input_data,
-        output_data,
-        err_msg=f"Inference output mismatch for {model_name}",
-    )
-
-
 def prepare_infer_args(input_value):
     """
     Create InferInput/InferRequestedOutput lists
@@ -107,6 +86,27 @@ def collect_responses(user_data, expected_responses_count):
     return errors, responses
 
 
+def call_inference_identity_model(model_name, protocol, client):
+    """Helper to test inference functionality"""
+    shape = (1, 8)
+    input_data = np.ones(shape, dtype=np.float32)
+
+    if protocol == "http":
+        inputs = [httpclient.InferInput("INPUT0", input_data.shape, "FP32")]
+    else:
+        inputs = [grpcclient.InferInput("INPUT0", input_data.shape, "FP32")]
+
+    inputs[0].set_data_from_numpy(input_data)
+    result = client.infer(model_name, inputs)
+    output_data = result.as_numpy("OUTPUT0")
+
+    np.testing.assert_array_almost_equal(
+        input_data,
+        output_data,
+        err_msg=f"Inference output mismatch for {model_name}",
+    )
+
+
 class TestModelReadiness(unittest.TestCase):
     def setUp(self):
         self.model_name = "identity_fp32"
@@ -120,7 +120,7 @@ class TestModelReadiness(unittest.TestCase):
             self.assertTrue(
                 is_ready, f"[HTTP] Model {self.model_name} should be READY but is NOT"
             )
-            call_inference(self.model_name, "http", self.client_http)
+            call_inference_identity_model(self.model_name, "http", self.client_http)
         except Exception as e:
             self.fail(f"[HTTP] Unexpected error: {str(e)}")
 
@@ -130,7 +130,7 @@ class TestModelReadiness(unittest.TestCase):
             self.assertTrue(
                 is_ready, f"[gRPC] Model {self.model_name} should be READY but is NOT"
             )
-            call_inference(self.model_name, "grpc", self.client_grpc)
+            call_inference_identity_model(self.model_name, "grpc", self.client_grpc)
         except Exception as e:
             self.fail(f"[gRPC] Unexpected error: {str(e)}")
 
@@ -172,16 +172,16 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         user_data = UserData()
         with grpcclient.InferenceServerClient(URL_GRPC) as triton_client:
             try:
-                inputs, outputs = prepare_infer_args(
-                    expected_responses_count
-                )
+                inputs, outputs = prepare_infer_args(expected_responses_count)
                 triton_client.start_stream(callback=partial(callback, user_data))
                 triton_client.async_stream_infer(
                     model_name=model_name, inputs=inputs, outputs=outputs
                 )
 
                 # Collect and verify responses
-                errors, responses = collect_responses(user_data, expected_responses_count)
+                errors, responses = collect_responses(
+                    user_data, expected_responses_count
+                )
                 self.assertEqual(
                     len(responses),
                     expected_responses_count,
@@ -204,11 +204,8 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 triton_client.stop_stream()
 
     def test_multiple_concurrent_ready_and_infer_requests_decoupled(self):
-        """
-        Test BLS decoupled inference and readiness requests
-        """
         model_name = "is_model_ready_fn_returns_true_decoupled"
-        num_requests = 16
+        num_requests = 32
         response_count = num_requests
         readiness_errors = []
         infer_errors = []
@@ -254,9 +251,10 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
 
     def test_is_model_ready_returns_true(self):
         model_name = "is_model_ready_fn_returns_true"
+        num_requests = 10
 
-        # Send multiple sequential requests to ensure consistent behavior
-        for i in range(10):
+        # Send multiple requests in sequence to ensure consistent behavior
+        for i in range(num_requests):
             self.assertTrue(
                 self.client_http.is_model_ready(model_name),
                 f"iteration {i} - HTTP client - Model {model_name} should be READY",
@@ -266,16 +264,17 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 f"iteration {i} - GRPC client - Model {model_name} should be READY",
             )
 
-        # Inference should work
-        # readiness check functionality should not affect inference
-        call_inference(model_name, "http", self.client_http)
-        call_inference(model_name, "grpc", self.client_grpc)
+            # Inference should work normally
+            # readiness check functionality should not affect inference
+            call_inference_identity_model(model_name, "http", self.client_http)
+            call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
     def test_is_model_ready_returns_false(self):
         model_name = "is_model_ready_fn_returns_false"
+        num_requests = 10
 
-        # Send multiple sequential requests to ensure consistent behavior
-        for i in range(10):
+        # Send multiple requests in sequence to ensure consistent behavior
+        for i in range(num_requests):
             self.assertFalse(
                 self.client_http.is_model_ready(model_name),
                 f"iteration {i} - HTTP client - Model {model_name} should be NOT READY",
@@ -285,16 +284,17 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 f"iteration {i} - GRPC client - Model {model_name} should be NOT READY",
             )
 
-        # Inference should still work
-        # readiness check functionality should not affect inference
-        call_inference(model_name, "http", self.client_http)
-        call_inference(model_name, "grpc", self.client_grpc)
+            # Inference should work normally
+            # readiness check functionality should not affect inference
+            call_inference_identity_model(model_name, "http", self.client_http)
+            call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
     def test_is_model_ready_raises_exception(self):
         model_name = "is_model_ready_fn_raises_error"
+        num_requests = 10
 
-        # Send multiple sequential requests to ensure consistent behavior
-        for i in range(10):
+        # Send multiple requests in sequence to ensure consistent behavior
+        for i in range(num_requests):
             self.assertFalse(
                 self.client_http.is_model_ready(model_name),
                 f"iteration {i} - HTTP client - Model {model_name} should be NOT READY (exception)",
@@ -304,9 +304,14 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 f"iteration {i} - GRPC client - Model {model_name} should be NOT READY (exception)",
             )
 
+            # Inference should work normally
+            # readiness check functionality should not affect inference
+            call_inference_identity_model(model_name, "http", self.client_http)
+            call_inference_identity_model(model_name, "grpc", self.client_grpc)
+
         # Test good model afterwards to ensure server is healthy
         model_name = "is_model_ready_fn_returns_true"
-        for i in range(10):
+        for i in range(num_requests):
             self.assertTrue(
                 self.client_http.is_model_ready(model_name),
                 f"iteration {i} - HTTP client - Model {model_name} should be READY",
@@ -316,16 +321,17 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 f"iteration {i} - GRPC client - Model {model_name} should be READY",
             )
 
-        # Inference should still work
-        # readiness check functionality should not affect inference
-        call_inference(model_name, "http", self.client_http)
-        call_inference(model_name, "grpc", self.client_grpc)
+            # Inference should work normally
+            # readiness check functionality should not affect inference
+            call_inference_identity_model(model_name, "http", self.client_http)
+            call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
     def test_is_model_ready_returns_non_boolean(self):
         model_name = "is_model_ready_fn_returns_non_boolean"
+        num_requests = 10
 
-        # Send multiple sequential requests to ensure consistent behavior
-        for i in range(10):
+        # Send multiple requests in sequence to ensure consistent behavior
+        for i in range(num_requests):
             self.assertFalse(
                 self.client_http.is_model_ready(model_name),
                 f"iteration {i} - HTTP client - Model {model_name} should be NOT READY (wrong return type)",
@@ -335,40 +341,56 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 f"iteration {i} - GRPC client - Model {model_name} should be NOT READY (wrong return type)",
             )
 
-        # Inference should still work
-        # readiness check functionality should not affect inference
-        call_inference(model_name, "http", self.client_http)
-        call_inference(model_name, "grpc", self.client_grpc)
+            # Inference should work normally
+            # readiness check functionality should not affect inference
+            call_inference_identity_model(model_name, "http", self.client_http)
+            call_inference_identity_model(model_name, "grpc", self.client_grpc)
+
+        # Test good model afterwards to ensure server is healthy
+        model_name = "is_model_ready_fn_returns_true"
+        for i in range(num_requests):
+            self.assertTrue(
+                self.client_http.is_model_ready(model_name),
+                f"iteration {i} - HTTP client - Model {model_name} should be READY",
+            )
+            self.assertTrue(
+                self.client_grpc.is_model_ready(model_name),
+                f"iteration {i} - GRPC client - Model {model_name} should be READY",
+            )
+
+            # Inference should work normally
+            # readiness check functionality should not affect inference
+            call_inference_identity_model(model_name, "http", self.client_http)
+            call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
     def test_is_model_ready_takes_longs_time(self):
         model_name = "is_model_ready_fn_timeout"
+        num_requests = 10
 
-        # Send multiple sequential requests to validate timeout.
-        for i in range(10):
-            # This call should time out and return NOT READY.
-            # Note: the stub may keep executing is_model_ready() in the background
-            # after the backend-side readiness timeout expires.
+        # Send multiple requests in sequence to ensure consistent behavior
+        for i in range(num_requests):
+            # This call should time out and return NOT_READY.
+            # Note: the stub will continue running is_model_ready()
+            # in the background (similar to the inference flow)
+            # even after the backend readiness timeout expires.
             is_ready = self.client_http.is_model_ready(model_name)
             self.assertFalse(
                 is_ready,
                 f"iteration {i} - HTTP client - Model {model_name} should timeout and return NOT READY",
             )
 
-            # Wait few microseconds before calling inference
-            time.sleep(0.5)
-            call_inference(model_name, "http", self.client_http)
+            call_inference_identity_model(model_name, "http", self.client_http)
 
-            # This call should wait on the in-flight readiness check
-            # (no new IPC) and return READY once it completes.
+            # This call should not create another internal IPC message.
+            # It must wait for the in-flight readiness check
+            # and return READY once that check completes.
             is_ready = self.client_grpc.is_model_ready(model_name)
             self.assertTrue(
                 is_ready,
                 f"iteration {i} - GRPC client - Model {model_name} should be READY",
             )
 
-            # Wait again before calling inference
-            time.sleep(0.5)
-            call_inference(model_name, "grpc", self.client_grpc)
+            call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
     def test_multiple_concurrent_ready_and_infer_requests(self):
         model_name = "is_model_ready_fn_returns_true"
@@ -376,7 +398,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         ready_errors = {"http": [], "grpc": []}
         infer_results = {"http": [], "grpc": []}
         infer_errors = {"http": [], "grpc": []}
-        num_requests = 16
+        num_requests = 32
 
         def check_model_readiness(protocol, index):
             try:
@@ -396,19 +418,19 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 if protocol == "http":
                     with httpclient.InferenceServerClient(url=URL_HTTP) as client_http:
                         start = time.time()
-                        call_inference(model_name, protocol, client_http)
+                        call_inference_identity_model(model_name, protocol, client_http)
                         elapsed = time.time() - start
                         infer_results["http"].append((index, True, elapsed))
                 else:
                     with grpcclient.InferenceServerClient(url=URL_GRPC) as client_grpc:
                         start = time.time()
-                        call_inference(model_name, protocol, client_grpc)
+                        call_inference_identity_model(model_name, protocol, client_grpc)
                         elapsed = time.time() - start
                         infer_results["grpc"].append((index, True, elapsed))
             except Exception as e:
                 infer_errors[protocol].append((index, str(e)))
 
-        # Launch 10 concurrent ready checks
+        # Launch concurrent ready checks
         http_threads = []
         for i in range(num_requests):
             t1 = threading.Thread(target=check_model_readiness, args=("http", i))
@@ -419,9 +441,9 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
 
         # Wait for all requests to complete
         for t in http_threads:
-            t.join(timeout=30)
+            t.join(timeout=60)
 
-        time.sleep(5)  # Give some time for all inference threads to complete
+        time.sleep(5)
 
         grpc_threads = []
         for i in range(num_requests):
@@ -433,11 +455,11 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
 
         # Wait for all requests to complete
         for t in grpc_threads:
-            t.join(timeout=30)
+            t.join(timeout=60)
 
-        time.sleep(5)  # Give some time for all inference threads to complete
+        time.sleep(5)
 
-        # Verify all succeeded
+        # Verify no errors in readiness checks
         self.assertEqual(
             len(ready_errors["http"]), 0, f"HTTP errors: {ready_errors['http']}"
         )
@@ -461,7 +483,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         for idx, ready in ready_results["grpc"]:
             self.assertTrue(ready, f"gRPC check {idx} should be ready")
 
-        # Verify no errors
+        # Verify no errors in inference
         self.assertEqual(
             len(infer_errors["http"]), 0, f"Errors occurred: {infer_errors['http']}"
         )
@@ -478,15 +500,6 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             num_requests,
             f"Expected {num_requests} gRPC inference results",
         )
-
-        for idx, success, elapsed in infer_results["http"]:
-            print(
-                f"Inference http[{idx}]: {'OK' if success else 'FAIL'} ({elapsed:.3f}s)"
-            )
-        for idx, success, elapsed in infer_results["grpc"]:
-            print(
-                f"Inference grpc[{idx}]: {'OK' if success else 'FAIL'} ({elapsed:.3f}s)"
-            )
 
 
 if __name__ == "__main__":

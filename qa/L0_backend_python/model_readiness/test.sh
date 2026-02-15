@@ -35,7 +35,7 @@ RET=0
 rm -fr *.log ./models
 
 MODEL_NAME="identity_fp32"
-mkdir -p ./models/$MODEL_NAME/1/
+mkdir -p models/$MODEL_NAME/1/
 cp ../../python_models/$MODEL_NAME/model.py ./models/$MODEL_NAME/1/model.py
 cp ../../python_models/$MODEL_NAME/config.pbtxt ./models/$MODEL_NAME/config.pbtxt
 
@@ -136,8 +136,8 @@ done
 
 # Start server with all models
 SERVER_ARGS="--model-repository=$(pwd)/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_LOG="./user_model_ready_server.log"
-CLIENT_LOG="./user_model_ready_client.log"
+SERVER_LOG="./test_user_defined_model_readiness_function_server.log"
+CLIENT_LOG="./test_user_defined_model_readiness_function_client.log"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -148,10 +148,6 @@ fi
 
 set +e
 
-# Wait for models to load
-sleep 5
-
-# Run test suite for user-defined model readiness
 echo "Running TestUserDefinedModelReadinessFunction..."
 python3 -m unittest test_model_readiness.TestUserDefinedModelReadinessFunction -v >> ${CLIENT_LOG} 2>&1
 TEST_EXIT_CODE=$?
