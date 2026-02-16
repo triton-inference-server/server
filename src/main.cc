@@ -404,6 +404,7 @@ StartTracing(triton::server::TraceManager** trace_manager)
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_Error* err = triton::server::TraceManager::Create(
       trace_manager, g_triton_params.trace_level_, g_triton_params.trace_rate_,
+      g_triton_params.trace_honor_parent_sampling_,
       g_triton_params.trace_count_, g_triton_params.trace_log_frequency_,
       g_triton_params.trace_filepath_, g_triton_params.trace_mode_,
       g_triton_params.trace_config_map_);
