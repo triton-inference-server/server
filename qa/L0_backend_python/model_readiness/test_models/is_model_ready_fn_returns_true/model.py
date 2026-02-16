@@ -24,8 +24,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import triton_python_backend_utils as pb_utils
 import time
+
+import triton_python_backend_utils as pb_utils
+
 
 class TritonPythonModel:
     def execute(self, requests):
@@ -41,5 +43,5 @@ class TritonPythonModel:
 
     def is_model_ready(self) -> bool:
         # Add slight delay 200ms - under 5s timeout
-        time.sleep(0.2)  
+        time.sleep(0.2)
         return True

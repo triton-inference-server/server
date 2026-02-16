@@ -24,15 +24,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
-import numpy as np
 import queue
-import time
 import threading
+import time
+import unittest
+from functools import partial
+
+import numpy as np
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 from tritonclient.utils import InferenceServerException
-from functools import partial
 
 URL_HTTP = "localhost:8000"
 URL_GRPC = "localhost:8001"

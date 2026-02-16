@@ -38,7 +38,7 @@ class TritonPythonModel:
             out_tensor = pb_utils.Tensor("OUTPUT0", input_tensor.as_numpy())
             responses.append(pb_utils.InferenceResponse([out_tensor]))
         return responses
-    
+
     def is_model_ready(self):
         """Raises an exception - simulates health check failure"""
         raise RuntimeError("Internal check failed – model is not ready")
