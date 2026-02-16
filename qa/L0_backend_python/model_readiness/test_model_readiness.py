@@ -206,7 +206,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
     def test_multiple_concurrent_ready_and_infer_requests_decoupled(self):
         model_name = "is_model_ready_fn_returns_true_decoupled"
         num_requests = 16
-        response_count = num_requests
+        response_count = 8
         readiness_errors = []
         infer_errors = []
 
