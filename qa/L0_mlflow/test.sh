@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -187,7 +187,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Python Test Failed\n***"
     RET=1
 else
-    check_test_results $TEST_RESULT_FILE 2
+    check_test_results $TEST_RESULT_FILE 3
     if [ $? -ne 0 ]; then
         cat $PY_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
