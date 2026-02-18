@@ -93,7 +93,11 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
     import build
 
     df += build.dockerfile_prepare_container_linux(
-        argmap, backends, FLAGS.enable_gpu, platform.machine().lower()
+        argmap,
+        backends,
+        FLAGS.enable_gpu,
+        FLAGS.enable_rocm,
+        platform.machine().lower(),
     )
     # Copy over files
     df += """
@@ -409,7 +413,16 @@ if __name__ == "__main__":
         nargs="?",
         type=lambda x: (str(x).lower() == "true"),
         const=True,
-        default=True,
+        default=False,
+        required=False,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--enable-rocm",
+        nargs="?",
+        type=lambda x: (str(x).lower() == "true"),
+        const=True,
+        default=False,
         required=False,
         help=argparse.SUPPRESS,
     )

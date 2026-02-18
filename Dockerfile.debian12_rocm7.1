@@ -1,0 +1,146 @@
+#
+# Debian 12 + ROCm 7.1 + Python 3.10 Base Image
+# This base image is used by all Triton build stages for onnxruntime backend with ROCm enabled on Debian OS to avoid redundant installations
+#
+
+FROM debian:12
+
+# Prevent apt-get from prompting for input
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Allow pip to install packages system-wide (needed for Debian 12+)
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
+
+WORKDIR /workspace
+
+# Install basic dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        locales \
+        ca-certificates \
+        wget \
+        gnupg2 \
+        curl \
+        software-properties-common \
+        build-essential \
+        git \
+        pkg-config && \
+    rm -rf /var/lib/apt/lists/*
+
+# Need this for debian
+RUN sed -i 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/g' /etc/locale.gen
+RUN echo 'LANG=en_US.UTF-8' > /etc/default/locale
+RUN locale-gen en_US.UTF-8
+RUN update-locale LANG=en_US.UTF-8
+
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
+
+# Install Python 3.10 from source on Debian 12
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libssl-dev zlib1g-dev libbz2-dev \
+        libreadline-dev libsqlite3-dev \
+        libncursesw5-dev xz-utils tk-dev \
+        libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev && \
+    wget https://www.python.org/ftp/python/3.10.16/Python-3.10.16.tgz && \
+    tar xzf Python-3.10.16.tgz && \
+    cd Python-3.10.16 && \
+    ./configure --enable-optimizations && \
+    make -j$(nproc) && \
+    make altinstall && \
+    cd .. && rm -rf Python-3.10.16 Python-3.10.16.tgz && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python3.10 2 && \
+    ln -sf /usr/bin/python3 /usr/bin/python && \
+    python3.10 --version && \
+    python3.10 -m pip install --upgrade pip setuptools==69.5.1 wheel && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install ROCm 7.1.1 (runtime + development packages) on Debian 12
+RUN wget https://repo.radeon.com/amdgpu-install/7.1.1/ubuntu/jammy/amdgpu-install_7.1.1.70101-1_all.deb && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends ./amdgpu-install_7.1.1.70101-1_all.deb && \
+    rm amdgpu-install_7.1.1.70101-1_all.deb && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        rocm-dev \
+        rocm-libs \
+        hip-base \
+        hip-dev \
+        rocm-device-libs \
+        rocblas \
+        rocblas-dev \
+        hipblas \
+        hipblas-dev \
+        miopen-hip \
+        miopen-hip-dev \
+        rocrand \
+        rocrand-dev \
+        rccl \
+        rccl-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install libevent (needed by Triton for HTTP/gRPC endpoints)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libevent-2.1-7 \
+        libevent-core-2.1-7 \
+        libevent-pthreads-2.1-7 \
+        libevent-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install common runtime dependencies used by Triton
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libb64-0d \
+        libcurl4-openssl-dev \
+        libre2-9 \
+        libre2-dev \
+        libnuma-dev \
+        libnuma1 \
+        libgoogle-perftools-dev \
+        libjemalloc-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# Install cmake
+RUN apt update -q=2 && apt install -y wget && \
+    wget -q https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-linux-x86_64.tar.gz && \
+    tar -zxf cmake-3.28.3-linux-x86_64.tar.gz -C /opt && \
+    rm cmake-3.28.3-linux-x86_64.tar.gz && \
+    ln -sf /opt/cmake-3.28.3-linux-x86_64/bin/cmake /usr/local/bin/cmake && \
+    ln -sf /opt/cmake-3.28.3-linux-x86_64/bin/ctest /usr/local/bin/ctest && \
+    ln -sf /opt/cmake-3.28.3-linux-x86_64/bin/cpack /usr/local/bin/cpack && \
+    cmake --version 
+
+# Set ROCm environment variables
+ENV ROCM_PATH=/opt/rocm
+ENV HIP_PATH=/opt/rocm
+ENV PATH=/opt/rocm/bin:${PATH}
+ENV LD_LIBRARY_PATH=/opt/rocm/lib:${LD_LIBRARY_PATH}
+
+# TODO: move MIGraphX and onnxruntime build to separate build script instead of installing in base image
+
+# build MIGraphX from source
+RUN git clone https://github.com/ROCm/AMDMIGraphX.git --recursive -b concat_ai && ls && \
+    cd AMDMIGraphX && \
+    pip3 install --prefix /usr/local https://github.com/RadeonOpenCompute/rbuild/archive/master.tar.gz && \
+    rbuild build -d depend -B build -DMIGRAPHX_ENABLE_PYTHON=OFF -DGPU_TARGETS=gfx942 2>&1 | tee migraphx_build.log && \
+    cd build && \
+    make -j$(nproc) package && dpkg -i *.deb
+
+ENV MIGRAPHX_MLIR_USE_SPECIFIC_OPS=attention,dot,fused_dot
+ENV ORT_MIGRAPHX_MODEL_CACHE_PATH=/models
+ENV ORT_MIGRAPHX_MODEL_PATH=/models
+
+# build onnxruntime with MIGraphX EP from source
+RUN git clone https://github.com/ROCm/onnxruntime.git --recursive -b add_dynamic_batch &&  ls && \
+    cd onnxruntime && \
+    pip install numpy packaging && \
+    ./build.sh --config Release --allow_running_as_root --rocm_home /opt/rocm --use_migraphx --migraphx_home /opt/rocm --skip_tests --parallel --enable_pybind --build_wheel 2>&1 | tee onnxrt_build.log && \
+    pip install ./build/Linux/Release/dist/*.whl --force-reinstall && \
+    cd build/Linux/Release && \
+    cmake --install . --prefix /opt/rocm && \
+    echo "ONNX Runtime installed to /opt/rocm with headers and libraries"
+
+

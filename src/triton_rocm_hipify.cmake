@@ -46,7 +46,7 @@ message(STATUS "Project Root ${REPO_ROOT} ")
               --hipify_perl ${TRITON_HIPIFY_PERL}
               ${f} -o ${f_out}
       DEPENDS ${hipify_tool} ${f}
-      COMMENT WARNING "Hipify: ${cuda_f_rel} -> amdgpu/${rocm_f_rel}"
+      COMMENT "Hipify: ${cuda_f_rel} -> amdgpu/${rocm_f_rel}"
     )
 
     if(f MATCHES ".*\\.cuh?$")
