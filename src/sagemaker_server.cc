@@ -26,6 +26,8 @@
 
 #include "sagemaker_server.h"
 
+#include <filesystem>
+
 namespace triton { namespace server {
 
 #define HTTP_RESPOND_IF_ERR(REQ, X)                   \
@@ -292,8 +294,12 @@ SagemakerAPIServer::ParseSageMakerRequest(
     }
   }
 
-  if (url_string.find("/dev/") == 0 || url_string.find("/proc/") == 0 ||
-      url_string.find("/sys/") == 0) {
+  std::filesystem::path url_path(url_string);
+  url_path = std::filesystem::absolute(url_path.lexically_normal());  // Normalize the path to remove any redundant components.
+  auto repo_path = url_path.string();
+
+  if (repo_path.find("/dev/") == 0 || repo_path.find("/proc/") == 0
+      || repo_path.find("/sys/") == 0) {
     LOG_ERROR << "Invalid URL: " << url_string
               << ". \"url\" property value cannot start with /dev/, /proc/, or "
               "/sys/." << std::endl;
@@ -901,13 +907,17 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     evhtp_request_t* req,
     const std::unordered_map<std::string, std::string> parse_map)
 {
-  std::string repo_path = parse_map.at("url");
+  std::string url_string = parse_map.at("url");
   std::string model_name_hash = parse_map.at("model_name_hash");
   std::string target_model = parse_map.at("target_model");
 
-  if (repo_path.find("/dev/") == 0 || repo_path.find("/proc/") == 0 ||
-      repo_path.find("/sys/") == 0) {
-    LOG_ERROR << "Invalid repository path: " << repo_path
+  std::filesystem::path url_path(url_string);
+  url_path = std::filesystem::absolute(url_path.lexically_normal());  // Normalize the path to remove any redundant components.
+  std::string repo_path = url_path.string();
+
+  if (repo_path.find("/dev/") == 0 || repo_path.find("/proc/") == 0
+      || repo_path.find("/sys/") == 0) {
+    LOG_ERROR << "Invalid repository path: " << url_string
               << ". \"url\" property of `parse_map`cannot start with /dev/, "
               "/proc/, or /sys/." << std::endl;
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
