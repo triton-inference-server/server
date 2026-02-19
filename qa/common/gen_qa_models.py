@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,10 +27,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-from cProfile import label
 import os
-from builtins import range
 import sys
+from builtins import range
+from cProfile import label
 
 import gen_ensemble_model_utils as emu
 import numpy as np
@@ -46,7 +46,6 @@ from gen_common import (
 FLAGS = None
 np_dtype_string = np.dtype(object)
 from typing import List, Tuple
-
 
 _color_blue = "\033[94m"
 _color_green = "\033[32m"
@@ -1078,6 +1077,7 @@ def create_libtorch_modelfile(
         and (output0_dtype != np_dtype_string)
         and (output1_dtype != np_dtype_string)
     ):
+
         class AddSubNet(nn.Module):
             def __init__(self, *args):
                 self.output0_dtype = args[0][0]
@@ -1105,6 +1105,7 @@ def create_libtorch_modelfile(
         and (output0_dtype == np_dtype_string)
         and (output1_dtype == np_dtype_string)
     ):
+
         class AddSubNet(nn.Module):
             def __init__(self, *args):
                 self.output0_dtype = args[0][0]
@@ -1140,6 +1141,7 @@ def create_libtorch_modelfile(
         and (output0_dtype == np_dtype_string)
         and (output1_dtype != np_dtype_string)
     ):
+
         class AddSubNet(nn.Module):
             def __init__(self, *args):
                 self.output0_dtype = args[0][0]
@@ -1172,6 +1174,7 @@ def create_libtorch_modelfile(
         and (output0_dtype != np_dtype_string)
         and (output1_dtype == np_dtype_string)
     ):
+
         class AddSubNet(nn.Module):
             def __init__(self, *args):
                 self.output0_dtype = args[0][0]
@@ -1204,6 +1207,7 @@ def create_libtorch_modelfile(
         and (output0_dtype == np_dtype_string)
         and (output1_dtype == np_dtype_string)
     ):
+
         class AddSubNet(nn.Module):
             def __init__(self, *args):
                 self.output0_dtype = args[0][0]
@@ -1227,6 +1231,7 @@ def create_libtorch_modelfile(
         and (output0_dtype != np_dtype_string)
         and (output1_dtype == np_dtype_string)
     ):
+
         class AddSubNet(nn.Module):
             def __init__(self, *args):
                 self.output0_dtype = args[0][0]
@@ -1249,6 +1254,7 @@ def create_libtorch_modelfile(
         and (output0_dtype == np_dtype_string)
         and (output1_dtype != np_dtype_string)
     ):
+
         class AddSubNet(nn.Module):
             def __init__(self, *args):
                 self.output0_dtype = args[0][0]
@@ -1267,6 +1273,7 @@ def create_libtorch_modelfile(
                 return op0, op1
 
     else:
+
         class AddSubNet(nn.Module):
             def __init__(self, *args):
                 self.output0_dtype = args[0][0]
@@ -1308,14 +1315,34 @@ def generate_sample_inputs(
         input0 = torch.randint(-128, 127, input_shape, dtype=torch.int8, device=device)
         input1 = torch.randint(-128, 127, input_shape, dtype=torch.int8, device=device)
     elif input_dtype == np.int16:
-        input0 = torch.randint(-32768, 32767, input_shape, dtype=torch.int16, device=device)
-        input1 = torch.randint(-32768, 32767, input_shape, dtype=torch.int16, device=device)
+        input0 = torch.randint(
+            -32768, 32767, input_shape, dtype=torch.int16, device=device
+        )
+        input1 = torch.randint(
+            -32768, 32767, input_shape, dtype=torch.int16, device=device
+        )
     elif input_dtype == np.int32:
-        input0 = torch.randint(-2147483648, 2147483647, input_shape, dtype=torch.int32, device=device)
-        input1 = torch.randint(-2147483648, 2147483647, input_shape, dtype=torch.int32, device=device)
+        input0 = torch.randint(
+            -2147483648, 2147483647, input_shape, dtype=torch.int32, device=device
+        )
+        input1 = torch.randint(
+            -2147483648, 2147483647, input_shape, dtype=torch.int32, device=device
+        )
     elif input_dtype == np.int64:
-        input0 = torch.randint(-9223372036854775808, 9223372036854775807, input_shape, dtype=torch.int64, device=device)
-        input1 = torch.randint(-9223372036854775808, 9223372036854775807, input_shape, dtype=torch.int64, device=device)
+        input0 = torch.randint(
+            -9223372036854775808,
+            9223372036854775807,
+            input_shape,
+            dtype=torch.int64,
+            device=device,
+        )
+        input1 = torch.randint(
+            -9223372036854775808,
+            9223372036854775807,
+            input_shape,
+            dtype=torch.int64,
+            device=device,
+        )
     elif input_dtype == np.float16:
         input0 = torch.randn(*input_shape, dtype=torch.float16, device=device)
         input1 = torch.randn(*input_shape, dtype=torch.float16, device=device)
@@ -1332,11 +1359,19 @@ def generate_sample_inputs(
         input0 = torch.randint(0, 65535, input_shape, dtype=torch.uint16, device=device)
         input1 = torch.randint(0, 65535, input_shape, dtype=torch.uint16, device=device)
     elif input_dtype == np.uint32:
-        input0 = torch.randint(0, 4294967295, input_shape, dtype=torch.uint32, device=device)
-        input1 = torch.randint(0, 4294967295, input_shape, dtype=torch.uint32, device=device)
+        input0 = torch.randint(
+            0, 4294967295, input_shape, dtype=torch.uint32, device=device
+        )
+        input1 = torch.randint(
+            0, 4294967295, input_shape, dtype=torch.uint32, device=device
+        )
     elif input_dtype == np.uint64:
-        input0 = torch.randint(0, 18446744073709551615, input_shape, dtype=torch.uint64, device=device)
-        input1 = torch.randint(0, 18446744073709551615, input_shape, dtype=torch.uint64, device=device)
+        input0 = torch.randint(
+            0, 18446744073709551615, input_shape, dtype=torch.uint64, device=device
+        )
+        input1 = torch.randint(
+            0, 18446744073709551615, input_shape, dtype=torch.uint64, device=device
+        )
     else:
         input0 = torch.randn(*input_shape, device=device)
         input1 = torch.randn(*input_shape, device=device)
@@ -1372,6 +1407,7 @@ def np_to_dtype(np_dtype):
             f"{_color_yellow}warning: dtype {np_dtype} is unsupported; falling back to torch.int32{_color_reset}"
         )
         return torch.int32
+
 
 def create_torch_aoti_modelfile(
     models_dir,
@@ -1416,11 +1452,7 @@ def create_torch_aoti_modelfile(
             self.output_dtype = output_dtype
             super(AddSubNet, self).__init__()
 
-        def forward(
-            self,
-            INPUT0: torch.Tensor,
-            INPUT1: torch.Tensor
-        ) -> torch.Tensor:
+        def forward(self, INPUT0: torch.Tensor, INPUT1: torch.Tensor) -> torch.Tensor:
             if INPUT0.dtype != self.input_dtype:
                 raise TypeError(
                     f"INPUT0 expected {self.input_dtype} vs. actual {INPUT0.dtype} type."
@@ -1484,8 +1516,8 @@ def create_torchvision_aoti_modelfile(
         ep = torch.export.export(model, (input_tensor,))
 
         torch._inductor.aoti_compile_and_package(
-          ep,
-          package_path=f"{model_version_dir}/model.pt2",
+            ep,
+            package_path=f"{model_version_dir}/model.pt2",
         )
     except Exception as e:
         print(
@@ -2086,7 +2118,9 @@ def create_models(
 
     if FLAGS.torch_aoti:
         if output0_dtype == output1_dtype:
-            print(f"{_color_magenta}PyTorch: AOTI model generation requested{_color_reset}")
+            print(
+                f"{_color_magenta}PyTorch: AOTI model generation requested{_color_reset}"
+            )
             # max-batch 8
             if create_torch_aoti_modelfile(
                 models_dir,
@@ -2104,7 +2138,6 @@ def create_models(
                     output0_label_cnt,
                     version_policy,
                 )
-
 
     if FLAGS.openvino:
         print(f"{_color_magenta}OpenVINO model generation requested{_color_reset}")
@@ -2340,9 +2373,11 @@ if __name__ == "__main__":
         import torch
         from torch import nn
     if FLAGS.torchvision_aoti:
+        import shutil
+
         import torch
         import torchvision.models as models
-        import shutil
+
         RESNET50_LABEL_FILE = "resnet50_labels.txt"
     if FLAGS.openvino:
         import openvino.runtime as ov
