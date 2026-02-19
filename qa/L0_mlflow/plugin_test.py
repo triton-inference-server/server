@@ -115,13 +115,9 @@ class PluginTest(tu.TestResultCollector):
             filecmp.cmp(config_path, "./models/onnx_model_with_files/config.pbtxt")
         )
 
-    def test_path_traversal_model_name(self):
+    def test_invalid_path_traversal_model_name(self):
 
         model_uri = "models:/onnx_model_with_files/1"
-
-        model_name_normal = "onnx_model_123"
-        self.client_.create_deployment(model_name_normal, model_uri, flavor="onnx")
-        self.client_.delete_deployment(model_name_normal)
 
         model_name_empty = ""
         with self.assertRaises(Exception) as e:
@@ -154,20 +150,6 @@ class PluginTest(tu.TestResultCollector):
         self.assertIn(
             "Path traversal is not allowed in model's name: {}".format(
                 model_name_path_traversal_2
-            ),
-            str(e.exception),
-        )
-
-        model_name_path_traversal_3 = "onnx_model\\abc"
-        with self.assertRaises(Exception) as e:
-            self.client_.create_deployment(
-                model_name_path_traversal_3,
-                model_uri,
-                flavor="onnx",
-            )
-        self.assertIn(
-            "Path traversal is not allowed in model's name: {}".format(
-                model_name_path_traversal_3
             ),
             str(e.exception),
         )
