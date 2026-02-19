@@ -37,6 +37,7 @@ import numpy as np
 import test_util as tu
 from mlflow.deployments import get_deploy_client
 
+
 class PluginTest(tu.TestResultCollector):
     def setUp(self):
         self.client_ = get_deploy_client("triton")
@@ -116,7 +117,6 @@ class PluginTest(tu.TestResultCollector):
         )
 
     def test_invalid_path_traversal_model_name(self):
-
         model_uri = "models:/onnx_model_with_files/1"
 
         model_name_empty = ""
@@ -150,6 +150,7 @@ class PluginTest(tu.TestResultCollector):
             ),
             str(e.exception),
         )
+
 
 if __name__ == "__main__":
     unittest.main()
