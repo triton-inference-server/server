@@ -130,9 +130,8 @@ class PluginTest(tu.TestResultCollector):
         model_name_path_traversal_1 = "/opt/sys/"
         with self.assertRaises(Exception) as e:
             self.client_.create_deployment(
-                model_name_path_traversal_1,
-                model_uri,
-                flavor="onnx")
+                model_name_path_traversal_1, model_uri, flavor="onnx"
+            )
         self.assertIn(
             "Path traversal is not allowed in model's name: {}".format(
                 model_name_path_traversal_1
@@ -143,9 +142,7 @@ class PluginTest(tu.TestResultCollector):
         model_name_path_traversal_2 = "../../etc/passwd"
         with self.assertRaises(Exception) as e:
             self.client_.create_deployment(
-                model_name_path_traversal_2,
-                model_uri,
-                flavor="onnx"
+                model_name_path_traversal_2, model_uri, flavor="onnx"
             )
         self.assertIn(
             "Path traversal is not allowed in model's name: {}".format(

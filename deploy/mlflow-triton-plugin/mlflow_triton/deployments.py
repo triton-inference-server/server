@@ -520,7 +520,9 @@ default_model_filename: "{}"
         if not name:
             raise Exception("Please provide a model name for the deployment")
         if '/' in name or '..' in name:  # Path traversal protection
-            raise Exception("Path traversal is not allowed in model's name: {}".format(name))
+            raise Exception(
+                "Path traversal is not allowed in model's name: {}".format(name)
+            )
 
     def _model_exists(self, name):
         deploys = self.list_deployments()
