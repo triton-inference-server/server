@@ -295,14 +295,17 @@ SagemakerAPIServer::ParseSageMakerRequest(
   }
 
   std::filesystem::path url_path(url_string);
-  url_path = std::filesystem::absolute(url_path.lexically_normal());  // Normalize the path to remove any redundant components.
+  url_path = std::filesystem::absolute(
+      url_path.lexically_normal());  // Normalize the path to remove any
+                                     // redundant components.
   auto repo_path = url_path.string();
 
-  if (repo_path.find("/dev/") == 0 || repo_path.find("/proc/") == 0
-      || repo_path.find("/sys/") == 0) {
+  if (repo_path.find("/dev/") == 0 || repo_path.find("/proc/") == 0 ||
+      repo_path.find("/sys/") == 0) {
     LOG_ERROR << "Invalid URL: " << url_string
               << ". \"url\" property value cannot start with /dev/, /proc/, or "
-              "/sys/." << std::endl;
+                 "/sys/."
+              << std::endl;
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
   }
@@ -912,14 +915,17 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   std::string target_model = parse_map.at("target_model");
 
   std::filesystem::path url_path(url_string);
-  url_path = std::filesystem::absolute(url_path.lexically_normal());  // Normalize the path to remove any redundant components.
+  url_path = std::filesystem::absolute(
+      url_path.lexically_normal());  // Normalize the path to remove any
+                                     // redundant components.
   std::string repo_path = url_path.string();
 
-  if (repo_path.find("/dev/") == 0 || repo_path.find("/proc/") == 0
-      || repo_path.find("/sys/") == 0) {
+  if (repo_path.find("/dev/") == 0 || repo_path.find("/proc/") == 0 ||
+      repo_path.find("/sys/") == 0) {
     LOG_ERROR << "Invalid repository path: " << url_string
               << ". \"url\" property of `parse_map`cannot start with /dev/, "
-              "/proc/, or /sys/." << std::endl;
+                 "/proc/, or /sys/."
+              << std::endl;
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return;
   }
