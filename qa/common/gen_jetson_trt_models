@@ -42,7 +42,7 @@ TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3-igp
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:24.04}
 
 # Set CI specific parameters
-DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus $NVIDIA_VISIBLE_DEVICES" )}
+DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ -v RUNNER_GPUS && $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=$NVIDIA_VISIBLE_DEVICES" )}
 
 ############################################################################
 # Check if Docker volume exists
