@@ -80,7 +80,7 @@ PROJECT_NAME=${PROJECT_NAME:=tritonserver}
 log_message.status "define: Docker engine parameters"
 DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_qa_model_repository.${CI_JOB_ID}}
 DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
-DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus $NVIDIA_VISIBLE_DEVICES" )}
+DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ -v RUNNER_GPUS && $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=$NVIDIA_VISIBLE_DEVICES" )}
 
 function define_model_output_directories() {
     log_message.status "define: model output directories"
