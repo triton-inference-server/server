@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -114,6 +114,41 @@ class PluginTest(tu.TestResultCollector):
 
         self.assertTrue(
             filecmp.cmp(config_path, "./models/onnx_model_with_files/config.pbtxt")
+        )
+
+    def test_invalid_path_traversal_model_name(self):
+        model_uri = "models:/onnx_model_with_files/1"
+
+        model_name_empty = ""
+        with self.assertRaises(Exception) as e:
+            self.client_.create_deployment(model_name_empty, model_uri, flavor="onnx")
+        self.assertIn(
+            "Please provide a model name for the deployment",
+            str(e.exception),
+        )
+
+        model_name_path_traversal_1 = "/opt/sys/"
+        with self.assertRaises(Exception) as e:
+            self.client_.create_deployment(
+                model_name_path_traversal_1, model_uri, flavor="onnx"
+            )
+        self.assertIn(
+            "Path traversal is not allowed in model's name: {}".format(
+                model_name_path_traversal_1
+            ),
+            str(e.exception),
+        )
+
+        model_name_path_traversal_2 = "../../etc/passwd"
+        with self.assertRaises(Exception) as e:
+            self.client_.create_deployment(
+                model_name_path_traversal_2, model_uri, flavor="onnx"
+            )
+        self.assertIn(
+            "Path traversal is not allowed in model's name: {}".format(
+                model_name_path_traversal_2
+            ),
+            str(e.exception),
         )
 
 
