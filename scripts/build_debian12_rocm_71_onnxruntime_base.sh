@@ -6,7 +6,7 @@
 
 set -e
 
-IMAGE_NAME="localhost/debian12_rocm7.1_onnxruntime1.23_py310"
+IMAGE_NAME="localhost/debian12_rocm7.1_ort1.23_py310"
 DOCKERFILE="Dockerfile.debian12_rocm7.1_onnxruntime"
 
 echo "========================================"

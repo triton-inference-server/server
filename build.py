@@ -1834,7 +1834,7 @@ def create_build_dockerfiles(
     elif FLAGS.enable_rocm:
         if "onnxruntime" in backends:
             if FLAGS.linux_distro == "debian":
-                base_image = "localhost/debian12_rocm7.1_onnxruntime1.23_py310"
+                base_image = "localhost/debian12_rocm7.1_ort1.23_py310"
             else:
                 base_image = "rocm/onnxruntime:rocm7.0_ub22.04_ort1.22_torch2.8.0"
         else:
@@ -2325,9 +2325,9 @@ def backend_build(
         repository_name = "TensorRT-LLM"
         cmake_script.gitclone(repository_name, tag, be, github_organization)
     elif be == "onnxruntime" and FLAGS.enable_rocm:
-        # ROCm ONNX Runtime backend: https://github.com/ROCm/tis-onnxruntime-backend
+        # ROCm ONNX Runtime backend: https://github.com/ROCm/triton-inference-server-onnxruntime-backend
         cmake_script.gitclone(
-            "tis-onnxruntime-backend",
+            "triton-inference-server-onnxruntime_backend",
             "rocm7.1.1_r25.12",
             be,
             "https://github.com/ROCm",
@@ -3311,13 +3311,13 @@ if __name__ == "__main__":
         OVERRIDE_BACKEND_CMAKE_FLAGS[be][parts[0]] = parts[1]
 
     # Initialize map of common components and repo-tag for each.
-    # ROCm builds use ROCm org repos and tags (tis-core, tis-backend, tis-third-party).
+    # ROCm builds use ROCm org repos and tags (triton-inference-server-core, triton-inference-server-backend, triton-inference-server-third_party).
     if FLAGS.enable_rocm:
         components = {
             "common": default_repo_tag,
-            "core": "rocm7.1.1_r25.12",      # https://github.com/ROCm/tis-core
-            "backend": "rocm7.1.1_r25.12",   # https://github.com/ROCm/tis-backend
-            "thirdparty": "rocm7.1.1_r25.12",  # https://github.com/ROCm/tis-third-party
+            "core": "rocm7.1.1_r25.12",      # https://github.com/ROCm/triton-inference-server-core
+            "backend": "rocm7.1.1_r25.12",   # https://github.com/ROCm/triton-inference-server-backend
+            "thirdparty": "rocm7.1.1_r25.12",  # https://github.com/ROCm/triton-inference-server-third_party
         }
     else:
         components = {
