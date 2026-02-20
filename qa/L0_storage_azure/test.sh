@@ -137,7 +137,10 @@ sleep 10
 
 # Test 1 Scenarios:
 # 1. access blob using shared key in envs
-# 2. adding more scenarios in future
+# 2. access blob using system-assigned managed identity
+# 3. access blob using user-assigned managed identity
+# 4. access blob using DefaultAzureCredential
+# 5. adding more scenarios in future
 for ENV_VAR in "shared_key"; do
     SERVER_LOG=$SERVER_LOG_BASE.$ENV_VAR.log
     CLIENT_LOG=$CLIENT_LOG_BASE.$ENV_VAR.log
@@ -168,6 +171,117 @@ for ENV_VAR in "shared_key"; do
     kill $SERVER_PID
     wait $SERVER_PID
 done
+
+# Test 2: Managed Identity authentication
+# Requires the test host (VM/AKS) to have a system-assigned managed identity
+# with Storage Blob Data Reader on the test storage account.
+# Skip if not running in an MI-capable environment.
+if [ ! -z "$TEST_AZURE_MANAGED_IDENTITY" ]; then
+    echo -e "\n***\n*** Testing system-assigned Managed Identity\n***"
+
+    # Save original key and clear it so it won't be used
+    SAVED_AZURE_STORAGE_KEY=$AZURE_STORAGE_KEY
+    unset AZURE_STORAGE_KEY
+    export AZURE_STORAGE_AUTH_TYPE="managed_identity"
+
+    SERVER_LOG=$SERVER_LOG_BASE.managed_identity_system.log
+    CLIENT_LOG=$CLIENT_LOG_BASE.managed_identity_system.log
+    MODEL_REPO="${AS_URL}/models"
+    SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER with system-assigned MI\n***"
+        cat $SERVER_LOG
+        RET=1
+    else
+        set +e
+        run_unit_tests
+        set -e
+
+        kill $SERVER_PID
+        wait $SERVER_PID
+    fi
+
+    # Test 3: User-assigned Managed Identity (if client ID is provided)
+    if [ ! -z "$AZURE_STORAGE_CLIENT_ID" ]; then
+        echo -e "\n***\n*** Testing user-assigned Managed Identity\n***"
+
+        SERVER_LOG=$SERVER_LOG_BASE.managed_identity_user.log
+        CLIENT_LOG=$CLIENT_LOG_BASE.managed_identity_user.log
+        SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
+
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER with user-assigned MI\n***"
+            cat $SERVER_LOG
+            RET=1
+        else
+            set +e
+            run_unit_tests
+            set -e
+
+            kill $SERVER_PID
+            wait $SERVER_PID
+        fi
+    else
+        echo -e "\n***\n*** Skipping user-assigned MI test (AZURE_STORAGE_CLIENT_ID not set)\n***"
+    fi
+
+    # Test 4: DefaultAzureCredential chain
+    echo -e "\n***\n*** Testing DefaultAzureCredential\n***"
+    export AZURE_STORAGE_AUTH_TYPE="default"
+    unset AZURE_STORAGE_CLIENT_ID
+
+    SERVER_LOG=$SERVER_LOG_BASE.default_credential.log
+    CLIENT_LOG=$CLIENT_LOG_BASE.default_credential.log
+    SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER with DefaultAzureCredential\n***"
+        cat $SERVER_LOG
+        RET=1
+    else
+        set +e
+        run_unit_tests
+        set -e
+
+        kill $SERVER_PID
+        wait $SERVER_PID
+    fi
+
+    # Test: invalid auth_type should fail gracefully
+    echo -e "\n***\n*** Testing invalid auth_type (expect failure)\n***"
+    export AZURE_STORAGE_AUTH_TYPE="invalid_type"
+
+    SERVER_LOG=$SERVER_LOG_BASE.invalid_auth_type.log
+    SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120 --exit-on-error=false"
+
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        # Server started — but model load should have failed. Verify the log
+        # contains an authentication error rather than a successful load.
+        if grep -q "Unable to create Azure filesystem client" $SERVER_LOG; then
+            echo -e "*** invalid auth_type correctly rejected ***"
+        else
+            echo -e "\n***\n*** Expected auth failure with invalid auth_type\n***"
+            cat $SERVER_LOG
+            RET=1
+        fi
+        kill $SERVER_PID
+        wait $SERVER_PID
+    else
+        echo -e "*** Server correctly refused to start with invalid auth_type ***"
+    fi
+
+    # Restore environment for remaining tests
+    unset AZURE_STORAGE_AUTH_TYPE
+    unset AZURE_STORAGE_CLIENT_ID
+    export AZURE_STORAGE_KEY=$SAVED_AZURE_STORAGE_KEY
+else
+    echo -e "\n***\n*** Skipping Managed Identity tests (TEST_AZURE_MANAGED_IDENTITY not set)\n***"
+fi
 
 # Test localization to a specified location
 export TRITON_AZURE_MOUNT_DIRECTORY=`pwd`/azure_localization_test
