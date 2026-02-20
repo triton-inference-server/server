@@ -1,4 +1,4 @@
-// Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -45,6 +45,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
       const int32_t port, const std::string address, const int thread_cnt,
+      const size_t max_input_size,
       std::unique_ptr<HTTPServer>* sagemaker_server);
 
   class SagemakeInferRequestClass : public InferRequestClass {
@@ -73,10 +74,11 @@ class SagemakerAPIServer : public HTTPAPIServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const int32_t port, const std::string address, const int thread_cnt)
+      const int32_t port, const std::string address, const int thread_cnt,
+      const size_t max_input_size)
       : HTTPAPIServer(
             server, trace_manager, shm_manager, port, false /* reuse_port */,
-            address, "" /* header_forward_pattern */, thread_cnt),
+            address, "" /* header_forward_pattern */, thread_cnt, max_input_size),
         ping_regex_(R"(/ping)"), invocations_regex_(R"(/invocations)"),
         models_regex_(R"(/models(?:/)?([^/]+)?(/invoke)?)"),
         model_path_regex_(
