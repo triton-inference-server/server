@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -155,9 +155,6 @@ class InferReshapeTest(tu.TestResultCollector):
                 dtype,
                 dtype,
                 dtype,
-                input_shapes[0],
-                input_shapes[0],
-                input_shapes[0],
             ):
                 # model that supports batching
                 for bs in (1, 8):

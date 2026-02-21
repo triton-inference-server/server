@@ -326,22 +326,22 @@ If a model framework does not have an entry for a given datatype, then Triton do
 The sixth column, labeled "API", shows the corresponding datatype for the TRITONSERVER C API, TRITONBACKEND C API, HTTP/REST protocol and GRPC protocol.
 The last column shows the corresponding datatype for the Python numpy library.
 
-|Model Config  |TensorRT      |ONNX Runtime  |PyTorch  |API      |NumPy         |
-|--------------|--------------|--------------|---------|---------|--------------|
-|TYPE_BOOL     | kBOOL        |BOOL          |kBool    |BOOL     |bool          |
-|TYPE_UINT8    | kUINT8       |UINT8         |kByte    |UINT8    |uint8         |
-|TYPE_UINT16   |              |UINT16        |         |UINT16   |uint16        |
-|TYPE_UINT32   |              |UINT32        |         |UINT32   |uint32        |
-|TYPE_UINT64   |              |UINT64        |         |UINT64   |uint64        |
-|TYPE_INT8     | kINT8        |INT8          |kChar    |INT8     |int8          |
-|TYPE_INT16    |              |INT16         |kShort   |INT16    |int16         |
-|TYPE_INT32    | kINT32       |INT32         |kInt     |INT32    |int32         |
-|TYPE_INT64    | kINT64       |INT64         |kLong    |INT64    |int64         |
-|TYPE_FP16     | kHALF        |FLOAT16       |         |FP16     |float16       |
-|TYPE_FP32     | kFLOAT       |FLOAT         |kFloat   |FP32     |float32       |
-|TYPE_FP64     |              |DOUBLE        |kDouble  |FP64     |float64       |
-|TYPE_STRING   |              |STRING        |         |BYTES    |dtype(object) |
-|TYPE_BF16     | kBF16        |              |         |BF16     |              |
+|Model Config  |TensorRT      |ONNX Runtime  |PyTorch  |API      |NumPy              |
+|--------------|--------------|--------------|---------|---------|-------------------|
+|TYPE_BOOL     | kBOOL        |BOOL          |kBool    |BOOL     |bool               |
+|TYPE_UINT8    | kUINT8       |UINT8         |kByte    |UINT8    |uint8              |
+|TYPE_UINT16   |              |UINT16        |         |UINT16   |uint16             |
+|TYPE_UINT32   |              |UINT32        |         |UINT32   |uint32             |
+|TYPE_UINT64   |              |UINT64        |         |UINT64   |uint64             |
+|TYPE_INT8     | kINT8        |INT8          |kChar    |INT8     |int8               |
+|TYPE_INT16    |              |INT16         |kShort   |INT16    |int16              |
+|TYPE_INT32    | kINT32       |INT32         |kInt     |INT32    |int32              |
+|TYPE_INT64    | kINT64       |INT64         |kLong    |INT64    |int64              |
+|TYPE_FP16     | kHALF        |FLOAT16       |         |FP16     |float16            |
+|TYPE_FP32     | kFLOAT       |FLOAT         |kFloat   |FP32     |float32            |
+|TYPE_FP64     |              |DOUBLE        |kDouble  |FP64     |float64            |
+|TYPE_STRING   |              |STRING        |         |BYTES    |dtype(object)      |
+|TYPE_BF16     | kBF16        |BFLOAT16      |         |BF16     |ml_dtypes.bfloat16 |
 
 For TensorRT each value is in the nvinfer1::DataType namespace.
 For example, nvinfer1::DataType::kFLOAT is the 32-bit floating-point datatype.

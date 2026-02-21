@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -140,9 +140,6 @@ class InferVariableTest(tu.TestResultCollector):
                 input_dtype,
                 output0_dtype,
                 output1_dtype,
-                input_shape,
-                input_shape,
-                input_shape,
             ):
                 ensemble_prefix.append(prefix)
 

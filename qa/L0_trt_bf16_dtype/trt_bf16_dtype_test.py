@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,6 +32,7 @@ sys.path.append("../common")
 
 import unittest
 
+import ml_dtypes
 import numpy as np
 import test_util as tu
 import tritonclient.http as client
@@ -49,8 +50,8 @@ class TrtBF16DataTypeTest(tu.TestResultCollector):
         inputs.append(client.InferInput("INPUT0", shape, "BF16"))
         inputs.append(client.InferInput("INPUT1", shape, "BF16"))
 
-        input0_data = np.ones(shape=shape).astype(np.float32)
-        input1_data = np.ones(shape=shape).astype(np.float32)
+        input0_data = np.ones(shape=shape).astype(ml_dtypes.bfloat16)
+        input1_data = np.ones(shape=shape).astype(ml_dtypes.bfloat16)
 
         inputs[0].set_data_from_numpy(input0_data, binary_data=True)
         inputs[1].set_data_from_numpy(input1_data, binary_data=True)
