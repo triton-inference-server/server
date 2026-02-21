@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,13 +29,10 @@
 import json
 import unittest
 
+import ml_dtypes
 import numpy as np
 
 _last_request_id = 0
-
-# Numpy does not support the BF16 datatype natively.
-# We use this dummy dtype as a representative for BF16.
-np_dtype_bfloat16 = np.dtype([("bf16", object)])
 
 
 def shape_element_count(shape):
@@ -85,7 +82,7 @@ def validate_for_trt_model(
         np.uint8,
         np.float16,
         np.float32,
-        np_dtype_bfloat16,
+        ml_dtypes.bfloat16,
     ]
     # FIXME: Remove this check when jetson supports TRT 8.5 (DLIS-4256)
     if not support_trt_uint8():
@@ -113,9 +110,6 @@ def validate_for_ensemble_model(
     input_dtype,
     output0_dtype,
     output1_dtype,
-    input_shape,
-    output0_shape,
-    output1_shape,
 ):
     """Return True if input and output dtypes are supported by the ensemble type."""
 
@@ -259,7 +253,7 @@ def validate_for_openvino_model(
 
 
 def get_dtype_name(dtype):
-    if dtype == np_dtype_bfloat16:
+    if dtype == ml_dtypes.bfloat16:
         return "bf16"
     else:
         return np.dtype(dtype).name

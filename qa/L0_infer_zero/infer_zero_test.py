@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -93,9 +93,7 @@ class InferZeroTest(tu.TestResultCollector):
             )
 
         for name in ["simple_zero", "sequence_zero", "fan_zero"]:
-            if tu.validate_for_ensemble_model(
-                name, dtype, dtype, dtype, shapes[0], shapes[0], shapes[0]
-            ):
+            if tu.validate_for_ensemble_model(name, dtype, dtype, dtype):
                 # model that supports batching
                 for bs in (1, 8):
                     batch_shapes = [

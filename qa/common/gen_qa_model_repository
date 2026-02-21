@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -153,7 +153,7 @@ apt-get update && \
 
 ln -s /usr/bin/python3 /usr/bin/python
 
-pip3 install  "numpy<=1.23.5" setuptools
+pip3 install ml_dtypes "numpy<=1.23.5" setuptools
 
 pip3 install openvino==$OPENVINO_VERSION
 
@@ -195,7 +195,7 @@ apt-get update && \
                 protobuf-compiler python3 python3-dev python3-pip
 ln -s /usr/bin/python3 /usr/bin/python
 
-pip3 install "protobuf<=3.20.1"  "numpy<=1.23.5" # TODO: Remove current line DLIS-3838
+pip3 install ml_dtypes
 pip3 install --upgrade onnx==${ONNX_VERSION}
 
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$TRITON_MDLS_QA_MODEL
@@ -302,6 +302,7 @@ EOF
 umask 0000
 nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index --format=csv || true
 nvidia-smi || true
+pip3 install ml_dtypes
 set -e
 set -x
 dpkg -l | grep TensorRT

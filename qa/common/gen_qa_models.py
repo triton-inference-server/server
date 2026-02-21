@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,9 +31,9 @@ import os
 from builtins import range
 
 import gen_ensemble_model_utils as emu
+import ml_dtypes
 import numpy as np
 from gen_common import (
-    np_dtype_bfloat16,
     np_to_model_dtype,
     np_to_onnx_dtype,
     np_to_torch_dtype,
@@ -2028,9 +2028,9 @@ if __name__ == "__main__":
             if tu.check_gpus_compute_capability(min_capability=8.0):
                 create_fixed_models(
                     FLAGS.models_dir,
-                    np_dtype_bfloat16,
-                    np_dtype_bfloat16,
-                    np_dtype_bfloat16,
+                    ml_dtypes.bfloat16,
+                    ml_dtypes.bfloat16,
+                    ml_dtypes.bfloat16,
                 )
             else:
                 print(
@@ -2317,9 +2317,9 @@ if __name__ == "__main__":
             if tu.check_gpus_compute_capability(min_capability=8.0):
                 create_models(
                     FLAGS.models_dir,
-                    np_dtype_bfloat16,
-                    np_dtype_bfloat16,
-                    np_dtype_bfloat16,
+                    ml_dtypes.bfloat16,
+                    ml_dtypes.bfloat16,
+                    ml_dtypes.bfloat16,
                     (-1, -1),
                     (-1, -1),
                     (-1, -1),

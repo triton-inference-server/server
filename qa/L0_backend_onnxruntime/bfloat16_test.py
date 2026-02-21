@@ -31,6 +31,7 @@ import unittest
 
 import ml_dtypes
 import numpy as np
+import pytest
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 
@@ -79,64 +80,27 @@ class BFloat16Test(unittest.TestCase):
         results = self.client_.infer(self.model_name_, [input0, input1])
         return results.as_numpy("OUTPUT")
 
-    def test_bf16_add_variants(self):
-        """Run multiple BF16 add cases in one test: zeros, negatives, large, small, cancellation, identical."""
+    @pytest.mark.parametrize(
+        "input0_val,input1_val,expected_val",
+        [
+            (0.0, 0.0, 0.0),  # zeros
+            (-1.5, 3.5, 2.0),  # negatives / mixed
+            (100.0, 200.0, 300.0),  # large
+            (1e-2, 1e-2, 2e-2),  # small (near underflow)
+            (1.0, -1.0, 0.0),  # cancellation
+            (2.0, 2.0, 4.0),  # identical inputs
+        ],
+    )
+    def test_bf16_add_variants(self, input0_val, input1_val, expected_val):
+        """Run BF16 add for one case: zeros, negatives, large, small, cancellation, or identical."""
         shape = (5, 5)
-
-        # Zeros: 0.0 + 0.0 = 0.0
         output = self._infer_bf16(
-            np.zeros(shape, dtype=ml_dtypes.bfloat16),
-            np.zeros(shape, dtype=ml_dtypes.bfloat16),
-        )
-        self.assertEqual(output.dtype, ml_dtypes.bfloat16)
-        self._assert_allclose_bf16(output, np.zeros(shape, dtype=ml_dtypes.bfloat16))
-
-        # Negative and mixed: -1.5 + 3.5 = 2.0
-        output = self._infer_bf16(
-            np.full(shape, -1.5, dtype=ml_dtypes.bfloat16),
-            np.full(shape, 3.5, dtype=ml_dtypes.bfloat16),
+            np.full(shape, input0_val, dtype=ml_dtypes.bfloat16),
+            np.full(shape, input1_val, dtype=ml_dtypes.bfloat16),
         )
         self.assertEqual(output.dtype, ml_dtypes.bfloat16)
         self._assert_allclose_bf16(
-            output, np.full(shape, 2.0, dtype=ml_dtypes.bfloat16)
-        )
-
-        # Large values within BF16 range: 100 + 200 = 300
-        output = self._infer_bf16(
-            np.full(shape, 100.0, dtype=ml_dtypes.bfloat16),
-            np.full(shape, 200.0, dtype=ml_dtypes.bfloat16),
-        )
-        self.assertEqual(output.dtype, ml_dtypes.bfloat16)
-        self._assert_allclose_bf16(
-            output, np.full(shape, 300.0, dtype=ml_dtypes.bfloat16)
-        )
-
-        # Small values (near underflow / precision limit): 0.01 + 0.01 = 0.02
-        output = self._infer_bf16(
-            np.full(shape, 1e-2, dtype=ml_dtypes.bfloat16),
-            np.full(shape, 1e-2, dtype=ml_dtypes.bfloat16),
-        )
-        self.assertEqual(output.dtype, ml_dtypes.bfloat16)
-        self._assert_allclose_bf16(
-            output, np.full(shape, 2e-2, dtype=ml_dtypes.bfloat16)
-        )
-
-        # Exact cancellation: 1.0 + (-1.0) = 0.0
-        output = self._infer_bf16(
-            np.full(shape, 1.0, dtype=ml_dtypes.bfloat16),
-            np.full(shape, -1.0, dtype=ml_dtypes.bfloat16),
-        )
-        self.assertEqual(output.dtype, ml_dtypes.bfloat16)
-        self._assert_allclose_bf16(output, np.zeros(shape, dtype=ml_dtypes.bfloat16))
-
-        # Identical inputs: 2.0 + 2.0 = 4.0
-        output = self._infer_bf16(
-            np.full(shape, 2.0, dtype=ml_dtypes.bfloat16),
-            np.full(shape, 2.0, dtype=ml_dtypes.bfloat16),
-        )
-        self.assertEqual(output.dtype, ml_dtypes.bfloat16)
-        self._assert_allclose_bf16(
-            output, np.full(shape, 4.0, dtype=ml_dtypes.bfloat16)
+            output, np.full(shape, expected_val, dtype=ml_dtypes.bfloat16)
         )
 
 
