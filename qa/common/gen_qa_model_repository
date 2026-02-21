@@ -34,7 +34,7 @@
 ## match what is being used by the tritonserver release being
 ## tested.
 ##
-## 2. Set CUDA_DEVICE to the ID of the CUDA device present on the
+## 2. Set NVIDIA_VISIBLE_DEVICES to the ID of the CUDA device present on the
 ## local system that you want to target for the generated models.
 ##
 ## 3. Run this script to create /tmp/qa_model_repository,
@@ -67,7 +67,7 @@ OPENVINO_VERSION=2024.5.0
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
-CUDA_DEVICE=${NV_GPU:=0}
+NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:=0}
 MODEL_TYPE=${MODEL_TYPE:-""}
 TRITON_MODELS_USE_DOCKER=${TRITON_MODELS_USE_DOCKER:-"1"}
 TRITON_MODELS_USE_ENROOT=${TRITON_MODELS_USE_ENROOT:-"1"}
@@ -80,7 +80,7 @@ PROJECT_NAME=${PROJECT_NAME:=tritonserver}
 log_message.status "define: Docker engine parameters"
 DOCKER_VOLUME=${DOCKER_VOLUME:=volume.gen_qa_model_repository.${CI_JOB_ID}}
 DOCKER_VOLUME_CONTAINER=${DOCKER_VOLUME}.gen_qa_model_repository.${CI_JOB_ID}
-DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
+DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ -v RUNNER_GPUS && $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=$NVIDIA_VISIBLE_DEVICES" )}
 
 function define_model_output_directories() {
     log_message.status "define: model output directories"
