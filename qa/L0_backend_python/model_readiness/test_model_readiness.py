@@ -383,7 +383,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             call_inference_identity_model(model_name, "http", self.client_http)
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
-    def test_is_model_ready_takes_longs_time(self):
+    def test_is_model_ready_takes_long_time(self):
         model_name = "is_model_ready_fn_timeout"
         num_requests = 10
 
