@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,7 +47,7 @@ cp ../../python_models/$MODEL_NAME/config.pbtxt ./models/$MODEL_NAME/config.pbtx
 for SIGNAL in 11 9; do
     echo -e "\n***\n*** Testing model_readiness with Signal $SIGNAL\n***"
     SERVER_LOG="./model_readiness_signal_${SIGNAL}_server.log"
-    CLIENT_LOG="./model_readiness_${SIGNAL}_client.log"
+    CLIENT_LOG="./model_readiness_signal_${SIGNAL}_client.log"
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -107,10 +107,87 @@ for SIGNAL in 11 9; do
     kill_server
 done
 
-if [ $RET -eq 0 ]; then
-  echo -e "\n***\n*** Test Passed\n***"
+#
+# Test User-Defined Model Readiness Function
+#
+echo -e "\n***\n*** Testing User-Defined is_model_ready() Function\n***"
+
+# Helper function to set up test models with different readiness behaviors based on config parameters
+setup_readiness_test_model() {
+    local model_name=$1
+    local return_value=$2
+    local delay_secs=$3
+
+    mkdir -p ./models/$model_name/1/
+    if [ "$model_name" == "is_model_ready_fn_coroutine_returns_true" ]; then
+        cp ./test_models/readiness_coroutine_model.py ./models/$model_name/1/model.py
+    else
+        cp ./test_models/readiness_model.py ./models/$model_name/1/model.py
+    fi
+    cp ./models/identity_fp32/config.pbtxt ./models/$model_name/config.pbtxt
+    sed -i "s/^name:.*/name: \"$model_name\"/" ./models/$model_name/config.pbtxt
+    cat >> ./models/$model_name/config.pbtxt << EOF
+parameters: {
+  key: "READINESS_FN_RETURN_VALUE"
+  value: { string_value: "$return_value" }
+}
+parameters: {
+  key: "READINESS_FN_DELAY_SECS"
+  value: { string_value: "$delay_secs" }
+}
+EOF
+}
+
+# Create readiness test models using shared model.py + config parameters
+setup_readiness_test_model "is_model_ready_fn_returns_true" "true" "0.1"
+setup_readiness_test_model "is_model_ready_fn_returns_false" "false" "0.1"
+setup_readiness_test_model "is_model_ready_fn_raises_error" "exception" "0.1"
+setup_readiness_test_model "is_model_ready_fn_returns_non_boolean" "non_boolean" "0.1"
+setup_readiness_test_model "is_model_ready_fn_timeout" "true" "8"
+setup_readiness_test_model "is_model_ready_fn_coroutine_returns_true" "coroutine" "0.1"
+
+# Decoupled model has a unique execute() and its own config
+mkdir -p ./models/is_model_ready_fn_returns_true_decoupled/1/
+cp ./test_models/is_model_ready_fn_returns_true_decoupled/model.py \
+    ./models/is_model_ready_fn_returns_true_decoupled/1/model.py
+cp ./test_models/is_model_ready_fn_returns_true_decoupled/config.pbtxt \
+    ./models/is_model_ready_fn_returns_true_decoupled/config.pbtxt
+
+# Start server with all models
+SERVER_ARGS="--model-repository=$(pwd)/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_LOG="./test_user_defined_model_readiness_function_server.log"
+CLIENT_LOG="./test_user_defined_model_readiness_function_client.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    exit 1
+fi
+
+set +e
+
+echo "Running TestUserDefinedModelReadinessFunction..."
+python3 -m unittest test_model_readiness.TestUserDefinedModelReadinessFunction -v >> ${CLIENT_LOG} 2>&1
+TEST_EXIT_CODE=$?
+
+if [ $TEST_EXIT_CODE -ne 0 ]; then
+    echo -e "\n***\n*** TestUserDefinedModelReadinessFunction FAILED\n***"
+    cat ${CLIENT_LOG}
+    RET=1
 else
-  echo -e "\n***\n*** Test FAILED\n***"
+    echo -e "\n***\n*** TestUserDefinedModelReadinessFunction PASSED\n***"
+fi
+
+set -e
+kill_server
+
+
+# Final result
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** All Model Readiness Tests Passed\n***"
+else
+  echo -e "\n***\n*** Model Readiness Tests FAILED\n***"
 fi
 
 exit $RET
