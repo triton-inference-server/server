@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -286,6 +286,69 @@ class InputShapeTest(unittest.TestCase):
 
         inference_helper(model_name="plan_nobatch_zero_1_float32_int32")
         inference_helper(model_name="plan_zero_1_float32_int32", batch_size=8)
+
+
+class ModelNameValidationTest(unittest.TestCase):
+    INVALID_TRAVERSAL_NAMES = [
+        "../etc",
+        "a/../b",
+        "../../etc/passwd",
+        "../../../../etc",
+        "model/..",
+        "..",
+        "..\\windows",
+        "\\..\\windows",
+        "model\\..\\other",
+        "/etc/passwd",
+        "model/subdir",
+    ]
+
+    def test_model_name_invalid_load(self):
+        client = tritongrpcclient.InferenceServerClient("localhost:8001")
+        for model_name in self.INVALID_TRAVERSAL_NAMES:
+            with self.assertRaises(InferenceServerException) as cm:
+                client.load_model(model_name)
+            self.assertIn(
+                "model name must not contain path traversal characters",
+                str(cm.exception),
+                f"Expected traversal rejection for model name: {model_name!r}",
+            )
+
+    def test_model_name_invalid_unload(self):
+        client = tritongrpcclient.InferenceServerClient("localhost:8001")
+        for model_name in self.INVALID_TRAVERSAL_NAMES:
+            with self.assertRaises(InferenceServerException) as cm:
+                client.unload_model(model_name)
+            self.assertIn(
+                "model name must not contain path traversal characters",
+                str(cm.exception),
+                f"Expected traversal rejection for model name: {model_name!r}",
+            )
+
+    def test_model_name_empty_load(self):
+        client = tritongrpcclient.InferenceServerClient("localhost:8001")
+        with self.assertRaises(InferenceServerException) as cm:
+            client.load_model("")
+        self.assertIn("model name must not be empty", str(cm.exception))
+
+    def test_model_name_empty_unload(self):
+        client = tritongrpcclient.InferenceServerClient("localhost:8001")
+        with self.assertRaises(InferenceServerException) as cm:
+            client.unload_model("")
+        self.assertIn("model name must not be empty", str(cm.exception))
+
+    def test_model_name_valid(self):
+        """Verify that a syntactically valid model name is not rejected by
+        the traversal check -- it should fail with a model not found error instead."""
+        client = tritongrpcclient.InferenceServerClient("localhost:8001")
+        with self.assertRaises(InferenceServerException) as cm:
+            client.load_model("nonexistent_model")
+        self.assertNotIn(
+            "path traversal characters",
+            str(cm.exception),
+            "Valid model name should not trigger path traversal rejection",
+        )
+        self.assertIn("failed to poll from model repository", str(cm.exception))
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -174,6 +174,32 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 set -e
+
+# Model name validation test
+mkdir -p test_models
+SERVER_LOG="./model_name_validation_test.log"
+CLIENT_LOG="./model_name_validation_client.log"
+SERVER_ARGS="--model-repository=`pwd`/test_models --model-control-mode=explicit --log-verbose=1"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python3 -m pytest -s --junitxml="model_name_validation.report.xml" $TEST_PY::ModelNameValidationTest >> $CLIENT_LOG 2>&1
+
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    cat $SERVER_LOG
+    echo -e "\n***\n*** input_validation_test.py::ModelNameValidationTest FAILED. \n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Input Validation Test Passed\n***"
