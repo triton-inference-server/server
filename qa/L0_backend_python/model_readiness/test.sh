@@ -112,28 +112,46 @@ done
 #
 echo -e "\n***\n*** Testing User-Defined is_model_ready() Function\n***"
 
-# Define all test models
-USER_READY_MODELS=(
-    "is_model_ready_fn_returns_true"
-    "is_model_ready_fn_returns_false"
-    "is_model_ready_fn_raises_error"
-    "is_model_ready_fn_returns_non_boolean"
-    "is_model_ready_fn_timeout"
-    "is_model_ready_fn_coroutine_returns_true"
-    "is_model_ready_fn_returns_true_decoupled"
-)
+# Helper function to set up test models with different readiness behaviors based on config parameters
+setup_readiness_test_model() {
+    local model_name=$1
+    local return_value=$2
+    local delay_secs=$3
 
-# Create model directories and copy files
-for MODEL in "${USER_READY_MODELS[@]}"; do
-    mkdir -p ./models/$MODEL/1/
-    cp ./test_models/$MODEL/model.py ./models/$MODEL/1/model.py
-    if [ "$MODEL" == "is_model_ready_fn_returns_true_decoupled" ]; then
-        cp ./test_models/$MODEL/config.pbtxt ./models/$MODEL/config.pbtxt
+    mkdir -p ./models/$model_name/1/
+    if [ "$model_name" == "is_model_ready_fn_coroutine_returns_true" ]; then
+        cp ./test_models/readiness_coroutine_model.py ./models/$model_name/1/model.py
     else
-        cp ./models/identity_fp32/config.pbtxt ./models/$MODEL/config.pbtxt
-        sed -i "s/^name:.*/name: \"$MODEL\"/" ./models/$MODEL/config.pbtxt
+        cp ./test_models/readiness_model.py ./models/$model_name/1/model.py
     fi
-done
+    cp ./models/identity_fp32/config.pbtxt ./models/$model_name/config.pbtxt
+    sed -i "s/^name:.*/name: \"$model_name\"/" ./models/$model_name/config.pbtxt
+    cat >> ./models/$model_name/config.pbtxt << EOF
+parameters: {
+  key: "READINESS_FN_RETURN_VALUE"
+  value: { string_value: "$return_value" }
+}
+parameters: {
+  key: "READINESS_FN_DELAY_SECS"
+  value: { string_value: "$delay_secs" }
+}
+EOF
+}
+
+# Create readiness test models using shared model.py + config parameters
+setup_readiness_test_model "is_model_ready_fn_returns_true" "true" "0.1"
+setup_readiness_test_model "is_model_ready_fn_returns_false" "false" "0.1"
+setup_readiness_test_model "is_model_ready_fn_raises_error" "exception" "0.1"
+setup_readiness_test_model "is_model_ready_fn_returns_non_boolean" "non_boolean" "0.1"
+setup_readiness_test_model "is_model_ready_fn_timeout" "true" "8"
+setup_readiness_test_model "is_model_ready_fn_coroutine_returns_true" "coroutine" "0.1"
+
+# Decoupled model has a unique execute() and its own config
+mkdir -p ./models/is_model_ready_fn_returns_true_decoupled/1/
+cp ./test_models/is_model_ready_fn_returns_true_decoupled/model.py \
+    ./models/is_model_ready_fn_returns_true_decoupled/1/model.py
+cp ./test_models/is_model_ready_fn_returns_true_decoupled/config.pbtxt \
+    ./models/is_model_ready_fn_returns_true_decoupled/config.pbtxt
 
 # Start server with all models
 SERVER_ARGS="--model-repository=$(pwd)/models --backend-directory=${BACKEND_DIR} --log-verbose=1"

@@ -24,14 +24,28 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import asyncio
+import json
+
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
+    """
+    Parameterized test model for async is_model_ready() testing.
+
+    Behavior is controlled via config.pbtxt parameters:
+      READINESS_FN_DELAY_SECS - seconds to await before returning (e.g. "0.1")
+    """
+
+    def initialize(self, args):
+        model_config = json.loads(args["model_config"])
+        params = model_config.get("parameters", {})
+        self.readiness_delay_secs = float(
+            params.get("READINESS_FN_DELAY_SECS", {}).get("string_value", "0.1")
+        )
+
     def execute(self, requests):
-        """
-        Identity model in Python backend.
-        """
         responses = []
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
@@ -39,6 +53,6 @@ class TritonPythonModel:
             responses.append(pb_utils.InferenceResponse([out_tensor]))
         return responses
 
-    def is_model_ready(self):
-        """Raises an exception - simulates health check failure"""
-        raise RuntimeError("Internal check failed – model is not ready")
+    async def is_model_ready(self):
+        await asyncio.sleep(self.readiness_delay_secs)
+        return True

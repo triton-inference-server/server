@@ -24,16 +24,32 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import json
 import time
 
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
+    """
+    Parameterized test model for user-defined is_model_ready() testing.
+
+    Behavior is controlled via config.pbtxt parameters:
+      READINESS_FN_RETURN_VALUE - "true", "false", "exception", or "non_boolean"
+      READINESS_FN_DELAY_SECS  - seconds to sleep before returning (e.g. "0.1")
+    """
+
+    def initialize(self, args):
+        model_config = json.loads(args["model_config"])
+        params = model_config.get("parameters", {})
+        self.readiness_return_value = params.get("READINESS_FN_RETURN_VALUE", {}).get(
+            "string_value", "true"
+        )
+        self.readiness_delay_secs = float(
+            params.get("READINESS_FN_DELAY_SECS", {}).get("string_value", "0")
+        )
+
     def execute(self, requests):
-        """
-        Identity model in Python backend.
-        """
         responses = []
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
@@ -42,6 +58,15 @@ class TritonPythonModel:
         return responses
 
     def is_model_ready(self):
-        """Takes longer than default 5 seconds timeout"""
-        time.sleep(10)
+        if self.readiness_delay_secs > 0:
+            time.sleep(self.readiness_delay_secs)
+
+        if self.readiness_return_value == "true":
+            return True
+        elif self.readiness_return_value == "false":
+            return False
+        elif self.readiness_return_value == "exception":
+            raise RuntimeError("Internal check failed – model is not ready")
+        elif self.readiness_return_value == "non_boolean":
+            return "ready"
         return True

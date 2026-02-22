@@ -53,9 +53,7 @@ def callback(user_data, result, error):
 
 
 def prepare_infer_args(input_value):
-    """
-    Create InferInput/InferRequestedOutput lists
-    """
+    """Create InferInput and InferRequestedOutput lists for decoupled inference."""
     input_data = np.array([[input_value]], dtype=np.int32)
     infer_input = [grpcclient.InferInput("IN", input_data.shape, "INT32")]
     infer_input[0].set_data_from_numpy(input_data)
@@ -65,7 +63,7 @@ def prepare_infer_args(input_value):
 
 def collect_responses(user_data, expected_responses_count):
     """
-    Collect responses from user_data until the final response flag is seen.
+    Collect up to `expected_responses_count` responses from user_data.
     """
     errors = []
     responses = []
@@ -88,7 +86,7 @@ def collect_responses(user_data, expected_responses_count):
 
 
 def call_inference_identity_model(model_name, protocol, client):
-    """Helper to test inference functionality"""
+    """Send an inference request and verify the output matches the input."""
     shape = (1, 8)
     input_data = np.ones(shape, dtype=np.float32)
 
@@ -167,9 +165,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         self.client_grpc = grpcclient.InferenceServerClient(url=URL_GRPC)
 
     def _run_inference_decoupled(self, index, model_name, expected_responses_count):
-        """
-        Helper function for streaming inference.
-        """
+        """Send a decoupled streaming inference request and verify responses."""
         user_data = UserData()
         with grpcclient.InferenceServerClient(URL_GRPC) as triton_client:
             try:
@@ -284,8 +280,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 f"iteration {i} - GRPC client - Model {model_name} should be READY",
             )
 
-            # Inference should work normally
-            # readiness check functionality should not affect inference
+            # Verify inference is unaffected by readiness checks.
             call_inference_identity_model(model_name, "http", self.client_http)
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
@@ -304,8 +299,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 f"iteration {i} - GRPC client - Model {model_name} should be NOT READY",
             )
 
-            # Inference should work normally
-            # readiness check functionality should not affect inference
+            # Verify inference is unaffected by readiness checks.
             call_inference_identity_model(model_name, "http", self.client_http)
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
@@ -324,12 +318,11 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 f"iteration {i} - GRPC client - Model {model_name} should be NOT READY (exception)",
             )
 
-            # Inference should work normally
-            # readiness check functionality should not affect inference
+            # Verify inference is unaffected by readiness checks.
             call_inference_identity_model(model_name, "http", self.client_http)
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
-        # Test good model afterwards to ensure server is healthy
+        # Verify a healthy model is still ready to confirm server stability.
         model_name = "is_model_ready_fn_returns_true"
         for i in range(num_requests):
             self.assertTrue(
@@ -341,8 +334,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 f"iteration {i} - GRPC client - Model {model_name} should be READY",
             )
 
-            # Inference should work normally
-            # readiness check functionality should not affect inference
+            # Verify inference is unaffected by readiness checks.
             call_inference_identity_model(model_name, "http", self.client_http)
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
@@ -361,12 +353,11 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 f"iteration {i} - GRPC client - Model {model_name} should be NOT READY (wrong return type)",
             )
 
-            # Inference should work normally
-            # readiness check functionality should not affect inference
+            # Verify inference is unaffected by readiness checks.
             call_inference_identity_model(model_name, "http", self.client_http)
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
-        # Test good model afterwards to ensure server is healthy
+        # Verify a healthy model is still ready to confirm server stability.
         model_name = "is_model_ready_fn_returns_true"
         for i in range(num_requests):
             self.assertTrue(
@@ -378,8 +369,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 f"iteration {i} - GRPC client - Model {model_name} should be READY",
             )
 
-            # Inference should work normally
-            # readiness check functionality should not affect inference
+            # Verify inference is unaffected by readiness checks.
             call_inference_identity_model(model_name, "http", self.client_http)
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
@@ -450,7 +440,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             except Exception as e:
                 infer_errors[protocol].append((index, str(e)))
 
-        # Launch concurrent ready checks
+        # Launch concurrent readiness and inference requests.
         http_threads = []
         for i in range(num_requests):
             t1 = threading.Thread(target=check_model_readiness, args=("http", i))
@@ -466,8 +456,6 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         for t in http_threads:
             self.assertFalse(t.is_alive(), f"HTTP threads are not completed")
 
-        time.sleep(5)
-
         grpc_threads = []
         for i in range(num_requests):
             t1 = threading.Thread(target=check_model_readiness, args=("grpc", i))
@@ -482,8 +470,6 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
 
         for t in grpc_threads:
             self.assertFalse(t.is_alive(), f"gRPC threads are not completed")
-
-        time.sleep(5)
 
         # Verify no errors in readiness checks
         self.assertEqual(
