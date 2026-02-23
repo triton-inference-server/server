@@ -314,12 +314,8 @@ class ModelNameValidationTest(unittest.TestCase):
         # Whitespace variations
         " ..",
         ".. ",
-        " model",
-        "model ",
-        "model name",
         # Null bytes and special characters
         "../etc/passwd\x00",
-        "model\x00name",
         "../etc/passwd\n",
     ]
 

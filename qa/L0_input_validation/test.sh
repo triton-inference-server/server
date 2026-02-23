@@ -176,8 +176,8 @@ fi
 set -e
 
 # Model name validation test
-mkdir -p test_models
-SERVER_LOG="./model_name_validation_test.log"
+rm -rf test_models ; mkdir -p test_models
+SERVER_LOG="./model_name_validation_server.log"
 CLIENT_LOG="./model_name_validation_client.log"
 SERVER_ARGS="--model-repository=`pwd`/test_models --model-control-mode=explicit --log-verbose=1"
 run_server
