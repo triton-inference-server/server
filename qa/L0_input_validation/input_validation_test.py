@@ -301,6 +301,26 @@ class ModelNameValidationTest(unittest.TestCase):
         "model\\..\\other",
         "/etc/passwd",
         "model/subdir",
+        # URL-encoded path traversal sequences
+        "..%2Fetc",
+        "%2e%2e/",
+        "..%2F",
+        "..%5Cwindows",
+        # Mixed separators (Unix + Windows)
+        "../\\windows",
+        # Trailing path separators
+        "model/",
+        "model\\",
+        # Whitespace variations
+        " ..",
+        ".. ",
+        " model",
+        "model ",
+        "model name",
+        # Null bytes and special characters
+        "../etc/passwd\x00",
+        "model\x00name",
+        "../etc/passwd\n",
     ]
 
     def test_model_name_invalid_load(self):
