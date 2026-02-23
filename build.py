@@ -935,17 +935,16 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
 """
     df += """
 # Install docker docker buildx
-RUN yum install -y ca-certificates curl gnupg yum-utils \\
-      && yum-config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo \\
-      && yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-#   && yum install -y docker.io docker-buildx-plugin
+RUN dnf install -y ca-certificates curl gnupg dnf-utils \\
+      && dnf config-manager addrepo --from-repofile https://download.docker.com/linux/fedora/docker-ce.repo \\
+      && dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
 # libxml2-dev is needed for Azure Storage
 # scons is needed for armnn_tflite backend build dep
-RUN yum install -y \\
+RUN dnf install -y \\
             autoconf \\
             automake \\
             bzip2-devel \\
@@ -960,7 +959,7 @@ RUN yum install -y \\
             libxml2-devel \\
             ncurses-devel \\
             numactl-devel \\
-            openssl-devel \\
+            openssl3-devel \\
             pkg-config \\
             python3-pip \\
             python3-scons \\
@@ -1353,11 +1352,11 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
     if target_platform() == "rhel":
         df += """
 # Common dependencies.
-RUN yum install -y \\
+RUN dnf install -y \\
         git \\
         gperf \\
         re2-devel \\
-        openssl-devel \\
+        openssl3-devel \\
         libtool \\
         libcurl-devel \\
         libb64-devel \\
@@ -1434,7 +1433,7 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
         if target_platform() == "rhel":
             df += """
 # python3, python3-pip and some pip installs required for the python backend
-RUN yum install -y \\
+RUN dnf install -y \\
         libarchive-devel \\
         openssl-devel \\
         readline-devel
