@@ -918,7 +918,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   url_path = std::filesystem::absolute(
       url_path.lexically_normal());  // Normalize the path to remove any
                                      // redundant components.
-  std::string repo_path = url_path.string();
+  std::string url_abspath = url_path.string();
 
   if (repo_path.find("/dev/") == 0 || repo_path.find("/proc/") == 0 ||
       repo_path.find("/sys/") == 0) {
