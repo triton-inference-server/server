@@ -116,7 +116,7 @@ class PluginTest(tu.TestResultCollector):
             filecmp.cmp(config_path, "./models/onnx_model_with_files/config.pbtxt")
         )
 
-    def test_invalid_path_traversal_model_name(self):
+    def test_invalid_model_name(self):
         model_uri = "models:/onnx_model_with_files/1"
 
         model_name_empty = ""
