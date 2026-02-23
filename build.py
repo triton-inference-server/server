@@ -734,19 +734,61 @@ def onnxruntime_cmake_args(images, library_paths):
                 "/opt/rocm/",
             )
         )
+        cargs.append(
+            cmake_backend_arg(
+                "onnxruntime",
+                "TRITON_BUILD_ONNXRUNTIME_REPO",
+                None,
+                FLAGS.ort_repo,
+            )
+        )
+        cargs.append(
+            cmake_backend_arg(
+                "onnxruntime",
+                "TRITON_BUILD_ONNXRUNTIME_BRANCH",
+                None,
+                FLAGS.ort_branch,
+            )
+        )
+        cargs.append(
+            cmake_backend_arg(
+                "onnxruntime",
+                "TRITON_BUILD_MIGRAPHX_REPO",
+                None,
+                FLAGS.migraphx_repo,
+            )
+        )
+        cargs.append(
+            cmake_backend_arg(
+                "onnxruntime",
+                "TRITON_BUILD_MIGRAPHX_BRANCH",
+                None,
+                FLAGS.migraphx_branch,
+            )
+        )
+
+    # Pass same base image as main container
+    effective_base = None
+    if "base" in images:
+        effective_base = images["base"]
+    elif FLAGS.enable_rocm:
+        if FLAGS.linux_distro == "debian":
+            effective_base = get_base_image_rocm_debian()
+        elif FLAGS.linux_distro == "ubuntu":
+            effective_base = get_base_image_rocm_ubuntu()
 
     if target_platform() == "windows":
-        if "base" in images:
+        if effective_base is not None:
             cargs.append(
                 cmake_backend_arg(
-                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
+                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, effective_base
                 )
             )
     else:
-        if "base" in images:
+        if effective_base is not None:
             cargs.append(
                 cmake_backend_arg(
-                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
+                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, effective_base
                 )
             )
         else:
@@ -1814,6 +1856,20 @@ LABEL com.nvidia.build.ref={}
         dfile.write(df)
 
 
+def get_base_image_rocm_debian():
+    """Return base image for ROCm Debian: vllm image if --install-vllm, else minimal ROCm."""
+    return (
+        "localhost/debian12_rocm7.2_vllm"
+        if getattr(FLAGS, "install_vllm", False)
+        else "localhost/debian12_rocm7.2"
+    )
+
+
+def get_base_image_rocm_ubuntu():
+    """Return base image for ROCm Ubuntu (onnxruntime and python backends)."""
+    return "rocm/dev-ubuntu-22.04:7.2-complete"
+
+
 def create_build_dockerfiles(
     container_build_dir, images, backends, repoagents, caches, endpoints
 ):
@@ -1832,13 +1888,11 @@ def create_build_dockerfiles(
             FLAGS.upstream_container_version
         )
     elif FLAGS.enable_rocm:
-        if "onnxruntime" in backends:
-            if FLAGS.linux_distro == "debian":
-                base_image = "localhost/debian12_rocm7.1_ort1.23_py310"
-            else:
-                base_image = "rocm/onnxruntime:rocm7.0_ub22.04_ort1.22_torch2.8.0"
+        # Only onnxruntime and python backends share the same base image (debian or ubuntu)
+        if FLAGS.linux_distro == "debian":
+            base_image = get_base_image_rocm_debian()
         else:
-            base_image = "rocm/pytorch:rocm7.0_ubuntu22.04_py3.10_pytorch_release_2.8.0"
+            base_image = get_base_image_rocm_ubuntu()
     else:
         base_image = "ubuntu:24.04"
 
@@ -1959,6 +2013,8 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         docker_script.comment("Run build in tritonserver_buildbase container")
         docker_script.comment("Mount a directory into the container where the install")
         docker_script.comment("artifacts will be placed.")
+        if getattr(FLAGS, "reuse_third_party_build", False):
+            docker_script.comment("With --reuse-third-party-build, build/tritonbuild_cache is mounted so third-party libs are reused.")
         docker_script.comment()
 
         # Don't use '-v' to communicate the built artifacts out of the
@@ -1975,6 +2031,13 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             "-e",
             "GIT_TERMINAL_PROMPT=0",  # avoid credential prompt for public FetchContent clones
         ]
+
+        # Optional: mount persistent build dir so third-party libs are reused
+        if getattr(FLAGS, "reuse_third_party_build", False) and target_platform() != "windows":
+            tritonbuild_cache = os.path.abspath(
+                os.path.join(FLAGS.build_dir, "tritonbuild_cache")
+            )
+            runargs += ["-v", "{}:/tmp/tritonbuild".format(tritonbuild_cache)]
 
         if not FLAGS.no_container_interactive:
             runargs += ["-it"]
@@ -2330,6 +2393,14 @@ def backend_build(
             "triton-inference-server-onnxruntime_backend",
             "rocm7.1.1_r25.12",
             be,
+            "https://github.com/ROCm",
+        )
+    elif be == "python" and FLAGS.enable_rocm:
+        # Use AMD-specific python_backend fork for ROCm support
+        cmake_script.gitclone(
+            "triton-inference-server-python_backend",
+            "rocm7.1.1_r25.12",
+            "python",
             "https://github.com/ROCm",
         )
     else:
@@ -2813,6 +2884,12 @@ if __name__ == "__main__":
         help="Temporary directory used for building inside docker. Default is /tmp.",
     )
     parser.add_argument(
+        "--reuse-third-party-build",
+        action="store_true",
+        required=False,
+        help="Mount a persistent directory for the in-container build so third-party libs (e.g. libevhtp, re2, grpc) are reused across runs instead of rebuilding from scratch. Uses build/tritonbuild_cache on the host.",
+    )
+    parser.add_argument(
         "--library-paths",
         action="append",
         required=False,
@@ -2916,6 +2993,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--enable-rocm", action="store_true", required=False, help="Enable AMD GPU support."
+    )
+    parser.add_argument(
+        "--install-vllm",
+        action="store_true",
+        required=False,
+        help="Use localhost/debian12_rocm7.2_vllm as base for ROCm Debian (onnxruntime and python backends). If false, use localhost/debian12_rocm7.2.",
     )
     parser.add_argument(
         "--linux-distro",
@@ -3039,6 +3122,34 @@ if __name__ == "__main__":
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["ort_openvino_version"],
         help="This flag sets the OpenVino version for Triton Inference Server to be built. Default: the latest supported version.",
+    )
+    parser.add_argument(
+        "--ort-repo",
+        required=False,
+        type=str,
+        default="https://github.com/ROCm/onnxruntime",
+        help="ONNX Runtime (ROCm) git repo URL when building from source. Used by onnxruntime backend.",
+    )
+    parser.add_argument(
+        "--ort-branch",
+        required=False,
+        type=str,
+        default="add_padded_batch",
+        help="ONNX Runtime (ROCm) git branch when building from source. Used by onnxruntime backend.",
+    )
+    parser.add_argument(
+        "--migraphx-repo",
+        required=False,
+        type=str,
+        default="https://github.com/ROCm/AMDMIGraphX.git",
+        help="MIGraphX git repo URL when building from source. Used by onnxruntime backend.",
+    )
+    parser.add_argument(
+        "--migraphx-branch",
+        required=False,
+        type=str,
+        default="concat_ai",
+        help="MIGraphX git branch when building from source. Used by onnxruntime backend.",
     )
     parser.add_argument(
         "--standalone-openvino-version",
@@ -3202,6 +3313,26 @@ if __name__ == "__main__":
                 )
             )
             backends["python"] = backends["vllm"]
+
+    # ROCm: inform about backends other than onnxruntime and python
+    if FLAGS.enable_rocm and backends:
+        backend_names = list(backends.keys())
+        other = [b for b in backend_names if b not in ("onnxruntime", "python")]
+        if other:
+            in_progress = [b for b in other if b in ("vllm", "pytorch", "tensorflow")]
+            not_enabled = [b for b in other if b not in ("vllm", "pytorch", "tensorflow")]
+            if in_progress:
+                print(
+                    "Backend(s) {} are in progress of upgrading for ROCm.".format(
+                        ", ".join(in_progress)
+                    )
+                )
+            if not_enabled:
+                print(
+                    "Backend(s) {} are not yet enabled for ROCm.".format(
+                        ", ".join(not_enabled)
+                    )
+                )
 
     secrets = dict(getattr(FLAGS, "build_secret", []))
     if secrets:

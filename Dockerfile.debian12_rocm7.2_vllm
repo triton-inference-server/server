@@ -1,7 +1,7 @@
 # default base image
 ARG REMOTE_VLLM="0"
 ARG COMMON_WORKDIR=/app
-ARG BASE_IMAGE=local/debian12_rocm7.2_vllm_base
+ARG BASE_IMAGE=localhost/debian12_rocm7.2_vllm_base
 
 # Sccache configuration (only used in release pipeline)
 ARG USE_SCCACHE
