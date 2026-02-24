@@ -2391,7 +2391,7 @@ def backend_build(
         # ROCm ONNX Runtime backend: https://github.com/ROCm/triton-inference-server-onnxruntime-backend
         cmake_script.gitclone(
             "triton-inference-server-onnxruntime_backend",
-            "rocm7.1.1_r25.12",
+            "rocm7.2_r25.12",
             be,
             "https://github.com/ROCm",
         )
@@ -2399,7 +2399,7 @@ def backend_build(
         # Use AMD-specific python_backend fork for ROCm support
         cmake_script.gitclone(
             "triton-inference-server-python_backend",
-            "rocm7.1.1_r25.12",
+            "rocm7.2_r25.12",
             "python",
             "https://github.com/ROCm",
         )
@@ -3446,9 +3446,9 @@ if __name__ == "__main__":
     if FLAGS.enable_rocm:
         components = {
             "common": default_repo_tag,
-            "core": "rocm7.1.1_r25.12",      # https://github.com/ROCm/triton-inference-server-core
-            "backend": "rocm7.1.1_r25.12",   # https://github.com/ROCm/triton-inference-server-backend
-            "thirdparty": "rocm7.1.1_r25.12",  # https://github.com/ROCm/triton-inference-server-third_party
+            "core": "rocm7.2_r25.12",      # https://github.com/ROCm/triton-inference-server-core
+            "backend": "rocm7.2_r25.12",   # https://github.com/ROCm/triton-inference-server-backend
+            "thirdparty": "rocm7.2_r25.12",  # https://github.com/ROCm/triton-inference-server-third_party
         }
     else:
         components = {
