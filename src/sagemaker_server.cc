@@ -300,8 +300,8 @@ SagemakerAPIServer::ParseSageMakerRequest(
                                      // redundant components.
   auto url_abspath = url_path.string();
 
-  if (repo_path.find("/dev/") == 0 || repo_path.find("/proc/") == 0 ||
-      repo_path.find("/sys/") == 0) {
+  if (url_abspath.find("/dev/") == 0 || url_abspath.find("/proc/") == 0 ||
+      url_abspath.find("/sys/") == 0) {
     LOG_ERROR << "Invalid URL: " << url_string
               << ". \"url\" property value cannot start with /dev/, /proc/, or "
                  "/sys/."
@@ -920,8 +920,8 @@ SagemakerAPIServer::SageMakerMMELoadModel(
                                      // redundant components.
   std::string url_abspath = url_path.string();
 
-  if (repo_path.find("/dev/") == 0 || repo_path.find("/proc/") == 0 ||
-      repo_path.find("/sys/") == 0) {
+  if (url_abspath.find("/dev/") == 0 || url_abspath.find("/proc/") == 0 ||
+      url_abspath.find("/sys/") == 0) {
     LOG_ERROR << "Invalid repository path: " << url_string
               << ". \"url\" property of `parse_map`cannot start with /dev/, "
                  "/proc/, or /sys/."
@@ -930,7 +930,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     return;
   }
 
-  /* Check subdirs for models and find ensemble model within the repo_path
+  /* Check subdirs for models and find ensemble model within the url_abspath
    * If only 1 model, that will be selected as model_subdir
    * Else ensemble model directory is set as model_subdir
    */
@@ -939,7 +939,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   int dir_count = 0;
   std::string model_subdir, ensemble_model_subdir;
 
-  if ((dir = opendir(repo_path.c_str())) != NULL) {
+  if ((dir = opendir(url_abspath.c_str())) != NULL) {
     std::shared_ptr<DIR> dir_ptr{dir, closedir};
     while ((ent = readdir(dir)) != NULL) {
       if ((ent->d_type == DT_DIR) && (!strcmp(ent->d_name, ".") == 0) &&
@@ -959,7 +959,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
 
       // Read the config.pbtxt file at each path, if available
       std::string ensemble_config_path =
-          repo_path + "/" + model_subdir + "/config.pbtxt";
+          url_abspath + "/" + model_subdir + "/config.pbtxt";
       std::ifstream config_fstream(ensemble_config_path);
       std::stringstream ensemble_config_content;
 
@@ -1007,10 +1007,10 @@ SagemakerAPIServer::SageMakerMMELoadModel(
 
   std::string repo_parent_path, subdir, customer_subdir;
   RE2::FullMatch(
-      repo_path, model_path_regex_, &repo_parent_path, &subdir,
+      url_abspath, model_path_regex_, &repo_parent_path, &subdir,
       &customer_subdir);
 
-  std::string config_path = repo_path + "/config.pbtxt";
+  std::string config_path = url_abspath + "/config.pbtxt";
   struct stat buffer;
 
   /* If config.pbtxt is at repo root,
@@ -1021,7 +1021,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   if (stat(config_path.c_str(), &buffer) == 0) {
     model_subdir = subdir;
   } else {
-    repo_parent_path = repo_path;
+    repo_parent_path = url_abspath;
   }
 
   auto param = TRITONSERVER_ParameterNew(
