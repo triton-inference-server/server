@@ -936,7 +936,7 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
     df += """
 # Install docker docker buildx
 RUN dnf install -y ca-certificates curl gnupg dnf-utils \\
-      && dnf config-manager addrepo --from-repofile https://download.docker.com/linux/fedora/docker-ce.repo \\
+      && dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo \\
       && dnf install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # libcurl4-openSSL-dev is needed for GCS
