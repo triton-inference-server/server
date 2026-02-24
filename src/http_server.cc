@@ -3593,7 +3593,48 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
     if (dtype == TRITONSERVER_TYPE_BYTES) {
       RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
     } else {
-      byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
+      size_t element_size = TRITONSERVER_DataTypeByteSize(dtype);
+
+      // Ensure that we do not have an integer overflow when calculating
+      // byte_size = element_cnt * element_size.
+      // For element_size == 1, there is no risk of integer overflow so we can
+      // skip the check.
+      switch (element_size) {
+        case 1:
+          break;
+        case 2:
+        case 4:
+        case 8:
+          if (element_cnt > (SIZE_MAX / element_size)) {
+            return TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("input '") + name +
+                 "' has too many elements of datatype " + value)
+                    .c_str());
+          }
+          break;
+        default:
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              (std::string("input '") + name + "' has unsupported datatype " +
+               value)
+                  .c_str());
+      }
+
+      byte_size = element_cnt * element_size;
+    }
+
+    // Ensure that the resulting array size in bytes does not exceed the maximum
+    // allowed input size.
+    if (byte_size > max_input_size_) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          ("Input '" + name + "' has a byte_size (" +
+           std::to_string(byte_size) +
+           " bytes) that exceeds the maximum allowed value of " +
+           std::to_string(max_input_size_) +
+           " bytes. Use --http-max-input-size to increase the limit.")
+              .c_str());
     }
 
     std::vector<int64_t> shape_vec;
