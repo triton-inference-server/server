@@ -989,8 +989,8 @@ RUN ccache -p
 """.format(
             os.getenv("CCACHE_REMOTE_STORAGE")
         )
+
     # Requires openssl-devel to be installed first for pyenv build to be successful
-    df += change_default_python_version_rhel(FLAGS.rhel_py_version)
     df += """
 
 RUN pip3 install --upgrade pip \\
@@ -1436,10 +1436,11 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
 RUN dnf install -y \\
         libarchive-devel \\
         openssl3-devel \\
+        python3.12-devel \\
+        python3.12-pip \\
         readline-devel
 """
             # Requires openssl-devel to be installed first for pyenv build to be successful
-            df += change_default_python_version_rhel(FLAGS.rhel_py_version)
             df += """
 RUN pip3 install --upgrade pip \\
     && pip3 install --upgrade \\
@@ -1615,30 +1616,6 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
             libs_arch=libs_arch
         )
 
-    return df
-
-
-def change_default_python_version_rhel(version):
-    df = f"""
-# The python library version available for install via 'yum install python3.X-devel' does not
-# match the version of python inside the RHEL base container. This means that python packages
-# installed within the container will not be picked up by the python backend stub process pybind
-# bindings. It must instead must be installed via pyenv.
-ENV PYENV_ROOT=/opt/pyenv_build
-RUN curl https://pyenv.run | bash
-ENV PATH="${{PYENV_ROOT}}/bin:$PATH"
-RUN eval "$(pyenv init -)"
-RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {version} \\
-    && cp ${{PYENV_ROOT}}/versions/{version}/lib/libpython3* /usr/lib64/
-
-# RHEL image has several python versions. It's important
-# to set the correct version, otherwise, packages that are
-# pip installed will not be found during testing.
-ENV PYVER={version} PYTHONPATH=/opt/python/v
-RUN ln -sf ${{PYENV_ROOT}}/versions/${{PYVER}}* ${{PYTHONPATH}}
-ENV PYBIN=${{PYTHONPATH}}/bin
-ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
-"""
     return df
 
 
