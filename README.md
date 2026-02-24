@@ -109,7 +109,7 @@ python3 build.py \
 
 The following instructions are for building on **Debian 12** with ROCm 7.2.
 
-Step1: build base docker image with Debian12+ROCm7.2+vLLM deps+vLLM
+Step1: build base docker image with Debian12+ROCm7.2
 ```bash
 git clone -b rocm7.2_r25.12 https://github.com/ROCm/triton-inference-server-server.git
 cd triton-inference-server-server
