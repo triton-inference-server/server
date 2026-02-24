@@ -55,7 +55,7 @@ The following table lists the ROCm-enabled Triton Inference Server component rep
 | Backend | [ROCm/triton-inference-server-backend](https://github.com/ROCm/triton-inference-server-backend) | `rocm7.2_r25.12` |
 | Third Party | [ROCm/triton-inference-server-third_party](https://github.com/ROCm/triton-inference-server-third_party) | `rocm7.2_r25.12` |
 | ONNX Runtime Backend | [ROCm/triton-inference-server-onnxruntime_backend](https://github.com/ROCm/triton-inference-server-onnxruntime_backend) | `rocm7.2_r25.12` |
-| Python Backend | [ROCm/triton-inference-server-python_backend](https://github.com/ROCm/triton-inference-server-python_backend/tree/r23.10-amd-port) | `rocm7.2_r25.12` |
+| Python Backend | [ROCm/triton-inference-server-python_backend](https://github.com/ROCm/triton-inference-server-python_backend) | `rocm7.2_r25.12` |
 
 
 ## Build Triton Inference Server
