@@ -2388,13 +2388,20 @@ def backend_build(
         repository_name = "TensorRT-LLM"
         cmake_script.gitclone(repository_name, tag, be, github_organization)
     elif be == "onnxruntime" and FLAGS.enable_rocm:
-        # ROCm ONNX Runtime backend: https://github.com/ROCm/triton-inference-server-onnxruntime-backend
-        cmake_script.gitclone(
-            "triton-inference-server-onnxruntime_backend",
-            "rocm7.2_r25.12",
-            be,
-            "https://github.com/ROCm",
-        )
+        # ROCm ONNX Runtime backend: use local dir from --onnxruntime-backend-dir if set, else clone
+        if getattr(FLAGS, "onnxruntime_backend_dir", None):
+            cmake_script.comment(
+                "Using local ONNX Runtime backend from --onnxruntime-backend-dir (mounted at {}/onnxruntime)".format(
+                    build_dir
+                )
+            )
+        else:
+            cmake_script.gitclone(
+                "triton-inference-server-onnxruntime_backend",
+                "rocm7.2_r25.12",
+                be,
+                "https://github.com/ROCm",
+            )
     elif be == "python" and FLAGS.enable_rocm:
         # Use AMD-specific python_backend fork for ROCm support
         cmake_script.gitclone(
