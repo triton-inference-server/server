@@ -961,9 +961,8 @@ RUN dnf install -y \\
             numactl-devel \\
             openssl3-devel \\
             pkg-config \\
-            python3-pip \\
-            python3-scons \\
-            python3-setuptools \\
+            python3.12-pip \\
+            python3.12-devel \\
             rapidjson-devel \\
             re2-devel \\
             readline-devel \\
@@ -1362,7 +1361,8 @@ RUN dnf install -y \\
         libb64-devel \\
         gperftools-devel \\
         wget \\
-        python3-pip \\
+        python3.12-pip \\
+        python3.12-devel \\
         numactl-devel
 
 RUN pip3 install patchelf==0.17.2
