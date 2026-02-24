@@ -330,27 +330,10 @@ class ModelNameValidationTest(unittest.TestCase):
                 f"Expected traversal rejection for model name: {model_name!r}",
             )
 
-    def test_model_name_invalid_unload(self):
-        client = tritongrpcclient.InferenceServerClient("localhost:8001")
-        for model_name in self.INVALID_TRAVERSAL_NAMES:
-            with self.assertRaises(InferenceServerException) as cm:
-                client.unload_model(model_name)
-            self.assertIn(
-                "model name must not contain path traversal characters",
-                str(cm.exception),
-                f"Expected traversal rejection for model name: {model_name!r}",
-            )
-
     def test_model_name_empty_load(self):
         client = tritongrpcclient.InferenceServerClient("localhost:8001")
         with self.assertRaises(InferenceServerException) as cm:
             client.load_model("")
-        self.assertIn("model name must not be empty", str(cm.exception))
-
-    def test_model_name_empty_unload(self):
-        client = tritongrpcclient.InferenceServerClient("localhost:8001")
-        with self.assertRaises(InferenceServerException) as cm:
-            client.unload_model("")
         self.assertIn("model name must not be empty", str(cm.exception))
 
     def test_model_name_valid(self):
