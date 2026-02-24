@@ -1435,7 +1435,7 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
 # python3, python3-pip and some pip installs required for the python backend
 RUN dnf install -y \\
         libarchive-devel \\
-        openssl-devel \\
+        openssl3-devel \\
         readline-devel
 """
             # Requires openssl-devel to be installed first for pyenv build to be successful
