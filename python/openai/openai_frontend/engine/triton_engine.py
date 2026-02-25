@@ -534,7 +534,7 @@ class TritonLLMEngine(LLMEngine):
 
     def _get_model_metadata(self) -> Dict[str, TritonModelMetadata]:
         model_metadata = {}
-        for name, _ in self.server.models().keys():
+        for name, _ in self.server.models(exclude_not_ready=True).keys():
             model_metadata[name] = self._build_model_metadata(name)
         return model_metadata
 
@@ -555,9 +555,7 @@ class TritonLLMEngine(LLMEngine):
             # the event loop. The C API blocks until model is fully loaded and
             # ready, matching standard Triton server behavior.
             try:
-                metadata = await asyncio.to_thread(
-                    self._load_model_sync, model_name
-                )
+                metadata = await asyncio.to_thread(self._load_model_sync, model_name)
             except tritonserver.TritonError as e:
                 raise ServerError(f"Failed to load model '{model_name}': {e}")
 
@@ -592,9 +590,7 @@ class TritonLLMEngine(LLMEngine):
             try:
                 await asyncio.to_thread(self._unload_model_sync, model_name)
             except tritonserver.TritonError as e:
-                raise ServerError(
-                    f"Failed to unload model '{model_name}': {e}"
-                )
+                raise ServerError(f"Failed to unload model '{model_name}': {e}")
 
             del self.model_metadata[model_name]
 
