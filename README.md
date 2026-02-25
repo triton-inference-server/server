@@ -159,7 +159,10 @@ docker run \
   -p 8001:8001 \
   -p 8002:8002 \
   --net=host \
+  -e ORT_MIGRAPHX_MODEL_CACHE_PATH=/migraphx_cache \
+  -e ORT_MIGRAPHX_CACHE_PATH=/migraphx_cache \
   -v /path/to/your/model_repository/on/host:/models \
+  -v /path/to/your/migraphx_cache_save_dir/on/host:/migraphx_cache \
   tritonserver \
   tritonserver --model-repository=/models --exit-on-error=false
 ```
