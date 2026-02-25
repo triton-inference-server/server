@@ -93,7 +93,6 @@ class TestModelManagement:
             yield test_client
         server.stop()
 
-    # ------ test_load_model (combined) ------
     def test_load_model(self, client):
         # 1. Initially no models loaded
         assert _get_model_names(client) == []
@@ -112,7 +111,6 @@ class TestModelManagement:
         assert response.status_code == 200
         _assert_model_fields(response.json())
 
-    # ------ test_unload_model (combined) ------
     def test_unload_model(self, client):
         # Ensure model is loaded first
         if TEST_MODEL not in _get_model_names(client):
@@ -312,45 +310,118 @@ class TestModelManagementStartupModels:
             assert TEST_MODEL in names
             assert TEST_MODEL_2 not in names
 
-    def test_explicit_load_after_startup(self):
+    def test_explicit_load_unload_via_api(self):
         args = [
             "--model-repository",
             TEST_MODEL_REPOSITORY,
             "--model-control-mode",
             "explicit",
-            "--startup-models",
-            TEST_MODEL,
         ]
-        with OpenAIServer(args) as openai_server:
-            base = openai_server.url_root
+        with OpenAIServer(args) as server:
+            base = server.url_root
 
-            # Startup model is present
-            names = [
-                m["id"]
-                for m in requests.get(f"{base}/v1/models", timeout=10).json()[
-                    "data"
-                ]
-            ]
+            assert requests.post(f"{base}/v1/models/{TEST_MODEL}/load", timeout=30).status_code == 200
+            assert requests.post(f"{base}/v1/models/{TEST_MODEL_2}/load", timeout=30).status_code == 200
+
+            names = [m["id"] for m in requests.get(f"{base}/v1/models", timeout=10).json()["data"]]
             assert TEST_MODEL in names
+            assert TEST_MODEL_2 in names
 
-            # Load the second model dynamically
-            r = requests.post(
-                f"{base}/v1/models/{TEST_MODEL_2}/load", timeout=30
-            )
-            assert r.status_code == 200
+            assert requests.post(f"{base}/v1/models/{TEST_MODEL}/unload", timeout=30).status_code == 200
 
-            names = [
-                m["id"]
-                for m in requests.get(f"{base}/v1/models", timeout=10).json()[
-                    "data"
-                ]
-            ]
-            assert TEST_MODEL in names
+            names = [m["id"] for m in requests.get(f"{base}/v1/models", timeout=10).json()["data"]]
+            assert TEST_MODEL not in names
             assert TEST_MODEL_2 in names
 
 
 # ---------------------------------------------------------------------------
-# Group 5: API restriction for model-management endpoints
+# Group 5: Inference with real LLM backend after load/unload
+# ---------------------------------------------------------------------------
+@pytest.mark.openai
+class TestModelManagementInference:
+    @pytest.fixture(scope="class")
+    def managed_server(
+        self,
+        model_repository: str,
+        tokenizer_model: str,
+        backend: str,
+    ):
+        args = [
+            "--model-repository",
+            model_repository,
+            "--tokenizer",
+            tokenizer_model,
+            "--backend",
+            backend,
+            "--model-control-mode",
+            "explicit",
+        ]
+        with OpenAIServer(args) as openai_server:
+            yield openai_server
+
+    @staticmethod
+    def _completions(base_url, model_name):
+        return requests.post(
+            f"{base_url}/v1/completions",
+            json={
+                "model": model_name,
+                "prompt": "What is machine learning?",
+                "max_tokens": 10,
+            },
+            timeout=30,
+        )
+
+    @staticmethod
+    def _chat_completions(base_url, model_name):
+        return requests.post(
+            f"{base_url}/v1/chat/completions",
+            json={
+                "model": model_name,
+                "messages": [{"role": "user", "content": "What is machine learning?"}],
+                "max_tokens": 10,
+            },
+            timeout=30,
+        )
+
+    def test_reload_inference(self, managed_server, model: str):
+        base = managed_server.url_root
+
+        # Load → both endpoints succeed with 200
+        assert requests.post(f"{base}/v1/models/{model}/load", timeout=120).status_code == 200
+        r = self._completions(base, model)
+        assert r.status_code == 200
+        assert r.json()["choices"][0]["text"].strip()
+
+        r = self._chat_completions(base, model)
+        assert r.status_code == 200
+        assert r.json()["choices"][0]["message"]["content"].strip()
+
+        # Unload → both fail with "Unknown model"
+        assert requests.post(f"{base}/v1/models/{model}/unload", timeout=60).status_code == 200
+        r = self._completions(base, model)
+        assert r.status_code == 400
+        assert "unknown model" in r.json()["detail"].lower()
+
+        r = self._chat_completions(base, model)
+        assert r.status_code == 400
+        assert "unknown model" in r.json()["detail"].lower()
+
+        # Reload → both succeed again with 200
+        assert requests.post(f"{base}/v1/models/{model}/load", timeout=120).status_code == 200
+        r = self._completions(base, model)
+        assert r.status_code == 200
+        assert r.json()["choices"][0]["text"].strip()
+
+        r = self._chat_completions(base, model)
+        assert r.status_code == 200
+        assert r.json()["choices"][0]["message"]["content"].strip()
+
+        # Cleanup
+        requests.post(f"{base}/v1/models/{model}/unload", timeout=60)
+
+
+# ---------------------------------------------------------------------------
+# Group 6: API restriction for model-management endpoints
 # ---------------------------------------------------------------------------
 @pytest.mark.openai
 class TestModelManagementRestriction:
