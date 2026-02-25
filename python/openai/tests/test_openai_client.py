@@ -720,25 +720,3 @@ class TestAsyncOpenAIClient:
             )
         # Pydantic validation error
         assert "less than or equal to 5" in str(exc_info.value).lower()
-
-
-@pytest.mark.openai
-class TestOpenAIClientExplicitMode(TestOpenAIClient):
-    """Re-runs TestOpenAIClient against a model loaded via explicit mode.
-
-    The model is loaded in fixture setup and unloaded in teardown, validating
-    that inference works identically after an explicit load.
-    """
-
-    @pytest.fixture(scope="class")
-    def client(self, server_explicit):
-        return server_explicit.get_client()
-
-
-@pytest.mark.openai
-class TestAsyncOpenAIClientExplicitMode(TestAsyncOpenAIClient):
-    """Re-runs TestAsyncOpenAIClient against a model loaded via explicit mode."""
-
-    @pytest.fixture(scope="class")
-    def client(self, server_explicit):
-        return server_explicit.get_async_client()

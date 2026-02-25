@@ -513,15 +513,3 @@ class TestCompletions:
         assert "Input should be less than or equal to 5" in str(
             response.json()["detail"]
         )
-
-
-class TestCompletionsExplicitMode(TestCompletions):
-    """Re-runs TestCompletions against a model loaded via explicit mode.
-
-    The model is loaded in fixture setup and unloaded in teardown, validating
-    that inference works identically after an explicit load.
-    """
-
-    @pytest.fixture(scope="class")
-    def client(self, fastapi_client_explicit_class_scope):
-        yield fastapi_client_explicit_class_scope

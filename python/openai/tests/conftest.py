@@ -208,7 +208,6 @@ def server_explicit(
     model: str,
     tool_call_parser: str,
 ):
-    explicit_port = 9001
     args = [
         "--model-repository",
         model_repository,
@@ -220,10 +219,8 @@ def server_explicit(
         tool_call_parser,
         "--model-control-mode",
         "explicit",
-        "--openai-port",
-        str(explicit_port),
     ]
-    with OpenAIServer(args, port=explicit_port) as openai_server:
+    with OpenAIServer(args) as openai_server:
         r = requests.post(
             f"{openai_server.url_root}/v1/models/{model}/load",
             timeout=240,

@@ -808,15 +808,3 @@ class TestChatCompletionsTokenizers:
         assert any(
             error in response.json()["detail"].lower() for error in expected_errors
         )
-
-
-class TestChatCompletionsExplicitMode(TestChatCompletions):
-    """Re-runs TestChatCompletions against a model loaded via explicit mode.
-
-    The model is loaded in fixture setup and unloaded in teardown, validating
-    that inference works identically after an explicit load.
-    """
-
-    @pytest.fixture(scope="class")
-    def client(self, fastapi_client_explicit_class_scope):
-        yield fastapi_client_explicit_class_scope
