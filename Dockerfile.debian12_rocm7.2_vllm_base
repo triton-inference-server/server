@@ -1,5 +1,5 @@
 # Build base image first: docker build -t localhost/debian12_rocm7.2 -f Dockerfile.debian12_rocm7.2 .
-ARG BASE_IMAGE=localhost/debian12_rocm7.2
+ARG BASE_IMAGE=localhost/debian12_rocm7.2_base
 ARG TRITON_BRANCH="f332c492"
 ARG TRITON_REPO="https://github.com/ROCm/triton.git"
 ARG PYTORCH_BRANCH="89075173"

@@ -119,6 +119,14 @@ cd triton-inference-server-server
 bash scripts/build_debian12_rocm_72_base.sh
 ```
 
+OR if you want to install vLLM in final tritronserver artifacts
+```bash
+git clone -b rocm7.2_r25.12 https://github.com/ROCm/triton-inference-server-server.git
+cd triton-inference-server-server
+bash scripts/build_debian12_rocm_72_vllm_base.sh
+```
+This still creates base image localhost/debian12_rocm7.2 but with Debian12+ROCm7.2+vLLM+deps
+
 Step2: build tritonserver docker image
 ```bash
 cd triton-inference-server-server
