@@ -1696,6 +1696,7 @@ ENV NVIDIA_PRODUCT_NAME="Triton Server"
         df += """
 COPY docker/cpu_only/ /opt/rocm/
 COPY docker/entrypoint.d/ /opt/rocm/entrypoint.d/
+RUN chmod +x /opt/rocm/rocm_entrypoint.sh
 ENTRYPOINT ["/opt/rocm/rocm_entrypoint.sh"]
 """
     else:
