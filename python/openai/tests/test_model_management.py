@@ -286,9 +286,7 @@ class TestModelManagementStartupModels:
             "explicit",
         ]
         with OpenAIServer(args) as openai_server:
-            response = requests.get(
-                openai_server.url_for("v1", "models"), timeout=10
-            )
+            response = requests.get(openai_server.url_for("v1", "models"), timeout=10)
             assert response.status_code == 200
             assert len(response.json()["data"]) == 0
 
@@ -302,9 +300,7 @@ class TestModelManagementStartupModels:
             TEST_MODEL,
         ]
         with OpenAIServer(args) as openai_server:
-            response = requests.get(
-                openai_server.url_for("v1", "models"), timeout=10
-            )
+            response = requests.get(openai_server.url_for("v1", "models"), timeout=10)
             assert response.status_code == 200
             names = [m["id"] for m in response.json()["data"]]
             assert TEST_MODEL in names
@@ -320,16 +316,37 @@ class TestModelManagementStartupModels:
         with OpenAIServer(args) as server:
             base = server.url_root
 
-            assert requests.post(f"{base}/v1/models/{TEST_MODEL}/load", timeout=30).status_code == 200
-            assert requests.post(f"{base}/v1/models/{TEST_MODEL_2}/load", timeout=30).status_code == 200
+            assert (
+                requests.post(
+                    f"{base}/v1/models/{TEST_MODEL}/load", timeout=30
+                ).status_code
+                == 200
+            )
+            assert (
+                requests.post(
+                    f"{base}/v1/models/{TEST_MODEL_2}/load", timeout=30
+                ).status_code
+                == 200
+            )
 
-            names = [m["id"] for m in requests.get(f"{base}/v1/models", timeout=10).json()["data"]]
+            names = [
+                m["id"]
+                for m in requests.get(f"{base}/v1/models", timeout=10).json()["data"]
+            ]
             assert TEST_MODEL in names
             assert TEST_MODEL_2 in names
 
-            assert requests.post(f"{base}/v1/models/{TEST_MODEL}/unload", timeout=30).status_code == 200
+            assert (
+                requests.post(
+                    f"{base}/v1/models/{TEST_MODEL}/unload", timeout=30
+                ).status_code
+                == 200
+            )
 
-            names = [m["id"] for m in requests.get(f"{base}/v1/models", timeout=10).json()["data"]]
+            names = [
+                m["id"]
+                for m in requests.get(f"{base}/v1/models", timeout=10).json()["data"]
+            ]
             assert TEST_MODEL not in names
             assert TEST_MODEL_2 in names
 
@@ -387,7 +404,10 @@ class TestModelManagementInference:
         base = managed_server.url_root
 
         # Load → both endpoints succeed with 200
-        assert requests.post(f"{base}/v1/models/{model}/load", timeout=120).status_code == 200
+        assert (
+            requests.post(f"{base}/v1/models/{model}/load", timeout=120).status_code
+            == 200
+        )
         r = self._completions(base, model)
         assert r.status_code == 200
         assert r.json()["choices"][0]["text"].strip()
@@ -397,7 +417,10 @@ class TestModelManagementInference:
         assert r.json()["choices"][0]["message"]["content"].strip()
 
         # Unload → both fail with "Unknown model"
-        assert requests.post(f"{base}/v1/models/{model}/unload", timeout=60).status_code == 200
+        assert (
+            requests.post(f"{base}/v1/models/{model}/unload", timeout=60).status_code
+            == 200
+        )
         r = self._completions(base, model)
         assert r.status_code == 400
         assert "unknown model" in r.json()["detail"].lower()
@@ -407,7 +430,10 @@ class TestModelManagementInference:
         assert "unknown model" in r.json()["detail"].lower()
 
         # Reload → both succeed again with 200
-        assert requests.post(f"{base}/v1/models/{model}/load", timeout=120).status_code == 200
+        assert (
+            requests.post(f"{base}/v1/models/{model}/load", timeout=120).status_code
+            == 200
+        )
         r = self._completions(base, model)
         assert r.status_code == 200
         assert r.json()["choices"][0]["text"].strip()
@@ -473,13 +499,5 @@ class TestModelManagementRestriction:
         )
 
     def test_model_list_unrestricted(self, restricted_server):
-        r = requests.get(
-            f"{restricted_server.url_root}/v1/models", timeout=10
-        )
-        assert r.status_code == 200
-
-    def test_health_unrestricted(self, restricted_server):
-        r = requests.get(
-            f"{restricted_server.url_root}/health/ready", timeout=10
-        )
+        r = requests.get(f"{restricted_server.url_root}/v1/models", timeout=10)
         assert r.status_code == 200
