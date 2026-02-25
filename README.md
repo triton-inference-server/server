@@ -46,7 +46,7 @@ This repository contains ROCm-enabled builds of Triton Inference Server for AMD 
 
 The following table lists the ROCm-enabled Triton Inference Server component repositories. All components are based on **Triton Inference Server r25.12**.
 
-> **Note**: These repositories and branches are temporary during active development. We plan to clean up, merge branches, and upgrade to a newer version of Triton Inference Server in the future.
+> **Note**: These repositories contain ROCm-enabled source code. For the remaining repositories used to build the Triton Server artifacts without need of ROCm enablement, we use them as-is from the Triton Inference Server GitHub repository https://github.com/triton-inference-server.
 
 | Component | Repository | Branch |
 |-----------|------------|--------|
@@ -56,6 +56,9 @@ The following table lists the ROCm-enabled Triton Inference Server component rep
 | Third Party | [ROCm/triton-inference-server-third_party](https://github.com/ROCm/triton-inference-server-third_party) | `rocm7.2_r25.12` |
 | ONNX Runtime Backend | [ROCm/triton-inference-server-onnxruntime_backend](https://github.com/ROCm/triton-inference-server-onnxruntime_backend) | `rocm7.2_r25.12` |
 | Python Backend | [ROCm/triton-inference-server-python_backend](https://github.com/ROCm/triton-inference-server-python_backend) | `rocm7.2_r25.12` |
+| vLLM Backend | [ROCm/triton-inference-server-vllm_backend](https://github.com/ROCm/triton-inference-server-vllm_backend) | `TBD` |
+| Pytorch Backend | [ROCm/triton-inference-server-pytorch_backend](https://github.com/ROCm/triton-inference-server-pytorch_backend) | `TBD` |
+| Tensorflow Backend | [ROCm/triton-inference-server-tensorflow_backend](https://github.com/ROCm/triton-inference-server-tensorflow_backend) | `TBD` |
 
 
 ## Build Triton Inference Server
