@@ -150,6 +150,21 @@ def parse_args():
         default=16,
         help="The default maximum number of tokens to generate if not specified in the request. The default is 16.",
     )
+    triton_group.add_argument(
+        "--model-control-mode",
+        type=str,
+        default="none",
+        choices=["none", "explicit"],
+        help="Model control mode. 'none': all models loaded at startup. "
+        "'explicit': models must be loaded/unloaded via management API.",
+    )
+    triton_group.add_argument(
+        "--startup-models",
+        type=str,
+        nargs="*",
+        default=[],
+        help="Models to load at startup when using explicit model control mode.",
+    )
 
     # OpenAI-Compatible Frontend (FastAPI)
     openai_group = parser.add_argument_group("Triton OpenAI-Compatible Frontend")
@@ -200,8 +215,15 @@ def main():
     args = parse_args()
 
     # Initialize a Triton Inference Server pointing at LLM models
+    model_control_mode = (
+        tritonserver.ModelControlMode.EXPLICIT
+        if args.model_control_mode == "explicit"
+        else tritonserver.ModelControlMode.NONE
+    )
     server: tritonserver.Server = tritonserver.Server(
         model_repository=args.model_repository,
+        model_control_mode=model_control_mode,
+        startup_models=args.startup_models or [],
         log_verbose=args.tritonserver_log_verbose_level,
         log_info=True,
         log_warn=True,

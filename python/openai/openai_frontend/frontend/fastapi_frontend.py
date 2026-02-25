@@ -38,6 +38,7 @@ from frontend.fastapi.routers import (
     chat,
     completions,
     embeddings,
+    model_management,
     models,
     observability,
 )
@@ -101,6 +102,7 @@ class FastApiFrontend(OpenAIFrontend):
 
         app.include_router(observability.router)
         app.include_router(models.router)
+        app.include_router(model_management.router)
         app.include_router(completions.router)
         app.include_router(chat.router)
         app.include_router(embeddings.router)

@@ -53,6 +53,21 @@ def setup_server(model_repository: str):
     return server
 
 
+def setup_server_explicit(
+    model_repository: str, startup_models: Optional[List[str]] = None
+):
+    server: tritonserver.Server = tritonserver.Server(
+        model_repository=model_repository,
+        model_control_mode=tritonserver.ModelControlMode.EXPLICIT,
+        startup_models=startup_models or [],
+        log_verbose=0,
+        log_info=True,
+        log_warn=True,
+        log_error=True,
+    ).start(wait_until_ready=True)
+    return server
+
+
 def setup_fastapi_app(
     tokenizer: str,
     server: tritonserver.Server,
