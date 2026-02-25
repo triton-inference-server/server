@@ -23,12 +23,6 @@ RUN apt-get update && \
         pkg-config && \
     rm -rf /var/lib/apt/lists/*
 
-# Need this for debian
-RUN sed -i 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/g' /etc/locale.gen
-RUN echo 'LANG=en_US.UTF-8' > /etc/default/locale
-RUN locale-gen en_US.UTF-8
-RUN update-locale LANG=en_US.UTF-8
-
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
 
@@ -44,7 +38,7 @@ RUN apt-get update && \
     python3 --version && \
     rm -rf /var/lib/apt/lists/*
 
-# Install ROCm 7.2 (runtime + development packages) on Debian 12
+# Install ROCm 7.2 (runtime + development packages) on Ubuntu 22.04
 RUN wget https://repo.radeon.com/amdgpu-install/7.2/ubuntu/jammy/amdgpu-install_7.2.70200-1_all.deb && \
     apt-get update && \
     apt-get install -y --no-install-recommends ./amdgpu-install_7.2.70200-1_all.deb && \

@@ -1096,9 +1096,11 @@ RUN pip3 install --upgrade pip \\
     df += f"""
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
+# Remove existing /usr/include/boost first so mv replaces it
 RUN wget -O /tmp/boost.tar.gz {FLAGS.boost_url} \\
       && sha256sum /tmp/boost.tar.gz | grep {FLAGS.boost_sha256} \\
       && (cd /tmp && tar xzf boost.tar.gz) \\
+      && rm -rf /usr/include/boost \\
       && mv /tmp/boost_1_80_0/boost /usr/include/boost
 """
 
@@ -1217,9 +1219,11 @@ RUN pip3 install --upgrade \\
         df += f"""
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
+# Remove existing /usr/include/boost first so mv replaces it (else mv creates boost/boost/)
 RUN wget -O /tmp/boost.tar.gz {FLAGS.boost_url} \\
       && sha256sum /tmp/boost.tar.gz | grep {FLAGS.boost_sha256} \\
       && (cd /tmp && tar xzf boost.tar.gz) \\
+      && rm -rf /usr/include/boost \\
       && mv /tmp/boost_1_80_0/boost /usr/include/boost
 """
 
