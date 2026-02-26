@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -58,7 +58,7 @@ def check_valgrind_log(log_file):
         a list of the leak records as strings
     """
 
-    with open(args.input_log_file, "r") as f:
+    with open(log_file, "r") as f:
         logs = f.read()
 
     # Find the pid and start and end of definite leak reports
