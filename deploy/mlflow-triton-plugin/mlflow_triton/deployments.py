@@ -517,9 +517,11 @@ default_model_filename: "{}"
             raise Exception("{} model flavor not supported by Triton".format(flavor))
 
     def _validate_model_name(self, name):
-        if not name:
-            raise Exception("Please provide a model name for the deployment")
-        if "/" in name or ".." in name:  # Path traversal protection
+        # Check if the model name is empty or only contains whitespace, tabs, or newlines
+        if name.strip() == "":
+            raise Exception("Please provide a valid model name for the deployment")
+        # Path traversal protection
+        if "/" in name or name == "..":
             raise Exception(
                 "Path traversal is not allowed in model's name: {}".format(name)
             )

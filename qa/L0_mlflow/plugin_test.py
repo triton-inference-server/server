@@ -45,7 +45,7 @@ class PluginTest(tu.TestResultCollector):
     def _validate_deployment(self, model_name):
         # create
         self.client_.create_deployment(
-            model_name, "models:/{}/1".format(model_name), flavor="onnx"
+            model_name, f"models:/{model_name}/1", flavor="onnx"
         )
 
         # list
@@ -116,40 +116,65 @@ class PluginTest(tu.TestResultCollector):
             filecmp.cmp(config_path, "./models/onnx_model_with_files/config.pbtxt")
         )
 
-    def test_invalid_model_name(self):
-        model_uri = "models:/onnx_model_with_files/1"
+    def test_model_name(self):
+        EMPTY_MODEL_NAMES = [
+            "",
+            "     ",
+            " ",
+            "\t\n",
+        ]
+        INVALID_PATH_TRAVERSAL_NAMES = [
+            "/opt/sys/",
+            "../../etc/passwd",
+            "../outside/repo",
+            "test_models/../identity_py",
+            "..",
+        ]
+        VALID_MODEL_NAMES = [
+            "model123",
+            "model  OAI",
+            "model.version1",
+            "...",
+            "..my_model",
+            "model..1",
+            "model....1",
+        ]
 
-        model_name_empty = ""
-        with self.assertRaises(Exception) as e:
-            self.client_.create_deployment(model_name_empty, model_uri, flavor="onnx")
-        self.assertIn(
-            "Please provide a model name for the deployment",
-            str(e.exception),
-        )
-
-        model_name_path_traversal_1 = "/opt/sys/"
-        with self.assertRaises(Exception) as e:
-            self.client_.create_deployment(
-                model_name_path_traversal_1, model_uri, flavor="onnx"
+        for model_name in EMPTY_MODEL_NAMES:
+            model_uri = f"models:/{model_name}/1"
+            with self.assertRaises(Exception) as e:
+                self.client_.create_deployment(model_name, model_uri, flavor="onnx")
+            self.assertIn(
+                "Please provide a valid model name for the deployment",
+                str(e.exception),
             )
-        self.assertIn(
-            "Path traversal is not allowed in model's name: {}".format(
-                model_name_path_traversal_1
-            ),
-            str(e.exception),
-        )
 
-        model_name_path_traversal_2 = "../../etc/passwd"
-        with self.assertRaises(Exception) as e:
-            self.client_.create_deployment(
-                model_name_path_traversal_2, model_uri, flavor="onnx"
+        for model_name in INVALID_PATH_TRAVERSAL_NAMES:
+            model_uri = f"models:/{model_name}/1"
+            with self.assertRaises(Exception) as e:
+                self.client_.create_deployment(model_name, model_uri, flavor="onnx")
+            self.assertIn(
+                f"Path traversal is not allowed in model's name: {model_name}",
+                str(e.exception),
             )
-        self.assertIn(
-            "Path traversal is not allowed in model's name: {}".format(
-                model_name_path_traversal_2
-            ),
-            str(e.exception),
-        )
+
+        for model_name in VALID_MODEL_NAMES:
+            # _validate_model_name should not raise an exception
+            model_uri = f"models:/{model_name}/1"
+            with self.assertRaises(Exception) as e:
+                self.client_.create_deployment(model_name, model_uri, flavor="onnx")
+            self.assertNotIn(
+                "Please provide a valid model name for the deployment",
+                str(e.exception),
+            )
+            self.assertNotIn(
+                f"Path traversal is not allowed in model's name: {model_name}",
+                str(e.exception),
+            )
+            self.assertIn(
+                f"Registered Model with name={model_name} not found",
+                str(e.exception),
+            )
 
 
 if __name__ == "__main__":
