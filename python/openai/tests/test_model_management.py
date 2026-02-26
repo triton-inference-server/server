@@ -70,7 +70,7 @@ class TestModelManagementNoneMode:
             response = client.post(f"/v1/models/{TEST_MODEL}/{api}")
             assert response.status_code == 400
             assert (
-                "Model load/unload requires --model-control-mode=explicit"
+                "model load/unload requires --model-control-mode=explicit"
                 in response.json()["detail"].lower()
             )
 
