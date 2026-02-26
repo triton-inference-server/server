@@ -28,14 +28,8 @@ import os
 from pathlib import Path
 
 import pytest
-import requests
 from fastapi.testclient import TestClient
-from tests.utils import (
-    OpenAIServer,
-    setup_fastapi_app,
-    setup_server,
-    setup_server_explicit,
-)
+from tests.utils import OpenAIServer, setup_fastapi_app, setup_server
 
 
 def pytest_configure(config):
@@ -179,60 +173,6 @@ def fastapi_client_class_scope(
         yield test_client
 
     server.stop()
-
-
-# Explicit model control mode fixtures: the server starts with no models loaded,
-# the model is loaded via the management API, all inherited tests run against it,
-# and teardown verifies that unload succeeds.
-@pytest.fixture(scope="class")
-def fastapi_client_explicit_class_scope(
-    model_repository: str, tokenizer_model: str, backend: str, model: str
-):
-    server = setup_server_explicit(model_repository=model_repository)
-    server.load(model)
-    app = setup_fastapi_app(tokenizer=tokenizer_model, server=server, backend=backend)
-    with TestClient(app) as test_client:
-        yield test_client
-
-        r = test_client.post(f"/v1/models/{model}/unload")
-        assert r.status_code == 200, f"Teardown unload failed: {r.text}"
-
-    server.stop()
-
-
-@pytest.fixture(scope="module")
-def server_explicit(
-    model_repository: str,
-    tokenizer_model: str,
-    backend: str,
-    model: str,
-    tool_call_parser: str,
-):
-    args = [
-        "--model-repository",
-        model_repository,
-        "--tokenizer",
-        tokenizer_model,
-        "--backend",
-        backend,
-        "--tool-call-parser",
-        tool_call_parser,
-        "--model-control-mode",
-        "explicit",
-    ]
-    with OpenAIServer(args) as openai_server:
-        r = requests.post(
-            f"{openai_server.url_root}/v1/models/{model}/load",
-            timeout=240,
-        )
-        assert r.status_code == 200, f"Setup load failed: {r.text}"
-        yield openai_server
-
-        r = requests.post(
-            f"{openai_server.url_root}/v1/models/{model}/unload",
-            timeout=60,
-        )
-        assert r.status_code == 200, f"Teardown unload failed: {r.text}"
 
 
 # FIXME: In TRTLLM tests, the in-process Triton server for the FastAPI app

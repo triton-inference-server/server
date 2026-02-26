@@ -155,15 +155,25 @@ def parse_args():
         type=str,
         default="none",
         choices=["none", "explicit"],
-        help="Model control mode. 'none': all models loaded at startup. "
-        "'explicit': models must be loaded/unloaded via management API.",
+        help="Specify the mode for model management. Options are 'none', and 'explicit'. "
+        "The default is 'none'. For 'none', the server will load all models in the model "
+        "repository at startup and will not make any changes to the load "
+        "models after that. For 'explicit', model load and unload is initiated by using the "
+        "model control APIs, and only models specified with --load-model will "
+        "be loaded at startup.",
     )
     triton_group.add_argument(
-        "--startup-models",
+        "--load-model",
         type=str,
-        nargs="*",
-        default=[],
-        help="Models to load at startup when using explicit model control mode.",
+        action="append",
+        default=None,
+        help="Name of the model to be loaded on server startup. It may be specified "
+        "multiple times to add multiple models. To load ALL models at startup, "
+        "specify '*' as the model name with --load-model=* as the ONLY "
+        "--load-model argument, this does not imply any pattern matching. "
+        "Specifying --load-model=* in conjunction with another --load-model "
+        "argument will result in error. Note that this option will only take "
+        "effect if --model-control-mode=explicit is true.",
     )
 
     # OpenAI-Compatible Frontend (FastAPI)
@@ -220,10 +230,20 @@ def main():
         if args.model_control_mode == "explicit"
         else tritonserver.ModelControlMode.NONE
     )
+
+    load_models = args.load_model or []
+    if load_models and model_control_mode != tritonserver.ModelControlMode.EXPLICIT:
+        print(
+            "Error: Use of '--load-model' requires setting "
+            "'--model-control-mode=explicit' as well.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     server: tritonserver.Server = tritonserver.Server(
         model_repository=args.model_repository,
         model_control_mode=model_control_mode,
-        startup_models=args.startup_models or [],
+        startup_models=load_models,
         log_verbose=args.tritonserver_log_verbose_level,
         log_info=True,
         log_warn=True,

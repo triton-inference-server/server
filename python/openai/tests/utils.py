@@ -54,12 +54,12 @@ def setup_server(model_repository: str):
 
 
 def setup_server_explicit(
-    model_repository: str, startup_models: Optional[List[str]] = None
+    model_repository: str, load_models: Optional[List[str]] = None
 ):
     server: tritonserver.Server = tritonserver.Server(
         model_repository=model_repository,
         model_control_mode=tritonserver.ModelControlMode.EXPLICIT,
-        startup_models=startup_models or [],
+        startup_models=load_models or [],
         log_verbose=0,
         log_info=True,
         log_warn=True,
