@@ -1148,15 +1148,23 @@ RUN python3 -m pip install build
 SHELL ["cmd", "/S", "/C"]
 """
     else:
-        # docker dependencies are different for debian and ubuntu linux distro
-        docker_apt_distro = (
-            "debian" if getattr(FLAGS, "linux_distro", "ubuntu") == "debian" else "ubuntu"
+        # ROCm + Ubuntu base image (Dockerfile.ubuntu24.04_rocm7.2) already has the right Docker client; do not update
+        need_docker_install = not (
+            getattr(FLAGS, "enable_rocm", False)
+            and getattr(FLAGS, "linux_distro", "ubuntu") == "ubuntu"
         )
-        df += """
+        if need_docker_install:
+            # docker dependencies are different for debian and ubuntu linux distro
+            docker_apt_distro = (
+                "debian" if getattr(FLAGS, "linux_distro", "ubuntu") == "debian" else "ubuntu"
+            )
+            df += """
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install docker docker buildx
+"""
+            df += """
 RUN apt-get update \\
       && apt-get install -y ca-certificates curl gnupg \\
       && install -m 0755 -d /etc/apt/keyrings \\
@@ -1167,10 +1175,18 @@ RUN apt-get update \\
           "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \\
           tee /etc/apt/sources.list.d/docker.list > /dev/null \\
       && apt-get update \\
+      && (apt-get remove -y docker-ce docker-ce-cli 2>/dev/null || true) \\
       && apt-get install -y docker.io docker-buildx-plugin
 """.format(
-            docker_apt_distro=docker_apt_distro
-        )
+                docker_apt_distro=docker_apt_distro
+            )
+        else:
+            df += """
+# Ensure apt-get won't prompt for selecting options
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Skip Docker install: ROCm Ubuntu base image already has Docker client 24.0.x (API 1.43)
+"""
         df += """
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision

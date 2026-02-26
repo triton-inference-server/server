@@ -62,6 +62,18 @@ RUN apt update -q=2 && apt install -y wget && \
     ln -sf /opt/cmake-3.28.3-linux-x86_64/bin/cpack /usr/local/bin/cpack && \
     cmake --version 
 
+# Install Docker client 24.0.x (API 1.43) for compatibility with daemon max API 1.43
+ENV DOCKER_VERSION=24.0.7
+RUN set -eux; \
+    wget -q "https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz" -O /tmp/docker.tgz; \
+    tar -xzf /tmp/docker.tgz -C /tmp; \
+    mv /tmp/docker/docker /usr/local/bin/docker; \
+    rm -rf /tmp/docker /tmp/docker.tgz; \
+    chmod +x /usr/local/bin/docker; \
+    echo "=== Docker client version (must be 24.0.x / API 1.43) ==="; \
+    docker version || true; \
+    echo "=== Docker client ${DOCKER_VERSION} (API 1.43) installed successfully ==="
+
 # Set ROCm environment variables
 ENV ROCM_PATH=/opt/rocm
 ENV HIP_PATH=/opt/rocm

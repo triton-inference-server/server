@@ -7,7 +7,7 @@ set -e
 echo "========================================"
 echo "Building localhost/ubuntu24.04_rocm7.2"
 echo "========================================"
-docker build -t localhost/ubuntu24.04_rocm7.2 -f Dockerfile.ubuntu24.04_rocm7.2 .
+docker build --progress=plain -t localhost/ubuntu24.04_rocm7.2 -f Dockerfile.ubuntu24.04_rocm7.2 .
 echo ""
 
 docker images | grep -E "localhost/ubuntu24.04_rocm7.2" || true

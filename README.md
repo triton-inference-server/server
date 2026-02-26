@@ -63,7 +63,7 @@ The following table lists the ROCm-enabled Triton Inference Server component rep
 
 ## Build Triton Inference Server
 
-### On Ubuntu 22.04
+### On Ubuntu 24.04
 
 #### Prerequisites
 
@@ -71,10 +71,17 @@ The following table lists the ROCm-enabled Triton Inference Server component rep
 - AMD GPU with ROCm support
 - ROCm 7.2 or compatible version installed on the host
 
-The following instructions are for building on **Ubuntu 22.04** with ROCm 7.2.
+The following instructions are for building on **Ubuntu 24.04** with ROCm 7.2.
 
+Step1: build base docker image with Ubuntu 24.04+ROCm7.2+deps
 ```bash
 git clone -b rocm7.2_r25.12 https://github.com/ROCm/triton-inference-server-server.git
+cd triton-inference-server-server
+bash scripts/build_ubuntu24.04_rocm_72_base.sh
+```
+Step2: build tritonserver docker image
+
+```bash
 cd triton-inference-server-server
 python3 build.py \
   --no-container-pull \
@@ -96,6 +103,7 @@ python3 build.py \
 - `--endpoint=grpc --endpoint=http`: Enable both HTTP and gRPC inference protocols
 - `--backend=onnxruntime`: Build with onnxruntime backend
 - `--backend=python`: Build with python backend
+- `--linux-distro`: Build on Ubuntu 24.04 OS
 
 
 *The above example builds tritonserver artifact with both onnxruntime and python backends.
