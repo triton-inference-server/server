@@ -1864,17 +1864,13 @@ LABEL com.nvidia.build.ref={}
 
 
 def get_base_image_rocm_debian():
-    """Return base image for ROCm Debian: vllm image if --install-vllm, else minimal ROCm."""
-    return (
-        "localhost/debian12_rocm7.2_vllm"
-        if getattr(FLAGS, "install_vllm", False)
-        else "localhost/debian12_rocm7.2"
-    )
+    """Return base image for ROCm Debian"""
+    return "localhost/debian12_rocm7.2"
 
 
 def get_base_image_rocm_ubuntu():
-    """Return base image for ROCm Ubuntu (onnxruntime and python backends)."""
-    return "rocm/dev-ubuntu-22.04:7.2-complete"
+    """Return base image for ROCm Ubuntu"""
+    return "localhost/ubuntu24.04_rocm7.2"
 
 
 def create_build_dockerfiles(
@@ -3007,12 +3003,6 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--enable-rocm", action="store_true", required=False, help="Enable AMD GPU support."
-    )
-    parser.add_argument(
-        "--install-vllm",
-        action="store_true",
-        required=False,
-        help="Use localhost/debian12_rocm7.2_vllm as base for ROCm Debian (onnxruntime and python backends). If false, use localhost/debian12_rocm7.2.",
     )
     parser.add_argument(
         "--linux-distro",
