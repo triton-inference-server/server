@@ -205,8 +205,11 @@ class TestModelManagementConcurrency:
             f1 = pool.submit(client.post, f"/v1/models/{TEST_MODEL}/load")
             f2 = pool.submit(client.post, f"/v1/models/{TEST_MODEL}/load")
 
-        assert f1.result().status_code == 200
-        assert f2.result().status_code == 400
+        codes = sorted([f1.result().status_code, f2.result().status_code])
+        assert codes == [
+            200,
+            400,
+        ], f"Expected one 200 and one 400 for concurrent loads of the same model, got {codes}"
         assert TEST_MODEL in _get_model_names(client)
 
         client.post(f"/v1/models/{TEST_MODEL}/unload")
@@ -218,9 +221,12 @@ class TestModelManagementConcurrency:
             f1 = pool.submit(client.post, f"/v1/models/{TEST_MODEL}/unload")
             f2 = pool.submit(client.post, f"/v1/models/{TEST_MODEL}/unload")
 
-        # One succeeds (200), the other fails (400 "unknown model")
-        assert f1.result().status_code == 200
-        assert f2.result().status_code == 400
+        # One succeeds (200), the other fails (400 "unknown model") — order is non-deterministic
+        codes = sorted([f1.result().status_code, f2.result().status_code])
+        assert codes == [
+            200,
+            400,
+        ], f"Expected one 200 and one 400 for concurrent unloads of the same model, got {codes}"
         assert TEST_MODEL not in _get_model_names(client)
 
 
