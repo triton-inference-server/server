@@ -55,7 +55,7 @@ def _assert_model_fields(model_data: dict):
     assert model_data["owned_by"] == "Triton Inference Server"
 
 
-# Test Mode enforcement – NONE mode rejects load/unload
+# Test Mode enforcement – NONE mode rejects load/unload API calls
 class TestModelManagementNoneMode:
     @pytest.fixture(scope="class")
     def client(self):
@@ -95,7 +95,6 @@ class TestModelManagement:
         _assert_model_fields(response.json())
         assert response.json()["id"] == TEST_MODEL
 
-        # Model now appears in GET /v1/models
         assert TEST_MODEL in _get_model_names(client)
 
         # GET /v1/models/{model_name} returns correct info
@@ -104,35 +103,29 @@ class TestModelManagement:
         _assert_model_fields(response.json())
 
     def test_unload_model(self, client):
-        # Ensure model is loaded first
         if TEST_MODEL not in _get_model_names(client):
             response = client.post(f"/v1/models/{TEST_MODEL}/load")
             assert response.status_code == 200
 
-        # Unload – 200 with success status
         response = client.post(f"/v1/models/{TEST_MODEL}/unload")
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "success"
         assert body["model"] == TEST_MODEL
 
-        # Model no longer in model list
         assert TEST_MODEL not in _get_model_names(client)
 
-        # GET /v1/models/{model_name} now 404
-        response = client.get(f"/v1/models/{TEST_MODEL}")
-        assert response.status_code == 404
+        assert client.get(f"/v1/models/{TEST_MODEL}").status_code == 404
 
     def test_load_already_loaded_model(self, client):
-        # Load the model
-        client.post(f"/v1/models/{TEST_MODEL}/load")
+        client.post(f"/v1/models/{TEST_MODEL}/unload")
+        assert client.post(f"/v1/models/{TEST_MODEL}/load").status_code == 200
 
         # Second load of the same model should fail
         response = client.post(f"/v1/models/{TEST_MODEL}/load")
         assert response.status_code == 400
         assert "already loaded" in response.json()["detail"].lower()
 
-        # Cleanup
         client.post(f"/v1/models/{TEST_MODEL}/unload")
 
     def test_unload_unknown_model(self, client):
@@ -145,42 +138,31 @@ class TestModelManagement:
         assert response.status_code == 500
 
     def test_load_unload_reload(self, client):
-        # Load
-        response = client.post(f"/v1/models/{TEST_MODEL}/load")
-        assert response.status_code == 200
-
-        # Unload
-        response = client.post(f"/v1/models/{TEST_MODEL}/unload")
-        assert response.status_code == 200
-        assert TEST_MODEL not in _get_model_names(client)
-
-        # Reload – should succeed
-        response = client.post(f"/v1/models/{TEST_MODEL}/load")
-        assert response.status_code == 200
+        assert client.post(f"/v1/models/{TEST_MODEL}/load").status_code == 200
         assert TEST_MODEL in _get_model_names(client)
 
-        # Cleanup
+        assert client.post(f"/v1/models/{TEST_MODEL}/unload").status_code == 200
+        assert TEST_MODEL not in _get_model_names(client)
+
+        assert client.post(f"/v1/models/{TEST_MODEL}/load").status_code == 200
+        assert TEST_MODEL in _get_model_names(client)
+
         client.post(f"/v1/models/{TEST_MODEL}/unload")
 
     def test_load_multiple_models(self, client):
-        # Load both models
-        r1 = client.post(f"/v1/models/{TEST_MODEL}/load")
-        r2 = client.post(f"/v1/models/{TEST_MODEL_2}/load")
-        assert r1.status_code == 200
-        assert r2.status_code == 200
+        assert client.post(f"/v1/models/{TEST_MODEL}/load").status_code == 200
+        assert client.post(f"/v1/models/{TEST_MODEL_2}/load").status_code == 200
 
-        # Both appear in list
         names = _get_model_names(client)
         assert TEST_MODEL in names
         assert TEST_MODEL_2 in names
 
-        # Unload one – the other remains
+        # Unload one; other remains
         client.post(f"/v1/models/{TEST_MODEL}/unload")
         names = _get_model_names(client)
         assert TEST_MODEL not in names
         assert TEST_MODEL_2 in names
 
-        # Cleanup
         client.post(f"/v1/models/{TEST_MODEL_2}/unload")
 
 
@@ -205,81 +187,67 @@ class TestModelManagementConcurrency:
             assert TEST_MODEL not in _get_model_names(client)
 
     def test_concurrent_load_different_models(self, client):
-        def load_model(model_name):
-            return client.post(f"/v1/models/{model_name}/load")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            f1 = pool.submit(client.post, f"/v1/models/{TEST_MODEL}/load")
+            f2 = pool.submit(client.post, f"/v1/models/{TEST_MODEL_2}/load")
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            f1 = executor.submit(load_model, TEST_MODEL)
-            f2 = executor.submit(load_model, TEST_MODEL_2)
-            r1 = f1.result()
-            r2 = f2.result()
-
-        assert r1.status_code == 200
-        assert r2.status_code == 200
+        assert f1.result().status_code == 200
+        assert f2.result().status_code == 200
         names = _get_model_names(client)
         assert TEST_MODEL in names
         assert TEST_MODEL_2 in names
 
-        # Cleanup
         client.post(f"/v1/models/{TEST_MODEL}/unload")
         client.post(f"/v1/models/{TEST_MODEL_2}/unload")
 
     def test_concurrent_load_same_model(self, client):
-        def load_model():
-            return client.post(f"/v1/models/{TEST_MODEL}/load")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            f1 = pool.submit(client.post, f"/v1/models/{TEST_MODEL}/load")
+            f2 = pool.submit(client.post, f"/v1/models/{TEST_MODEL}/load")
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            f1 = executor.submit(load_model)
-            f2 = executor.submit(load_model)
-            r1 = f1.result()
-            r2 = f2.result()
-
-        statuses = sorted([r1.status_code, r2.status_code])
-        # One should succeed (200), the other should fail (400 "already loaded")
-        assert statuses == [200, 400]
-
-        # Model is loaded exactly once
+        assert f1.result().status_code == 200
+        assert f2.result().status_code == 400
         assert TEST_MODEL in _get_model_names(client)
 
-        # Cleanup
         client.post(f"/v1/models/{TEST_MODEL}/unload")
 
     def test_concurrent_unload_same_model(self, client):
         client.post(f"/v1/models/{TEST_MODEL}/load")
 
-        def unload_model():
-            return client.post(f"/v1/models/{TEST_MODEL}/unload")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            f1 = pool.submit(client.post, f"/v1/models/{TEST_MODEL}/unload")
+            f2 = pool.submit(client.post, f"/v1/models/{TEST_MODEL}/unload")
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-            f1 = executor.submit(unload_model)
-            f2 = executor.submit(unload_model)
-            r1 = f1.result()
-            r2 = f2.result()
-
-        statuses = sorted([r1.status_code, r2.status_code])
-        # One succeeds, the other gets "Unknown model"
-        assert statuses == [200, 400]
-
+        # One succeeds (200), the other fails (400 "unknown model")
+        assert f1.result().status_code == 200
+        assert f2.result().status_code == 400
         assert TEST_MODEL not in _get_model_names(client)
 
 
 # Test "--load-model" and "--model-control-mode" CLI options
 @pytest.mark.openai
 class TestModelManagementCLIOptions:
-    def test_load_model_without_explicit_mode_rejected(self):
-        """--load-model without --model-control-mode=explicit must error."""
-        args = [
-            "--model-repository",
-            TEST_MODEL_REPOSITORY,
-            "--load-model",
-            TEST_MODEL,
-        ]
-        with pytest.raises(Exception):
+    def _assert_server_startup_fails(self, args, expected_error: str):
+        """Helper: verify server fails to start and stderr contains expected_error."""
+        with pytest.raises(Exception) as exc_info:
             with OpenAIServer(args):
                 pass
+        assert expected_error in str(exc_info.value)
 
-    def test_explicit_no_load_model(self):
-        """Explicit mode with no --load-model: no models loaded."""
+    def test_load_model_without_explicit_mode_is_error(self):
+        """--load-model without --model-control-mode=explicit must exit with error.
+        Error message matches native tritonserver exactly."""
+        self._assert_server_startup_fails(
+            args=[
+                "--model-repository",
+                TEST_MODEL_REPOSITORY,
+                "--load-model",
+                TEST_MODEL,
+            ],
+            expected_error="Error: Use of '--load-model' requires setting '--model-control-mode=explicit' as well.",
+        )
+
+    def test_explicit_no_load_model_starts_with_no_models(self):
         args = [
             "--model-repository",
             TEST_MODEL_REPOSITORY,
@@ -291,8 +259,7 @@ class TestModelManagementCLIOptions:
             assert r.status_code == 200
             assert len(r.json()["data"]) == 0
 
-    def test_explicit_with_single_load_model(self):
-        """--load-model with one model: only that model loaded."""
+    def test_explicit_single_load_model_at_startup(self):
         args = [
             "--model-repository",
             TEST_MODEL_REPOSITORY,
@@ -307,8 +274,7 @@ class TestModelManagementCLIOptions:
             assert TEST_MODEL in names
             assert TEST_MODEL_2 not in names
 
-    def test_explicit_with_multiple_load_model(self):
-        """Multiple --load-model args: all specified models loaded."""
+    def test_explicit_multiple_load_model_at_startup(self):
         args = [
             "--model-repository",
             TEST_MODEL_REPOSITORY,
@@ -325,8 +291,7 @@ class TestModelManagementCLIOptions:
             assert TEST_MODEL in names
             assert TEST_MODEL_2 in names
 
-    def test_explicit_load_model_wildcard(self):
-        """--load-model=* loads all models in the repository."""
+    def test_explicit_load_model_wildcard_loads_all(self):
         args = [
             "--model-repository",
             TEST_MODEL_REPOSITORY,
@@ -341,24 +306,22 @@ class TestModelManagementCLIOptions:
             assert TEST_MODEL in names
             assert TEST_MODEL_2 in names
 
-    def test_explicit_load_model_wildcard_with_other_rejected(self):
-        """--load-model=* combined with another --load-model must error."""
-        args = [
-            "--model-repository",
-            TEST_MODEL_REPOSITORY,
-            "--model-control-mode",
-            "explicit",
-            "--load-model",
-            "*",
-            "--load-model",
-            TEST_MODEL,
-        ]
-        with pytest.raises(Exception):
-            with OpenAIServer(args):
-                pass
+    def test_explicit_load_model_wildcard_with_other_is_error(self):
+        self._assert_server_startup_fails(
+            args=[
+                "--model-repository",
+                TEST_MODEL_REPOSITORY,
+                "--model-control-mode",
+                "explicit",
+                "--load-model",
+                "*",
+                "--load-model",
+                TEST_MODEL,
+            ],
+            expected_error="Wildcard model name '*' must be the ONLY startup model if specified at all.",
+        )
 
-    def test_explicit_load_unload_via_api(self):
-        """Load and unload models dynamically via the management API."""
+    def test_explicit_dynamic_load_unload_via_api(self):
         args = [
             "--model-repository",
             TEST_MODEL_REPOSITORY,
@@ -428,9 +391,8 @@ class TestModelManagementInference:
 
     @pytest.fixture(autouse=True)
     def ensure_model_unloaded(self, managed_server, model: str):
-        """Ensure the model is unloaded before each test so every test
-        starts from a clean state.  Ignores errors (model may already
-        be unloaded)."""
+        """Guarantee clean state before and after every test: unload silently
+        (model may already be unloaded -- that is fine)."""
         requests.post(f"{managed_server.url_root}/v1/models/{model}/unload", timeout=60)
         yield
         requests.post(f"{managed_server.url_root}/v1/models/{model}/unload", timeout=60)
@@ -487,11 +449,8 @@ class TestModelManagementInference:
 
     def test_load_completions(self, managed_server, model: str):
         base = managed_server.url_root
-
-        # Before load
         self._assert_unknown_model(self._completions(base, model))
 
-        # Load and verify completions
         self._load(base, model)
         r = self._completions(base, model)
         assert r.status_code == 200
@@ -500,16 +459,12 @@ class TestModelManagementInference:
         assert data["choices"][0]["finish_reason"] == "stop"
         self._assert_usage(data["usage"])
 
-        # Cleanup
         self._unload(base, model)
 
     def test_load_chat_completions(self, managed_server, model: str):
         base = managed_server.url_root
-
-        # Before load
         self._assert_unknown_model(self._chat_completions(base, model))
 
-        # Load and verify chat completions
         self._load(base, model)
         r = self._chat_completions(base, model)
         assert r.status_code == 200
@@ -520,7 +475,6 @@ class TestModelManagementInference:
         assert data["choices"][0]["finish_reason"] == "stop"
         self._assert_usage(data["usage"])
 
-        # Cleanup
         self._unload(base, model)
 
     def test_load_streaming_completions(self, managed_server, model: str):
@@ -577,30 +531,24 @@ class TestModelManagementInference:
         base = managed_server.url_root
         self._load(base, model)
 
-        # Verify inference works
         assert self._completions(base, model).status_code == 200
         assert self._chat_completions(base, model).status_code == 200
 
-        # Unload
         self._unload(base, model)
 
-        # Both endpoints reject with "Unknown model"
         self._assert_unknown_model(self._completions(base, model))
         self._assert_unknown_model(self._chat_completions(base, model))
 
     def test_reload_inference(self, managed_server, model: str):
         base = managed_server.url_root
 
-        # Load → inference works
         self._load(base, model)
         assert self._completions(base, model).status_code == 200
         assert self._chat_completions(base, model).status_code == 200
 
-        # Unload → inference fails
         self._unload(base, model)
         self._assert_unknown_model(self._completions(base, model))
 
-        # Reload → inference works again
         self._load(base, model)
         r = self._completions(base, model)
         assert r.status_code == 200
@@ -610,7 +558,6 @@ class TestModelManagementInference:
         assert r.status_code == 200
         assert r.json()["choices"][0]["message"]["content"].strip()
 
-        # Cleanup
         self._unload(base, model)
 
     def test_model_list_after_load_unload(self, managed_server, model: str):
@@ -621,16 +568,18 @@ class TestModelManagementInference:
         assert r.status_code == 200
         assert len(r.json()["data"]) == 0
 
-        # Load → model appears
         self._load(base, model)
-        r = requests.get(f"{base}/v1/models", timeout=10)
-        names = [m["id"] for m in r.json()["data"]]
+        names = [
+            m["id"]
+            for m in requests.get(f"{base}/v1/models", timeout=10).json()["data"]
+        ]
         assert model in names
 
-        # Unload → model disappears
         self._unload(base, model)
-        r = requests.get(f"{base}/v1/models", timeout=10)
-        names = [m["id"] for m in r.json()["data"]]
+        names = [
+            m["id"]
+            for m in requests.get(f"{base}/v1/models", timeout=10).json()["data"]
+        ]
         assert model not in names
 
 
@@ -656,15 +605,13 @@ class TestModelManagementRestriction:
 
     def test_load_without_auth_rejected(self, restricted_server):
         r = requests.post(
-            f"{restricted_server.url_root}/v1/models/{TEST_MODEL_2}/load",
-            timeout=10,
+            f"{restricted_server.url_root}/v1/models/{TEST_MODEL_2}/load", timeout=10
         )
         assert r.status_code == 401
 
     def test_unload_without_auth_rejected(self, restricted_server):
         r = requests.post(
-            f"{restricted_server.url_root}/v1/models/{TEST_MODEL}/unload",
-            timeout=10,
+            f"{restricted_server.url_root}/v1/models/{TEST_MODEL}/unload", timeout=10
         )
         assert r.status_code == 401
 
