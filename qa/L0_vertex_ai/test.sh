@@ -69,7 +69,7 @@ mkdir single_model && \
     cp -r multi_models/addsub single_model/.
 
 # Set up single-model Python repository used by restricted API regression
-rm -rf restricted_single_model && mkdir -p restricted_single_model/identity_fp32/1 && \
+mkdir -p restricted_single_model/identity_fp32/1 && \
     cp ../python_models/identity_fp32/config.pbtxt restricted_single_model/identity_fp32/ && \
     cp ../python_models/identity_fp32/model.py restricted_single_model/identity_fp32/1/
 
