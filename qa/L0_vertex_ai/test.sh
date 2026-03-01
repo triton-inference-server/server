@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,7 +44,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
-rm -rf multi_models single_model
+rm -rf multi_models single_model restricted_single_model
 rm -f *.log
 rm -f *.out
 
@@ -67,6 +67,11 @@ mkdir multi_models && \
     sed -i "s/onnx_int32_int32_int32/subadd/" multi_models/subadd/config.pbtxt
 mkdir single_model && \
     cp -r multi_models/addsub single_model/.
+
+# Set up single-model Python repository used by restricted API regression
+rm -rf restricted_single_model && mkdir -p restricted_single_model/identity_fp32/1 && \
+    cp ../python_models/identity_fp32/config.pbtxt restricted_single_model/identity_fp32/ && \
+    cp ../python_models/identity_fp32/model.py restricted_single_model/identity_fp32/1/
 
 # Use Vertex AI's health endpoint to check server status
 # Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
@@ -708,6 +713,145 @@ else
         echo -e "\n***\n*** Failed. Expected error on model control\n***"
         RET=1
     fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVE_PID
+
+#
+# Restricted API regression for Vertex redirect
+#
+unset_vertex_variables
+export AIP_PREDICT_ROUTE="/predict"
+export AIP_HEALTH_ROUTE="/health"
+
+SERVER_LOG="vertex_restricted_api_testing_server.log"
+SERVER_ARGS="--allow-vertex-ai=true --model-repository=restricted_single_model --vertex-ai-default-model=identity_fp32 --http-restricted-api=metadata,model-config,model-repository,statistics,shared-memory:X-Vertex-Restricted=secret"
+run_server_nowait
+vertex_ai_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Baseline infer remains available without restricted header
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "Content-Type: application/json" -d'{"inputs":[{"name":"INPUT0","datatype":"FP32","shape":[1,1],"data":[42.0]}],"outputs":[{"name":"OUTPUT0"}]}' localhost:8080/predict`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected /predict inference succeeds without restricted header\n***"
+    RET=1
+else
+    grep "OUTPUT0" ./curl.out
+    if [ $? -ne 0 ]; then
+        cat ./curl.out
+        echo -e "\n***\n*** Failed. Expected inference output is returned\n***"
+        RET=1
+    fi
+fi
+set -e
+
+# Redirected management APIs should be blocked without restricted header
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected /v2 metadata is restricted\n***"
+    RET=1
+else
+    grep "This API is restricted" ./curl.out
+    if [ $? -ne 0 ]; then
+        cat ./curl.out
+        echo -e "\n***\n*** Failed. Expected restriction error message\n***"
+        RET=1
+    fi
+fi
+
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/models/identity_fp32/config" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model config is restricted\n***"
+    RET=1
+fi
+
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/index" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected repository index is restricted\n***"
+    RET=1
+fi
+
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/systemsharedmemory/status" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected system shared memory status is restricted\n***"
+    RET=1
+fi
+
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/cudasharedmemory/status" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected CUDA shared memory status is restricted\n***"
+    RET=1
+fi
+
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/systemsharedmemory/region/test/register" -H "Content-Type: application/json" -d '{"key":"test_shm","byte_size":1024}' localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected shared memory register operation is restricted\n***"
+    RET=1
+fi
+set -e
+
+# Restricted header should allow handler invocation
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected /v2 metadata passes with restricted header\n***"
+    RET=1
+fi
+
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/systemsharedmemory/status" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected shared memory status passes with restricted header\n***"
+    RET=1
+fi
+
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/cudasharedmemory/status" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected CUDA shared memory status passes with restricted header\n***"
+    RET=1
+fi
+
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/models/identity_fp32/config" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model config passes with restricted header\n***"
+    RET=1
+fi
+
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/index" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected repository index passes with restricted header\n***"
+    RET=1
+fi
+
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/systemsharedmemory/region/test/register" -H "X-Vertex-Restricted: secret" -H "Content-Type: application/json" -d '{"key":"test_shm","byte_size":1024}' localhost:8080/predict`
+if [ "$code" == "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Restricted header should allow shared memory register handler to be reached\n***"
+    RET=1
 fi
 set -e
 
