@@ -320,6 +320,18 @@ class ModelNameValidationTest(unittest.TestCase):
             client.load_model("")
         self.assertIn("model name must not be empty", str(cm.exception))
 
+    def test_model_name_whitespace_only_load(self):
+        client = tritongrpcclient.InferenceServerClient("localhost:8001")
+        whitespace_names = [" ", "   ", "\t", "\n", "\r", "\f", "\v", " \t \n "]
+        for model_name in whitespace_names:
+            with self.assertRaises(InferenceServerException) as cm:
+                client.load_model(model_name)
+            self.assertIn(
+                "model name must not contain only whitespace",
+                str(cm.exception),
+                f"Expected whitespace-only rejection for model name: {model_name!r}",
+            )
+
     def test_model_name_invalid_unload(self):
         # Unload should not trigger traversal check
         client = tritongrpcclient.InferenceServerClient("localhost:8001")
