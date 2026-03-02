@@ -3361,12 +3361,12 @@ HTTPAPIServer::HandleGenerate(
         server_.get(), req, GetResponseCompressionType(req),
         generate_stream_request_schema_.get(),
         generate_stream_response_schema_.get(), streaming, irequest_shared,
-        shm_manager_));
+        shm_manager_, max_input_size_));
   } else {
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_request_schema_.get(), generate_response_schema_.get(),
-        streaming, irequest_shared, shm_manager_));
+        streaming, irequest_shared, shm_manager_, max_input_size_));
   }
   generate_request->trace_ = trace;
 
@@ -3513,13 +3513,15 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
   std::vector<std::string> members;
   RETURN_IF_ERR(generate_request.Members(&members));
 
+  size_t consumed_input_size{0};
+
   for (const auto& m : members) {
     auto it = schema->children_.find(m);
     if (it != schema->children_.end()) {
       switch (it->second->kind_) {
         case MappingSchema::Kind::EXACT_MAPPING: {
           // Read meta data
-          RETURN_IF_ERR(ExactMappingInput(m, generate_request, input_metadata));
+          RETURN_IF_ERR(ExactMappingInput(m, generate_request, input_metadata, consumed_input_size));
           break;
         }
         case MappingSchema::Kind::MAPPING_SCHEMA: {
@@ -3549,7 +3551,7 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
       }
     } else if (schema->allow_unspecified_) {
       // Unspecified key follows EXACT_MAPPING
-      RETURN_IF_ERR(ExactMappingInput(m, generate_request, input_metadata));
+      RETURN_IF_ERR(ExactMappingInput(m, generate_request, input_metadata, consumed_input_size));
     } else {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNSUPPORTED,
@@ -3563,7 +3565,8 @@ TRITONSERVER_Error*
 HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
     const std::string& name,
     triton::common::TritonJson::Value& generate_request,
-    std::map<std::string, triton::common::TritonJson::Value>& input_metadata)
+    std::map<std::string, triton::common::TritonJson::Value>& input_metadata,
+    size_t& consumed_input_byte_size)
 {
   auto it = input_metadata.find(name);
   if (it == input_metadata.end()) {
@@ -3597,28 +3600,12 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
 
       // Ensure that we do not have an integer overflow when calculating
       // byte_size = element_cnt * element_size.
-      // For element_size == 1, there is no risk of integer overflow so we can
-      // skip the check.
-      switch (element_size) {
-        case 1:
-          break;
-        case 2:
-        case 4:
-        case 8:
-          if (element_cnt > (SIZE_MAX / element_size)) {
-            return TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INVALID_ARG,
-                (std::string("input '") + name +
-                 "' has too many elements of datatype " + value)
-                    .c_str());
-          }
-          break;
-        default:
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INVALID_ARG,
-              (std::string("input '") + name + "' has unsupported datatype " +
-               value)
-                  .c_str());
+      if (element_cnt > (SIZE_MAX / element_size)) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("input '") + name +
+              "' has too many elements of datatype " + value)
+                .c_str());
       }
 
       byte_size = element_cnt * element_size;
@@ -3626,16 +3613,18 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
 
     // Ensure that the resulting array size in bytes does not exceed the maximum
     // allowed input size.
-    if (byte_size > max_input_size_) {
+    if (byte_size + consumed_input_byte_size > max_input_size_) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           ("Input '" + name + "' has a byte_size (" +
            std::to_string(byte_size) +
            " bytes) that exceeds the maximum allowed value of " +
-           std::to_string(max_input_size_) +
+           std::to_string(max_input_size_ - consumed_input_byte_size) +
            " bytes. Use --http-max-input-size to increase the limit.")
               .c_str());
     }
+
+    consumed_input_byte_size += byte_size;
 
     std::vector<int64_t> shape_vec;
     {
