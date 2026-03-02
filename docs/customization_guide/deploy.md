@@ -226,6 +226,10 @@ for more information.
 > [!Note]
 > Restricting access can be used to limit exposure to model
 > control APIs to trusted users.
+> When Vertex AI endpoint support is enabled, this setting also
+> applies to redirected Vertex AI requests.
+> If Triton is built without `TRITON_ENABLE_HTTP`, Vertex AI uses
+> default unrestricted API settings.
 
 ##### `--allow-sagemaker <boolean> default False`
 

@@ -207,6 +207,11 @@ StartVertexAiService(
   size_t max_input_size = triton::server::HTTP_DEFAULT_MAX_INPUT_SIZE;
   triton::server::RestrictedFeatures restricted_apis{};
 #ifdef TRITON_ENABLE_HTTP
+  // Reuse HTTP server settings for Vertex AI endpoint behavior. In
+  // particular, --http-restricted-api and --http-max-input-size also apply
+  // to Vertex AI requests. Without TRITON_ENABLE_HTTP, Vertex AI falls back to
+  // default input size and unrestricted APIs (no command-line configuration for
+  // restricted APIs).
   max_input_size = g_triton_params.http_max_input_size_;
   restricted_apis = g_triton_params.http_restricted_apis_;
 #endif  // TRITON_ENABLE_HTTP
