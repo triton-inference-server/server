@@ -204,7 +204,7 @@ StartVertexAiService(
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
-  size_t max_input_size = HTTP_DEFAULT_MAX_INPUT_SIZE;
+  size_t max_input_size = triton::server::HTTP_DEFAULT_MAX_INPUT_SIZE;
   triton::server::RestrictedFeatures restricted_apis{};
 #ifdef TRITON_ENABLE_HTTP
   max_input_size = g_triton_params.http_max_input_size_;
