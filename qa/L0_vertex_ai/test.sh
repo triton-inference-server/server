@@ -739,8 +739,8 @@ if [ "$WAIT_RET" != "0" ]; then
 fi
 
 # Baseline infer remains available without restricted header
-rm -f ./curl.out
 set +e
+rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "Content-Type: application/json" -d'{"inputs":[{"name":"INPUT0","datatype":"FP32","shape":[1,1],"data":[42.0]}],"outputs":[{"name":"OUTPUT0"}]}' localhost:8080/predict`
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -757,8 +757,8 @@ fi
 set -e
 
 # Redirected management APIs should be blocked without restricted header
-rm -f ./curl.out
 set +e
+rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2" localhost:8080/predict`
 if [ "$code" != "403" ]; then
     cat ./curl.out
@@ -773,6 +773,7 @@ else
     fi
 fi
 
+rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/models/identity_fp32/config" localhost:8080/predict`
 if [ "$code" != "403" ]; then
     cat ./curl.out
@@ -780,6 +781,7 @@ if [ "$code" != "403" ]; then
     RET=1
 fi
 
+rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/index" localhost:8080/predict`
 if [ "$code" != "403" ]; then
     cat ./curl.out
@@ -787,6 +789,7 @@ if [ "$code" != "403" ]; then
     RET=1
 fi
 
+rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/systemsharedmemory/status" localhost:8080/predict`
 if [ "$code" != "403" ]; then
     cat ./curl.out
@@ -794,6 +797,7 @@ if [ "$code" != "403" ]; then
     RET=1
 fi
 
+rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/cudasharedmemory/status" localhost:8080/predict`
 if [ "$code" != "403" ]; then
     cat ./curl.out
@@ -801,6 +805,7 @@ if [ "$code" != "403" ]; then
     RET=1
 fi
 
+rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/systemsharedmemory/region/test/register" -H "Content-Type: application/json" -d '{"key":"test_shm","byte_size":1024}' localhost:8080/predict`
 if [ "$code" != "403" ]; then
     cat ./curl.out
@@ -810,8 +815,8 @@ fi
 set -e
 
 # Restricted header should allow handler invocation
-rm -f ./curl.out
 set +e
+rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -819,6 +824,7 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
+rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/systemsharedmemory/status" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -826,6 +832,7 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
+rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/cudasharedmemory/status" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -833,6 +840,7 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
+rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/models/identity_fp32/config" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -840,6 +848,7 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
+rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/index" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -847,10 +856,20 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
+rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/systemsharedmemory/region/test/register" -H "X-Vertex-Restricted: secret" -H "Content-Type: application/json" -d '{"key":"test_shm","byte_size":1024}' localhost:8080/predict`
 if [ "$code" == "403" ]; then
     cat ./curl.out
-    echo -e "\n***\n*** Failed. Restricted header should allow shared memory register handler to be reached\n***"
+    echo -e "\n***\n*** Failed. Expected valid restricted header to pass restriction check (request may still fail for non-auth reasons)\n***"
+    RET=1
+fi
+
+# Wrong restricted header should reject the request
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2" -H "X-Vertex-Restricted: invalid" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected invalid restricted header value is rejected\n***"
     RET=1
 fi
 set -e
