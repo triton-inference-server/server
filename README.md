@@ -58,7 +58,7 @@ The following table lists the ROCm-enabled Triton Inference Server component rep
 | Python Backend | [ROCm/triton-inference-server-python_backend](https://github.com/ROCm/triton-inference-server-python_backend) | `rocm7.2_r25.12` |
 | vLLM Backend | [ROCm/triton-inference-server-vllm_backend](https://github.com/ROCm/triton-inference-server-vllm_backend) | `TBD` |
 | Pytorch Backend | [ROCm/triton-inference-server-pytorch_backend](https://github.com/ROCm/triton-inference-server-pytorch_backend) | `TBD` |
-| Tensorflow Backend | [ROCm/triton-inference-server-tensorflow_backend](https://github.com/ROCm/triton-inference-server-tensorflow_backend) | `TBD` |
+| Tensorflow Backend | [ROCm/triton-inference-server-tensorflow_backend](https://github.com/ROCm/triton-inference-server-tensorflow_backend/tree/rocm7.2_r24.03) | `rocm7.2_r24.03` |
 
 
 ## Build Triton Inference Server
