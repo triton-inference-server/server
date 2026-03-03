@@ -251,7 +251,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         )
         self.assertEqual(len(infer_errors), 0, f"Inference errors: {infer_errors}")
 
-    def test_is_model_ready_coroutine_returns_true(self):
+    def test_is_ready_coroutine_returns_true(self):
         model_name = "is_ready_fn_coroutine_returns_true"
         for _ in range(5):
             self.assertTrue(
@@ -265,7 +265,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         call_inference_identity_model(model_name, "http", self.client_http)
         call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
-    def test_is_model_ready_returns_true(self):
+    def test_is_ready_returns_true(self):
         model_name = "is_ready_fn_returns_true"
         num_requests = 10
 
@@ -284,7 +284,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             call_inference_identity_model(model_name, "http", self.client_http)
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
-    def test_is_model_ready_returns_false(self):
+    def test_is_ready_returns_false(self):
         model_name = "is_ready_fn_returns_false"
         num_requests = 10
 
@@ -303,7 +303,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             call_inference_identity_model(model_name, "http", self.client_http)
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
-    def test_is_model_ready_raises_exception(self):
+    def test_is_ready_raises_exception(self):
         model_name = "is_ready_fn_raises_error"
         num_requests = 10
 
@@ -338,7 +338,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             call_inference_identity_model(model_name, "http", self.client_http)
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
-    def test_is_model_ready_returns_non_boolean(self):
+    def test_is_ready_returns_non_boolean(self):
         model_name = "is_ready_fn_returns_non_boolean"
         num_requests = 10
 
@@ -373,7 +373,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             call_inference_identity_model(model_name, "http", self.client_http)
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
-    def test_is_model_ready_takes_long_time(self):
+    def test_is_ready_takes_long_time(self):
         model_name = "is_ready_fn_timeout"
         num_requests = 10
 
