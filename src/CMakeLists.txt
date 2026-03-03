@@ -109,6 +109,11 @@ endif()
 #
 find_package(re2 REQUIRED)
 
+# Boost (header-only for triton_signal.cc stacktrace)
+#
+find_package(Boost 1.78 REQUIRED)
+message(STATUS "Using Boost ${Boost_VERSION}")
+
 #
 # tritonserver executable
 #
@@ -173,6 +178,12 @@ else()
       b64
   )
   endif()
+
+target_include_directories(
+  main
+  PRIVATE
+    ${Boost_INCLUDE_DIRS}
+)
 
 set(LIB_DIR "lib")
 if(LINUX)
