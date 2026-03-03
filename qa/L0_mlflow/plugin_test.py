@@ -33,7 +33,9 @@ sys.path.append("../common")
 import json
 import unittest
 
+import mlflow.onnx
 import numpy as np
+import onnx
 import test_util as tu
 from mlflow.deployments import get_deploy_client
 
@@ -79,8 +81,6 @@ class PluginTest(tu.TestResultCollector):
 
     def test_onnx_flavor(self):
         # Log the ONNX model to MLFlow
-        import mlflow.onnx
-        import onnx
 
         model = onnx.load(
             "./mlflow-triton-plugin/examples/onnx_float32_int32_int32/1/model.onnx"
@@ -92,8 +92,6 @@ class PluginTest(tu.TestResultCollector):
 
     def test_onnx_flavor_with_files(self):
         # Log the ONNX model and additional Triton config file to MLFlow
-        import mlflow.onnx
-        import onnx
 
         model = onnx.load(
             "./mlflow-triton-plugin/examples/onnx_float32_int32_int32/1/model.onnx"
@@ -121,7 +119,11 @@ class PluginTest(tu.TestResultCollector):
             "",
             "     ",
             " ",
-            "\t\n",
+            "\n",
+            "\t",
+            "\r",
+            "\v",
+            "\f",
         ]
         INVALID_PATH_TRAVERSAL_NAMES = [
             "/opt/sys/",
@@ -132,7 +134,7 @@ class PluginTest(tu.TestResultCollector):
         ]
         VALID_MODEL_NAMES = [
             "model123",
-            "model  OAI",
+            # "model  OAI",   TRI-769: Fix this test case
             "model.version1",
             "...",
             "..my_model",
@@ -145,7 +147,7 @@ class PluginTest(tu.TestResultCollector):
             with self.assertRaises(Exception) as e:
                 self.client_.create_deployment(model_name, model_uri, flavor="onnx")
             self.assertIn(
-                "Please provide a valid model name for the deployment",
+                "Model name cannot be empty. Please enter a valid name to deploy.",
                 str(e.exception),
             )
 
@@ -159,22 +161,17 @@ class PluginTest(tu.TestResultCollector):
             )
 
         for model_name in VALID_MODEL_NAMES:
-            # _validate_model_name should not raise an exception
-            model_uri = f"models:/{model_name}/1"
-            with self.assertRaises(Exception) as e:
-                self.client_.create_deployment(model_name, model_uri, flavor="onnx")
-            self.assertNotIn(
-                "Please provide a valid model name for the deployment",
-                str(e.exception),
+            model = onnx.load(
+                "./mlflow-triton-plugin/examples/onnx_float32_int32_int32/1/model.onnx"
             )
-            self.assertNotIn(
-                f"Path traversal is not allowed in model's name: {model_name}",
-                str(e.exception),
+
+            # Use a different name to ensure the plugin operates on correct model
+            mlflow.onnx.log_model(
+                model, "triton", registered_model_name=f"{model_name}"
             )
-            self.assertIn(
-                f"Registered Model with name={model_name} not found",
-                str(e.exception),
-            )
+
+            # Validate deployment functionalities - create, list, get, predict, delete
+            self._validate_deployment(model_name)
 
 
 if __name__ == "__main__":

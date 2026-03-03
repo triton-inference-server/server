@@ -519,7 +519,9 @@ default_model_filename: "{}"
     def _validate_model_name(self, name):
         # Check if the model name is empty or only contains whitespace, tabs, or newlines
         if name.strip() == "":
-            raise Exception("Please provide a valid model name for the deployment")
+            raise Exception(
+                "Model name cannot be empty. Please enter a valid name to deploy."
+            )
         # Path traversal protection
         if "/" in name or name == "..":
             raise Exception(
