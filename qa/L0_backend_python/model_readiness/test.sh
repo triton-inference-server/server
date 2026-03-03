@@ -110,7 +110,7 @@ done
 #
 # Test User-Defined Model Readiness Function
 #
-echo -e "\n***\n*** Testing User-Defined is_model_ready() Function\n***"
+echo -e "\n***\n*** Testing User-Defined is_ready() Function\n***"
 
 # Helper function to set up test models with different readiness behaviors based on config parameters
 setup_readiness_test_model() {
@@ -119,7 +119,7 @@ setup_readiness_test_model() {
     local delay_secs=$3
 
     mkdir -p ./models/$model_name/1/
-    if [ "$model_name" == "is_model_ready_fn_coroutine_returns_true" ]; then
+    if [ "$model_name" == "is_ready_fn_coroutine_returns_true" ]; then
         cp ./test_models/readiness_coroutine_model.py ./models/$model_name/1/model.py
     else
         cp ./test_models/readiness_model.py ./models/$model_name/1/model.py
@@ -139,19 +139,19 @@ EOF
 }
 
 # Create readiness test models using shared model.py + config parameters
-setup_readiness_test_model "is_model_ready_fn_returns_true" "true" "0.1"
-setup_readiness_test_model "is_model_ready_fn_returns_false" "false" "0.1"
-setup_readiness_test_model "is_model_ready_fn_raises_error" "exception" "0.1"
-setup_readiness_test_model "is_model_ready_fn_returns_non_boolean" "non_boolean" "0.1"
-setup_readiness_test_model "is_model_ready_fn_timeout" "true" "8"
-setup_readiness_test_model "is_model_ready_fn_coroutine_returns_true" "coroutine" "0.1"
+setup_readiness_test_model "is_ready_fn_returns_true" "true" "0.1"
+setup_readiness_test_model "is_ready_fn_returns_false" "false" "0.1"
+setup_readiness_test_model "is_ready_fn_raises_error" "exception" "0.1"
+setup_readiness_test_model "is_ready_fn_returns_non_boolean" "non_boolean" "0.1"
+setup_readiness_test_model "is_ready_fn_timeout" "true" "8"
+setup_readiness_test_model "is_ready_fn_coroutine_returns_true" "coroutine" "0.1"
 
 # Decoupled model has a unique execute() and its own config
-mkdir -p ./models/is_model_ready_fn_returns_true_decoupled/1/
-cp ./test_models/is_model_ready_fn_returns_true_decoupled/model.py \
-    ./models/is_model_ready_fn_returns_true_decoupled/1/model.py
-cp ./test_models/is_model_ready_fn_returns_true_decoupled/config.pbtxt \
-    ./models/is_model_ready_fn_returns_true_decoupled/config.pbtxt
+mkdir -p ./models/is_ready_fn_returns_true_decoupled/1/
+cp ./test_models/is_ready_fn_returns_true_decoupled/model.py \
+    ./models/is_ready_fn_returns_true_decoupled/1/model.py
+cp ./test_models/is_ready_fn_returns_true_decoupled/config.pbtxt \
+    ./models/is_ready_fn_returns_true_decoupled/config.pbtxt
 
 # Start server with all models
 SERVER_ARGS="--model-repository=$(pwd)/models --backend-directory=${BACKEND_DIR} --log-verbose=1"

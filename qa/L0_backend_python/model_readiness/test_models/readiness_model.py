@@ -32,7 +32,7 @@ import triton_python_backend_utils as pb_utils
 
 class TritonPythonModel:
     """
-    Parameterized test model for user-defined is_model_ready() testing.
+    Parameterized test model for user-defined is_ready() testing.
 
     Behavior is controlled via config.pbtxt parameters:
       READINESS_FN_RETURN_VALUE - "true", "false", "exception", or "non_boolean"
@@ -57,7 +57,7 @@ class TritonPythonModel:
             responses.append(pb_utils.InferenceResponse([out_tensor]))
         return responses
 
-    def is_model_ready(self):
+    def is_ready(self):
         if self.readiness_delay_secs > 0:
             time.sleep(self.readiness_delay_secs)
 

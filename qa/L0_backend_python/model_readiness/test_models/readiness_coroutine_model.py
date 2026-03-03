@@ -32,7 +32,7 @@ import triton_python_backend_utils as pb_utils
 
 class TritonPythonModel:
     """
-    Parameterized test model for async is_model_ready() testing.
+    Parameterized test model for async is_ready() testing.
 
     Behavior is controlled via config.pbtxt parameters:
       READINESS_FN_DELAY_SECS - seconds to await before returning (e.g. "0.1")
@@ -53,6 +53,6 @@ class TritonPythonModel:
             responses.append(pb_utils.InferenceResponse([out_tensor]))
         return responses
 
-    async def is_model_ready(self):
+    async def is_ready(self):
         await asyncio.sleep(self.readiness_delay_secs)
         return True

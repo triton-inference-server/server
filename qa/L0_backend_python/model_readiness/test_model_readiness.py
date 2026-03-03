@@ -157,7 +157,7 @@ class TestModelReadiness(unittest.TestCase):
 
 class TestUserDefinedModelReadinessFunction(unittest.TestCase):
     """
-    Test user-defined is_model_ready() function
+    Test user-defined is_ready() function
     """
 
     def setUp(self):
@@ -201,7 +201,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
                 triton_client.stop_stream()
 
     def test_multiple_concurrent_ready_and_infer_requests_decoupled(self):
-        model_name = "is_model_ready_fn_returns_true_decoupled"
+        model_name = "is_ready_fn_returns_true_decoupled"
         num_requests = 16
         response_count = 8
         readiness_errors = []
@@ -252,7 +252,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         self.assertEqual(len(infer_errors), 0, f"Inference errors: {infer_errors}")
 
     def test_is_model_ready_coroutine_returns_true(self):
-        model_name = "is_model_ready_fn_coroutine_returns_true"
+        model_name = "is_ready_fn_coroutine_returns_true"
         for _ in range(5):
             self.assertTrue(
                 self.client_http.is_model_ready(model_name),
@@ -266,7 +266,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
     def test_is_model_ready_returns_true(self):
-        model_name = "is_model_ready_fn_returns_true"
+        model_name = "is_ready_fn_returns_true"
         num_requests = 10
 
         # Send multiple requests in sequence to ensure consistent behavior
@@ -285,7 +285,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
     def test_is_model_ready_returns_false(self):
-        model_name = "is_model_ready_fn_returns_false"
+        model_name = "is_ready_fn_returns_false"
         num_requests = 10
 
         # Send multiple requests in sequence to ensure consistent behavior
@@ -304,7 +304,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
     def test_is_model_ready_raises_exception(self):
-        model_name = "is_model_ready_fn_raises_error"
+        model_name = "is_ready_fn_raises_error"
         num_requests = 10
 
         # Send multiple requests in sequence to ensure consistent behavior
@@ -323,7 +323,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
         # Verify a healthy model is still ready to confirm server stability.
-        model_name = "is_model_ready_fn_returns_true"
+        model_name = "is_ready_fn_returns_true"
         for i in range(num_requests):
             self.assertTrue(
                 self.client_http.is_model_ready(model_name),
@@ -339,7 +339,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
     def test_is_model_ready_returns_non_boolean(self):
-        model_name = "is_model_ready_fn_returns_non_boolean"
+        model_name = "is_ready_fn_returns_non_boolean"
         num_requests = 10
 
         # Send multiple requests in sequence to ensure consistent behavior
@@ -358,7 +358,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
         # Verify a healthy model is still ready to confirm server stability.
-        model_name = "is_model_ready_fn_returns_true"
+        model_name = "is_ready_fn_returns_true"
         for i in range(num_requests):
             self.assertTrue(
                 self.client_http.is_model_ready(model_name),
@@ -374,7 +374,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
     def test_is_model_ready_takes_long_time(self):
-        model_name = "is_model_ready_fn_timeout"
+        model_name = "is_ready_fn_timeout"
         num_requests = 10
 
         # Send multiple requests in sequence to ensure consistent behavior
@@ -403,7 +403,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
             call_inference_identity_model(model_name, "grpc", self.client_grpc)
 
     def test_multiple_concurrent_ready_and_infer_requests(self):
-        model_name = "is_model_ready_fn_returns_true"
+        model_name = "is_ready_fn_returns_true"
         ready_results = {"http": [], "grpc": []}
         ready_errors = {"http": [], "grpc": []}
         infer_results = {"http": [], "grpc": []}
