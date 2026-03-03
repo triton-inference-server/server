@@ -173,7 +173,7 @@ def parse_args():
         "--load-model argument, this does not imply any pattern matching. "
         "Specifying --load-model=* in conjunction with another --load-model "
         "argument will result in error. Note that this option will only take "
-        "effect if --model-control-mode=explicit is true.",
+        "effect if --model-control-mode is set to 'explicit'.",
     )
 
     # OpenAI-Compatible Frontend (FastAPI)
