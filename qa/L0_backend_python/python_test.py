@@ -33,7 +33,6 @@ sys.path.append("../common")
 import os
 import unittest
 
-import ml_dtypes
 import numpy as np
 import requests as httpreq
 import shm_util
@@ -375,7 +374,7 @@ class PythonTest(unittest.TestCase):
             ) as client:
                 # NOTE: Client will truncate FP32 to BF16 internally
                 # since numpy has no built-in BF16 representation.
-                np_input = np.ones(shape, dtype=ml_dtypes.bfloat16)
+                np_input = np.ones(shape, dtype=np.float32)
                 inputs = [
                     httpclient.InferInput(
                         "INPUT0", np_input.shape, "BF16"
@@ -392,8 +391,8 @@ class PythonTest(unittest.TestCase):
                 np_output = result.as_numpy("OUTPUT0")
                 self.assertIsNotNone(np_output)
                 # BF16 tensors are held in FP32 when converted to numpy due to
-                # lack of native   support in numpy, so verify that.
-                self.assertEqual(np_output.dtype, ml_dtypes.bfloat16)
+                # lack of native BF16 support in numpy, so verify that.
+                self.assertEqual(np_output.dtype, np.float32)
                 self.assertTrue(np.allclose(np_output, np_input))
 
     def test_infer_pytorch(self):

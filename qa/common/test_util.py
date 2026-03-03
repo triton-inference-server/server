@@ -29,10 +29,13 @@
 import json
 import unittest
 
-import ml_dtypes
 import numpy as np
 
 _last_request_id = 0
+
+# Numpy does not support the BF16 datatype natively.
+# We use this dummy dtype as a representative for BF16.
+np_dtype_bfloat16 = np.dtype([("bf16", object)])
 
 
 def shape_element_count(shape):
@@ -82,7 +85,7 @@ def validate_for_trt_model(
         np.uint8,
         np.float16,
         np.float32,
-        ml_dtypes.bfloat16,
+        np_dtype_bfloat16,
     ]
     # FIXME: Remove this check when jetson supports TRT 8.5 (DLIS-4256)
     if not support_trt_uint8():
@@ -253,7 +256,7 @@ def validate_for_openvino_model(
 
 
 def get_dtype_name(dtype):
-    if dtype == ml_dtypes.bfloat16:
+    if dtype == np_dtype_bfloat16:
         return "bf16"
     else:
         return np.dtype(dtype).name
