@@ -202,6 +202,8 @@ if __name__ == "__main__":
             ("identity_nobatch_int8", np.int8, [0]),
             ("identity_nobatch_int8", np.int8, [7]),
             ("identity_bytes", object, [1, 1]),
+            ("identity_bf16", np.float32, [1, 0]),
+            ("identity_bf16", np.float32, [1, 5]),
             ("identity_bf16", ml_dtypes.bfloat16, [1, 0]),
             ("identity_bf16", ml_dtypes.bfloat16, [1, 5])
         ):
@@ -212,7 +214,10 @@ if __name__ == "__main__":
                 in0 = 16384 * np.ones(shape, dtype="int")
                 in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
                 input_data = in0n.reshape(in0.shape)
-            triton_type = np_to_triton_dtype(input_data.dtype)
+            if model_name == "identity_bf16" and input_data.dtype == np.float32:
+                triton_type = "BF16"
+            else:
+                triton_type = np_to_triton_dtype(input_data.dtype)
             inputs = [client_util.InferInput("INPUT0", input_data.shape, triton_type)]
             inputs[0].set_data_from_numpy(input_data)
 
@@ -232,7 +237,7 @@ if __name__ == "__main__":
                 print("error: expected 'OUTPUT0'")
                 sys.exit(1)
 
-            if model_name == "identity_bf16":
+            if model_name == "identity_bf16" and input_data.dtype == np.float32:
                 if input_data.shape != output_data.shape:
                     print(
                         "error: expected output shape {} to match input shape {}".format(
