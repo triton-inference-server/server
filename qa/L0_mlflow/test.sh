@@ -256,7 +256,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Python Test Failed\n***"
     RET=1
 else
-    check_test_results $TEST_RESULT_FILE 2
+    check_test_results $TEST_RESULT_FILE 3
     if [ $? -ne 0 ]; then
         cat $PY_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
