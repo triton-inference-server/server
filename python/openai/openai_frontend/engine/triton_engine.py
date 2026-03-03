@@ -533,6 +533,7 @@ class TritonLLMEngine(LLMEngine):
         )
 
     def _get_model_metadata(self) -> Dict[str, TritonModelMetadata]:
+        # One tokenizer and creation time shared for all loaded models for now.
         model_metadata = {}
         for name, _ in self.server.models(exclude_not_ready=True).keys():
             model_metadata[name] = self._build_model_metadata(name)
