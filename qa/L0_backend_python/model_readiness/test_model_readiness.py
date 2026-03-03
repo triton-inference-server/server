@@ -380,7 +380,7 @@ class TestUserDefinedModelReadinessFunction(unittest.TestCase):
         # Send multiple requests in sequence to ensure consistent behavior
         for i in range(num_requests):
             # This call should time out and return NOT_READY.
-            # Note: the stub will continue running is_model_ready()
+            # Note: the stub will continue running is_ready()
             # in the background (similar to the inference flow)
             # even after the backend readiness timeout expires.
             is_ready = self.client_http.is_model_ready(model_name)
