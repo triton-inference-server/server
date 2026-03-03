@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,6 +38,7 @@ from frontend.fastapi.routers import (
     chat,
     completions,
     embeddings,
+    model_management,
     models,
     observability,
 )
@@ -101,6 +102,7 @@ class FastApiFrontend(OpenAIFrontend):
 
         app.include_router(observability.router)
         app.include_router(models.router)
+        app.include_router(model_management.router)
         app.include_router(completions.router)
         app.include_router(chat.router)
         app.include_router(embeddings.router)
