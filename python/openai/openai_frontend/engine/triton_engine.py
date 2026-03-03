@@ -138,8 +138,6 @@ class TritonLLMEngine(LLMEngine):
         self.lora_separator = lora_separator
         self.default_max_tokens = default_max_tokens
 
-        # NOTE: Creation time and model metadata will be static at startup for
-        # now, and won't account for dynamically loading/unloading models.
         self.create_time = int(time.time())
         self.model_metadata = self._get_model_metadata()
         self._metadata_lock = asyncio.Lock()
