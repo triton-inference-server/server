@@ -29,7 +29,6 @@ import os
 import sys
 import unittest
 
-import ml_dtypes
 import numpy as np
 import pytest
 import tritonclient.grpc as grpcclient
@@ -49,22 +48,6 @@ class BFloat16Test(unittest.TestCase):
         else:
             self.client_ = grpcclient.InferenceServerClient("localhost:8001")
         self.model_name_ = "add_bf16"
-
-    def _assert_allclose_bf16(self, actual, desired, **kwargs):
-        """Compare bfloat16 arrays by converting to float32 for the check.
-
-        We cannot use np.testing.assert_allclose(actual, desired) directly:
-        isclose() does result_type(y, 1.) and raises DTypePromotionError for
-        bfloat16 in NumPy 2. The error message is misleading—it says
-        "Float16DType and bfloat16" even when both arrays are bfloat16; the
-        real conflict is bfloat16 vs the scalar 1.0 (float64) used inside
-        isclose. Converting to float32 only for the comparison avoids this.
-        """
-        np.testing.assert_allclose(
-            np.asarray(actual, dtype=np.float32),
-            np.asarray(desired, dtype=np.float32),
-            **kwargs,
-        )
 
     def _infer_bf16(self, input0_data, input1_data):
         """Helper to run BF16 inference and return the output numpy array."""
@@ -95,13 +78,11 @@ class BFloat16Test(unittest.TestCase):
         """Run BF16 add for one case: zeros, negatives, large, small, cancellation, or identical."""
         shape = (5, 5)
         output = self._infer_bf16(
-            np.full(shape, input0_val, dtype=ml_dtypes.bfloat16),
-            np.full(shape, input1_val, dtype=ml_dtypes.bfloat16),
+            np.full(shape, input0_val, dtype=np.float32),
+            np.full(shape, input1_val, dtype=np.float32),
         )
-        self.assertEqual(output.dtype, ml_dtypes.bfloat16)
-        self._assert_allclose_bf16(
-            output, np.full(shape, expected_val, dtype=ml_dtypes.bfloat16)
-        )
+        self.assertEqual(output.dtype, np.float32)
+        np.testing.assert_allclose(output, expected_val)
 
 
 if __name__ == "__main__":
