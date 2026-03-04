@@ -344,7 +344,18 @@ chmod -R 777 $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
 if [ -d "/usr/src/tensorrt/samples/python/onnx_custom_plugin" ]; then
     cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
 else
-    git clone -b release/\$( echo \$TRT_VERSION | cut -d . -f -2) --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
+    TRT_BRANCH=\$(echo \$TRT_VERSION | cut -d . -f -2)
+    if ! git clone -b release/\${TRT_BRANCH} --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT; then
+      MAJOR=\$(echo "\$TRT_BRANCH" | cut -d . -f 1)
+      MINOR=\$(echo "\$TRT_BRANCH" | cut -d . -f 2)
+      if [ -n "\$MINOR" ] && [ "\$MINOR" -gt 0 ] 2>/dev/null; then
+        TRT_BRANCH="\${MAJOR}.\$((MINOR - 1))"
+        echo "Fallback: cloning TensorRT release/\${TRT_BRANCH} (previous minor)"
+        git clone -b release/\${TRT_BRANCH} --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
+      else
+        exit 1
+      fi
+    fi
     cd /workspace/TensorRT/samples/python/onnx_custom_plugin
 fi
 rm -rf build && mkdir build && \
