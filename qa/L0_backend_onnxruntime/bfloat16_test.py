@@ -30,7 +30,6 @@ import sys
 import unittest
 
 import numpy as np
-import pytest
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 
@@ -65,16 +64,14 @@ class BFloat16Test(unittest.TestCase):
 
     def test_bf16_add_variants(self):
         """Run BF16 add for one case: zeros, negatives, large, small, cancellation, or identical."""
-        input0_val, input1_val, expected_val = (
-            [
-                (0.0, 0.0, 0.0),  # zeros
-                (-1.5, 3.5, 2.0),  # negatives / mixed
-                (100.0, 200.0, 300.0),  # large
-                (1e-2, 1e-2, 2e-2),  # small (near underflow)
-                (1.0, -1.0, 0.0),  # cancellation
-                (2.0, 2.0, 4.0),  # identical inputs
-            ],
-        )
+        input0_val, input1_val, expected_val = [
+            (0.0, 0.0, 0.0),  # zeros
+            (-1.5, 3.5, 2.0),  # negatives / mixed
+            (100.0, 200.0, 300.0),  # large
+            (1e-2, 1e-2, 2e-2),  # small (near underflow)
+            (1.0, -1.0, 0.0),  # cancellation
+            (2.0, 2.0, 4.0),  # identical inputs
+        ]
 
         shape = (5, 5)
         output = self._infer_bf16(
