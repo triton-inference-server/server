@@ -47,15 +47,16 @@ class BFloat16Test(unittest.TestCase):
         else:
             self.client_ = grpcclient.InferenceServerClient("localhost:8001")
         self.model_name_ = "add_bf16"
+        self.shape_ = [5, 5]
 
     def _infer_bf16(self, input0_data, input1_data):
         """Helper to run BF16 inference and return the output numpy array."""
         if self.protocol == "http":
-            input0 = httpclient.InferInput("INPUT0", [5, 5], "BF16")
-            input1 = httpclient.InferInput("INPUT1", [5, 5], "BF16")
+            input0 = httpclient.InferInput("INPUT0", self.shape_, "BF16")
+            input1 = httpclient.InferInput("INPUT1", self.shape_, "BF16")
         else:
-            input0 = grpcclient.InferInput("INPUT0", [5, 5], "BF16")
-            input1 = grpcclient.InferInput("INPUT1", [5, 5], "BF16")
+            input0 = grpcclient.InferInput("INPUT0", self.shape_, "BF16")
+            input1 = grpcclient.InferInput("INPUT1", self.shape_, "BF16")
         input0.set_data_from_numpy(input0_data)
         input1.set_data_from_numpy(input1_data)
 
@@ -64,22 +65,20 @@ class BFloat16Test(unittest.TestCase):
 
     def test_bf16_add_variants(self):
         """Run BF16 add for one case: zeros, negatives, large, small, cancellation, or identical."""
-        input0_val, input1_val, expected_val = [
+        for input0_val, input1_val, expected_val in [
             (0.0, 0.0, 0.0),  # zeros
             (-1.5, 3.5, 2.0),  # negatives / mixed
             (100.0, 200.0, 300.0),  # large
             (1e-2, 1e-2, 2e-2),  # small (near underflow)
             (1.0, -1.0, 0.0),  # cancellation
             (2.0, 2.0, 4.0),  # identical inputs
-        ]
-
-        shape = (5, 5)
-        output = self._infer_bf16(
-            np.full(shape, input0_val, dtype=np.float32),
-            np.full(shape, input1_val, dtype=np.float32),
-        )
-        self.assertEqual(output.dtype, np.float32)
-        np.testing.assert_allclose(output, expected_val)
+        ]:
+            output = self._infer_bf16(
+                np.full(self.shape_, input0_val, dtype=np.float32),
+                np.full(self.shape_, input1_val, dtype=np.float32),
+            )
+            self.assertEqual(output.dtype, np.float32)
+            np.testing.assert_allclose(output, expected_val)
 
 
 if __name__ == "__main__":
