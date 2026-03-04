@@ -3597,6 +3597,13 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
       RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
     } else {
       size_t element_size = TRITONSERVER_DataTypeByteSize(dtype);
+      if (element_size == 0) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("input '") + name +
+             "' has unsupported datatype " + value)
+                .c_str());
+      }
 
       // Ensure that we do not have an integer overflow when calculating
       // byte_size = element_cnt * element_size.
@@ -3606,9 +3613,9 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
             (std::string("input '") + name +
               "' has too many elements of datatype " + value)
                 .c_str());
+                
+        byte_size = element_cnt * element_size;
       }
-
-      byte_size = element_cnt * element_size;
     }
 
     // Ensure that the resulting array size in bytes does not exceed the maximum
