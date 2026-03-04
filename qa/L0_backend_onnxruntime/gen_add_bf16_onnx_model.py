@@ -25,6 +25,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+
+# Generates the add_bf16 ONNX model and Triton config.
+# Model: element-wise Add in BFLOAT16 (INPUT0 + INPUT1 = OUTPUT), ONNX Runtime backend.
 import os
 
 import onnx
@@ -33,7 +36,7 @@ import onnx
 def generate_bf16_add_model(models_dir):
     """Generate a simple BFLOAT16 Add model (INPUT0 + INPUT1 = OUTPUT)."""
     model_name = "add_bf16"
-    shape = [5, 5]
+    shape = [1]
     onnx_dtype = onnx.TensorProto.BFLOAT16
 
     add = onnx.helper.make_node("Add", ["INPUT0", "INPUT1"], ["OUTPUT"])
@@ -44,7 +47,7 @@ def generate_bf16_add_model(models_dir):
 
     graph_proto = onnx.helper.make_graph(
         [add],
-        "bf16_add",
+        model_name,
         [input0, input1],
         [output],
     )

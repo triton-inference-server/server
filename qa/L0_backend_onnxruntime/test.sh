@@ -33,8 +33,16 @@ CLIENT_LOG="./test.log"
 source ../common/util.sh
 
 rm -f *.log
+rm -rf models
 
 # BFLOAT16 test
+# Generate the model
+mkdir -p models/add_bf16/1
+set +e
+pip install onnx==1.20.1
+python gen_add_bf16_onnx_model.py
+set -e
+
 SERVER_ARGS="--model-repository=`pwd`/models"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -48,8 +56,8 @@ RET=0
 set +e
 
 for client_type in http grpc; do
-    CLIENT_LOG="./bfloat16_test_${client_type}.log"
-    python bfloat16_test.py $client_type >>$CLIENT_LOG 2>&1
+    CLIENT_LOG="./test_${client_type}.log"
+    python test.py $client_type >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed ($client_type)\n***"

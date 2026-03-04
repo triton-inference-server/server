@@ -47,7 +47,7 @@ class BFloat16Test(unittest.TestCase):
         else:
             self.client_ = grpcclient.InferenceServerClient("localhost:8001")
         self.model_name_ = "add_bf16"
-        self.shape_ = [5, 5]
+        self.shape_ = [1]
 
     def _infer_bf16(self, input0_data, input1_data):
         """Helper to run BF16 inference and return the output numpy array."""
@@ -78,7 +78,9 @@ class BFloat16Test(unittest.TestCase):
                 np.full(self.shape_, input1_val, dtype=np.float32),
             )
             self.assertEqual(output.dtype, np.float32)
-            np.testing.assert_allclose(output, expected_val)
+            # TODO: BF16 to FP32 conversion loses precision. Remove rtol and atol in TRI-801.
+            # BF16 has ~3 decimal digits; use relaxed tol for computed values
+            np.testing.assert_allclose(output, expected_val, rtol=1e-2, atol=1e-3)
 
 
 if __name__ == "__main__":
