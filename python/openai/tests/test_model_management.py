@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import concurrent.futures
+import os
 from pathlib import Path
 
 import pytest
@@ -40,6 +41,10 @@ from tests.utils import (
 TEST_MODEL_REPOSITORY = str(Path(__file__).parent / "test_models")
 TEST_MODEL = "mock_llm"
 TEST_MODEL_2 = "identity_py"
+MODEL_MGMT_LOAD_TIMEOUT_S = int(os.getenv("TEST_MODEL_MANAGEMENT_LOAD_TIMEOUT", "300"))
+MODEL_MGMT_UNLOAD_TIMEOUT_S = int(
+    os.getenv("TEST_MODEL_MANAGEMENT_UNLOAD_TIMEOUT", "120")
+)
 
 
 def _get_model_names(client: TestClient) -> list[str]:
@@ -399,18 +404,30 @@ class TestModelManagementInference:
     def ensure_model_unloaded(self, managed_server, model: str):
         """Guarantee clean state before and after every test: unload silently
         (model may already be unloaded -- that is fine)."""
-        requests.post(f"{managed_server.url_root}/v1/models/{model}/unload", timeout=60)
+        requests.post(
+            f"{managed_server.url_root}/v1/models/{model}/unload",
+            timeout=MODEL_MGMT_UNLOAD_TIMEOUT_S,
+        )
         yield
-        requests.post(f"{managed_server.url_root}/v1/models/{model}/unload", timeout=60)
+        requests.post(
+            f"{managed_server.url_root}/v1/models/{model}/unload",
+            timeout=MODEL_MGMT_UNLOAD_TIMEOUT_S,
+        )
 
     @staticmethod
     def _load(base_url, model_name):
-        r = requests.post(f"{base_url}/v1/models/{model_name}/load", timeout=120)
+        r = requests.post(
+            f"{base_url}/v1/models/{model_name}/load",
+            timeout=MODEL_MGMT_LOAD_TIMEOUT_S,
+        )
         assert r.status_code == 200, f"Load failed: {r.text}"
 
     @staticmethod
     def _unload(base_url, model_name):
-        r = requests.post(f"{base_url}/v1/models/{model_name}/unload", timeout=60)
+        r = requests.post(
+            f"{base_url}/v1/models/{model_name}/unload",
+            timeout=MODEL_MGMT_UNLOAD_TIMEOUT_S,
+        )
         assert r.status_code == 200, f"Unload failed: {r.text}"
 
     @staticmethod
