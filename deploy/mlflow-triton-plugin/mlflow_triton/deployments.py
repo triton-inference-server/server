@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -90,7 +90,7 @@ class TritonPlugin(BaseDeploymentClient):
         """
         Deploy the model at the model_uri to the Triton model repo. Associated config.pbtxt and *labels* files will be deployed.
 
-        :param name: Name of the of the model
+        :param name: Name of the model
         :param model_uri: Model uri in format model:/<model-name>/<version-or-stage>
         :param flavor: Flavor of the deployed model
         :param config: Configuration parameters
@@ -98,6 +98,9 @@ class TritonPlugin(BaseDeploymentClient):
         :return: Model flavor and name
         """
         self._validate_flavor(flavor)
+
+        # Validate model name
+        self._validate_model_name(name)
 
         # Verify model does not already exist in Triton
         if self._model_exists(name):
@@ -512,6 +515,18 @@ default_model_filename: "{}"
     def _validate_flavor(self, flavor):
         if flavor not in self.supported_flavors:
             raise Exception("{} model flavor not supported by Triton".format(flavor))
+
+    def _validate_model_name(self, name):
+        # Check if the model name is empty or only contains whitespace, tabs, or newlines
+        if name.strip() == "":
+            raise Exception(
+                "Model name cannot be empty. Please enter a valid name to deploy."
+            )
+        # Path traversal protection
+        if "/" in name or name == "..":
+            raise Exception(
+                "Path traversal is not allowed in model's name: {}".format(name)
+            )
 
     def _model_exists(self, name):
         deploys = self.list_deployments()
