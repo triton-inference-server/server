@@ -35,6 +35,8 @@ source ../common/util.sh
 rm -f *.log
 rm -rf models
 
+RET=0
+
 # BFLOAT16 test
 # Generate the model
 mkdir -p models/add_bf16/1
@@ -59,10 +61,8 @@ run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    RET=1
+    exit 1
 fi
-
-RET=0
 
 set +e
 
