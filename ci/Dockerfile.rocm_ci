@@ -1,0 +1,234 @@
+# syntax=docker/dockerfile:1
+ARG BASE_IMAGE=rocm/dev-ubuntu-22.04:7.2-complete
+ARG TRITON_INFERENCE_SERVER_VERSION=2.64.0
+# Set to ON to build the OnnxRuntime backend. Requires /src/onnxruntime and
+# /src/AMDMIGraphX to be pre-fetched (prefetch_sources.sh or manifest). For
+# air-gapped builds the onnxruntime_backend must build ORT in-tree from
+# file:///src/... without invoking docker.
+ARG BUILD_ONNXRUNTIME=ON
+
+# ── Stage 1a: build environment (deps + sources; no build.py) ───────────────────
+# Target "buildenv" to get an image where you can run build.py (or cmake_build)
+# manually for fast iteration without rebuilding this stage.
+FROM ${BASE_IMAGE} AS buildenv
+
+ARG TRITON_INFERENCE_SERVER_VERSION
+ARG BUILD_ONNXRUNTIME
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ROCM_PATH=/opt/rocm
+ENV HIP_PATH=/opt/rocm
+ENV CMAKE_PREFIX_PATH=/opt/rocm:/opt/rocm/lib/cmake
+# hipify-perl ships with the ROCm image at /opt/rocm/bin; ensure it is on PATH.
+ENV PATH=/opt/rocm/bin:${PATH}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential autoconf automake curl git gperf pkg-config unzip wget \
+        libre2-dev libssl-dev libtool libcurl4-openssl-dev libb64-dev \
+        libgoogle-perftools-dev python3-dev python3-pip \
+        libarchive-dev libxml2-dev libnuma-dev rapidjson-dev \
+        scons zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── micromamba + conda-forge: Boost headers, cmake, patchelf, Python tools ───
+# Mirrors the pattern used in flashinfer/docker/Dockerfile.rocm_ci.
+# micromamba installs to ~/.local/bin/micromamba and uses ~/micromamba as root.
+#
+# boost-cpp=1.86 from conda-forge satisfies find_package(Boost 1.78 REQUIRED).
+# Only headers are needed (boost::span); no compiled Boost library is linked.
+# cmake=3.31 keeps the pinned version that avoids cmake 4.0 breaking
+# ExternalProject sub-builds with cmake_minimum_required(VERSION < 3.5).
+ARG MAMBA_ENV_NAME=base
+RUN curl -L micro.mamba.pm/install.sh | bash && \
+    ~/.local/bin/micromamba install -n ${MAMBA_ENV_NAME} -c conda-forge \
+        --override-channels -y \
+        boost-cpp=1.85.0 \
+        cmake=3.31 \
+        patchelf=0.17.2 && \
+    ~/.local/bin/micromamba run -n ${MAMBA_ENV_NAME} pip install --no-cache-dir \
+        build wheel setuptools virtualenv distro requests && \
+    ~/.local/bin/micromamba clean -afy
+
+# Activate the conda env for all subsequent RUN steps and cmake sub-processes.
+# BOOST_ROOT points micromamba's prefix; FindBoost locates headers at
+# ${BOOST_ROOT}/include/boost/ automatically.
+ENV MAMBA_ROOT_PREFIX=/root/micromamba
+ENV CONDA_PREFIX=/root/micromamba
+ENV CONDA_DEFAULT_ENV=${MAMBA_ENV_NAME}
+ENV PATH=/root/micromamba/bin:${PATH}
+ENV BOOST_ROOT=/root/micromamba
+
+# Sources injected via BuildKit named context: --opt context:local_src_dir=local:<path>
+COPY --from=local_src_dir . /src/
+
+# ── Git configuration ─────────────────────────────────────────────────────────
+# Git 2.35.2+ refuses to operate on repos owned by a different UID.
+# Git 2.38.1+ restricts file:// transport in submodule init by default; our
+# insteadOf rules rewrite external URLs to file:// paths so we must allow it.
+#
+# ExternalProject_Add (third-party C++ deps) redirects:
+#   Seven top-level deps are pre-fetched under /src/third_party/.
+#   grpc submodules are NOT redirected — see note in prefetch_sources.sh.
+#
+# Backend repo redirects (new vs custom build.sh):
+#   build.py --no-container-build generates a cmake_build script that
+#   git-clones the ROCm backend repos from https://github.com/ROCm/.
+#   These insteadOf rules redirect those clones to pre-fetched local copies.
+RUN git config --global --add safe.directory '*' \
+ && git config --global protocol.file.allow always \
+ && git config --global "url.file:///src/third_party/curl.insteadOf"              "https://github.com/curl/curl.git" \
+ && git config --global "url.file:///src/third_party/grpc.insteadOf"              "https://github.com/grpc/grpc.git" \
+ && git config --global "url.file:///src/third_party/libevent.insteadOf"          "https://github.com/libevent/libevent.git" \
+ && git config --global "url.file:///src/third_party/nlohmann-json.insteadOf"     "https://github.com/nlohmann/json.git" \
+ && git config --global "url.file:///src/third_party/prometheus-cpp.insteadOf"    "https://github.com/jupp0r/prometheus-cpp.git" \
+ && git config --global "url.file:///src/third_party/crc32c.insteadOf"            "https://github.com/google/crc32c.git" \
+ && git config --global "url.file:///src/third_party/opentelemetry-cpp.insteadOf" "https://github.com/open-telemetry/opentelemetry-cpp.git" \
+ && git config --global "url.file:///src/triton-inference-server-onnxruntime_backend.insteadOf" \
+        "https://github.com/ROCm/triton-inference-server-onnxruntime_backend.git" \
+ && git config --global "url.file:///src/triton-inference-server-python_backend.insteadOf" \
+        "https://github.com/ROCm/triton-inference-server-python_backend.git" \
+ && git config --global --add "url.file:///src/triton-inference-server-python_backend.insteadOf" \
+        "https://github.com/triton-inference-server/python_backend.git"
+
+# ── Stage 1b: run build.py (thin layer on buildenv) ───────────────────────────
+# Build Triton via build.py --no-container-build. build.py generates and
+# immediately executes a cmake_build shell script inside this container.
+#
+# When BUILD_ONNXRUNTIME=ON we build MIGraphX from /src/AMDMIGraphX first so the
+# onnxruntime backend's in-tree ORT build (from file:///src/onnxruntime) can use it.
+#
+# FETCHCONTENT_SOURCE_DIR_* overrides (passed via --extra-*-cmake-arg) prevent
+# all FetchContent git fetches; the git insteadOf rules above handle the backend
+# repo git clones that the generated cmake_build script performs.
+#
+# BOOST_ROOT is passed to the core CMake so the core and its test targets
+# (e.g. metrics_api_test) see the micromamba Boost headers; the env var alone
+# is not always inherited by ExternalProject sub-builds.
+FROM buildenv AS build
+
+ARG TRITON_INFERENCE_SERVER_VERSION
+ARG BUILD_ONNXRUNTIME
+
+SHELL ["/bin/bash", "-c"]
+# Pre-build MIGraphX from prefetched source when building OnnxRuntime backend (in-tree ORT needs it)
+RUN if [ "${BUILD_ONNXRUNTIME}" = "ON" ] && [ -d /src/AMDMIGraphX ]; then \
+  pip3 install --no-cache-dir "https://github.com/RadeonOpenCompute/rbuild/archive/master.tar.gz" && \
+  cd /src/AMDMIGraphX && \
+  rbuild build -d depend -B build -DMIGRAPHX_ENABLE_PYTHON=OFF -DGPU_TARGETS=gfx942 2>&1 | tee migraphx_build.log && \
+  cd build && make -j$(nproc) package && dpkg -i *.deb; \
+fi
+
+RUN set -xe; \
+  FC_CORE=( \
+    --extra-core-cmake-arg FETCHCONTENT_SOURCE_DIR_REPO-COMMON=/src/common \
+    --extra-core-cmake-arg FETCHCONTENT_SOURCE_DIR_REPO-CORE=/src/triton-inference-server-core \
+    --extra-core-cmake-arg FETCHCONTENT_SOURCE_DIR_REPO-BACKEND=/src/triton-inference-server-backend \
+    --extra-core-cmake-arg FETCHCONTENT_SOURCE_DIR_REPO-THIRD-PARTY=/src/triton-inference-server-third_party \
+    --extra-core-cmake-arg FETCHCONTENT_SOURCE_DIR_REPO_COMMON=/src/common \
+    --extra-core-cmake-arg FETCHCONTENT_SOURCE_DIR_REPO_CORE=/src/triton-inference-server-core \
+    --extra-core-cmake-arg FETCHCONTENT_SOURCE_DIR_REPO_BACKEND=/src/triton-inference-server-backend \
+    --extra-core-cmake-arg FETCHCONTENT_SOURCE_DIR_REPO_THIRD_PARTY=/src/triton-inference-server-third_party \
+    --extra-core-cmake-arg BOOST_ROOT=/root/micromamba \
+  ); \
+  FC_PY=( \
+    --extra-backend-cmake-arg python:FETCHCONTENT_SOURCE_DIR_REPO-COMMON=/src/common \
+    --extra-backend-cmake-arg python:FETCHCONTENT_SOURCE_DIR_REPO-CORE=/src/triton-inference-server-core \
+    --extra-backend-cmake-arg python:FETCHCONTENT_SOURCE_DIR_REPO-BACKEND=/src/triton-inference-server-backend \
+    --extra-backend-cmake-arg python:FETCHCONTENT_SOURCE_DIR_REPO-THIRD-PARTY=/src/triton-inference-server-third_party \
+    --extra-backend-cmake-arg python:FETCHCONTENT_SOURCE_DIR_REPO_COMMON=/src/common \
+    --extra-backend-cmake-arg python:FETCHCONTENT_SOURCE_DIR_REPO_CORE=/src/triton-inference-server-core \
+    --extra-backend-cmake-arg python:FETCHCONTENT_SOURCE_DIR_REPO_BACKEND=/src/triton-inference-server-backend \
+    --extra-backend-cmake-arg python:FETCHCONTENT_SOURCE_DIR_REPO_THIRD_PARTY=/src/triton-inference-server-third_party \
+  ); \
+  BACKENDS=(--backend=python:rocm7.2_r25.12); \
+  FC_ORT=(); \
+  ORT_REPO_FLAGS=(); \
+  if [[ "${BUILD_ONNXRUNTIME}" == "ON" ]]; then \
+    BACKENDS+=(--backend=onnxruntime); \
+    FC_ORT=( \
+      --extra-backend-cmake-arg onnxruntime:FETCHCONTENT_SOURCE_DIR_REPO-COMMON=/src/common \
+      --extra-backend-cmake-arg onnxruntime:FETCHCONTENT_SOURCE_DIR_REPO-CORE=/src/triton-inference-server-core \
+      --extra-backend-cmake-arg onnxruntime:FETCHCONTENT_SOURCE_DIR_REPO-BACKEND=/src/triton-inference-server-backend \
+      --extra-backend-cmake-arg onnxruntime:FETCHCONTENT_SOURCE_DIR_REPO-THIRD-PARTY=/src/triton-inference-server-third_party \
+      --extra-backend-cmake-arg onnxruntime:FETCHCONTENT_SOURCE_DIR_REPO_COMMON=/src/common \
+      --extra-backend-cmake-arg onnxruntime:FETCHCONTENT_SOURCE_DIR_REPO_CORE=/src/triton-inference-server-core \
+      --extra-backend-cmake-arg onnxruntime:FETCHCONTENT_SOURCE_DIR_REPO_BACKEND=/src/triton-inference-server-backend \
+      --extra-backend-cmake-arg onnxruntime:FETCHCONTENT_SOURCE_DIR_REPO_THIRD_PARTY=/src/triton-inference-server-third_party \
+    ); \
+    ORT_REPO_FLAGS=( \
+      --ort-repo "file:///src/onnxruntime" \
+      --migraphx-repo "file:///src/AMDMIGraphX" \
+    ); \
+  fi; \
+  python3 /src/triton-inference-server-server/build.py \
+    --no-container-build \
+    --build-dir=/tmp/tritonbuild \
+    --install-dir=/opt/tritonserver \
+    --version="${TRITON_INFERENCE_SERVER_VERSION}" \
+    --no-container-pull \
+    --enable-logging --enable-stats --enable-tracing \
+    --enable-rocm \
+    --enable-metrics --enable-cpu-metrics \
+    --linux-distro=ubuntu \
+    --endpoint=grpc --endpoint=http \
+    "${BACKENDS[@]}" \
+    "${FC_CORE[@]}" \
+    "${FC_ORT[@]}" \
+    "${ORT_REPO_FLAGS[@]}" \
+    "${FC_PY[@]}"
+
+# ── Stage 2: runtime image (the shippable artifact) ──────────────────────────
+# Package list mirrors what build.py's dockerfile_prepare_container_linux()
+# generates for: enable_rocm=True, linux_distro=ubuntu, backends=[python, onnxruntime].
+FROM ${BASE_IMAGE} AS runtime
+
+ARG TRITON_INFERENCE_SERVER_VERSION
+ARG INTEGRATION_JOB_NAME
+ARG INTEGRATION_BUILD_ID
+
+COPY --from=build /opt/tritonserver/ /opt/tritonserver/
+
+# ROCm environment — must be re-declared in each stage (not inherited from build).
+ENV ROCM_PATH=/opt/rocm
+ENV HIP_PATH=/opt/rocm
+ENV CMAKE_PREFIX_PATH=/opt/rocm:/opt/rocm/lib/cmake
+ENV PATH=/opt/tritonserver/bin:/opt/rocm/bin:${PATH}
+ENV LD_LIBRARY_PATH=/opt/tritonserver/lib:/opt/rocm/lib
+
+# Triton server metadata
+ENV TRITON_SERVER_VERSION=${TRITON_INFERENCE_SERVER_VERSION}
+ENV TRITON_SERVER_GPU_ENABLED=1
+ENV UCX_MEM_EVENTS=no
+ENV DEBIAN_FRONTEND=noninteractive
+LABEL com.amd.tritonserver.version="${TRITON_INFERENCE_SERVER_VERSION}"
+
+# Common runtime dependencies (mirrors dockerfile_prepare_container_linux ubuntu path)
+# libgomp1             — onnxruntime backend
+# libarchive-dev       — python backend (libarchive used by stub loader)
+# python3-wheel/setuptools/dev — python backend
+# libjemalloc-dev      — tcmalloc/jemalloc performance allocator
+# libcurl4-openssl-dev — HTTP filesystem / S3 support
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libb64-0d \
+        libcurl4-openssl-dev \
+        libgoogle-perftools-dev \
+        libjemalloc-dev \
+        libnuma-dev \
+        libgomp1 \
+        python3-pip \
+        python3-wheel \
+        python3-setuptools \
+        libpython3-dev \
+        libarchive-dev \
+    && pip3 install --no-cache-dir "numpy<2" virtualenv \
+    && pip3 install --no-cache-dir /opt/tritonserver/python/*.whl 2>/dev/null || true \
+    && rm -rf /var/lib/apt/lists/*
+
+# ROCm entrypoint — sources env setup files from entrypoint.d/ before exec.
+# Mirrors the COPY docker/cpu_only/ + ENTRYPOINT that build.py generates for ROCm.
+COPY --from=build /src/triton-inference-server-server/docker/cpu_only/ /opt/rocm/
+COPY --from=build /src/triton-inference-server-server/docker/entrypoint.d/ /opt/rocm/entrypoint.d/
+RUN chmod +x /opt/rocm/rocm_entrypoint.sh
+
+ENTRYPOINT ["/opt/rocm/rocm_entrypoint.sh"]
+CMD ["tritonserver", "--model-repository=/models"]
