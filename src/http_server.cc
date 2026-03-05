@@ -3084,12 +3084,13 @@ HTTPAPIServer::EVBufferToJson(
     const size_t length, int n)
 {
   if (length > max_input_size_) {
+    auto overrun = length - max_input_size_;
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
-        ("Request JSON size of " + std::to_string(length) +
-         " bytes exceeds the maximum allowed value of " +
-         std::to_string(max_input_size_) +
-         " bytes. Use --http-max-input-size to increase the limit.")
+        ("Request JSON size of " + std::to_string(length) + " + " +
+         std::to_string(overrun) +
+         " bytes exceeds the maximum allowed input size. "
+         "Use --http-max-input-size to increase the limit.")
             .c_str());
   }
 
@@ -3521,7 +3522,8 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
       switch (it->second->kind_) {
         case MappingSchema::Kind::EXACT_MAPPING: {
           // Read meta data
-          RETURN_IF_ERR(ExactMappingInput(m, generate_request, input_metadata, consumed_input_size));
+          RETURN_IF_ERR(ExactMappingInput(
+              m, generate_request, input_metadata, consumed_input_size));
           break;
         }
         case MappingSchema::Kind::MAPPING_SCHEMA: {
@@ -3551,7 +3553,8 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
       }
     } else if (schema->allow_unspecified_) {
       // Unspecified key follows EXACT_MAPPING
-      RETURN_IF_ERR(ExactMappingInput(m, generate_request, input_metadata, consumed_input_size));
+      RETURN_IF_ERR(ExactMappingInput(
+          m, generate_request, input_metadata, consumed_input_size));
     } else {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNSUPPORTED,
@@ -3600,8 +3603,8 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
       if (element_size == 0) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
-            (std::string("input '") + name +
-             "' has unsupported datatype " + value)
+            (std::string("input '") + name + "' has unsupported datatype " +
+             value)
                 .c_str());
       }
 
@@ -3611,23 +3614,25 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             (std::string("input '") + name +
-              "' has too many elements of datatype " + value)
+             "' has too many elements of datatype " + value)
                 .c_str());
-                
+
         byte_size = element_cnt * element_size;
       }
     }
 
     // Ensure that the resulting array size in bytes does not exceed the maximum
     // allowed input size.
-    if (byte_size + consumed_input_byte_size > max_input_size_) {
+    if (byte_size + consumed_input_byte_size > max_input_size_ ||
+        byte_size + consumed_input_byte_size < consumed_input_byte_size) {
+      auto overrun = byte_size + consumed_input_byte_size - max_input_size_;
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
-          ("Input '" + name + "' has a byte_size (" +
-           std::to_string(byte_size) +
-           " bytes) that exceeds the maximum allowed value of " +
-           std::to_string(max_input_size_ - consumed_input_byte_size) +
-           " bytes. Use --http-max-input-size to increase the limit.")
+          ("Input '" + name + "' has size of " +
+           std::to_string(max_input_size_ - consumed_input_byte_size) + " + " +
+           std::to_string(overrun) +
+           " bytes exceeds the maximum allowed input size. "
+           "Use --http-max-input-size to increase the limit.")
               .c_str());
     }
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -255,7 +255,7 @@ echo -n 'username:' > pswd
 echo "password" | openssl passwd -stdin -apr1 >> pswd
 nginx -c `pwd`/$NGINX_CONF
 
-python $BASIC_AUTH_TEST
+python $BASIC_AUTH_TEST >> ${CLIENT_LOG}.python.plugin.auth 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.python.plugin.auth
     RET=1
@@ -668,9 +668,9 @@ fi
 ## Python Unit Tests
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=generate_endpoint_test.py
-EXPECTED_NUM_TESTS=17
+EXPECTED_NUM_TESTS=18
 set +e
-python $PYTHON_TEST >$CLIENT_LOG 2>&1
+python $PYTHON_TEST > $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
@@ -800,6 +800,14 @@ python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_compr
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for compressed input\n***"
+    RET=1
+fi
+
+# Run test to verify that large inputs fail with default limit
+python http_input_size_limit_test.py InferSizeLimitTest.test_type_size_explosion >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Default Input Size Limit Test Failed for type size explosion\n***"
     RET=1
 fi
 set -e
