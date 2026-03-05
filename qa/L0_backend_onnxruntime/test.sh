@@ -45,13 +45,13 @@ set +e
 pip install onnx==1.20.1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to install onnx dependency\n***"
-    RET=1
+    exit 1
 fi
 
 python gen_add_bf16_onnx_model.py
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to generate BFLOAT16 ONNX model\n***"
-    RET=1
+    exit 1
 fi
 
 set -e
