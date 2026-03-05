@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,7 +47,9 @@ from typing import List, Tuple
 def create_ensemble_modelfile(
     create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape
 ):
-    if not tu.validate_for_ensemble_model("zero", dtype, dtype, dtype):
+    if not tu.validate_for_ensemble_model(
+        "zero", dtype, dtype, dtype, shape, shape, shape
+    ):
         return
 
     emu.create_identity_ensemble_modelfile(
@@ -64,7 +66,9 @@ def create_ensemble_modelfile(
 def create_ensemble_modelconfig(
     create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape
 ):
-    if not tu.validate_for_ensemble_model("zero", dtype, dtype, dtype):
+    if not tu.validate_for_ensemble_model(
+        "zero", dtype, dtype, dtype, shape, shape, shape
+    ):
         return
 
     emu.create_identity_ensemble_modelconfig(

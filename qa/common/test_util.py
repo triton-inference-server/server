@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -113,6 +113,9 @@ def validate_for_ensemble_model(
     input_dtype,
     output0_dtype,
     output1_dtype,
+    input_shape,
+    output0_shape,
+    output1_shape,
 ):
     """Return True if input and output dtypes are supported by the ensemble type."""
 
