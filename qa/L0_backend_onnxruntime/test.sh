@@ -39,8 +39,19 @@ rm -rf models
 # Generate the model
 mkdir -p models/add_bf16/1
 set +e
+
 pip install onnx==1.20.1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to install onnx dependency\n***"
+    RET=1
+fi
+
 python gen_add_bf16_onnx_model.py
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to generate BFLOAT16 ONNX model\n***"
+    RET=1
+fi
+
 set -e
 
 SERVER_ARGS="--model-repository=`pwd`/models"
@@ -48,7 +59,7 @@ run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    exit 1
+    RET=1
 fi
 
 RET=0
@@ -56,14 +67,16 @@ RET=0
 set +e
 
 for client_type in http grpc; do
+    export CLIENT_TYPE=$client_type
     CLIENT_LOG="./test_${client_type}.log"
-    python test.py $client_type >>$CLIENT_LOG 2>&1
+    python test.py >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed ($client_type)\n***"
         RET=1
     fi
 done
+unset CLIENT_TYPE
 
 set -e
 

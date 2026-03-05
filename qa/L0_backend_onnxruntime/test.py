@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -26,17 +26,11 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
-import sys
 import unittest
 
 import numpy as np
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
-
-# Client type can be passed as first arg (e.g. python bfloat16_test.py http) or via CLIENT_TYPE env.
-if len(sys.argv) >= 2 and sys.argv[1] in ("http", "grpc"):
-    os.environ["CLIENT_TYPE"] = sys.argv[1]
-    del sys.argv[1]
 
 
 class BFloat16Test(unittest.TestCase):
@@ -64,7 +58,7 @@ class BFloat16Test(unittest.TestCase):
         return results.as_numpy("OUTPUT")
 
     def test_bf16_add_variants(self):
-        """Run BF16 add for one case: zeros, negatives, large, small, cancellation, or identical."""
+        """Run BF16 add across multiple cases: zeros, negatives, large, small, cancellation, and identical."""
         for input0_val, input1_val, expected_val in [
             (0.0, 0.0, 0.0),  # zeros
             (-1.5, 3.5, 2.0),  # negatives / mixed
