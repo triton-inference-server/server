@@ -727,7 +727,10 @@ export AIP_PREDICT_ROUTE="/predict"
 export AIP_HEALTH_ROUTE="/health"
 
 SERVER_LOG="vertex_restricted_api_testing_server.log"
-SERVER_ARGS="--allow-vertex-ai=true --model-repository=restricted_single_model --vertex-ai-default-model=identity_fp32 --http-restricted-api=metadata,model-config,model-repository,statistics,shared-memory:X-Vertex-Restricted=secret"
+SERVER_ARGS="--allow-vertex-ai=true"
+SERVER_ARGS+=" --model-repository=restricted_single_model"
+SERVER_ARGS+=" --vertex-ai-default-model=identity_fp32"
+SERVER_ARGS+=" --http-restricted-api=metadata,model-config,model-repository,statistics,shared-memory:X-Vertex-Restricted=secret"
 run_server_nowait
 vertex_ai_wait_for_server_ready $SERVER_PID 10
 if [ "$WAIT_RET" != "0" ]; then
