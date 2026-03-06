@@ -201,8 +201,9 @@ VertexAiAPIServer::Handle(evhtp_request_t* req)
           HandleSystemSharedMemory(req, region, action);
           return;
         }
-        // register/unregister are mutating operations that must not be
-        // reachable through the prediction endpoint.
+        // Only read-only status queries are permitted through redirect.
+        // Mutating operations (register/unregister) require the core
+        // HTTP endpoint.
         LOG_VERBOSE(1) << "Vertex AI redirect blocked: " << redirect_endpoint;
         evhtp_send_reply(req, EVHTP_RES_FORBIDDEN);
         return;
@@ -224,7 +225,8 @@ VertexAiAPIServer::Handle(evhtp_request_t* req)
           HandleRepositoryIndex(req, repo_name);
           return;
         }
-        // Model load/unload must not be reachable through the prediction endpoint.
+        // Only repository index queries are permitted through redirect.
+        // Model load/unload requires the core HTTP endpoint.
         LOG_VERBOSE(1) << "Vertex AI redirect blocked: " << redirect_endpoint;
         evhtp_send_reply(req, EVHTP_RES_FORBIDDEN);
         return;
