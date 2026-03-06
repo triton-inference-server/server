@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 
 This guide captures the steps to build Phi-3 with TRT-LLM and deploy with Triton Inference Server. It also shows a shows how to use GenAI-Perf to run benchmarks to measure model performance in terms of throughput and latency.
 
-This guide is tested on A100 80GB SXM4 and H100 80GB PCIe. It is confirmed to work with Phi-3-mini-128k-instruct and Phi-3-mini-4k-instruct (see [Support Matrix](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/phi) for full list) using TRT-LLM v0.11 and Triton Inference Server 24.07.
+This guide is tested on A100 80GB SXM4 and H100 80GB PCIe. It is confirmed to work with Phi-3-mini-128k-instruct and Phi-3-mini-4k-instruct (see [Support Matrix](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/models/core/phi) for full list) using TRT-LLM v0.11 and Triton Inference Server 24.07.
 
 - [Build and test TRT-LLM engine](#build-and-test-trt-llm-engine)
 - [Deploy with Triton Inference Server](#deploy-with-triton-inference-server)
@@ -76,7 +76,7 @@ Reference: <https://nvidia.github.io/TensorRT-LLM/installation/linux.html>
 
 ## Build the TRT-LLM Engine
 
-Reference: <https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/phi>
+Reference: <https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/models/core/phi>
 
 4. ## Download Phi-3-mini-4k-instruct
 
@@ -354,7 +354,7 @@ All config files inside /tensorrtllm\_backend/all\_models/inflight\_batcher\_llm
 <details>
 <summary><b> ensemble/config.pbtxt</b></summary>
 
-    # Copyright (c) 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+    # Copyright (c) 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
     #
     # Redistribution and use in source and binary forms, with or without
     # modification, are permitted provided that the following conditions
@@ -864,7 +864,7 @@ All config files inside /tensorrtllm\_backend/all\_models/inflight\_batcher\_llm
 <details>
 <summary><b>postprocessing/config.pbtxt</b></summary>
 
-    # Copyright (c) 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+    # Copyright (c) 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
     #
     # Redistribution and use in source and binary forms, with or without
     # modification, are permitted provided that the following conditions
@@ -993,7 +993,7 @@ All config files inside /tensorrtllm\_backend/all\_models/inflight\_batcher\_llm
 <details>
 <summary><b> preprocessing/config.pbtxt</b> </summary>
 
-    # Copyright (c) 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+    # Copyright (c) 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
     #
     # Redistribution and use in source and binary forms, with or without
     # modification, are permitted provided that the following conditions
@@ -1188,7 +1188,7 @@ All config files inside /tensorrtllm\_backend/all\_models/inflight\_batcher\_llm
 <summary> <b> tensorrt_llm/config.pbtxt </b></summary>
 
 
-    # Copyright (c) 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+    # Copyright (c) 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
     #
     # Redistribution and use in source and binary forms, with or without
     # modification, are permitted provided that the following conditions

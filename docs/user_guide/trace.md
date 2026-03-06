@@ -1,5 +1,5 @@
 <!--
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -632,8 +632,8 @@ refer to the [identity backend](https://github.com/triton-inference-server/ident
 In `openTelemetry` trace mode, if one wishes to start a new span, make sure
 that the name of your custom activity ends with `_START`. To end the new span,
 make sure that corresponding activity ends with `_END`. For example, in the
-identity backend, we start a `CUSTOM_ACTIVITY` span, by [reporting](https://github.com/triton-inference-server/identity_backend/blob/oandreeva-custom-trace-activity/src/identity.cc#L872-L876)
-`CUSTOM_ACTIVITY_START` event; and we close this span by [reporting](https://github.com/triton-inference-server/identity_backend/blob/oandreeva-custom-trace-activity/src/identity.cc#L880-L883)
+identity backend, we start a `CUSTOM_ACTIVITY` span, by [reporting](https://github.com/triton-inference-server/identity_backend/blob/30ff4255d09a4ec7547e7949a75d0cefb7e3bb28/src/identity.cc#L887-L893)
+`CUSTOM_ACTIVITY_START` event; and we close this span by [reporting](https://github.com/triton-inference-server/identity_backend/blob/30ff4255d09a4ec7547e7949a75d0cefb7e3bb28/src/identity.cc#L897-L902)
 `CUSTOM_ACTIVITY_END` event.
 
 Please note, that it is user's responsibility to make sure that all custom started
@@ -644,7 +644,7 @@ spans are properly ended.
 - OpenTelemetry trace mode is not supported on Windows systems.
 
 - Triton supports only
-[OTLP/HTTP Exporter](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md#otlphttp)
+[OTLP/HTTP Exporter](https://opentelemetry.io/docs/specs/otlp/#otlphttp)
 and allows specification of only url for this exporter through
 `--trace-config`. Other options and corresponding default values can be
 found [here](https://github.com/open-telemetry/opentelemetry-cpp/tree/v1.8.3/exporters/otlp#configuration-options--otlp-http-exporter-).

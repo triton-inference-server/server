@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -57,7 +57,7 @@ each model. It is also possible to use the [Model
 Analyzer](model_analyzer.md) to automatically search across different
 dynamic batcher configurations.
 
-* Decide on a [maximum batch size](#maximum-batch-size) for the model.
+* Decide on a [maximum batch size](model_configuration.md#maximum-batch-size) for the model.
 
 * Add the following to the model configuration to enable the dynamic
   batcher with all default settings. By default the dynamic batcher
@@ -207,7 +207,7 @@ in that order. If found, it will load it. This lets you easily share a custom ba
 among all models using the same backend.
 
 For a tutorial of how to create and use a custom batching library, please see the
-[backend examples directory](https://github.com/triton-inference-server/backend/tree/main/examples#volume-batching).
+[backend examples directory](https://github.com/triton-inference-server/backend/tree/main/examples#custom-batching).
 
 ## Sequence Batcher
 
@@ -217,7 +217,7 @@ dynamic batcher, the sequence batcher should be used for
 [stateful models](architecture.md#stateful-models) where a sequence of
 inference requests must be routed to the same model instance. The
 dynamically created batches are distributed to all [model
-instances](#instance-groups) configured for the model.
+instances](model_configuration.md#instance-groups) configured for the model.
 
 Sequence batching is enabled and configured independently for each
 model using the *ModelSequenceBatching* property in the model
@@ -259,7 +259,7 @@ sequence", the user doesn't need to set [control
 inputs](architecture.md#control-inputs) mentioned in the previous
 section. They will be filled internally by the scheduler.
 
-"Iterative sequences" can be [decoupled](architecture.md#decoupled) where more than
+"Iterative sequences" can be [decoupled](decoupled_models.md#decoupled-backends-and-models) where more than
 one response can be generated during execution or non-decoupled where
 a single response is generated when the full response is complete.
 
