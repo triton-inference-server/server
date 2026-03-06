@@ -3084,12 +3084,13 @@ HTTPAPIServer::EVBufferToJson(
     const size_t length, int n)
 {
   if (length > max_input_size_) {
+    auto overrun = length - max_input_size_;
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
-        ("Request JSON size of " + std::to_string(length) +
-         " bytes exceeds the maximum allowed value of " +
-         std::to_string(max_input_size_) +
-         " bytes. Use --http-max-input-size to increase the limit.")
+        ("Request JSON size of " + std::to_string(length) + " + " +
+         std::to_string(overrun) +
+         " bytes exceeds the maximum allowed input size. "
+         "Use --http-max-input-size to increase the limit.")
             .c_str());
   }
 

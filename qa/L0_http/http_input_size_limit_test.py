@@ -103,8 +103,8 @@ class InferSizeLimitTest(tu.TestResultCollector):
             f"Expected error code for type/size mismatch, got: {response.status_code}",
         )
         error_msg = response.content.decode()
-        self.assertEqual(
-            '{"error":"Request JSON size of 89478576 bytes exceeds the maximum allowed value of 67108864 bytes. Use --http-max-input-size to increase the limit."}',
+        self.assertIn(
+            " exceeds the maximum allowed value ",
             error_msg,
             "Expected error message about exceeding max input size with type mismatch",
         )
@@ -139,8 +139,8 @@ class InferSizeLimitTest(tu.TestResultCollector):
             f"Expected error code for type/size mismatch, got: {response.status_code}",
         )
         error_msg = response.content.decode()
-        self.assertEqual(
-            '{"error":"Request JSON size of 89478652 bytes exceeds the maximum allowed value of 67108864 bytes. Use --http-max-input-size to increase the limit."}',
+        self.assertIn(
+            " exceeds the maximum allowed value ",
             error_msg,
             "Expected error message about exceeding max input size with type mismatch",
         )

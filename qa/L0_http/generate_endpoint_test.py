@@ -282,7 +282,7 @@ class GenerateEndpointTest(tu.TestResultCollector):
         input_bytes = bytes(input_data)
         input_str = base64.b64encode(input_bytes).decode("utf-8")
         inputs = {"PROMPT": input_str, "STREAM": False}
-        error_msg = "Request JSON size of 89478519 bytes exceeds the maximum allowed value of 67108864 bytes. Use --http-max-input-size to increase the limit."
+        error_msg = "Request JSON size of 67108864 + 22369655 bytes exceeds the maximum allowed input size. Use --http-max-input-size to increase the limit."
         self.generate_expect_failure(self._model_name, inputs, error_msg)
 
         inputs = {
@@ -290,7 +290,7 @@ class GenerateEndpointTest(tu.TestResultCollector):
             "INPUT1": input_str[(len(input_str) // 2) :],
             "STREAM": False,
         }
-        error_msg = "Request JSON size of 89478533 bytes exceeds the maximum allowed value of 67108864 bytes. Use --http-max-input-size to increase the limit."
+        error_msg = "Request JSON size of 67108864 + 22369669 bytes exceeds the maximum allowed input size. Use --http-max-input-size to increase the limit."
         self.generate_expect_failure(self._model_name, inputs, error_msg)
 
     def test_duplicate_inputs(self):
