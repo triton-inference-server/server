@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -313,16 +313,13 @@ def check_gpus_compute_capability(min_capability):
     import importlib.util
 
     if importlib.util.find_spec("cuda") is not None:
-        import cuda.core.experimental as cuda_core_experimental
+        from cuda.core import Device
 
-        devices = cuda_core_experimental.system.devices
-
+        devices = Device.get_all_devices()
         for device in devices:
-            compute_capability = (
-                device.compute_capability.major + device.compute_capability.minor / 10.0
-            )
-
-            if compute_capability < min_capability:
+            cc = device.compute_capability
+            compute_capability_value = cc.major + cc.minor / 10.0
+            if compute_capability_value < min_capability:
                 return False
 
     elif importlib.util.find_spec("pycuda") is not None:
