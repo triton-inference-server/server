@@ -174,8 +174,7 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
                   RestrictedCategory::MODEL_REPOSITORY) &&
               RespondIfRestricted(
                   req,
-                  restricted_apis_.Get(
-                      RestrictedCategory::MODEL_REPOSITORY))) {
+                  restricted_apis_.Get(RestrictedCategory::MODEL_REPOSITORY))) {
             return;
           }
           SageMakerMMEListModel(req);
@@ -187,8 +186,7 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
                   RestrictedCategory::MODEL_REPOSITORY) &&
               RespondIfRestricted(
                   req,
-                  restricted_apis_.Get(
-                      RestrictedCategory::MODEL_REPOSITORY))) {
+                  restricted_apis_.Get(RestrictedCategory::MODEL_REPOSITORY))) {
             return;
           }
           SageMakerMMEGetModel(req, multi_model_name.c_str());
@@ -230,8 +228,7 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
                   RestrictedCategory::MODEL_REPOSITORY) &&
               RespondIfRestricted(
                   req,
-                  restricted_apis_.Get(
-                      RestrictedCategory::MODEL_REPOSITORY))) {
+                  restricted_apis_.Get(RestrictedCategory::MODEL_REPOSITORY))) {
             return;
           }
           std::unordered_map<std::string, std::string> parse_load_map;
