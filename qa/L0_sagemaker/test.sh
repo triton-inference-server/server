@@ -618,10 +618,12 @@ wait $SERVE_PID
 # unrestricted.
 
 SERVER_LOG="./sagemaker_restricted_api_server.log"
-SERVER_ARGS="--allow-sagemaker=true --allow-http=true --allow-grpc=false --allow-metrics=false \
-             --model-repository=`pwd`/models --model-control-mode=explicit \
-             --load-model=sm_model \
-             --http-restricted-api=model-repository:X-SM-Auth=secret"
+SERVER_ARGS="--allow-sagemaker=true --allow-http=true \
+  --allow-grpc=false --allow-metrics=false \
+  --model-repository=`pwd`/models \
+  --model-control-mode=explicit \
+  --load-model=sm_model \
+  --http-restricted-api=model-repository:X-SM-Auth=secret"
 run_server_nowait
 sagemaker_wait_for_server_ready $SERVER_PID 10
 if [ "$WAIT_RET" != "0" ]; then
@@ -744,10 +746,12 @@ wait $SERVER_PID
 # path, not just the core HTTP endpoint.
 
 SERVER_LOG="./sagemaker_max_input_size_server.log"
-SERVER_ARGS="--allow-sagemaker=true --allow-http=true --allow-grpc=false --allow-metrics=false \
-             --model-repository=`pwd`/models --model-control-mode=explicit \
-             --load-model=sm_model \
-             --http-max-input-size=256"
+SERVER_ARGS="--allow-sagemaker=true --allow-http=true \
+  --allow-grpc=false --allow-metrics=false \
+  --model-repository=`pwd`/models \
+  --model-control-mode=explicit \
+  --load-model=sm_model \
+  --http-max-input-size=256"
 run_server_nowait
 sagemaker_wait_for_server_ready $SERVER_PID 10
 if [ "$WAIT_RET" != "0" ]; then
