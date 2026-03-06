@@ -1,4 +1,5 @@
-# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/bin/bash
+# Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,19 +25,68 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    app: nv-triton-client
-  name: nv-triton-client
-  namespace: default
-spec:
-  containers:
-  - image: nvcr.io/nvidia/tritonserver:26.02-py3-sdk
-    imagePullPolicy: Always
-    name: nv-triton-client
-    securityContext:
-      privileged: true
-    command: [ "/bin/bash", "-c", "--" ]
-    args: [ "while true; do sleep 30; done;" ]
+export CUDA_VISIBLE_DEVICES=0
+
+SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_LOG="./inference_server.log"
+CLIENT_LOG="./test.log"
+source ../common/util.sh
+
+rm -f *.log
+rm -rf models
+
+RET=0
+
+# BFLOAT16 test
+# Generate the model
+mkdir -p models/add_bf16/1
+set +e
+
+pip install onnx==1.20.1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to install onnx dependency\n***"
+    exit 1
+fi
+
+python gen_add_bf16_onnx_model.py
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to generate BFLOAT16 ONNX model\n***"
+    exit 1
+fi
+
+set -e
+
+SERVER_ARGS="--model-repository=`pwd`/models"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+for client_type in http grpc; do
+    export CLIENT_TYPE=$client_type
+    CLIENT_LOG="./test_${client_type}.log"
+    python test.py >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed ($client_type)\n***"
+        RET=1
+    fi
+done
+unset CLIENT_TYPE
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+exit $RET
