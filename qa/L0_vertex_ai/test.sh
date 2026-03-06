@@ -699,20 +699,14 @@ else
 fi
 set -e
 
-# repository control (expect error)
+# repository control via redirect is blocked unconditionally
 rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/models/subadd/unload" localhost:8080/predict`
-if [ "$code" == "200" ]; then
+if [ "$code" != "403" ]; then
     cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Failed. Expected model unload via redirect to return 403 (got $code)\n***"
     RET=1
-else
-    grep "explicit model load / unload is not allowed" ./curl.out
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected error on model control\n***"
-        RET=1
-    fi
 fi
 set -e
 
@@ -907,7 +901,7 @@ export AIP_PREDICT_ROUTE="/predict"
 export AIP_HEALTH_ROUTE="/health"
 
 SERVER_LOG="vertex_max_input_size_server.log"
-SERVER_ARGS="--allow-vertex-ai=true --model-repository=restricted_single_model --vertex-ai-default-model=identity_fp32 --http-max-input-size=256"
+SERVER_ARGS="--allow-vertex-ai=true --model-repository=restricted_single_model --vertex-ai-default-model=identity_fp32 --http-max-input-size=128"
 run_server_nowait
 vertex_ai_wait_for_server_ready $SERVER_PID 10
 if [ "$WAIT_RET" != "0" ]; then
