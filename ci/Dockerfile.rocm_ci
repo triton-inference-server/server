@@ -1,17 +1,21 @@
-# syntax=docker/dockerfile:1
-ARG BASE_IMAGE=rocm/dev-ubuntu-22.04:7.2-complete
+ARG ROCM_VERSION=7.2
+ARG UBUNTU_VERSION=24.04
 ARG TRITON_INFERENCE_SERVER_VERSION=2.64.0
 # Set to ON to build the OnnxRuntime backend. Requires /src/onnxruntime and
 # /src/AMDMIGraphX to be pre-fetched (prefetch_sources.sh or manifest). For
 # air-gapped builds the onnxruntime_backend must build ORT in-tree from
 # file:///src/... without invoking docker.
-ARG BUILD_ONNXRUNTIME=ON
+ARG BUILD_ONNXRUNTIME=OFF
+ARG BASE_IMAGE=rocm/dev-ubuntu-${UBUNTU_VERSION}:${ROCM_VERSION}-complete
 
 # ── Stage 1a: build environment (deps + sources; no build.py) ───────────────────
 # Target "buildenv" to get an image where you can run build.py (or cmake_build)
 # manually for fast iteration without rebuilding this stage.
 FROM ${BASE_IMAGE} AS buildenv
 
+ARG ROCM_VERSION
+ARG UBUNTU_VERSION
+ARG PYTHON_VERSION=3.12
 ARG TRITON_INFERENCE_SERVER_VERSION
 ARG BUILD_ONNXRUNTIME
 
@@ -42,6 +46,7 @@ ARG MAMBA_ENV_NAME=base
 RUN curl -L micro.mamba.pm/install.sh | bash && \
     ~/.local/bin/micromamba install -n ${MAMBA_ENV_NAME} -c conda-forge \
         --override-channels -y \
+        python=${PYTHON_VERSION} \
         boost-cpp=1.85.0 \
         cmake=3.31 \
         patchelf=0.17.2 && \
