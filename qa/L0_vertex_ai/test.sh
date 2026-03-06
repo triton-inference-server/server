@@ -914,7 +914,7 @@ fi
 
 set +e
 
-# Small payload under 256 bytes should succeed
+# Small payload under 128 bytes should succeed
 rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "Content-Type: application/json" -d'{"inputs":[{"name":"INPUT0","datatype":"FP32","shape":[1,1],"data":[1.0]}],"outputs":[{"name":"OUTPUT0"}]}' localhost:8080/predict`
 if [ "$code" != "200" ]; then
@@ -923,7 +923,7 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
-# Large payload over 256 bytes should be rejected
+# Large payload over 128 bytes should be rejected
 rm -f ./curl.out
 LARGE_PAYLOAD='{"inputs":[{"name":"INPUT0","datatype":"FP32","shape":[1,16],"data":[1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0]}],"outputs":[{"name":"OUTPUT0"}]}'
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "Content-Type: application/json" -d"$LARGE_PAYLOAD" localhost:8080/predict`
@@ -936,7 +936,7 @@ fi
 set -e
 
 kill $SERVER_PID
-wait $SERVE_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
