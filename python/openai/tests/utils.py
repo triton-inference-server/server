@@ -53,6 +53,21 @@ def setup_server(model_repository: str):
     return server
 
 
+def setup_server_explicit(
+    model_repository: str, load_models: Optional[List[str]] = None
+):
+    server: tritonserver.Server = tritonserver.Server(
+        model_repository=model_repository,
+        model_control_mode=tritonserver.ModelControlMode.EXPLICIT,
+        startup_models=load_models or [],
+        log_verbose=0,
+        log_info=True,
+        log_warn=True,
+        log_error=True,
+    ).start(wait_until_ready=True)
+    return server
+
+
 def setup_fastapi_app(
     tokenizer: str,
     server: tritonserver.Server,
@@ -78,11 +93,12 @@ class OpenAIServer:
         self,
         cli_args: List[str],
         *,
+        port: int = 9000,
         env_dict: Optional[Dict[str, str]] = None,
     ) -> None:
         # TODO: Incorporate caller's cli_args passed to this instance instead
         self.host = "localhost"
-        self.port = 9000
+        self.port = port
 
         env = os.environ.copy()
         if env_dict is not None:
