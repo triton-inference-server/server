@@ -165,6 +165,48 @@ set -e
 kill $SERVER_PID
 wait $SERVE_PID
 
+# Test custom model repository via SAGEMAKER_TRITON_MODEL_REPOSITORY
+CUSTOM_REPO_DIR=`pwd`/custom_repo
+mkdir -p ${CUSTOM_REPO_DIR}
+cp -r `pwd`/models/sm_model ${CUSTOM_REPO_DIR}/sm_model
+
+export SAGEMAKER_TRITON_MODEL_REPOSITORY=${CUSTOM_REPO_DIR}
+export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME=sm_model
+serve > $SERVER_LOG 2>&1 &
+SERVE_PID=$!
+sleep 1
+SERVER_PID=`ps | grep tritonserver | awk '{ printf $1 }'`
+sagemaker_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER with custom model repository\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Inference with custom model repository
+set +e
+python $SAGEMAKER_TEST SageMakerTest >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed (custom model repository)\n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $UNIT_TEST_COUNT
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed (custom model repository)\n***"
+        RET=1
+    fi
+fi
+set -e
+
+unset SAGEMAKER_TRITON_MODEL_REPOSITORY
+
+kill $SERVER_PID
+wait $SERVE_PID
+rm -rf ${CUSTOM_REPO_DIR}
+
 # Change SageMaker port
 export SAGEMAKER_BIND_TO_PORT=8000
 serve > $SERVER_LOG 2>&1 &
