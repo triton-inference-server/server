@@ -29,11 +29,14 @@
 #include <grpc++/grpc++.h>
 #include <re2/re2.h>
 
+#include <atomic>
 #include <condition_variable>
+#include <mutex>
 #include <queue>
 #include <regex>
 #include <shared_mutex>
 #include <thread>
+#include <unordered_set>
 
 #include "../tracer.h"
 #include "grpc_handler.h"
@@ -709,14 +712,33 @@ class InferHandlerState {
   // transaction (e.g. a stream).
   struct Context {
     explicit Context(
-        ::grpc::ServerCompletionQueue* cq, const uint64_t unique_id = 0)
-        : cq_(cq), unique_id_(unique_id), ongoing_requests_(0),
-          step_(Steps::START), finish_ok_(true), ongoing_write_(false),
-          received_notification_(false)
+        ::grpc::ServerCompletionQueue* cq, std::atomic<bool>* cq_shutting_down,
+        std::function<void(::grpc::Alarm*)> register_alarm_fn,
+        std::function<void(::grpc::Alarm*)> unregister_alarm_fn,
+        const uint64_t unique_id = 0)
+        : cq_(cq), cq_shutting_down_(cq_shutting_down),
+          register_alarm_fn_(register_alarm_fn),
+          unregister_alarm_fn_(unregister_alarm_fn), unique_id_(unique_id),
+          ongoing_requests_(0), step_(Steps::START), finish_ok_(true),
+          ongoing_write_(false), received_notification_(false)
     {
       ctx_.reset(new ::grpc::ServerContext());
       responder_.reset(new ServerResponderType(ctx_.get()));
       gRPCErrorTracker_ = std::make_unique<gRPCErrorTracker>();
+    }
+
+    void RegisterAlarm(::grpc::Alarm* alarm)
+    {
+      if (register_alarm_fn_) {
+        register_alarm_fn_(alarm);
+      }
+    }
+
+    void UnregisterAlarm(::grpc::Alarm* alarm)
+    {
+      if (unregister_alarm_fn_) {
+        unregister_alarm_fn_(alarm);
+      }
     }
 
     void SetCompressionLevel(grpc_compression_level compression_level)
@@ -976,16 +998,26 @@ class InferHandlerState {
     }
 
     // Adds the state object to the completion queue so
-    // that it can be processed later
-    void PutTaskBackToQueue(InferHandlerStateType* state)
+    // that it can be processed later. Returns false if the
+    // completion queue is shutting down and the alarm was not set.
+    bool PutTaskBackToQueue(InferHandlerStateType* state)
     {
+      // Check if CQ is shutting down before scheduling alarm
+      if (state->context_->cq_shutting_down_ &&
+          state->context_->cq_shutting_down_->load(std::memory_order_acquire)) {
+        LOG_VERBOSE(1) << "PutTaskBackToQueue suppressed for "
+                       << state->unique_id_ << " due to CQ shutdown";
+        return false;
+      }
+
       std::lock_guard<std::recursive_mutex> lock(mu_);
-      // FIXME: Is there a better way to put task on the
-      // completion queue rather than using alarm object?
+      // Register alarm before setting it
+      state->context_->RegisterAlarm(&state->alarm_);
       // The alarm object will add a new task to the back of the
-      // completion queue when it expires or when it’s cancelled.
+      // completion queue when it expires or when it's cancelled.
       state->alarm_.Set(
           cq_, gpr_now(gpr_clock_type::GPR_CLOCK_REALTIME), state);
+      return true;
     }
 
     // Check the state at the front of the queue and write it if
@@ -1053,6 +1085,11 @@ class InferHandlerState {
 
     // The grpc completion queue associated with the RPC.
     ::grpc::ServerCompletionQueue* cq_;
+
+    // Shutdown guard - pointer to handler's shutdown flag
+    std::atomic<bool>* cq_shutting_down_;
+    std::function<void(::grpc::Alarm*)> register_alarm_fn_;
+    std::function<void(::grpc::Alarm*)> unregister_alarm_fn_;
 
     // Unique ID for the context. Used only for debugging so will
     // always be 0 in non-debug builds.
@@ -1349,6 +1386,15 @@ class InferHandler : public HandlerBase {
     return state;
   }
 
+  // Create a new context with shutdown guard
+  std::shared_ptr<StateContext> CreateContext()
+  {
+    return std::make_shared<StateContext>(
+        cq_, &cq_shutting_down_,
+        [this](::grpc::Alarm* a) { this->RegisterAlarm(a); },
+        [this](::grpc::Alarm* a) { this->UnregisterAlarm(a); });
+  }
+
   void StateRelease(State* state)
   {
     LOG_VERBOSE(2) << "StateRelease, " << state->unique_id_ << " Step "
@@ -1418,6 +1464,55 @@ class InferHandler : public HandlerBase {
   virtual bool Process(State* state, bool rpc_ok, bool is_notification) = 0;
   bool ExecutePrecondition(InferHandler::State* state);
 
+  // Notify handler that the completion queue is shutting down.
+  // This prevents new alarms from being set and cancels active ones.
+  void NotifyCQShutdown() override
+  {
+    bool expected = false;
+    if (cq_shutting_down_.compare_exchange_strong(
+            expected, true, std::memory_order_acq_rel)) {
+      LOG_VERBOSE(1) << "NotifyCQShutdown called for " << Name();
+      CancelActiveAlarms();
+    }
+  }
+
+  // Check if the completion queue is shutting down
+  bool IsCQShuttingDown() const
+  {
+    return cq_shutting_down_.load(std::memory_order_acquire);
+  }
+
+  // Register an alarm so it can be cancelled during shutdown
+  void RegisterAlarm(::grpc::Alarm* alarm)
+  {
+    std::lock_guard<std::mutex> lock(alarms_mu_);
+    active_alarms_.insert(alarm);
+  }
+
+  // Unregister an alarm when it fires or is cancelled
+  void UnregisterAlarm(::grpc::Alarm* alarm)
+  {
+    std::lock_guard<std::mutex> lock(alarms_mu_);
+    active_alarms_.erase(alarm);
+  }
+
+  // Cancel all active alarms
+  void CancelActiveAlarms()
+  {
+    std::unordered_set<::grpc::Alarm*> alarms_copy;
+    {
+      std::lock_guard<std::mutex> lock(alarms_mu_);
+      alarms_copy.swap(active_alarms_);
+    }
+    LOG_VERBOSE(1) << "Cancelling " << alarms_copy.size()
+                   << " active alarms for " << Name();
+    for (auto* alarm : alarms_copy) {
+      if (alarm != nullptr) {
+        alarm->Cancel();
+      }
+    }
+  }
+
   TRITONSERVER_Error* ForwardHeadersAsParameters(
       TRITONSERVER_InferenceRequest* irequest, InferHandler::State* state);
 
@@ -1444,6 +1539,11 @@ class InferHandler : public HandlerBase {
   std::shared_mutex* conn_mtx_;
   std::atomic<uint32_t>* conn_cnt_;
   bool* accepting_new_conn_;
+
+  // Shutdown guard for completion queue
+  std::atomic<bool> cq_shutting_down_{false};
+  std::mutex alarms_mu_;
+  std::unordered_set<::grpc::Alarm*> active_alarms_;
 };
 
 template <
@@ -1500,8 +1600,37 @@ InferHandler<
     void* tag;
     bool ok;
 
-    while (cq_->Next(&tag, &ok)) {
+    // Use deadline-based polling to allow checking shutdown flag
+    while (true) {
+      // Poll with 100ms timeout to allow shutdown detection
+      gpr_timespec deadline = gpr_time_add(
+          gpr_now(GPR_CLOCK_MONOTONIC),
+          gpr_time_from_millis(100, GPR_TIMESPAN));
+
+      auto status = cq_->AsyncNext(&tag, &ok, deadline);
+
+      if (status == ::grpc::CompletionQueue::SHUTDOWN) {
+        LOG_VERBOSE(1) << "Completion queue shut down for " << Name();
+        break;
+      }
+
+      if (status == ::grpc::CompletionQueue::TIMEOUT) {
+        // Check if we should exit due to shutdown
+        if (IsCQShuttingDown()) {
+          LOG_VERBOSE(1) << "Handler exiting due to CQ shutdown for " << Name();
+          break;
+        }
+        continue;
+      }
+
+      // GOT_EVENT - process the event
       State* state = static_cast<State*>(tag);
+
+      // Unregister alarm if this event is from an alarm
+      if (state->step_ != Steps::WAITING_NOTIFICATION) {
+        state->context_->UnregisterAlarm(&state->alarm_);
+      }
+
       bool is_notification = false;
       if (state->step_ == Steps::WAITING_NOTIFICATION) {
         State* state_wrapper = state;
