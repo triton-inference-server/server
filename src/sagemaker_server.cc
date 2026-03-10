@@ -41,14 +41,14 @@ namespace triton { namespace server {
     }                                                 \
   } while (false)
 
-#define RETURN_AND_RESPOND_IF_RESTRICTED(REQ, RESTRICTED_CATEGORY)          \
-  do {                                                                      \
-    auto const& is_restricted_api =                                         \
-        restricted_apis_.IsRestricted(RESTRICTED_CATEGORY);                 \
-    auto const& restriction = restricted_apis_.Get(RESTRICTED_CATEGORY);    \
-    if (is_restricted_api && RespondIfRestricted((REQ), restriction)) {     \
-      return;                                                               \
-    }                                                                       \
+#define RETURN_AND_RESPOND_IF_RESTRICTED(REQ, RESTRICTED_CATEGORY)       \
+  do {                                                                   \
+    auto const& is_restricted_api =                                      \
+        restricted_apis_.IsRestricted(RESTRICTED_CATEGORY);              \
+    auto const& restriction = restricted_apis_.Get(RESTRICTED_CATEGORY); \
+    if (is_restricted_api && RespondIfRestricted((REQ), restriction)) {  \
+      return;                                                            \
+    }                                                                    \
   } while (false)
 
 namespace {
