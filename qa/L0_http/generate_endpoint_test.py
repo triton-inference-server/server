@@ -275,23 +275,23 @@ class GenerateEndpointTest(tu.TestResultCollector):
             self.generate_expect_failure(self._model_name, inputs, error_msg)
             self.generate_stream_expect_failure(self._model_name, inputs, error_msg)
 
-    # def test_type_size_explosion(self):
-    #     input_data = [1] * (
-    #         64 * 1024 * 1024
-    #     )  # 64MB input, which is large but still reasonable for HTTP request body
-    #     input_bytes = bytes(input_data)
-    #     input_str = base64.b64encode(input_bytes).decode("utf-8")
-    #     inputs = {"PROMPT": input_str, "STREAM": False}
-    #     error_msg = "Request JSON size of 67108864 + 22369655 bytes exceeds the maximum allowed input size. Use --http-max-input-size to increase the limit."
-    #     self.generate_expect_failure(self._model_name, inputs, error_msg)
+    def test_type_size_explosion(self):
+        input_data = [1] * (
+            64 * 1024 * 1024
+        )  # 64MB input, which is large but still reasonable for HTTP request body
+        input_bytes = bytes(input_data)
+        input_str = base64.b64encode(input_bytes).decode("utf-8")
+        inputs = {"PROMPT": input_str, "STREAM": False}
+        error_msg = "Request JSON size of 67108864 + 22369655 bytes exceeds the maximum allowed input size. Use --http-max-input-size to increase the limit."
+        self.generate_expect_failure(self._model_name, inputs, error_msg)
 
-    #     inputs = {
-    #         "INPUT0": input_str[0 : (len(input_str) // 2)],
-    #         "INPUT1": input_str[(len(input_str) // 2) :],
-    #         "STREAM": False,
-    #     }
-    #     error_msg = "Request JSON size of 67108864 + 22369669 bytes exceeds the maximum allowed input size. Use --http-max-input-size to increase the limit."
-    #     self.generate_expect_failure(self._model_name, inputs, error_msg)
+        inputs = {
+            "INPUT0": input_str[0 : (len(input_str) // 2)],
+            "INPUT1": input_str[(len(input_str) // 2) :],
+            "STREAM": False,
+        }
+        error_msg = "Request JSON size of 67108864 + 22369669 bytes exceeds the maximum allowed input size. Use --http-max-input-size to increase the limit."
+        self.generate_expect_failure(self._model_name, inputs, error_msg)
 
     def test_duplicate_inputs(self):
         dupe_prompt = "input 'PROMPT' already exists in request"
