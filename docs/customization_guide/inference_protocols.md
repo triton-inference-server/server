@@ -163,6 +163,11 @@ protocol group (GRPC) or restricted API group (HTTP):
 --http-restricted-api=<API_1>,API_2>,...:<restricted-key>=<restricted-value>
 ```
 
+When Vertex AI endpoint support is enabled, `--http-restricted-api`
+also applies to redirected Vertex AI requests.
+If Triton is built without `TRITON_ENABLE_HTTP`, Vertex AI falls back
+to default unrestricted API settings.
+
 The option can be specified multiple times to specifies multiple groups of
 protocols or APIs with different restriction settings.
 
