@@ -38,6 +38,16 @@ namespace triton { namespace server {
     }                                                 \
   } while (false)
 
+#define RETURN_AND_RESPOND_IF_RESTRICTED(REQ, RESTRICTED_CATEGORY)          \
+  do {                                                                      \
+    auto const& is_restricted_api =                                         \
+        restricted_apis_.IsRestricted(RESTRICTED_CATEGORY);                 \
+    auto const& restriction = restricted_apis_.Get(RESTRICTED_CATEGORY);    \
+    if (is_restricted_api && RespondIfRestricted((REQ), restriction)) {     \
+      return;                                                               \
+    }                                                                       \
+  } while (false)
+
 namespace {
 
 void
@@ -170,25 +180,15 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
         if (multi_model_name.empty()) {
           LOG_VERBOSE(1) << "SageMaker request: LIST ALL MODELS";
 
-          if (restricted_apis_.IsRestricted(
-                  RestrictedCategory::MODEL_REPOSITORY) &&
-              RespondIfRestricted(
-                  req,
-                  restricted_apis_.Get(RestrictedCategory::MODEL_REPOSITORY))) {
-            return;
-          }
+          RETURN_AND_RESPOND_IF_RESTRICTED(
+              req, RestrictedCategory::MODEL_REPOSITORY);
           SageMakerMMEListModel(req);
           return;
         } else {
           LOG_VERBOSE(1) << "SageMaker request: GET MODEL";
 
-          if (restricted_apis_.IsRestricted(
-                  RestrictedCategory::MODEL_REPOSITORY) &&
-              RespondIfRestricted(
-                  req,
-                  restricted_apis_.Get(RestrictedCategory::MODEL_REPOSITORY))) {
-            return;
-          }
+          RETURN_AND_RESPOND_IF_RESTRICTED(
+              req, RestrictedCategory::MODEL_REPOSITORY);
           SageMakerMMEGetModel(req, multi_model_name.c_str());
           return;
         }
@@ -224,13 +224,8 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
         if (action.empty()) {
           LOG_VERBOSE(1) << "SageMaker request: LOAD MODEL";
 
-          if (restricted_apis_.IsRestricted(
-                  RestrictedCategory::MODEL_REPOSITORY) &&
-              RespondIfRestricted(
-                  req,
-                  restricted_apis_.Get(RestrictedCategory::MODEL_REPOSITORY))) {
-            return;
-          }
+          RETURN_AND_RESPOND_IF_RESTRICTED(
+              req, RestrictedCategory::MODEL_REPOSITORY);
           std::unordered_map<std::string, std::string> parse_load_map;
           ParseSageMakerRequest(req, &parse_load_map, "load");
           if (!parse_load_map.empty()) {
@@ -243,13 +238,8 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
         // UNLOAD MODEL
         LOG_VERBOSE(1) << "SageMaker request: UNLOAD MODEL";
 
-        if (restricted_apis_.IsRestricted(
-                RestrictedCategory::MODEL_REPOSITORY) &&
-            RespondIfRestricted(
-                req,
-                restricted_apis_.Get(RestrictedCategory::MODEL_REPOSITORY))) {
-          return;
-        }
+        RETURN_AND_RESPOND_IF_RESTRICTED(
+            req, RestrictedCategory::MODEL_REPOSITORY);
         req->method = htp_method_POST;
 
         SageMakerMMEUnloadModel(req, multi_model_name.c_str());
