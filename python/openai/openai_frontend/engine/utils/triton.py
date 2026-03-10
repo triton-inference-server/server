@@ -617,6 +617,34 @@ def _get_guided_json_from_tool(
     return None
 
 
+def _validate_lora_path_trtllm(repo_path: str, lora_path: str, lora_name: str):
+    if os.path.isabs(lora_path):
+        raise ValueError(
+            f"LoRA path '{lora_path}' for '{lora_name}' must be a relative path inside its model repository"
+        )
+
+    # NOTE: Error messages should never contain the real/absolute paths.
+    realpath_repo = os.path.realpath(repo_path)
+    realpath_lora = os.path.realpath(os.path.join(realpath_repo, lora_path))
+    # Always check if the LoRA path is inside the model repository before checking its existence.
+    if os.path.commonpath([realpath_repo, realpath_lora]) != realpath_repo:
+        raise ValueError(
+            f"LoRA path '{lora_path}' for '{lora_name}' must be inside its model repository"
+        )
+    if not os.path.exists(realpath_lora):
+        raise ServerError(
+            f"LoRA directory '{lora_path}' not found for '{lora_name}' in its model repository"
+        )
+
+    # Check if the files exist
+    for lora_file in ["model.lora_weights.npy", "model.lora_config.npy"]:
+        lora_file_path = os.path.join(realpath_lora, lora_file)
+        if not os.path.exists(lora_file_path):
+            raise ServerError(
+                f"LoRA file '{lora_file}' not found for '{lora_name}' at path: {lora_file_path}"
+            )
+
+
 def _parse_lora_configs(
     model_repository: str | list[str], model_name: str, model_version: int, backend: str
 ) -> None | List[tuple[str, str]]:
@@ -683,25 +711,10 @@ def _parse_lora_configs(
             with open(lora_config_path, "r") as f:
                 lora_config = json.load(f)
                 for lora_name, lora_path in lora_config.items():
-                    print(f"backend: {backend}")
                     if backend == "vllm":
                         lora_configs.append(TritonLoraConfig(name=lora_name))
                     else:
-                        lora_weights_path = os.path.join(
-                            lora_path, "model.lora_weights.npy"
-                        )
-                        lora_config_path = os.path.join(
-                            lora_path, "model.lora_config.npy"
-                        )
-                        if not os.path.exists(lora_weights_path):
-                            raise ServerError(
-                                f"LoRA weights file not found for '{lora_name}' at path: {lora_weights_path}"
-                            )
-                        if not os.path.exists(lora_config_path):
-                            raise ServerError(
-                                f"LoRA config file not found for '{lora_name}' at path: {lora_config_path}"
-                            )
-
+                        _validate_lora_path_trtllm(repo_path, lora_path, lora_name)
                         lora_configs.append(
                             TritonLoraConfig(
                                 name=lora_name, path=lora_path, task_id=lora_task_id
