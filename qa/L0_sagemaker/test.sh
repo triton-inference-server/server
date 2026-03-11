@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -611,6 +611,196 @@ set -e
 
 kill $SERVER_PID
 wait $SERVE_PID
+
+### Restricted API regression for SageMaker endpoint ###
+# Verify that --http-restricted-api applies to SageMaker model management
+# endpoints (load, unload, list, get) while leaving health and inference
+# unrestricted.
+
+SERVER_LOG="./sagemaker_restricted_api_server.log"
+SERVER_ARGS="--allow-sagemaker=true --allow-http=true \
+  --allow-grpc=false --allow-metrics=false \
+  --model-repository=`pwd`/models \
+  --model-control-mode=explicit \
+  --load-model=sm_model \
+  --http-restricted-api=model-repository:X-SM-Auth=secret"
+run_server_nowait
+sagemaker_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+# Health should succeed without restricted header
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8080/ping`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected /ping to succeed without restricted header\n***"
+    RET=1
+fi
+
+# Inference should succeed without restricted header
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8080/invocations \
+    -H "Content-Type: application/json" \
+    -d '{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}'`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected /invocations inference to succeed without restricted header\n***"
+    RET=1
+fi
+
+# List models without auth header should be blocked
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8080/models`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected GET /models to return 403 without restricted header (got $code)\n***"
+    RET=1
+else
+    grep "This API is restricted" ./curl.out
+    if [ $? -ne 0 ]; then
+        cat ./curl.out
+        echo -e "\n***\n*** Failed. Expected restriction error message in response body\n***"
+        RET=1
+    fi
+fi
+
+# Get model without auth header should be blocked
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8080/models/sm_model`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected GET /models/<name> to return 403 without restricted header (got $code)\n***"
+    RET=1
+fi
+
+# Load model without auth header should be blocked
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8080/models \
+    -H "Content-Type: application/json" \
+    -d '{"model_name":"test","url":"/opt/ml/models/123/model"}'`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected POST /models (load) to return 403 without restricted header (got $code)\n***"
+    RET=1
+fi
+
+# Unload model without auth header should be blocked
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X DELETE localhost:8080/models/sm_model`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected DELETE /models (unload) to return 403 without restricted header (got $code)\n***"
+    RET=1
+fi
+
+# List models WITH correct auth header should succeed
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -H "X-SM-Auth: secret" localhost:8080/models`
+if [ "$code" == "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected GET /models with auth header to pass restriction check\n***"
+    RET=1
+fi
+
+# Get model WITH correct auth header should pass restriction check
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -H "X-SM-Auth: secret" localhost:8080/models/sm_model`
+if [ "$code" == "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected GET /models/<name> with auth header to pass restriction check\n***"
+    RET=1
+fi
+
+# Wrong auth header value should be rejected
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -H "X-SM-Auth: wrong" localhost:8080/models`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected wrong auth header value to return 403 (got $code)\n***"
+    RET=1
+fi
+
+# Verify core HTTP endpoint is also restricted by the same flag
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/index`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected core HTTP repository index to be restricted (got $code)\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+### HTTP max input size enforcement on SageMaker endpoint ###
+# Verify that --http-max-input-size is enforced on the SageMaker /invocations
+# path, not just the core HTTP endpoint.
+
+SERVER_LOG="./sagemaker_max_input_size_server.log"
+SERVER_ARGS="--allow-sagemaker=true --allow-http=true \
+  --allow-grpc=false --allow-metrics=false \
+  --model-repository=`pwd`/models \
+  --model-control-mode=explicit \
+  --load-model=sm_model \
+  --http-max-input-size=256"
+run_server_nowait
+sagemaker_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+# Small payload under 256 bytes should succeed
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8080/invocations \
+    -H "Content-Type: application/json" \
+    -d '{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,1],"data":[1]},{"name":"INPUT1","datatype":"INT32","shape":[1,1],"data":[1]}]}'`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected small payload to succeed on SageMaker endpoint (got $code)\n***"
+    RET=1
+fi
+
+# Large payload over 256 bytes should be rejected
+rm -f ./curl.out
+LARGE_PAYLOAD='{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}'
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8080/invocations \
+    -H "Content-Type: application/json" \
+    -d "$LARGE_PAYLOAD"`
+if [ "$code" == "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected oversized payload to be rejected on SageMaker endpoint\n***"
+    RET=1
+fi
+
+# Same limit should apply to core HTTP endpoint
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/sm_model/infer \
+    -H "Content-Type: application/json" \
+    -d "$LARGE_PAYLOAD"`
+if [ "$code" == "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected oversized payload to be rejected on core HTTP endpoint\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 unlink /opt/ml/model
 rm -rf /opt/ml/model
