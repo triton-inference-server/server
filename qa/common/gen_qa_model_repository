@@ -344,7 +344,18 @@ chmod -R 777 $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
 if [ -d "/usr/src/tensorrt/samples/python/onnx_custom_plugin" ]; then
     cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
 else
-    git clone -b release/\$( echo \$TRT_VERSION | cut -d . -f -2) --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
+    TRT_BRANCH=\$(echo \$TRT_VERSION | cut -d . -f -2)
+    if ! git clone -b release/\${TRT_BRANCH} --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT; then
+      MAJOR=\$(echo "\$TRT_BRANCH" | cut -d . -f 1)
+      MINOR=\$(echo "\$TRT_BRANCH" | cut -d . -f 2)
+      if [ -n "\$MINOR" ] && [ "\$MINOR" -gt 0 ] 2>/dev/null; then
+        TRT_BRANCH="\${MAJOR}.\$((MINOR - 1))"
+        echo "Fallback: cloning TensorRT release/\${TRT_BRANCH} (previous minor)"
+        git clone -b release/\${TRT_BRANCH} --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
+      else
+        exit 1
+      fi
+    fi
     cd /workspace/TensorRT/samples/python/onnx_custom_plugin
 fi
 rm -rf build && mkdir build && \
@@ -441,7 +452,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
 
     if [[ "aarch64" != $(uname -m) ]] ; then
 
-        log_message.status "docker run: $OPENVINOSCRIPT"
+        log_message.info "docker run: $OPENVINOSCRIPT"
         docker run \
             --rm \
             --label RUNNER_ID=$RUNNER_ID \
@@ -457,7 +468,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
         fi
     fi # [[ "aarch64" != $(uname -m) ]]
 
-    log_message.status "docker run: $ONNXSCRIPT"
+    log_message.info "docker run: $ONNXSCRIPT"
     docker run \
         --rm \
         --label RUNNER_ID=$RUNNER_ID \
@@ -475,7 +486,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
     log_message.status "docker pull: $PYTORCH_IMAGE"
     docker pull $PYTORCH_IMAGE
 
-    log_message.status "docker run: $TORCHSCRIPT"
+    log_message.info "docker run: $TORCHSCRIPT"
     docker run \
         --rm \
         --label RUNNER_ID=$RUNNER_ID \
@@ -494,7 +505,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
         log_message.status "docker pull: $TENSORRT_IMAGE"
         docker pull $TENSORRT_IMAGE
 
-        log_message.status "docker run: $TRTSCRIPT"
+        log_message.info "docker run: $TRTSCRIPT"
         docker run \
             --rm \
             --label RUNNER_ID=$RUNNER_ID \
@@ -594,7 +605,7 @@ elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
 
     log_message.status "enroot create: pytorch.$CI_JOB_ID"
     enroot create --name pytorch.$CI_JOB_ID /tmp/pytorch.$CI_JOB_ID.enroot.sqsh
-    log_message.status "enroot start: pytorch.$CI_JOB_ID"
+    log_message.info "enroot start: pytorch.$CI_JOB_ID"
     enroot start --rw -m /tmp:/tmp pytorch.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
     if [ $? -ne 0 ]; then
         log_message.error "enroot start: ${TORCHSCRIPT} failed"
@@ -605,7 +616,7 @@ elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
     enroot import --output /tmp/tensorrt.$CI_JOB_ID.enroot.sqsh docker://$TENSORRT_IMAGE
     log_message.status "enroot create: tensorrt.$CI_JOB_ID"
     enroot create --name tensorrt.$CI_JOB_ID /tmp/tensorrt.$CI_JOB_ID.enroot.sqsh
-    log_message.status "enroot start: tensorrt.$CI_JOB_ID"
+    log_message.info "enroot start: tensorrt.$CI_JOB_ID"
     enroot start --rw -m /tmp:/tmp tensorrt.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
     if [ $? -ne 0 ]; then
         log_message.error "enroot start: ${TRTSCRIPT} failed"
