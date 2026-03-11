@@ -1660,7 +1660,6 @@ def create_torch_aoti_modelconfig(
 backend: "pytorch"
 name: "{model_name}"
 platform: "torch_aoti"
-max_batch_size: 8
 version_policy: {version_policy_str}
 input [
   {{
