@@ -699,20 +699,14 @@ else
 fi
 set -e
 
-# repository control (expect error)
+# repository control via redirect is blocked unconditionally
 rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/models/subadd/unload" localhost:8080/predict`
-if [ "$code" == "200" ]; then
+if [ "$code" != "403" ]; then
     cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Failed. Expected model unload via redirect to return 403 (got $code)\n***"
     RET=1
-else
-    grep "explicit model load / unload is not allowed" ./curl.out
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected error on model control\n***"
-        RET=1
-    fi
 fi
 set -e
 
@@ -760,61 +754,115 @@ else
 fi
 set -e
 
-# Redirected management APIs should be blocked without restricted header
+# Redirected read-only APIs should be blocked without restricted header
 set +e
 for redirect_endpoint in \
     "v2" \
     "v2/models/identity_fp32/config" \
     "v2/repository/index" \
     "v2/systemsharedmemory/status" \
-    "v2/cudasharedmemory/status" \
-    "v2/systemsharedmemory/region/test/register"
+    "v2/cudasharedmemory/status"
 do
     rm -f ./curl.out
-    if [ "$redirect_endpoint" != "v2/systemsharedmemory/region/test/register" ]; then
-        code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: ${redirect_endpoint}" localhost:8080/predict`
-    else
-        code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: ${redirect_endpoint}" \
-        -H "Content-Type: application/json" -d '{"key":"test_shm","byte_size":1024}' localhost:8080/predict`
-    fi
+    code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: ${redirect_endpoint}" localhost:8080/predict`
     if [ "$code" != "403" ]; then
         cat ./curl.out
         echo -e "\n***\n*** Failed. Expected ${redirect_endpoint} is restricted\n***"
         RET=1
     fi
 done
+
+# Mutating shared memory operations are blocked through redirect
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/systemsharedmemory/region/test/register" -H "Content-Type: application/json" -d '{"key":"test_shm","byte_size":1024}' localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected shared memory register is blocked via redirect\n***"
+    RET=1
+fi
+
+# Model load redirect is unconditionally blocked through the prediction endpoint
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/models/identity_fp32/load" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model load via redirect is blocked\n***"
+    RET=1
+fi
+
+# Model unload redirect is unconditionally blocked through the prediction endpoint
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/models/identity_fp32/unload" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model unload via redirect is blocked\n***"
+    RET=1
+fi
+
+# Statistics redirect without restricted header should be blocked
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/models/identity_fp32/stats" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model statistics via redirect is restricted\n***"
+    RET=1
+fi
 set -e
 
-# Restricted header should allow handler invocation
+# Restricted header should allow read-only handler invocation
 set +e
 for redirect_endpoint in \
     "v2" \
     "v2/models/identity_fp32/config" \
     "v2/repository/index" \
     "v2/systemsharedmemory/status" \
-    "v2/cudasharedmemory/status" \
-    "v2/systemsharedmemory/region/test/register"
+    "v2/cudasharedmemory/status"
 do
     rm -f ./curl.out
-    if [ "$redirect_endpoint" != "v2/systemsharedmemory/region/test/register" ]; then
-        code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: ${redirect_endpoint}" \
-        -H "X-Vertex-Restricted: secret" localhost:8080/predict`
-        if [ "$code" != "200" ]; then
-            cat ./curl.out
-            echo -e "\n***\n*** Failed. Expected ${redirect_endpoint} passes with restricted header\n***"
-            RET=1
-        fi
-    else
-        code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: ${redirect_endpoint}" \
-        -H "X-Vertex-Restricted: secret" -H "Content-Type: application/json" -d '{"key":"test_shm","byte_size":1024}' localhost:8080/predict`
-        # This request may fail with a different error: "Unable to open shared memory region: 'test_shm'"
-        if [ "$code" == "403" ]; then
-            cat ./curl.out
-            echo -e "\n***\n*** Failed. Expected ${redirect_endpoint} passes with restricted header\n***"
-            RET=1
-        fi
+    code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: ${redirect_endpoint}" \
+    -H "X-Vertex-Restricted: secret" localhost:8080/predict`
+    if [ "$code" != "200" ]; then
+        cat ./curl.out
+        echo -e "\n***\n*** Failed. Expected ${redirect_endpoint} passes with restricted header\n***"
+        RET=1
     fi
 done
+
+# Mutating shared memory operations remain blocked even with valid header
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/systemsharedmemory/region/test/register" -H "X-Vertex-Restricted: secret" -H "Content-Type: application/json" -d '{"key":"test_shm","byte_size":1024}' localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected shared memory register is blocked via redirect even with valid header\n***"
+    RET=1
+fi
+
+# Model load remains blocked even with valid restricted header
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/models/identity_fp32/load" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model load is blocked via redirect even with valid header\n***"
+    RET=1
+fi
+
+# Model unload remains blocked even with valid restricted header
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/models/identity_fp32/unload" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model unload is blocked via redirect even with valid header\n***"
+    RET=1
+fi
+
+# Statistics redirect with restricted header should pass
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/models/identity_fp32/stats" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
+if [ "$code" == "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model statistics passes with restricted header\n***"
+    RET=1
+fi
 
 # Wrong restricted header should reject the request
 set +e
@@ -840,6 +888,54 @@ do
         RET=1
     fi
 done
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+#
+# HTTP max input size enforcement on Vertex AI endpoint
+#
+unset_vertex_variables
+export AIP_PREDICT_ROUTE="/predict"
+export AIP_HEALTH_ROUTE="/health"
+
+SERVER_LOG="vertex_max_input_size_server.log"
+SERVER_ARGS="--allow-vertex-ai=true \
+  --model-repository=restricted_single_model \
+  --vertex-ai-default-model=identity_fp32 \
+  --http-max-input-size=128"
+run_server_nowait
+vertex_ai_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+# Small payload under 128 bytes should succeed
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "Content-Type: application/json" -d'{"inputs":[{"name":"INPUT0","datatype":"FP32","shape":[1,1],"data":[1.0]}],"outputs":[{"name":"OUTPUT0"}]}' localhost:8080/predict`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected small payload to succeed on Vertex AI endpoint (got $code)\n***"
+    RET=1
+fi
+
+# Large payload over 128 bytes should be rejected
+rm -f ./curl.out
+LARGE_PAYLOAD='{"inputs":[{"name":"INPUT0","datatype":"FP32","shape":[1,16],"data":[1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0]}],"outputs":[{"name":"OUTPUT0"}]}'
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "Content-Type: application/json" -d"$LARGE_PAYLOAD" localhost:8080/predict`
+if [ "$code" == "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected oversized payload to be rejected on Vertex AI endpoint\n***"
+    RET=1
+fi
+
 set -e
 
 kill $SERVER_PID
