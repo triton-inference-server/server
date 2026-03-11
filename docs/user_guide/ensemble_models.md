@@ -200,8 +200,8 @@ Consider an example ensemble model with two steps where the upstream model is 10
 
 Without backpressure, requests accumulate in the pipeline faster than they can be processed, eventually leading to out-of-memory errors.
 
-The `max_inflight_requests` field in the ensemble configuration sets a limit on the number of concurrent inflight requests permitted at each ensemble step for a single inference request.
-When this limit is reached, faster upstream models are paused (blocked) until downstream models finish processing, effectively preventing unbounded memory growth.
+The `max_inflight_requests` field in the ensemble configuration sets a global limit on the number of concurrent inflight requests permitted at each ensemble step across all concurrent ensemble requests.
+When this limit is reached, scheduling for that step is paused (blocked) until downstream capacity is available, effectively preventing unbounded memory growth.
 
 ```
 ensemble_scheduling {
@@ -225,8 +225,7 @@ ensemble_scheduling {
 ```
 
 **Configuration:**
-* **`max_inflight_requests: 16`**: For each ensemble request (not globally), at most 16 requests from `dali_preprocess`
-  can wait for `onnx_inference` to process. Once this per-step limit is reached, `dali_preprocess` is blocked until the downstream step completes a response.
+* **`max_inflight_requests: 16`**: At most 16 requests can be inflight at a step (for example, requests from `dali_preprocess` waiting for `onnx_inference`) across all concurrent ensemble requests. Once this global per-step limit is reached, scheduling to that step is blocked until capacity is released.
 * **Default (`0`)**: No limit - allows unlimited inflight requests (original behavior).
 
 ### When to Use This Feature

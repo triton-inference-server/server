@@ -170,7 +170,7 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
     def test_max_inflight_requests_limit_concurrent_requests(self):
         """
         Test that backpressure works correctly with multiple concurrent requests.
-        Each request should have independent backpressure state.
+        The inflight limit is shared globally at each ensemble step.
         """
         num_concurrent = 8
         expected_per_request = 8
