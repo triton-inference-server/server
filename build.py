@@ -1465,44 +1465,6 @@ RUN apt-get update \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
 """
-
-    if "vllm" in backends:
-        df += f"""
-# Install required packages for vLLM models
-ARG BUILD_PUBLIC_VLLM="true"
-RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
-    --mount=type=secret,id=VLLM_INDEX_URL,env=VLLM_INDEX_URL \\
-    --mount=type=secret,id=PYTORCH_TRITON_URL,env=PYTORCH_TRITON_URL \\
-    --mount=type=secret,id=NVPL_SLIM_URL,env=NVPL_SLIM_URL \\
-    if [ "$BUILD_PUBLIC_VLLM" = "false" ]; then \\
-        if [ "$(uname -m)" = "x86_64" ]; then \\
-            pip3 install --no-cache-dir \\
-                mkl==2021.1.1 \\
-                mkl-include==2021.1.1 \\
-                mkl-devel==2021.1.1; \\
-        elif [ "$(uname -m)" = "aarch64" ]; then \\
-            echo "Downloading NVPL from: $NVPL_SLIM_URL" && \\
-            cd /tmp && \\
-            wget -O nvpl_slim_24.04.tar $NVPL_SLIM_URL && \\
-            tar -xf nvpl_slim_24.04.tar && \\
-            cp -r nvpl_slim_24.04/lib/* /usr/local/lib && \\
-            cp -r nvpl_slim_24.04/include/* /usr/local/include && \\
-            rm -rf nvpl_slim_24.04.tar nvpl_slim_24.04; \\
-        fi \\
-        && pip3 install --no-cache-dir --extra-index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
-        # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
-        && cd /tmp \\
-        && wget $PYTORCH_TRITON_URL \\
-        && pip install --no-cache-dir /tmp/pytorch_triton-*.whl \\
-        && rm /tmp/pytorch_triton-*.whl; \\
-    else \\
-        # public vLLM needed for vLLM backend
-        pip3 install vllm=={DEFAULT_TRITON_VERSION_MAP["vllm_version"]}; \\
-    fi
-
-ARG PYVER=3.12
-ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages/torch/lib:${{LD_LIBRARY_PATH}}
-"""
     if "tensorrtllm" in backends or "vllm" in backends:
         df += """
 ENV TRITON_CUDACRT_PATH=/usr/local/cuda/include \\
@@ -1706,9 +1668,14 @@ def create_build_dockerfiles(
     elif target_platform() == "rhel":
         raise KeyError("A base image must be specified when targeting RHEL")
     elif FLAGS.enable_gpu:
-        base_image = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
-            FLAGS.upstream_container_version
-        )
+        if "vllm" in backends:
+            base_image = "nvcr.io/nvidia/vllm:{}-py3".format(
+                FLAGS.upstream_container_version
+            )
+        else:
+            base_image = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
+                FLAGS.upstream_container_version
+            )
     else:
         base_image = "ubuntu:24.04"
 
