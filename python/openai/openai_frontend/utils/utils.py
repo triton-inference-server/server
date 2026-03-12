@@ -24,7 +24,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import re
 from enum import IntEnum
+
+_INVALID_MODEL_NAME_PATTERN = re.compile(r"/|\.\.")
 
 
 class ServerError(Exception):
@@ -45,3 +48,13 @@ class StatusCode(IntEnum):
     AUTHORIZATION_ERROR = 401
     NOT_FOUND = 404
     SERVER_ERROR = 500
+
+
+def validate_model_name(model_name: str) -> None:
+    if not model_name or model_name.isspace():
+        raise ClientError("Model name must not be empty or whitespace")
+    if _INVALID_MODEL_NAME_PATTERN.search(model_name):
+        raise ClientError(
+            f"Invalid model name '{model_name}': "
+            "must not contain path traversal characters ('..', '/')"
+        )

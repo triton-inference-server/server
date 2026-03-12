@@ -141,6 +141,22 @@ class TestModelManagement:
         response = client.post("/v1/models/model_not_in_repo/load")
         assert response.status_code == 500
 
+    @pytest.mark.parametrize(
+        "invalid_name",
+        [
+            "..",
+            "..mock_llm",
+            "mock_llm..",
+            "mock..llm",
+            "..%2f..%2fetc%2fpasswd",
+        ],
+    )
+    def test_load_and_unload_invalid_model_name(self, client, invalid_name):
+        for endpoint in ["load", "unload"]:
+            response = client.post(f"/v1/models/{invalid_name}/{endpoint}")
+            assert response.status_code == 400
+            assert "Invalid model name" in response.json()["detail"]
+
     def test_load_unload_reload(self, client):
         assert client.post(f"/v1/models/{TEST_MODEL}/load").status_code == 200
         assert TEST_MODEL in _get_model_names(client)
