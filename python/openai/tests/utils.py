@@ -42,23 +42,14 @@ from frontend.fastapi_frontend import FastApiFrontend
 
 
 # TODO: Cleanup, refactor, mock, etc.
-def setup_server(model_repository: str):
-    server: tritonserver.Server = tritonserver.Server(
-        model_repository=model_repository,
-        log_verbose=0,
-        log_info=True,
-        log_warn=True,
-        log_error=True,
-    ).start(wait_until_ready=True)
-    return server
-
-
-def setup_server_explicit(
-    model_repository: str, load_models: Optional[List[str]] = None
+def setup_server(
+    model_repository: str,
+    model_control_mode: tritonserver.ModelControlMode = tritonserver.ModelControlMode.NONE,
+    load_models: Optional[List[str]] = None,
 ):
     server: tritonserver.Server = tritonserver.Server(
         model_repository=model_repository,
-        model_control_mode=tritonserver.ModelControlMode.EXPLICIT,
+        model_control_mode=model_control_mode,
         startup_models=load_models or [],
         log_verbose=0,
         log_info=True,

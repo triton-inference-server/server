@@ -35,7 +35,6 @@ from tests.utils import (
     OpenAIServer,
     setup_fastapi_app,
     setup_server,
-    setup_server_explicit,
 )
 
 TEST_MODEL_REPOSITORY = str(Path(__file__).parent / "test_models")
@@ -84,7 +83,10 @@ class TestModelManagementNoneMode:
 class TestModelManagement:
     @pytest.fixture(scope="class")
     def client(self):
-        server = setup_server_explicit(TEST_MODEL_REPOSITORY)
+        server = setup_server(
+            TEST_MODEL_REPOSITORY,
+            model_control_mode=tritonserver.ModelControlMode.EXPLICIT,
+        )
         app = setup_fastapi_app(tokenizer="", server=server, backend=None)
         with TestClient(app) as test_client:
             yield test_client
@@ -175,7 +177,10 @@ class TestModelManagement:
 class TestModelManagementConcurrency:
     @pytest.fixture(scope="class")
     def client(self):
-        server = setup_server_explicit(TEST_MODEL_REPOSITORY)
+        server = setup_server(
+            TEST_MODEL_REPOSITORY,
+            model_control_mode=tritonserver.ModelControlMode.EXPLICIT,
+        )
         app = setup_fastapi_app(tokenizer="", server=server, backend=None)
         with TestClient(app) as test_client:
             yield test_client
