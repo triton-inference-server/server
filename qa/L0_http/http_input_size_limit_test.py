@@ -104,9 +104,16 @@ class InferSizeLimitTest(tu.TestResultCollector):
         )
         error_msg = response.content.decode()
         self.assertIn(
-            " exceeds the maximum allowed value ",
+            "Request JSON size of ",
             error_msg,
-            "Expected error message about exceeding max input size with type mismatch",
+        )
+        self.assertIn(
+            " bytes exceeds the maximum allowed input size",
+            error_msg,
+        )
+        self.assertIn(
+            "Use --http-max-input-size to increase the limit",
+            error_msg,
         )
 
         # Test multiple inputs with one that causes size explosion.
@@ -140,9 +147,16 @@ class InferSizeLimitTest(tu.TestResultCollector):
         )
         error_msg = response.content.decode()
         self.assertIn(
-            " exceeds the maximum allowed value ",
+            "Request JSON size of ",
             error_msg,
-            "Expected error message about exceeding max input size with type mismatch",
+        )
+        self.assertIn(
+            " bytes exceeds the maximum allowed input size",
+            error_msg,
+        )
+        self.assertIn(
+            "Use --http-max-input-size to increase the limit",
+            error_msg,
         )
 
     def test_default_limit_raw_binary(self):
@@ -250,9 +264,16 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message contains size limit info
         error_msg = response.content.decode()
         self.assertIn(
-            "exceeds the maximum allowed value",
+            "Request JSON size of ",
             error_msg,
-            "Expected error message about exceeding max input size",
+        )
+        self.assertIn(
+            " bytes exceeds the maximum allowed input size",
+            error_msg,
+        )
+        self.assertIn(
+            "Use --http-max-input-size to increase the limit",
+            error_msg,
         )
 
         # Test case 2: Input just under the 64MB limit (should succeed)
@@ -405,9 +426,16 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message contains size limit info
         error_msg = response.content.decode()
         self.assertIn(
-            "exceeds the maximum allowed value",
+            "Request JSON size of ",
             error_msg,
-            "Expected error message about exceeding max input size",
+        )
+        self.assertIn(
+            " bytes exceeds the maximum allowed input size",
+            error_msg,
+        )
+        self.assertIn(
+            "Use --http-max-input-size to increase the limit",
+            error_msg,
         )
 
         # Test case 2: Input just under the 128MB configured limit (should succeed)
@@ -490,11 +518,11 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message
         error_msg = response.content.decode()
         self.assertIn(
-            "Request JSON size",
+            "Request JSON size of ",
             error_msg,
         )
         self.assertIn(
-            "exceeds the maximum allowed value",
+            " bytes exceeds the maximum allowed input size",
             error_msg,
         )
         self.assertIn(
