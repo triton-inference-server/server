@@ -30,9 +30,9 @@ from pathlib import Path
 
 import pytest
 import requests
+import tritonserver
 from fastapi.testclient import TestClient
-from tests.utils import OpenAIServer, setup_fastapi_app, setup_server,
-)
+from tests.utils import OpenAIServer, setup_fastapi_app, setup_server
 
 TEST_MODEL_REPOSITORY = str(Path(__file__).parent / "test_models")
 TEST_MODEL = "mock_llm"
