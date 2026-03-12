@@ -3628,7 +3628,7 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
       auto overrun = byte_size + consumed_input_byte_size - max_input_size_;
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
-          ("Input '" + name + "' has size of " +
+          (std::string("input '") + name + "' has size of " +
            std::to_string(max_input_size_ - consumed_input_byte_size) + " + " +
            std::to_string(overrun) +
            " bytes exceeds the maximum allowed input size. "
