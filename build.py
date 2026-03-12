@@ -1204,7 +1204,6 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 def create_dockerfile_linux(
     ddir, dockerfile_name, argmap, backends, repoagents, caches, endpoints
 ):
-    print(argmap)
     df = """
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
