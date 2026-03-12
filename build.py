@@ -995,7 +995,7 @@ RUN ccache -p
     df += change_default_python_version_rhel(FLAGS.rhel_py_version)
     df += """
 
-RUN  PIP_CONSTRAINT="" pip3 install --upgrade pip \\
+RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
           build \\
           wheel \\
@@ -1111,7 +1111,7 @@ RUN apt-get update \\
             wget \\
       && rm -rf /var/lib/apt/lists/*
 
-RUN PIP_CONSTRAINT="" pip3 install --upgrade \\
+RUN pip3 install --upgrade \\
           build \\
           docker \\
           virtualenv \\
