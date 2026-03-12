@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-SAGEMAKER_SINGLE_MODEL_REPO=/opt/ml/model/
+SAGEMAKER_SINGLE_MODEL_REPO=${SAGEMAKER_TRITON_MODEL_REPOSITORY:-/opt/ml/model/}
 
 # Use 'ready' for ping check in single-model endpoint mode, and use 'live' for ping check in multi-model endpoint model
 # https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/rest_predict_v2.yaml#L10-L26
