@@ -196,32 +196,40 @@ VertexAiAPIServer::Handle(evhtp_request_t* req)
       } else if (RE2::FullMatch(
                      redirect_endpoint, systemsharedmemory_regex_, &region,
                      &action)) {
-        // system shared memory
         if (action == "status") {
           req->method = htp_method_GET;
+          HandleSystemSharedMemory(req, region, action);
+          return;
         }
-        HandleSystemSharedMemory(req, region, action);
+        // Only read-only status queries are permitted through redirect.
+        // Mutating operations (register/unregister) require the core
+        // HTTP endpoint.
+        LOG_VERBOSE(1) << "Vertex AI redirect blocked: " << redirect_endpoint;
+        evhtp_send_reply(req, EVHTP_RES_FORBIDDEN);
         return;
       } else if (RE2::FullMatch(
                      redirect_endpoint, cudasharedmemory_regex_, &region,
                      &action)) {
-        // cuda shared memory
         if (action == "status") {
           req->method = htp_method_GET;
+          HandleCudaSharedMemory(req, region, action);
+          return;
         }
-        HandleCudaSharedMemory(req, region, action);
+        LOG_VERBOSE(1) << "Vertex AI redirect blocked: " << redirect_endpoint;
+        evhtp_send_reply(req, EVHTP_RES_FORBIDDEN);
         return;
       } else if (RE2::FullMatch(
                      redirect_endpoint, modelcontrol_regex_, &repo_name, &kind,
                      &model_name, &action)) {
-        // model repository
         if (kind == "index") {
           HandleRepositoryIndex(req, repo_name);
           return;
-        } else if (kind.find("models", 0) == 0) {
-          HandleRepositoryControl(req, repo_name, model_name, action);
-          return;
         }
+        // Only repository index queries are permitted through redirect.
+        // Model load/unload requires the core HTTP endpoint.
+        LOG_VERBOSE(1) << "Vertex AI redirect blocked: " << redirect_endpoint;
+        evhtp_send_reply(req, EVHTP_RES_FORBIDDEN);
+        return;
       }
     }
   }
