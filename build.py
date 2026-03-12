@@ -1204,15 +1204,20 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 def create_dockerfile_linux(
     ddir, dockerfile_name, argmap, backends, repoagents, caches, endpoints
 ):
+    print(argmap)
     df = """
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
-ARG BASE_IMAGE={}
-
 """.format(
         argmap["TRITON_VERSION"],
         argmap["TRITON_CONTAINER_VERSION"],
-        argmap["BASE_IMAGE"],
+    )
+
+    df += """ARG BASE_IMAGE={}
+""".format(
+        argmap["INFERENCE_IMAGE"]
+        if argmap["INFERENCE_IMAGE"] is not None
+        else argmap["BASE_IMAGE"],
     )
 
     # PyTorch backends need extra CUDA and other
@@ -1668,16 +1673,16 @@ def create_build_dockerfiles(
     elif target_platform() == "rhel":
         raise KeyError("A base image must be specified when targeting RHEL")
     elif FLAGS.enable_gpu:
-        if "vllm" in backends:
-            base_image = "nvcr.io/nvidia/vllm:{}-py3".format(
-                FLAGS.upstream_container_version
-            )
-        else:
-            base_image = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
-                FLAGS.upstream_container_version
-            )
+        base_image = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
+            FLAGS.upstream_container_version
+        )
     else:
         base_image = "ubuntu:24.04"
+
+    if "inference" in images:
+        inference_image = images["inference"]
+    else:
+        inference_image = None
 
     dockerfileargmap = {
         "NVIDIA_BUILD_REF": "" if FLAGS.build_sha is None else FLAGS.build_sha,
@@ -1685,6 +1690,7 @@ def create_build_dockerfiles(
         "TRITON_VERSION": FLAGS.version,
         "TRITON_CONTAINER_VERSION": FLAGS.container_version,
         "BASE_IMAGE": base_image,
+        "INFERENCE_IMAGE": inference_image,
         "DCGM_VERSION": FLAGS.dcgm_version,
     }
 
@@ -2914,7 +2920,7 @@ if __name__ == "__main__":
             len(parts) != 2, "--image must specify <image-name>,<full-image-registry>"
         )
         fail_if(
-            parts[0] not in ["base", "gpu-base", "pytorch"],
+            parts[0] not in ["base", "gpu-base", "pytorch", "inference"],
             "unsupported value for --image",
         )
         log('image "{}": "{}"'.format(parts[0], parts[1]))
