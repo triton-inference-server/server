@@ -745,13 +745,20 @@ wait $SERVER_PID
 # Verify that --http-max-input-size is enforced on the SageMaker /invocations
 # path, not just the core HTTP endpoint.
 
+rm -rf models_identity
+mkdir -p models_identity/sm_identity/1 && \
+    cp ../python_models/identity_fp32/model.py models_identity/sm_identity/1/ && \
+    cp ../python_models/identity_fp32/config.pbtxt models_identity/sm_identity/ && \
+    sed -i "s/identity_fp32/sm_identity/" models_identity/sm_identity/config.pbtxt
+mkdir -p /opt/ml
+ln -sf `pwd`/models_identity /opt/ml/model
+
+export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME=sm_identity
 SERVER_LOG="./sagemaker_max_input_size_server.log"
 SERVER_ARGS="--allow-sagemaker=true --allow-http=true \
   --allow-grpc=false --allow-metrics=false \
-  --model-repository=`pwd`/models \
-  --model-control-mode=explicit \
-  --load-model=sm_model \
-  --http-max-input-size=256"
+  --model-repository=`pwd`/models_identity \
+  --http-max-input-size=128"
 run_server_nowait
 sagemaker_wait_for_server_ready $SERVER_PID 10
 if [ "$WAIT_RET" != "0" ]; then
@@ -763,20 +770,20 @@ fi
 
 set +e
 
-# Small payload under 256 bytes should succeed
+# Small payload under 128 bytes should succeed
 rm -f ./curl.out
 code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8080/invocations \
     -H "Content-Type: application/json" \
-    -d '{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,1],"data":[1]},{"name":"INPUT1","datatype":"INT32","shape":[1,1],"data":[1]}]}'`
+    -d '{"inputs":[{"name":"INPUT0","datatype":"FP32","shape":[1,1],"data":[1.0]}],"outputs":[{"name":"OUTPUT0"}]}'`
 if [ "$code" != "200" ]; then
     cat ./curl.out
     echo -e "\n***\n*** Failed. Expected small payload to succeed on SageMaker endpoint (got $code)\n***"
     RET=1
 fi
 
-# Large payload over 256 bytes should be rejected
+# Large payload over 128 bytes should be rejected
 rm -f ./curl.out
-LARGE_PAYLOAD='{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}'
+LARGE_PAYLOAD='{"inputs":[{"name":"INPUT0","datatype":"FP32","shape":[1,16],"data":[1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0]}],"outputs":[{"name":"OUTPUT0"}]}'
 code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8080/invocations \
     -H "Content-Type: application/json" \
     -d "$LARGE_PAYLOAD"`
@@ -788,7 +795,7 @@ fi
 
 # Same limit should apply to core HTTP endpoint
 rm -f ./curl.out
-code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/sm_model/infer \
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/models/sm_identity/infer \
     -H "Content-Type: application/json" \
     -d "$LARGE_PAYLOAD"`
 if [ "$code" == "200" ]; then
@@ -799,11 +806,14 @@ fi
 
 set -e
 
+unset SAGEMAKER_TRITON_DEFAULT_MODEL_NAME
+
 kill $SERVER_PID
 wait $SERVER_PID
 
 unlink /opt/ml/model
 rm -rf /opt/ml/model
+rm -rf models_identity
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
