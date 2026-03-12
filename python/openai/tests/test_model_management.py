@@ -527,7 +527,9 @@ class TestModelManagementInference:
 
         self._unload(base, model)
 
-    def test_load_streaming_chat_completions(self, server_with_explicit_mode, model: str):
+    def test_load_streaming_chat_completions(
+        self, server_with_explicit_mode, model: str
+    ):
         base = server_with_explicit_mode.url_root
         self._load(base, model)
 
@@ -606,4 +608,3 @@ class TestModelManagementInference:
             for m in requests.get(f"{base}/v1/models", timeout=10).json()["data"]
         ]
         assert model not in names
-
