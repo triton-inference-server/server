@@ -31,9 +31,9 @@ This guide goes over first-step troubleshooting for common scenarios in which Tr
 
 - **[Configuration](#configuration-issues)**: Triton reports an error with your configuration file.
 - **[Model](#model-issues)**: Your model fails to load or perform inference.
-- Server: The server is crashing or unavailable.
-- Client: The client is failing in sending and receiving data to the server.
-- Performance: Triton is not achieving optimal performance.
+- **[Server](#server-issues)**: The server is crashing or unavailable.
+- **[Client](#client-issues)**: The client is failing in sending and receiving data to the server.
+- **[Performance](#performance-issues)**: Triton is not achieving optimal performance.
 
 Regardless of the category of your issue, it is worthwhile to try running in the latest Triton container, whenever possible. While we provide support to older containers, fixes get merged into the next release. By checking the latest release, you can spot whether this issue has already been resolved.
 
