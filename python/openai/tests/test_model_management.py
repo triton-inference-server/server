@@ -56,8 +56,9 @@ def _assert_model_fields(model_data: dict):
     assert model_data["owned_by"] == "Triton Inference Server"
 
 
-# Test Mode enforcement – NONE mode rejects load/unload API calls
 class TestModelManagementNoneMode:
+    """Test NONE mode rejects load/unload API calls."""
+
     @pytest.fixture(scope="class")
     def client(self):
         server = setup_server(TEST_MODEL_REPOSITORY)
@@ -76,8 +77,9 @@ class TestModelManagementNoneMode:
             )
 
 
-# Test load / unload operations – EXPLICIT mode
 class TestModelManagement:
+    """Test load/unload operations in EXPLICIT mode."""
+
     @pytest.fixture(scope="class")
     def client(self):
         server = setup_server(
@@ -89,11 +91,18 @@ class TestModelManagement:
             yield test_client
         server.stop()
 
+    @pytest.fixture(autouse=True)
+    def _clean_models(self, client):
+        """Ensure clean state before and after every test by unloading the models."""
+        for name in [TEST_MODEL, TEST_MODEL_2]:
+            client.post(f"/v1/models/{name}/unload")
+        yield
+        for name in [TEST_MODEL, TEST_MODEL_2]:
+            client.post(f"/v1/models/{name}/unload")
+
     def test_load_model(self, client):
-        # Initially no models loaded
         assert _get_model_names(client) == []
 
-        # Load a model – 200, response has correct OpenAI Model fields
         response = client.post(f"/v1/models/{TEST_MODEL}/load")
         assert response.status_code == 200
         _assert_model_fields(response.json())
@@ -101,15 +110,13 @@ class TestModelManagement:
 
         assert TEST_MODEL in _get_model_names(client)
 
-        # GET /v1/models/{model_name} returns correct info
         response = client.get(f"/v1/models/{TEST_MODEL}")
         assert response.status_code == 200
         _assert_model_fields(response.json())
+        assert client.get("/health/ready").status_code == 200
 
     def test_unload_model(self, client):
-        if TEST_MODEL not in _get_model_names(client):
-            response = client.post(f"/v1/models/{TEST_MODEL}/load")
-            assert response.status_code == 200
+        assert client.post(f"/v1/models/{TEST_MODEL}/load").status_code == 200
 
         response = client.post(f"/v1/models/{TEST_MODEL}/unload")
         assert response.status_code == 200
@@ -118,19 +125,15 @@ class TestModelManagement:
         assert body["model"] == TEST_MODEL
 
         assert TEST_MODEL not in _get_model_names(client)
-
         assert client.get(f"/v1/models/{TEST_MODEL}").status_code == 404
+        assert client.get("/health/ready").status_code == 200
 
     def test_load_already_loaded_model(self, client):
-        client.post(f"/v1/models/{TEST_MODEL}/unload")
         assert client.post(f"/v1/models/{TEST_MODEL}/load").status_code == 200
 
-        # Second load of the same model should fail
         response = client.post(f"/v1/models/{TEST_MODEL}/load")
         assert response.status_code == 400
         assert "already loaded" in response.json()["detail"].lower()
-
-        client.post(f"/v1/models/{TEST_MODEL}/unload")
 
     def test_unload_unknown_model(self, client):
         response = client.post("/v1/models/nonexistent_model/unload")
@@ -140,6 +143,7 @@ class TestModelManagement:
     def test_load_nonexistent_model(self, client):
         response = client.post("/v1/models/model_not_in_repo/load")
         assert response.status_code == 500
+        assert "Unknown model" in response.json()["detail"]
 
     @pytest.mark.parametrize(
         "invalid_name",
@@ -167,8 +171,6 @@ class TestModelManagement:
         assert client.post(f"/v1/models/{TEST_MODEL}/load").status_code == 200
         assert TEST_MODEL in _get_model_names(client)
 
-        client.post(f"/v1/models/{TEST_MODEL}/unload")
-
     def test_load_multiple_models(self, client):
         assert client.post(f"/v1/models/{TEST_MODEL}/load").status_code == 200
         assert client.post(f"/v1/models/{TEST_MODEL_2}/load").status_code == 200
@@ -177,17 +179,15 @@ class TestModelManagement:
         assert TEST_MODEL in names
         assert TEST_MODEL_2 in names
 
-        # Unload one; other remains
         client.post(f"/v1/models/{TEST_MODEL}/unload")
         names = _get_model_names(client)
         assert TEST_MODEL not in names
         assert TEST_MODEL_2 in names
 
-        client.post(f"/v1/models/{TEST_MODEL_2}/unload")
 
-
-# Test Sequential and concurrent load/unload
 class TestModelManagementConcurrency:
+    """Test sequential and concurrent load/unload."""
+
     @pytest.fixture(scope="class")
     def client(self):
         server = setup_server(
@@ -198,6 +198,15 @@ class TestModelManagementConcurrency:
         with TestClient(app) as test_client:
             yield test_client
         server.stop()
+
+    @pytest.fixture(autouse=True)
+    def _clean_models(self, client):
+        """Ensures clean state before and after every test."""
+        for name in [TEST_MODEL, TEST_MODEL_2]:
+            client.post(f"/v1/models/{name}/unload")
+        yield
+        for name in [TEST_MODEL, TEST_MODEL_2]:
+            client.post(f"/v1/models/{name}/unload")
 
     def test_rapid_sequential_load_unload(self, client):
         for _ in range(3):
@@ -220,9 +229,6 @@ class TestModelManagementConcurrency:
         assert TEST_MODEL in names
         assert TEST_MODEL_2 in names
 
-        client.post(f"/v1/models/{TEST_MODEL}/unload")
-        client.post(f"/v1/models/{TEST_MODEL_2}/unload")
-
     def test_concurrent_load_same_model(self, client):
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
             f1 = pool.submit(client.post, f"/v1/models/{TEST_MODEL}/load")
@@ -232,10 +238,8 @@ class TestModelManagementConcurrency:
         assert codes == [
             200,
             400,
-        ], f"Expected one 200 and one 400 for concurrent loads of the same model, got {codes}"
+        ], f"Expected one 200 and one 400 for concurrent loads, got {codes}"
         assert TEST_MODEL in _get_model_names(client)
-
-        client.post(f"/v1/models/{TEST_MODEL}/unload")
 
     def test_concurrent_unload_same_model(self, client):
         client.post(f"/v1/models/{TEST_MODEL}/load")
@@ -244,12 +248,11 @@ class TestModelManagementConcurrency:
             f1 = pool.submit(client.post, f"/v1/models/{TEST_MODEL}/unload")
             f2 = pool.submit(client.post, f"/v1/models/{TEST_MODEL}/unload")
 
-        # One succeeds (200), the other fails (400 "unknown model") — order is non-deterministic
         codes = sorted([f1.result().status_code, f2.result().status_code])
         assert codes == [
             200,
             400,
-        ], f"Expected one 200 and one 400 for concurrent unloads of the same model, got {codes}"
+        ], f"Expected one 200 and one 400 for concurrent unloads, got {codes}"
         assert TEST_MODEL not in _get_model_names(client)
 
 
@@ -420,8 +423,7 @@ class TestModelManagementInference:
 
     @pytest.fixture(autouse=True)
     def ensure_model_unloaded(self, server_with_explicit_mode, model: str):
-        """Guarantee clean state before and after every test: unload silently
-        (model may already be unloaded -- that is fine)."""
+        """Ensure clean state before and after every test by unloading the model."""
         requests.post(
             f"{server_with_explicit_mode.url_root}/v1/models/{model}/unload",
             timeout=MODEL_MGMT_UNLOAD_TIMEOUT_S,
