@@ -1212,7 +1212,10 @@ ARG TRITON_CONTAINER_VERSION={}
         argmap["TRITON_VERSION"],
         argmap["TRITON_CONTAINER_VERSION"],
     )
-
+    if "vllm" in backends and argmap["INFERENCE_IMAGE"] is None:
+        argmap["INFERENCE_IMAGE"] = "nvcr.io/nvidia/vllm:{}-py3".format(
+            FLAGS.upstream_container_version
+        )
     df += """ARG BASE_IMAGE={}
 """.format(
         argmap["INFERENCE_IMAGE"]
