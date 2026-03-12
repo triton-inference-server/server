@@ -603,7 +603,7 @@ python3 openai_frontend/main.py \
 > [!IMPORTANT]
 > `--load-model` requires `--model-control-mode=explicit`. Using `--load-model`
 > without it is an error. `--load-model=*` must be the **only** `--load-model`
-> argument; combining it with a named model is an error.
+> argument and combining it with a named model is an error.
 
 ### Dynamic Load / Unload API
 
@@ -666,11 +666,10 @@ curl -s -X POST http://localhost:9000/v1/models/${MODEL}/unload | jq
 | Model not loaded (unload unknown) | 400 | `Unknown model: <name>` |
 | Model not found in repository | 500 | Triton error: `failed to poll from model repository` |
 
-### Restricting the Management API
+### Restricting the Model Management APIs
 
 The model management endpoints can be protected with authentication headers using
-`--openai-restricted-api model-management`. This is separate from the inference
-API restriction so operations teams can lock down management access independently.
+`--openai-restricted-api model-repository`.
 
 ```bash
 python3 openai_frontend/main.py \
@@ -678,10 +677,11 @@ python3 openai_frontend/main.py \
   --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
   --model-control-mode explicit \
   --load-model llama-3.1-8b-instruct \
-  --openai-restricted-api model-management admin-key admin-secret
+  --openai-restricted-api model-repository admin-key admin-secret
 ```
 
-Clients must then include the header for load/unload requests:
+Clients must then include the header for model management requests such as
+load/unload:
 
 ```bash
 curl -H "admin-key: admin-secret" \
@@ -943,10 +943,9 @@ Use the `--openai-restricted-api` command-line argument to configure endpoint re
     - `POST /v1/completions`
   - **embedding**: Embedding endpoint
     - `POST /v1/embeddings`
-  - **model-repository**: Model listing and information endpoints
+  - **model-repository**: Model listing, information, and dynamic load/unload endpoints
     - `GET /v1/models`
     - `GET /v1/models/{model_name}`
-  - **model-management**: Dynamic model load/unload endpoints (requires `--model-control-mode=explicit`)
     - `POST /v1/models/{model_name}/load`
     - `POST /v1/models/{model_name}/unload`
   - **metrics**: Server metrics endpoint

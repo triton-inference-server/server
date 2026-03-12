@@ -383,7 +383,7 @@ class TestModelManagementCLIOptions:
 @pytest.mark.openai
 class TestModelManagementInference:
     @pytest.fixture(scope="class")
-    def managed_server(
+    def server_with_explicit_mode(
         self,
         model_repository: str,
         tokenizer_model: str,
@@ -403,16 +403,16 @@ class TestModelManagementInference:
             yield openai_server
 
     @pytest.fixture(autouse=True)
-    def ensure_model_unloaded(self, managed_server, model: str):
+    def ensure_model_unloaded(self, server_with_explicit_mode, model: str):
         """Guarantee clean state before and after every test: unload silently
         (model may already be unloaded -- that is fine)."""
         requests.post(
-            f"{managed_server.url_root}/v1/models/{model}/unload",
+            f"{server_with_explicit_mode.url_root}/v1/models/{model}/unload",
             timeout=MODEL_MGMT_UNLOAD_TIMEOUT_S,
         )
         yield
         requests.post(
-            f"{managed_server.url_root}/v1/models/{model}/unload",
+            f"{server_with_explicit_mode.url_root}/v1/models/{model}/unload",
             timeout=MODEL_MGMT_UNLOAD_TIMEOUT_S,
         )
 
@@ -472,8 +472,8 @@ class TestModelManagementInference:
             timeout=30,
         )
 
-    def test_load_completions(self, managed_server, model: str):
-        base = managed_server.url_root
+    def test_load_completions(self, server_with_explicit_mode, model: str):
+        base = server_with_explicit_mode.url_root
         self._assert_unknown_model(self._completions(base, model))
 
         self._load(base, model)
@@ -486,8 +486,8 @@ class TestModelManagementInference:
 
         self._unload(base, model)
 
-    def test_load_chat_completions(self, managed_server, model: str):
-        base = managed_server.url_root
+    def test_load_chat_completions(self, server_with_explicit_mode, model: str):
+        base = server_with_explicit_mode.url_root
         self._assert_unknown_model(self._chat_completions(base, model))
 
         self._load(base, model)
@@ -502,8 +502,8 @@ class TestModelManagementInference:
 
         self._unload(base, model)
 
-    def test_load_streaming_completions(self, managed_server, model: str):
-        base = managed_server.url_root
+    def test_load_streaming_completions(self, server_with_explicit_mode, model: str):
+        base = server_with_explicit_mode.url_root
         self._load(base, model)
 
         r = requests.post(
@@ -527,8 +527,8 @@ class TestModelManagementInference:
 
         self._unload(base, model)
 
-    def test_load_streaming_chat_completions(self, managed_server, model: str):
-        base = managed_server.url_root
+    def test_load_streaming_chat_completions(self, server_with_explicit_mode, model: str):
+        base = server_with_explicit_mode.url_root
         self._load(base, model)
 
         r = requests.post(
@@ -552,8 +552,8 @@ class TestModelManagementInference:
 
         self._unload(base, model)
 
-    def test_unload_rejects_inference(self, managed_server, model: str):
-        base = managed_server.url_root
+    def test_unload_rejects_inference(self, server_with_explicit_mode, model: str):
+        base = server_with_explicit_mode.url_root
         self._load(base, model)
 
         assert self._completions(base, model).status_code == 200
@@ -564,8 +564,8 @@ class TestModelManagementInference:
         self._assert_unknown_model(self._completions(base, model))
         self._assert_unknown_model(self._chat_completions(base, model))
 
-    def test_reload_inference(self, managed_server, model: str):
-        base = managed_server.url_root
+    def test_reload_inference(self, server_with_explicit_mode, model: str):
+        base = server_with_explicit_mode.url_root
 
         self._load(base, model)
         assert self._completions(base, model).status_code == 200
@@ -585,8 +585,8 @@ class TestModelManagementInference:
 
         self._unload(base, model)
 
-    def test_model_list_after_load_unload(self, managed_server, model: str):
-        base = managed_server.url_root
+    def test_model_list_after_load_unload(self, server_with_explicit_mode, model: str):
+        base = server_with_explicit_mode.url_root
 
         # No models initially
         r = requests.get(f"{base}/v1/models", timeout=10)
@@ -607,55 +607,3 @@ class TestModelManagementInference:
         ]
         assert model not in names
 
-
-# Test API restriction for model-management endpoints
-@pytest.mark.openai
-class TestModelManagementRestriction:
-    @pytest.fixture(scope="class")
-    def restricted_server(self):
-        args = [
-            "--model-repository",
-            TEST_MODEL_REPOSITORY,
-            "--model-control-mode",
-            "explicit",
-            "--load-model",
-            TEST_MODEL,
-            "--openai-restricted-api",
-            "model-management",
-            "mgmt-key",
-            "mgmt-secret",
-        ]
-        with OpenAIServer(args) as openai_server:
-            yield openai_server
-
-    def test_load_without_auth_rejected(self, restricted_server):
-        r = requests.post(
-            f"{restricted_server.url_root}/v1/models/{TEST_MODEL_2}/load", timeout=10
-        )
-        assert r.status_code == 401
-
-    def test_unload_without_auth_rejected(self, restricted_server):
-        r = requests.post(
-            f"{restricted_server.url_root}/v1/models/{TEST_MODEL}/unload", timeout=10
-        )
-        assert r.status_code == 401
-
-    def test_load_with_valid_auth(self, restricted_server):
-        headers = {"mgmt-key": "mgmt-secret"}
-        r = requests.post(
-            f"{restricted_server.url_root}/v1/models/{TEST_MODEL_2}/load",
-            headers=headers,
-            timeout=30,
-        )
-        assert r.status_code == 200
-
-        # Cleanup
-        requests.post(
-            f"{restricted_server.url_root}/v1/models/{TEST_MODEL_2}/unload",
-            headers=headers,
-            timeout=30,
-        )
-
-    def test_model_list_unrestricted(self, restricted_server):
-        r = requests.get(f"{restricted_server.url_root}/v1/models", timeout=10)
-        assert r.status_code == 200

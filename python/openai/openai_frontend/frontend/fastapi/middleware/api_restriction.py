@@ -36,8 +36,8 @@ ENDPOINT_MAPPING = {
         "POST /v1/completions",
         "POST /v1/embeddings",
     ],
-    "model-repository": ["GET /v1/models"],
-    "model-management": [
+    "model-repository": [
+        "GET /v1/models",
         "POST /v1/models/",
     ],
     "metrics": ["GET /metrics"],
