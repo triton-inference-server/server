@@ -41,6 +41,16 @@ namespace triton { namespace server {
     }                                                 \
   } while (false)
 
+#define RETURN_AND_RESPOND_IF_RESTRICTED(REQ, RESTRICTED_CATEGORY)       \
+  do {                                                                   \
+    auto const& is_restricted_api =                                      \
+        restricted_apis_.IsRestricted(RESTRICTED_CATEGORY);              \
+    auto const& restriction = restricted_apis_.Get(RESTRICTED_CATEGORY); \
+    if (is_restricted_api && RespondIfRestricted((REQ), restriction)) {  \
+      return;                                                            \
+    }                                                                    \
+  } while (false)
+
 namespace {
 
 void
@@ -173,11 +183,15 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
         if (multi_model_name.empty()) {
           LOG_VERBOSE(1) << "SageMaker request: LIST ALL MODELS";
 
+          RETURN_AND_RESPOND_IF_RESTRICTED(
+              req, RestrictedCategory::MODEL_REPOSITORY);
           SageMakerMMEListModel(req);
           return;
         } else {
           LOG_VERBOSE(1) << "SageMaker request: GET MODEL";
 
+          RETURN_AND_RESPOND_IF_RESTRICTED(
+              req, RestrictedCategory::MODEL_REPOSITORY);
           SageMakerMMEGetModel(req, multi_model_name.c_str());
           return;
         }
@@ -213,6 +227,8 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
         if (action.empty()) {
           LOG_VERBOSE(1) << "SageMaker request: LOAD MODEL";
 
+          RETURN_AND_RESPOND_IF_RESTRICTED(
+              req, RestrictedCategory::MODEL_REPOSITORY);
           std::unordered_map<std::string, std::string> parse_load_map;
           ParseSageMakerRequest(req, &parse_load_map, "load");
           if (!parse_load_map.empty()) {
@@ -224,6 +240,9 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
       case htp_method_DELETE: {
         // UNLOAD MODEL
         LOG_VERBOSE(1) << "SageMaker request: UNLOAD MODEL";
+
+        RETURN_AND_RESPOND_IF_RESTRICTED(
+            req, RestrictedCategory::MODEL_REPOSITORY);
         req->method = htp_method_POST;
 
         SageMakerMMEUnloadModel(req, multi_model_name.c_str());
@@ -253,10 +272,12 @@ SagemakerAPIServer::Create(
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const std::string address, const int thread_cnt,
+    const size_t max_input_size, const RestrictedFeatures& restricted_apis,
     std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new SagemakerAPIServer(
-      server, trace_manager, shm_manager, port, address, thread_cnt));
+      server, trace_manager, shm_manager, port, address, thread_cnt,
+      max_input_size, restricted_apis));
 
   const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started Sagemaker HTTPService at " << addr;
