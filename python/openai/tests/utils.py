@@ -84,12 +84,11 @@ class OpenAIServer:
         self,
         cli_args: List[str],
         *,
-        port: int = 9000,
         env_dict: Optional[Dict[str, str]] = None,
     ) -> None:
         # TODO: Incorporate caller's cli_args passed to this instance instead
         self.host = "localhost"
-        self.port = port
+        self.port = 9000
 
         env = os.environ.copy()
         if env_dict is not None:
