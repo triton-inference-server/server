@@ -306,6 +306,7 @@ class ModelNameValidationTest(unittest.TestCase):
     def test_model_name_invalid_load(self):
         client = tritongrpcclient.InferenceServerClient("localhost:8001")
         for model_name in self.INVALID_TRAVERSAL_NAMES:
+            print(f"Testing model name: {model_name!r}")
             with self.assertRaises(InferenceServerException) as cm:
                 client.load_model(model_name)
             self.assertIn(
@@ -318,7 +319,10 @@ class ModelNameValidationTest(unittest.TestCase):
         client = tritongrpcclient.InferenceServerClient("localhost:8001")
         with self.assertRaises(InferenceServerException) as cm:
             client.load_model("")
-        self.assertIn("model name must not be empty", str(cm.exception))
+        self.assertIn(
+            "Model name cannot be empty. Please enter a valid name to deploy.",
+            str(cm.exception),
+        )
 
     def test_model_name_whitespace_only_load(self):
         client = tritongrpcclient.InferenceServerClient("localhost:8001")
@@ -327,7 +331,7 @@ class ModelNameValidationTest(unittest.TestCase):
             with self.assertRaises(InferenceServerException) as cm:
                 client.load_model(model_name)
             self.assertIn(
-                "model name must not contain only whitespace",
+                "Model name cannot be empty. Please enter a valid name to deploy.",
                 str(cm.exception),
                 f"Expected whitespace-only rejection for model name: {model_name!r}",
             )
@@ -348,15 +352,25 @@ class ModelNameValidationTest(unittest.TestCase):
     def test_model_name_valid(self):
         """Verify that a syntactically valid model name is not rejected by
         the traversal check -- it should fail with a model not found error instead."""
+        VALID_MODEL_NAMES = [
+            "model123",
+            # "model  OAI",   TRI-769: Fix this test case
+            "model.version1",
+            "...",
+            "..my_model",
+            "model..1",
+            "model....1",
+        ]
         client = tritongrpcclient.InferenceServerClient("localhost:8001")
-        with self.assertRaises(InferenceServerException) as cm:
-            client.load_model("nonexistent_model")
-        self.assertNotIn(
-            "path traversal characters",
-            str(cm.exception),
-            "Valid model name should not trigger path traversal rejection",
-        )
-        self.assertIn("failed to poll from model repository", str(cm.exception))
+        for model_name in VALID_MODEL_NAMES:
+            with self.assertRaises(InferenceServerException) as cm:
+                client.load_model(model_name)
+            self.assertNotIn(
+                "path traversal characters",
+                str(cm.exception),
+                "Valid model name should not trigger path traversal rejection",
+            )
+            self.assertIn("failed to poll from model repository", str(cm.exception))
 
 
 if __name__ == "__main__":
