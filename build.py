@@ -1279,21 +1279,12 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.13 backends
 """
     if "tensorrtllm" in backends:
         df += """
-# Install required packages for TRT-LLM models
-# Remove contents that are not needed in runtime
-# Setuptools has breaking changes in version 70.0.0, so fix it to 69.5.1
-# The generated code in grpc_service_pb2_grpc.py depends on grpcio>=1.64.0, so fix it to 1.64.0
 RUN ldconfig && \\
     ARCH="$(uname -i)" && \\
-    rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \\
-    rm -fr ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \\
-    rm -fr ${TRT_ROOT}/samples ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples && \\
-    pip3 install --no-cache-dir transformers && \\
-    find /usr -name libtensorrt_llm.so -exec dirname {} \\; > /etc/ld.so.conf.d/tensorrt-llm.conf && \\
-    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \\; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \\
-    pip3 install --no-cache-dir  grpcio-tools==1.64.0 && \\
-    pip3 uninstall -y setuptools
-ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
+    find /usr /opt -name libtensorrt_llm.so -exec dirname {} \\; > /etc/ld.so.conf.d/tensorrt-llm.conf && \\
+    find /opt/tritonserver -name lib*so -exec dirname {} \\; > /etc/ld.so.conf.d/tritonserver.conf && \\
+    ldconfig
+
 """
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
