@@ -317,7 +317,7 @@ warmup_cuda_cache() {
     kill_server
 }
 
-# [TRI-830] Give extra time for GB300 to warmup CUDA_CACHE before testing.
+# [TRI-830] Send a simpple request to warmup CUDA_CACHE for GB300 before testing.
 if [[ $TEST_REPO_ARCH == "gb300_arm_103" ]]; then
     warmup_cuda_cache onnx 2
 fi
