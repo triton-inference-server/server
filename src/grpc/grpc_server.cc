@@ -274,6 +274,9 @@ class CommonHandler : public HandlerBase {
   // Stop handling requests.
   void Stop() override;
 
+  // Notify that CQ is shutting down (no-op for CommonHandler)
+  void NotifyCQShutdown() override {}
+
  private:
   void SetUpAllRequests();
 
@@ -2601,6 +2604,17 @@ Server::Stop()
 
   if (graceful_shutdown_thread_.joinable()) {
     graceful_shutdown_thread_.join();
+  }
+
+  // Notify all handlers that completion queues are shutting down.
+  // This must be done BEFORE calling Shutdown() on the CQs to prevent
+  // race conditions where alarms are set on shutting-down queues.
+  common_handler_->NotifyCQShutdown();
+  for (auto& model_infer_handler : model_infer_handlers_) {
+    model_infer_handler->NotifyCQShutdown();
+  }
+  for (auto& model_stream_infer_handler : model_stream_infer_handlers_) {
+    model_stream_infer_handler->NotifyCQShutdown();
   }
 
   // Shutdown completion queues
