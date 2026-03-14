@@ -46,59 +46,6 @@ BATCHER_TEST=batcher_test.py
 VERIFY_TIMESTAMPS=verify_timestamps.py
 TEST_RESULT_FILE='test_results.txt'
 
-warmup_cuda_cache() {
-    local backend=$1
-    local batch_size=$2
-    local model="${backend}_float32_float32_float32"
-    local n=$((16 * batch_size))
-    local input0_data=$(printf '1,%.0s' $(seq 1 $n) | sed 's/,$//')
-    local input1_data=$(printf '2,%.0s' $(seq 1 $n) | sed 's/,$//')
-
-    SERVER_ARGS="--model-repository=$MODELDIR/models --model-control-mode=explicit --load-model=$model"
-    SERVER_LOG="./warmup_cuda_cache.server.log"
-
-    run_server
-
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
-
-    set +e
-
-    curl -X POST "http://localhost:8000/v2/models/${model}/versions/1/infer" \
-        -H "Content-Type: application/json" \
-        -d '{
-            "inputs": [
-                {
-                    "name": "INPUT0",
-                    "datatype": "FP32",
-                    "shape": ['"$batch_size"', 16],
-                    "data": ['"$input0_data"']
-                },
-                {
-                    "name": "INPUT1",
-                    "datatype": "FP32",
-                    "shape": ['"$batch_size"', 16],
-                    "data": ['"$input1_data"']
-                }
-            ],
-            "outputs": [
-                { "name": "OUTPUT0" },
-                { "name": "OUTPUT1" }
-            ]
-        }'
-
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
-
-    kill_server
-}
-
 if [ -z "$TEST_VALGRIND" ]; then
     TEST_VALGRIND="0"
 fi
@@ -317,8 +264,63 @@ if [[ $BACKENDS == *"libtorch"* ]]; then
                     dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
 fi
 
+warmup_cuda_cache() {
+    local backend=$1
+    local batch_size=$2
+    local model="${backend}_float32_float32_float32"
+    local n=$((16 * batch_size))
+    local input0_data=$(printf '1,%.0s' $(seq 1 $n) | sed 's/,$//')
+    local input1_data=$(printf '2,%.0s' $(seq 1 $n) | sed 's/,$//')
+
+    SERVER_ARGS="--model-repository=$MODELDIR/models --model-control-mode=explicit --load-model=$model"
+    SERVER_LOG="./warmup_cuda_cache.server.log"
+
+    run_server
+
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+
+    curl -X POST "http://localhost:8000/v2/models/${model}/versions/1/infer" \
+        -H "Content-Type: application/json" \
+        -d '{
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "datatype": "FP32",
+                    "shape": ['"$batch_size"', 16],
+                    "data": ['"$input0_data"']
+                },
+                {
+                    "name": "INPUT1",
+                    "datatype": "FP32",
+                    "shape": ['"$batch_size"', 16],
+                    "data": ['"$input1_data"']
+                }
+            ],
+            "outputs": [
+                { "name": "OUTPUT0" },
+                { "name": "OUTPUT1" }
+            ]
+        }'
+
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    set -e
+
+    kill_server
+}
+
 # [TRI-830] Give extra time for GB300 to warmup CUDA_CACHE before testing.
-warmup_cuda_cache onnx 2
+if [[ $TEST_REPO_ARCH == "gb300_arm_103" ]]; then
+    warmup_cuda_cache onnx 2
+fi
 
 # Need to launch the server for each test so that the model status is
 # reset (which is used to make sure the correctly batch size was used
