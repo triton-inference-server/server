@@ -368,7 +368,7 @@ class HttpTest(tu.TestResultCollector):
                 error_message,
             )
             self.assertIn(
-                "exceeds the maximum allowed value",
+                " exceeds the maximum allowed input size. ",
                 error_message,
             )
         except ValueError:
