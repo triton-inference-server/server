@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -148,6 +148,25 @@ def verify_model_repository_endpoints(
         assert_response_unauthorized(
             response, description=f"{description_prefix} Specific model endpoint"
         )
+
+
+def verify_model_repository_management_endpoints(
+    base_url, model, headers, expected_success, description_prefix
+):
+    for endpoint in ["load", "unload"]:
+        response = requests.post(
+            f"{base_url}/v1/models/{model}/{endpoint}", headers=headers, timeout=120
+        )
+        if expected_success:
+            assert_response_success(
+                response,
+                description=f"{description_prefix} - Model {endpoint} endpoint",
+            )
+        else:
+            assert_response_unauthorized(
+                response,
+                description=f"{description_prefix} - Model {endpoint} endpoint",
+            )
 
 
 def verify_metrics_endpoint(base_url, headers, expected_success, description_prefix):
@@ -328,6 +347,47 @@ class TestOpenAIServerRestrictedAPIs:
         )
         verify_health_endpoint(
             base_url, None, expected_success=True, description_prefix="Unrestricted"
+        )
+
+
+@pytest.mark.openai
+class TestOpenAIServerModelRepositoryRestriction:
+    """Model-repository restriction for dynamic model load/unload."""
+
+    @pytest.fixture(scope="class")
+    def server_with_restrictions_explicit_mode(self):
+        args = [
+            "--model-repository",
+            str(Path(__file__).parent / "test_models"),
+            "--model-control-mode",
+            "explicit",
+            "--openai-restricted-api",
+            "model-repository",
+            "mgmt-key",
+            "mgmt-secret",
+        ]
+        with OpenAIServer(args) as openai_server:
+            yield openai_server
+
+    @pytest.mark.parametrize(
+        "headers, expected_success, description",
+        [
+            (None, False, "No auth"),
+            ({"mgmt-key": "mgmt-secret"}, True, "Valid auth"),
+            ({"mgmt-key": "wrong-secret"}, False, "Invalid auth value"),
+            ({"wrong-key": "mgmt-secret"}, False, "Invalid auth key"),
+        ],
+    )
+    def test_model_repository_management_endpoints_with_auth(
+        self,
+        server_with_restrictions_explicit_mode,
+        headers,
+        expected_success,
+        description,
+    ):
+        base_url = server_with_restrictions_explicit_mode.url_root
+        verify_model_repository_management_endpoints(
+            base_url, "mock_llm", headers, expected_success, description
         )
 
 
