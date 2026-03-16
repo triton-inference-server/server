@@ -1116,7 +1116,8 @@ RUN pip3 install --upgrade \\
           docker \\
           virtualenv \\
           patchelf==0.17.2 \\
-          cmake==4.0.3
+          cmake==4.0.3 \\
+          pybind11[global]
 """
 
         df += f"""
