@@ -1280,8 +1280,6 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.13 backends
     if "tensorrtllm" in backends:
         df += """
 RUN ldconfig && \\
-    ARCH="$(uname -i)" && \\
-    find /usr /opt -name libtensorrt_llm.so -exec dirname {} \\; > /etc/ld.so.conf.d/tensorrt-llm.conf && \\
     find /opt/tritonserver -name lib*so -exec dirname {} \\; > /etc/ld.so.conf.d/tritonserver.conf && \\
     ldconfig
 
