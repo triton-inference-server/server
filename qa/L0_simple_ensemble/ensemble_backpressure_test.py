@@ -151,12 +151,14 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
                 # Verify correctness of responses
                 for idx, resp in enumerate(responses):
                     output = resp.as_numpy("OUT")
+                    # output shape is [batch_size, 1]; extract scalar for comparison.
+                    value = float(output[0][0])
                     self.assertAlmostEqual(
-                        output[0],
+                        value,
                         EXPECTED_INFER_OUTPUT,
                         places=5,
                         msg=f"Request {i} response {idx}: expected "
-                        f"{EXPECTED_INFER_OUTPUT}, got {output[0]}",
+                        f"{EXPECTED_INFER_OUTPUT}, got {value}",
                     )
 
             # Stop all streams
