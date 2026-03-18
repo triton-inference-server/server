@@ -165,9 +165,9 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
 
     def test_single_request_with_different_limits(self):
         """
-        Single streaming request producing 16 responses through a 3-step
-        ensemble (decoupled_producer -> consumer_high_delay -> consumer_low_delay)
-        under various max_inflight_requests settings.
+        Single streaming request that produces 16 responses via a three-step ensemble pipeline
+        (decoupled_producer → consumer_high_delay → consumer_low_delay) under various
+        max_inflight_requests configurations.
         """
         cases = [
             ("ensemble_limit_4", "max_inflight_requests=4"),
@@ -180,10 +180,10 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
                     model_name=model_name, expected_responses_per_request=16
                 )
 
-    def test_concurrent_requests_across_topologies(self):
+    def test_concurrent_requests_with_different_limits(self):
         """
         NUM_REQUESTS concurrent streaming requests (NUM_RESPONSES_PER_REQUEST
-        responses each) exercise the global max_inflight_requests limit.
+        responses each) exercise the max_inflight_requests limit.
         Subtests cover: limit=4, limit=1, and the limit disabled.
         """
         cases = [
@@ -192,7 +192,7 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
             ("ensemble_disabled", "max_inflight_requests is disabled"),
         ]
         for model_name, desc in cases:
-            with self.subTest(topology=desc):
+            with self.subTest(limit=desc):
                 self._run_inference(
                     model_name=model_name,
                     expected_responses_per_request=NUM_RESPONSES_PER_REQUEST,
@@ -201,8 +201,8 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
 
     def test_sequential_requests_limiter_resets_cleanly(self):
         """
-        Send NUM_REQUESTS sequential requests one after another. If the limiter
-        leaks a slot on any request, subsequent requests will deadlock or time out.
+        Send NUM_REQUESTS requests one after another. If the limiter
+        leaks a slot on any request, subsequent requests will be stuck or time out.
         """
         for seq_idx in range(NUM_REQUESTS):
             with self.subTest(request=seq_idx):
@@ -240,7 +240,7 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
             except queue.Empty:
                 self.fail("Stream did not produce any response before cancellation.")
 
-            # Cancel the stream. This should unblock any waiting producers and result in a CANCELLED error.
+            # Cancel the stream - this unblocks any waiting producers and triggers a CANCELLED error.
             triton_client.stop_stream(cancel_requests=True)
 
             # Allow some time for cancellation
@@ -323,7 +323,7 @@ class EnsembleStepMaxQueueSizeTest(tu.TestResultCollector):
                 self.assertEqual(
                     len(errors),
                     1,
-                    "Expected exactly one error when queue full terminates stream",
+                    "Expected exactly one error when the queue is full and the stream terminates",
                 )
 
                 # Verify correctness of successful responses

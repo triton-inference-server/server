@@ -330,7 +330,7 @@ ensemble_scheduling {
 EOF
 }
 
-# Step 2, 3 - consumer_high_delay and consumer_low_delay (batch size 2)
+# Steps 2 and 3 - consumer_high_delay and consumer_low_delay (batch size 2)
 generate_consumer_model "consumer_high_delay" "0.5"
 generate_consumer_model "consumer_low_delay" "0.1"
 
@@ -376,7 +376,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 
-######## Test invalid value for "max_inflight_requests"
+######## Test invalid values for 'max_inflight_requests' config option ########
 INVALID_PARAM_MODEL_DIR="`pwd`/invalid_param_test_models"
 SERVER_ARGS="--model-repository=${INVALID_PARAM_MODEL_DIR}"
 SERVER_LOG="./invalid_max_inflight_requests_server.log"
@@ -385,7 +385,7 @@ rm -rf $SERVER_LOG ${INVALID_PARAM_MODEL_DIR}
 mkdir -p ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_negative_limit/1
 mkdir -p ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_string_limit/1
 mkdir -p ${INVALID_PARAM_MODEL_DIR}/ensemble_invalid_large_value_limit/1
-# Copy the same decoupled_producer and slow_consumer models from the previous tests for all three ensemble models.
+# Reuse the decoupled_producer and slow_consumer models built in the previous test section.
 cp -r ${MAX_QUEUE_SIZE_TEST_MODEL_DIR}/decoupled_producer ${MAX_QUEUE_SIZE_TEST_MODEL_DIR}/slow_consumer ${INVALID_PARAM_MODEL_DIR}/
 
 # max_inflight_requests = -5
