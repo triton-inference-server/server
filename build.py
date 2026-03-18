@@ -971,8 +971,6 @@ RUN dnf install -y \\
             xz-devel \\
             zlib-devel
 
-RUN python3.12 -m venv /opt/venv-tritonserver
-ENV PATH="/opt/venv-tritonserver/bin:$PATH"
 """
     if os.getenv("CCACHE_REMOTE_ONLY") and os.getenv("CCACHE_REMOTE_STORAGE"):
         df += """
@@ -1365,8 +1363,6 @@ RUN dnf install -y \\
         python3.12-pip \\
         numactl-devel
 
-RUN python3.12 -m venv /opt/venv-tritonserver
-ENV PATH="/opt/venv-tritonserver/bin:$PATH"
 RUN pip3 install patchelf==0.17.2
 
 """
@@ -1587,9 +1583,6 @@ def change_default_python_version_rhel(version):
 RUN dnf install -y \\
       python3.12-devel \\
       python3.12-pip
-
-RUN python3.12 -m venv /opt/venv-tritonserver
-ENV PATH="/opt/venv-tritonserver/bin:$PATH"
 """
     return df
 
