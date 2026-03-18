@@ -54,13 +54,13 @@ install_build_deps_apt() {
     && apt-get install -y --no-install-recommends cmake=4.0.3* cmake-data=4.0.3*
 }
 
-install_build_deps_yum() {
-  yum install rapidjson-devel -y
+install_build_deps_dnf() {
+  dnf install -y rapidjson-devel
 }
 
 install_build_deps() {
   if [[ ${TRITON_RHEL} -eq "1" ]] && grep -qE 'rhel|centos|fedora' /etc/os-release; then
-    install_build_deps_yum
+    install_build_deps_dnf
   else
     install_build_deps_apt
   fi

@@ -935,17 +935,16 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
 """
     df += """
 # Install docker docker buildx
-RUN yum install -y ca-certificates curl gnupg yum-utils \\
-      && yum-config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo \\
-      && yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-#   && yum install -y docker.io docker-buildx-plugin
+RUN dnf install -y ca-certificates curl gnupg dnf-plugins-core \\
+      && dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo \\
+      && dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
 # libxml2-dev is needed for Azure Storage
 # scons is needed for armnn_tflite backend build dep
-RUN yum install -y \\
+RUN dnf install -y \\
             autoconf \\
             automake \\
             bzip2-devel \\
@@ -962,9 +961,8 @@ RUN yum install -y \\
             numactl-devel \\
             openssl-devel \\
             pkg-config \\
-            python3-pip \\
-            python3-scons \\
-            python3-setuptools \\
+            python3.12-devel \\
+            python3.12-pip \\
             rapidjson-devel \\
             re2-devel \\
             readline-devel \\
@@ -972,6 +970,9 @@ RUN yum install -y \\
             wget \\
             xz-devel \\
             zlib-devel
+
+RUN python3.12 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:$PATH"
 """
     if os.getenv("CCACHE_REMOTE_ONLY") and os.getenv("CCACHE_REMOTE_STORAGE"):
         df += """
@@ -1350,7 +1351,7 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
     if target_platform() == "rhel":
         df += """
 # Common dependencies.
-RUN yum install -y \\
+RUN dnf install -y \\
         git \\
         gperf \\
         re2-devel \\
@@ -1360,9 +1361,12 @@ RUN yum install -y \\
         libb64-devel \\
         gperftools-devel \\
         wget \\
-        python3-pip \\
+        python3.12-devel \\
+        python3.12-pip \\
         numactl-devel
 
+RUN python3.12 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:$PATH"
 RUN pip3 install patchelf==0.17.2
 
 """
@@ -1431,7 +1435,7 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \\
         if target_platform() == "rhel":
             df += """
 # python3, python3-pip and some pip installs required for the python backend
-RUN yum install -y \\
+RUN dnf install -y \\
         libarchive-devel \\
         openssl-devel \\
         readline-devel
@@ -1580,24 +1584,12 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
 
 def change_default_python_version_rhel(version):
     df = f"""
-# The python library version available for install via 'yum install python3.X-devel' does not
-# match the version of python inside the RHEL base container. This means that python packages
-# installed within the container will not be picked up by the python backend stub process pybind
-# bindings. It must instead must be installed via pyenv.
-ENV PYENV_ROOT=/opt/pyenv_build
-RUN curl https://pyenv.run | bash
-ENV PATH="${{PYENV_ROOT}}/bin:$PATH"
-RUN eval "$(pyenv init -)"
-RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {version} \\
-    && cp ${{PYENV_ROOT}}/versions/{version}/lib/libpython3* /usr/lib64/
+RUN dnf install -y \\
+      python3.12-devel \\
+      python3.12-pip
 
-# RHEL image has several python versions. It's important
-# to set the correct version, otherwise, packages that are
-# pip installed will not be found during testing.
-ENV PYVER={version} PYTHONPATH=/opt/python/v
-RUN ln -sf ${{PYENV_ROOT}}/versions/${{PYVER}}* ${{PYTHONPATH}}
-ENV PYBIN=${{PYTHONPATH}}/bin
-ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
+RUN python3.12 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:$PATH"
 """
     return df
 
