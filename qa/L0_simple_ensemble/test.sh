@@ -291,7 +291,7 @@ generate_ensemble_model() {
     local name=$1
     local limit=$2
     local batch_size=2
-    
+
     local limit_str=""
     if [ "$limit" != "disabled" ]; then
         limit_str="max_inflight_requests: $limit"
