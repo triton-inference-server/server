@@ -478,6 +478,11 @@ ReadDataFromJsonHelper(
     triton::common::TritonJson::Value& tensor_data, int* counter,
     int64_t expected_cnt, int current_depth = 0)
 {
+  if (!base) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "output buffer `base` pointer cannot be null");
+  }
   // FIXME should move 'switch' statement outside the recursive function and
   // pass in a read data callback once data type is confirmed.
   // Currently 'switch' is performed on each element even through all elements
@@ -501,6 +506,10 @@ ReadDataFromJsonHelper(
           base, dtype, el, counter, expected_cnt, current_depth + 1));
     }
   } else {
+    if (!counter) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL, "`counter` pointer cannot be null");
+    }
     // Check if writing to 'serialized' is overrunning the expected byte_size
     if (*counter < 0 || static_cast<int64_t>(*counter) >= expected_cnt) {
       return TRITONSERVER_ErrorNew(
