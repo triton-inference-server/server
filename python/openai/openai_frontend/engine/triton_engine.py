@@ -94,7 +94,7 @@ from schemas.openai import (
     Model,
     ObjectType,
 )
-from utils.utils import ClientError, ServerError, validate_model_name
+from utils.utils import ClientError, ServerError
 
 
 # TODO: Improve type hints
@@ -540,7 +540,6 @@ class TritonLLMEngine(LLMEngine):
         return model_metadata
 
     async def load_model(self, model_name: str) -> Model:
-        validate_model_name(model_name)
 
         if (
             self.server.options.model_control_mode
@@ -576,8 +575,6 @@ class TritonLLMEngine(LLMEngine):
         return self._build_model_metadata(model_name)
 
     async def unload_model(self, model_name: str) -> None:
-        validate_model_name(model_name)
-
         if (
             self.server.options.model_control_mode
             != tritonserver.ModelControlMode.EXPLICIT
