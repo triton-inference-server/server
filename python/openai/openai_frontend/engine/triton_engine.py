@@ -540,7 +540,6 @@ class TritonLLMEngine(LLMEngine):
         return model_metadata
 
     async def load_model(self, model_name: str) -> Model:
-
         if (
             self.server.options.model_control_mode
             != tritonserver.ModelControlMode.EXPLICIT
