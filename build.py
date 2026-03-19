@@ -1360,7 +1360,7 @@ RUN yum install -y \\
         libb64-devel \\
         gperftools-devel \\
         wget \\
-        python3-pip \\
+        python3.12-pip \\
         numactl-devel
 
 RUN pip3 install patchelf==0.17.2
