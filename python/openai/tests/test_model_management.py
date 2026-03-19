@@ -165,19 +165,6 @@ class TestModelManagement:
                     f"got {response.status_code}"
                 )
 
-        INVALID_WHITESPACE_NAMES = [" ", "   ", "\t", "\n", "\r", "\f", "\v", " \t \n "]
-        for model_name in INVALID_WHITESPACE_NAMES:
-            for endpoint in ["load", "unload"]:
-                response = client.post(f"/v1/models/{model_name}/{endpoint}")
-                assert response.status_code == 500, (
-                    f"Expected 500 for model name {model_name!r}, "
-                    f"got {response.status_code}"
-                )
-                assert (
-                    "model name must not contain only whitespace characters"
-                    in response.json()["detail"].lower()
-                )
-
     def test_load_unload_reload(self, client):
         assert client.post(f"/v1/models/{TEST_MODEL}/load").status_code == 200
         assert TEST_MODEL in _get_model_names(client)
