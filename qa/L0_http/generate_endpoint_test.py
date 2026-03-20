@@ -34,6 +34,7 @@ import threading
 import time
 import unittest
 
+import base64
 import requests
 import sseclient
 import test_util as tu
