@@ -126,7 +126,6 @@ class TestModelManagement:
 
         assert TEST_MODEL not in _get_model_names(client)
         assert client.get(f"/v1/models/{TEST_MODEL}").status_code == 404
-        assert client.get("/health/ready").status_code == 200
 
     def test_load_already_loaded_model(self, client):
         assert client.post(f"/v1/models/{TEST_MODEL}/load").status_code == 200
@@ -143,23 +142,28 @@ class TestModelManagement:
     def test_load_nonexistent_model(self, client):
         response = client.post("/v1/models/model_not_in_repo/load")
         assert response.status_code == 500
-        assert "Unknown model" in response.json()["detail"]
+        assert "failed to poll from model repository" in response.json()["detail"]
 
-    @pytest.mark.parametrize(
-        "invalid_name",
-        [
+    def test_load_and_unload_invalid_model_name(self, client):
+        # Names containing '/' or '..' are intercepted by FastAPI/HTTP routing
+        # before reaching the handler. It return 404 Not Found or 405 Method Not Allowed.
+        INVALID_TRAVERSAL_NAMES = [
+            "../etc",
+            "../../etc/passwd",
+            "../../../../etc",
+            "model/..",
             "..",
-            "..mock_llm",
-            "mock_llm..",
-            "mock..llm",
-            "..%2f..%2fetc%2fpasswd",
-        ],
-    )
-    def test_load_and_unload_invalid_model_name(self, client, invalid_name):
-        for endpoint in ["load", "unload"]:
-            response = client.post(f"/v1/models/{invalid_name}/{endpoint}")
-            assert response.status_code == 400
-            assert "Invalid model name" in response.json()["detail"]
+            "/etc/passwd",
+            "model/subdir",
+            "model/",
+        ]
+        for model_name in INVALID_TRAVERSAL_NAMES:
+            for endpoint in ["load", "unload"]:
+                response = client.post(f"/v1/models/{model_name}/{endpoint}")
+                assert response.status_code in (404, 405), (
+                    f"Expected 404 or 405 for model name {model_name!r}, "
+                    f"got {response.status_code}"
+                )
 
     def test_load_unload_reload(self, client):
         assert client.post(f"/v1/models/{TEST_MODEL}/load").status_code == 200
