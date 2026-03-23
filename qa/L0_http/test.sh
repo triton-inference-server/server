@@ -380,9 +380,15 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -397,9 +403,15 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -414,9 +426,15 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -431,9 +449,15 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "0" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] found in output when not expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -449,9 +473,15 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -465,7 +495,10 @@ if [ "$code" == "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\}" ./curl.out` != "1" ]; then
+if [ `grep -c "\{\"error\":\"Failed to parse 'data' field: shape does not match true shape\"\}" ./curl.out` != "1" ]; then
+    echo -e "\{\"error\":\"Failed to parse 'data' field: shape does not match true shape\"\} not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -478,7 +511,10 @@ if [ "$code" == "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\}" ./curl.out` != "1" ]; then
+if [ `grep -c "\{\"error\":\"Unable to parse 'data': shape does not match true shape\"\}" ./curl.out` != "1" ]; then
+    echo -e "\{\"error\":\"Unable to parse 'data': shape does not match true shape\"\} not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -493,9 +529,15 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
