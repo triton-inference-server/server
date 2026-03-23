@@ -509,13 +509,13 @@ ReadDataFromJsonHelper(
     if (!counter) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
-          "Failed to parse 'data' field: invalid counter provided");
+          "Invalid counter provided");
     }
     // Check if writing to 'serialized' is overrunning the expected byte_size
     if (*counter < 0 || static_cast<int64_t>(*counter) >= expected_cnt) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
-          "Failed to parse 'data' field: shape does not match true shape");
+          "Shape does not match true shape of 'data' field");
     }
     switch (dtype) {
       case TRITONSERVER_TYPE_BOOL: {
@@ -619,8 +619,7 @@ ReadDataFromJsonHelper(
         if (len > INT64_MAX) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
-              "Failed to parse 'data' field: tensor size is too large to be "
-              "processed");
+              "Tensor size is too large to be processed");
         }
         // Quick sanity check to ensure we don't write beyond `expected_cnt`.
         int64_t actual_cnt = static_cast<int64_t>(*counter) +
@@ -629,7 +628,7 @@ ReadDataFromJsonHelper(
         if (actual_cnt < 0 || actual_cnt > expected_cnt) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
-              "Failed to parse 'data' field: shape does not match true shape");
+              "Shape does not match true shape of 'data' field");
         }
         memcpy(
             base + *counter, reinterpret_cast<char*>(&len), sizeof(uint32_t));
