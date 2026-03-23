@@ -508,8 +508,7 @@ ReadDataFromJsonHelper(
   } else {
     if (!counter) {
       return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL,
-          "Invalid counter provided");
+          TRITONSERVER_ERROR_INTERNAL, "Invalid counter provided");
     }
     // Check if writing to 'serialized' is overrunning the expected byte_size
     if (*counter < 0 || static_cast<int64_t>(*counter) >= expected_cnt) {
