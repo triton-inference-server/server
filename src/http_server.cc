@@ -628,7 +628,7 @@ ReadDataFromJsonHelper(
         if (actual_cnt < 0 || actual_cnt > expected_cnt) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
-              "Shape does not match true shape of 'data' field");
+              "shape does not match true shape of 'data' field");
         }
         memcpy(
             base + *counter, reinterpret_cast<char*>(&len), sizeof(uint32_t));

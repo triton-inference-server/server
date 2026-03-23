@@ -511,8 +511,8 @@ if [ "$code" == "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "\{\"error\":\"Unable to parse 'data': shape does not match true shape\"\}" ./curl.out` != "1" ]; then
-    echo -e "\{\"error\":\"Unable to parse 'data': shape does not match true shape\"\} not found in output when expected"
+if [ `grep -c "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\}" ./curl.out` != "1" ]; then
+    echo -e "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\} not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
