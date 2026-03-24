@@ -193,12 +193,17 @@ class _ModelManagementBase:
         return [TEST_MODEL, TEST_MODEL_2]
 
     @pytest.fixture(scope="class")
+    def load_model(self) -> list[str]:
+        return []
+
+    @pytest.fixture(scope="class")
     def server(
         self,
         model_repository: str,
         tokenizer_model: str,
         backend: str,
         model_control_mode: str,
+        load_model: list[str],
     ):
         args = [
             "--model-repository",
@@ -210,6 +215,9 @@ class _ModelManagementBase:
             args += ["--backend", backend]
         if model_control_mode:
             args += ["--model-control-mode", model_control_mode]
+        if load_model:
+            for model in load_model:
+                args += ["--load-model", model]
 
         with OpenAIServer(args) as openai_server:
             yield openai_server
@@ -531,28 +539,25 @@ class TestModelManagementInference(_ModelManagementBase):
     def model_control_mode(self):
         return "explicit"
 
-    @pytest.fixture
-    def all_models(self, model: str) -> list[str]:
+    @pytest.fixture(scope="class")
+    def load_model(self, model: str) -> list[str]:
+        # For tensorrt_llm_bls, we need to load all the dependent models
         if model == "tensorrt_llm_bls":
-            return ["postprocessing", "preprocessing", "tensorrt_llm", model]
-        else:
-            return [model]
+            return ["postprocessing", "preprocessing", "tensorrt_llm"]
 
     @staticmethod
-    def _assert_load(base_url, model_list: list[str]):
-        for model_name in model_list:
-            r = requests.post(
-                f"{base_url}/v1/models/{model_name}/load",
-            )
-            assert r.status_code == 200, f"Load {model_name} failed: {r.text}"
+    def _assert_load(base_url, model_name: str):
+        r = requests.post(
+            f"{base_url}/v1/models/{model_name}/load",
+        )
+        assert r.status_code == 200, f"Load {model_name} failed: {r.text}"
 
     @staticmethod
-    def _assert_unload(base_url, model_list: list[str]):
-        for model_name in model_list:
-            r = requests.post(
-                f"{base_url}/v1/models/{model_name}/unload",
-            )
-            assert r.status_code == 200, f"Unload {model_name} failed: {r.text}"
+    def _assert_unload(base_url, model_name: str):
+        r = requests.post(
+            f"{base_url}/v1/models/{model_name}/unload",
+        )
+        assert r.status_code == 200, f"Unload {model_name} failed: {r.text}"
 
     @staticmethod
     def _assert_usage(usage):
@@ -575,10 +580,10 @@ class TestModelManagementInference(_ModelManagementBase):
             },
         )
 
-    def test_load_completions(self, base_url, all_models: list[str], model: str):
+    def test_load_completions(self, base_url, model: str):
         self._assert_unknown_model(self._completions(base_url, model))
 
-        self._assert_load(base_url, all_models)
+        self._assert_load(base_url, model)
         r = self._completions(base_url, model)
         assert r.status_code == 200
         data = r.json()
@@ -586,25 +591,23 @@ class TestModelManagementInference(_ModelManagementBase):
         assert data["choices"][0]["finish_reason"] == "stop"
         self._assert_usage(data["usage"])
 
-        self._assert_unload(base_url, all_models)
+        self._assert_unload(base_url, model)
 
-    def test_unload_rejects_inference(
-        self, base_url, all_models: list[str], model: str
-    ):
-        self._assert_load(base_url, all_models)
+    def test_unload_rejects_inference(self, base_url, model: str):
+        self._assert_load(base_url, model)
         assert self._completions(base_url, model).status_code == 200
 
-        self._assert_unload(base_url, all_models)
+        self._assert_unload(base_url, model)
         self._assert_unknown_model(self._completions(base_url, model))
 
-    def test_reload_inference(self, base_url, all_models: list[str], model: str):
-        self._assert_load(base_url, all_models)
+    def test_reload_inference(self, base_url, model: str):
+        self._assert_load(base_url, model)
         assert self._completions(base_url, model).status_code == 200
 
-        self._assert_unload(base_url, all_models)
+        self._assert_unload(base_url, model)
         self._assert_unknown_model(self._completions(base_url, model))
 
-        self._assert_load(base_url, all_models)
+        self._assert_load(base_url, model)
         r = self._completions(base_url, model)
         assert r.status_code == 200
         assert r.json()["choices"][0]["text"].strip()
