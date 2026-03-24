@@ -542,6 +542,125 @@ available arguments and default values.
 For more information on the `tritonfrontend` python bindings, see the docs
 [here](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/tritonfrontend.md).
 
+## Model Management
+
+The OpenAI-compatible frontend supports explicit model control, allowing you to
+dynamically load and unload models at runtime without restarting the server.
+This is particularly useful when hosting multiple large models on a shared GPU
+cluster and needing to swap models on demand.
+
+### Model Control Mode
+
+Use `--model-control-mode` to specify how models are managed at startup and
+runtime. The default is `none`.
+
+| Mode | Behavior |
+|------|----------|
+| `none` (default) | All models in the repository are loaded at startup. Load/unload APIs are not available. |
+| `explicit` | No models are loaded at startup unless specified with `--load-model`. Load and unload are controlled via the management API. |
+
+> [!NOTE]
+> This matches the native `tritonserver --model-control-mode` behavior.
+> See [Triton Model Management](../../docs/user_guide/model_management.md) for
+> more details.
+
+### Load Models at Startup (Explicit Mode)
+
+When using `--model-control-mode=explicit`, use `--load-model` to specify which
+models should be loaded at startup. It may be specified multiple times to load
+multiple models.
+
+<details>
+<summary>Example</summary>
+
+```bash
+# Start in explicit mode with no models loaded
+python3 openai_frontend/main.py \
+  --model-repository /path/to/models \
+  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
+  --model-control-mode explicit
+
+# Start in explicit mode and load a specific model at startup
+python3 openai_frontend/main.py \
+  --model-repository /path/to/models \
+  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
+  --model-control-mode explicit \
+  --load-model llama-3.1-8b-instruct
+
+# Load multiple models at startup
+python3 openai_frontend/main.py \
+  --model-repository /path/to/models \
+  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
+  --model-control-mode explicit \
+  --load-model model-a \
+  --load-model model-b
+
+# Load ALL models in the repository at startup
+python3 openai_frontend/main.py \
+  --model-repository /path/to/models \
+  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
+  --model-control-mode explicit \
+  --load-model '*'
+```
+
+</details>
+
+> [!IMPORTANT]
+> - `--load-model` requires `--model-control-mode=explicit`.
+> - `--load-model=*` can not be used together with loading specific models.
+
+### Dynamic Load / Unload API
+
+Once the server is running in `explicit` mode, models can be loaded and unloaded
+at runtime via the following endpoints:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/v1/models/{model_name}/load` | Load a model. Blocks until model is fully loaded and ready. |
+| `POST` | `/v1/models/{model_name}/unload` | Unload a model. Blocks until fully unloaded. In-flight requests complete before removal. |
+
+Both endpoints return an error if `--model-control-mode` is not `explicit`.
+
+#### Load a model
+
+```bash
+MODEL="llama-3.1-8b-instruct"
+curl -s -X POST http://localhost:9000/v1/models/${MODEL}/load | jq
+```
+
+<details>
+<summary>Example output</summary>
+
+```json
+{
+  "id": "llama-3.1-8b-instruct",
+  "object": "model",
+  "created": 1750000000,
+  "owned_by": "Triton Inference Server"
+}
+```
+
+</details>
+
+#### Unload a model
+
+```bash
+MODEL="llama-3.1-8b-instruct"
+curl -s -X POST http://localhost:9000/v1/models/${MODEL}/unload | jq
+```
+
+<details>
+<summary>Example output</summary>
+
+```json
+{
+  "status": "success",
+  "model": "llama-3.1-8b-instruct"
+}
+```
+
+</details>
+
 ## Model Parallelism Support
 
 - [x] vLLM ([EngineArgs](https://github.com/triton-inference-server/vllm_backend/blob/main/README.md#using-the-vllm-backend))
@@ -794,9 +913,11 @@ Use the `--openai-restricted-api` command-line argument to configure endpoint re
     - `POST /v1/completions`
   - **embedding**: Embedding endpoint
     - `POST /v1/embeddings`
-  - **model-repository**: Model listing and information endpoints
+  - **model-repository**: Model listing, information, and dynamic load/unload endpoints
     - `GET /v1/models`
     - `GET /v1/models/{model_name}`
+    - `POST /v1/models/{model_name}/load`
+    - `POST /v1/models/{model_name}/unload`
   - **metrics**: Server metrics endpoint
     - `GET /metrics`
   - **health**: Health check endpoint

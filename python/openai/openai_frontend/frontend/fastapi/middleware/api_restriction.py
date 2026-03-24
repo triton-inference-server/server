@@ -1,4 +1,4 @@
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,7 +36,10 @@ ENDPOINT_MAPPING = {
         "POST /v1/completions",
         "POST /v1/embeddings",
     ],
-    "model-repository": ["GET /v1/models"],
+    "model-repository": [
+        "GET /v1/models",
+        "POST /v1/models/",
+    ],
     "metrics": ["GET /metrics"],
     "health": ["GET /health/ready"],
 }
