@@ -138,7 +138,6 @@ class TritonLLMEngine(LLMEngine):
         self.lora_separator = lora_separator
         self.default_max_tokens = default_max_tokens
 
-        self.create_time = int(time.time())
         self.model_metadata = self._get_model_metadata()
         self._metadata_lock = asyncio.Lock()
         self.tool_call_parser = (
@@ -533,7 +532,7 @@ class TritonLLMEngine(LLMEngine):
         )
 
     def _get_model_metadata(self) -> Dict[str, TritonModelMetadata]:
-        # One tokenizer and creation time shared for all loaded models for now.
+        # One tokenizer is shared for all loaded models; creation time is per model.
         model_metadata = {}
         for name, _ in self.server.models(exclude_not_ready=True).keys():
             model_metadata[name] = self._build_model_metadata(name)
@@ -557,6 +556,8 @@ class TritonLLMEngine(LLMEngine):
             # ready, matching standard Triton server behavior.
             try:
                 metadata = await asyncio.to_thread(self._load_model_sync, model_name)
+            except tritonserver.InvalidArgumentError as e:
+                raise ClientError(f"Failed to load model '{model_name}': {e}")
             except tritonserver.TritonError as e:
                 raise ServerError(f"Failed to load model '{model_name}': {e}")
 
@@ -590,6 +591,8 @@ class TritonLLMEngine(LLMEngine):
             # in-flight request draining and conflict resolution internally.
             try:
                 await asyncio.to_thread(self._unload_model_sync, model_name)
+            except tritonserver.InvalidArgumentError as e:
+                raise ClientError(f"Failed to unload model '{model_name}': {e}")
             except tritonserver.TritonError as e:
                 raise ServerError(f"Failed to unload model '{model_name}': {e}")
 

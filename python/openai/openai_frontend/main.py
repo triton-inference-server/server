@@ -157,8 +157,8 @@ def parse_args():
         choices=["none", "explicit"],
         help="Specify the mode for model management. Options are 'none', and 'explicit'. "
         "The default is 'none'. For 'none', the server will load all models in the model "
-        "repository at startup and will not make any changes to the load "
-        "models after that. For 'explicit', model load and unload is initiated by using the "
+        "repository at startup and will not make any changes to the loaded "
+        "models after that. For 'explicit', model load and unload are initiated by using the "
         "model control APIs, and only models specified with --load-model will "
         "be loaded at startup.",
     )

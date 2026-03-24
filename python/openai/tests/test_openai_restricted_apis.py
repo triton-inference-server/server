@@ -40,7 +40,7 @@ def assert_response_success(
     """Assert that a response was successful."""
     assert (
         response.status_code == expected_status
-    ), f"{description} should return {expected_status}, got {response.status_code}"
+    ), f"{description} should return {expected_status}, got {response.status_code} {response.text}"
 
 
 def assert_response_unauthorized(
@@ -49,7 +49,7 @@ def assert_response_unauthorized(
     """Assert that a response was unauthorized."""
     assert (
         response.status_code == expected_status
-    ), f"{description} should be unauthorized with {expected_status}, got {response.status_code}"
+    ), f"{description} should be unauthorized with {expected_status}, got {response.status_code} {response.text}"
 
 
 def make_get_request(
@@ -129,6 +129,7 @@ def verify_inference_endpoints(
 def verify_model_repository_endpoints(
     base_url, model, headers, expected_success, description_prefix
 ):
+    # Verify model repository endpoints
     response = make_get_request(base_url, "/v1/models", headers=headers)
     if expected_success:
         assert_response_success(
@@ -149,13 +150,10 @@ def verify_model_repository_endpoints(
             response, description=f"{description_prefix} Specific model endpoint"
         )
 
-
-def verify_model_repository_management_endpoints(
-    base_url, model, headers, expected_success, description_prefix
-):
-    for endpoint in ["load", "unload"]:
+    # Verify model management endpoints
+    for endpoint in ["unload", "load"]:
         response = requests.post(
-            f"{base_url}/v1/models/{model}/{endpoint}", headers=headers, timeout=120
+            f"{base_url}/v1/models/{model}/{endpoint}", headers=headers
         )
         if expected_success:
             assert_response_success(
@@ -307,6 +305,10 @@ class TestOpenAIServerRestrictedAPIs:
             tokenizer_model,
             "--backend",
             backend,
+            "--model-control-mode",
+            "explicit",
+            "--load-model",
+            "*",
             "--openai-restricted-api",
             "inference,model-repository",
             "admin-key",
@@ -351,47 +353,6 @@ class TestOpenAIServerRestrictedAPIs:
 
 
 @pytest.mark.openai
-class TestOpenAIServerModelRepositoryRestriction:
-    """Model-repository restriction for dynamic model load/unload."""
-
-    @pytest.fixture(scope="class")
-    def server_with_restrictions_explicit_mode(self):
-        args = [
-            "--model-repository",
-            str(Path(__file__).parent / "test_models"),
-            "--model-control-mode",
-            "explicit",
-            "--openai-restricted-api",
-            "model-repository",
-            "mgmt-key",
-            "mgmt-secret",
-        ]
-        with OpenAIServer(args) as openai_server:
-            yield openai_server
-
-    @pytest.mark.parametrize(
-        "headers, expected_success, description",
-        [
-            (None, False, "No auth"),
-            ({"mgmt-key": "mgmt-secret"}, True, "Valid auth"),
-            ({"mgmt-key": "wrong-secret"}, False, "Invalid auth value"),
-            ({"wrong-key": "mgmt-secret"}, False, "Invalid auth key"),
-        ],
-    )
-    def test_model_repository_management_endpoints_with_auth(
-        self,
-        server_with_restrictions_explicit_mode,
-        headers,
-        expected_success,
-        description,
-    ):
-        base_url = server_with_restrictions_explicit_mode.url_root
-        verify_model_repository_management_endpoints(
-            base_url, "mock_llm", headers, expected_success, description
-        )
-
-
-@pytest.mark.openai
 class TestOpenAIServerMultipleRestrictions:
     """Test cases for OpenAI server with multiple restriction groups."""
 
@@ -405,6 +366,10 @@ class TestOpenAIServerMultipleRestrictions:
             tokenizer_model,
             "--backend",
             backend,
+            "--model-control-mode",
+            "explicit",
+            "--load-model",
+            "*",
             "--openai-restricted-api",
             "model-repository",
             "model-key",
