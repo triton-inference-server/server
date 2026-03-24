@@ -564,11 +564,14 @@ runtime. The default is `none`.
 > See [Triton Model Management](../../docs/user_guide/model_management.md) for
 > more details.
 
-### Loading Models at Startup (Explicit Mode)
+### Load Models at Startup (Explicit Mode)
 
 When using `--model-control-mode=explicit`, use `--load-model` to specify which
 models should be loaded at startup. It may be specified multiple times to load
 multiple models.
+
+<details>
+<summary>Example</summary>
 
 ```bash
 # Start in explicit mode with no models loaded
@@ -600,15 +603,16 @@ python3 openai_frontend/main.py \
   --load-model '*'
 ```
 
+</details>
+
 > [!IMPORTANT]
-> `--load-model` requires `--model-control-mode=explicit`. Using `--load-model`
-> without it is an error. `--load-model=*` must be the **only** `--load-model`
-> argument and combining it with a named model is an error.
+> - `--load-model` requires `--model-control-mode=explicit`.
+> - `--load-model=*` can not be used together with loading specific models.
 
 ### Dynamic Load / Unload API
 
 Once the server is running in `explicit` mode, models can be loaded and unloaded
-at runtime via these endpoints:
+at runtime via the following endpoints:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -656,40 +660,6 @@ curl -s -X POST http://localhost:9000/v1/models/${MODEL}/unload | jq
 ```
 
 </details>
-
-#### Error cases
-
-| Scenario | HTTP Status | Detail |
-|----------|-------------|--------|
-| `--model-control-mode` is not `explicit` | 400 | `Model load/unload requires --model-control-mode=explicit` |
-| Model already loaded (duplicate load) | 400 | `Model '<name>' is already loaded` |
-| Model not loaded (unload unknown) | 400 | `Unknown model: <name>` |
-| Model not found in repository | 500 | Triton error: `failed to poll from model repository` |
-
-### Restricting the Model Management APIs
-
-The model management endpoints can be protected with authentication headers using
-`--openai-restricted-api model-repository`.
-
-```bash
-python3 openai_frontend/main.py \
-  --model-repository /path/to/models \
-  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
-  --model-control-mode explicit \
-  --load-model llama-3.1-8b-instruct \
-  --openai-restricted-api model-repository admin-key admin-secret
-```
-
-Clients must then include the header for model management requests such as
-load/unload:
-
-```bash
-curl -H "admin-key: admin-secret" \
-  -X POST http://localhost:9000/v1/models/llama-3.1-8b-instruct/load
-```
-
-See [Limit Endpoint Access](#limit-endpoint-access) for more details on
-restricting API groups.
 
 ## Model Parallelism Support
 

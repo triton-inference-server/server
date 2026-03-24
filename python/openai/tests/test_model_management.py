@@ -188,7 +188,7 @@ class _ModelManagementBase:
     def base_url(self, server: OpenAIServer):
         return server.url_root
 
-    @pytest.fixture(scope="class")
+    @pytest.fixture
     def all_models(self) -> list[str]:
         return [TEST_MODEL, TEST_MODEL_2]
 
@@ -241,6 +241,10 @@ class TestModelControlModeNone(_ModelManagementBase):
     @pytest.fixture(scope="class")
     def model_repository(self):
         return TEST_MODEL_REPOSITORY
+
+    @pytest.fixture(scope="class")
+    def model_control_mode(self, request):
+        return request.param
 
     @pytest.mark.parametrize("model_control_mode", [None, "none"], indirect=True)
     def test_load_and_unload_rejected(self, base_url):
@@ -527,7 +531,7 @@ class TestModelManagementInference(_ModelManagementBase):
     def model_control_mode(self):
         return "explicit"
 
-    @pytest.fixture(scope="class")
+    @pytest.fixture
     def all_models(self, model: str) -> list[str]:
         if model == "tensorrt_llm_bls":
             return ["postprocessing", "preprocessing", "tensorrt_llm", model]
