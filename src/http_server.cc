@@ -2700,12 +2700,12 @@ HTTPAPIServer::ParseJsonTritonIO(
           infer_req->serialized_data_.emplace_back();
           std::vector<char>& serialized = infer_req->serialized_data_.back();
           serialized.resize(byte_size);
-          char* serialized_base = &serialized[0];
+
           RETURN_IF_ERR(ReadDataFromJson(
-              input_name, tensor_data, serialized_base, dtype,
+              input_name, tensor_data, &serialized[0], dtype,
               dtype == TRITONSERVER_TYPE_BYTES ? byte_size : element_cnt));
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
-              irequest, input_name, serialized_base, serialized.size(),
+              irequest, input_name, &serialized[0], serialized.size(),
               TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
         }
       }
@@ -3718,18 +3718,15 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
     serialized_data_.emplace_back();
     std::vector<char>& serialized = serialized_data_.back();
     serialized.resize(byte_size);
-    char* serialized_base = &serialized[0];
 
     RETURN_IF_ERR(ReadDataFromJson(
-        name.c_str(), tensor_data, serialized_base, dtype,
+        name.c_str(), tensor_data, &serialized[0], dtype,
         dtype == TRITONSERVER_TYPE_BYTES ? byte_size : element_cnt));
-
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(
         triton_request_.get(), name.c_str(), dtype, &shape_vec[0],
         shape_vec.size()));
-
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
-        triton_request_.get(), name.c_str(), serialized_base, serialized.size(),
+        triton_request_.get(), name.c_str(), &serialized[0], serialized.size(),
         TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
   }
   return nullptr;  // success
