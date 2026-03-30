@@ -1,4 +1,4 @@
-// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -643,12 +643,26 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       static_cast<ResponseReleasePayload*>(userp));
   auto state = response_release_payload->state_;
 
-  // Ignore Response from CORE in case GRPC Strict as we dont care about
-  if (state->context_->gRPCErrorTracker_->triton_grpc_error_) {
-    std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
-    if (state->context_->gRPCErrorTracker_->GRPCErrorEncountered()) {
-      return;
+  // In triton_grpc_error mode, WriteGRPCErrorResponse closes the stream on
+  // the first error and sets grpc_stream_closed_. The backend may still send
+  // subsequent responses or the FINAL flag — safely discard them here.
+  // This flag is checked instead of state->context_ to avoid a race with
+  // the CQ thread that may release the state (setting context_ to nullptr)
+  // concurrently.
+  if (response_release_payload->triton_grpc_error_ &&
+      response_release_payload->grpc_stream_closed_.load()) {
+    LOG_VERBOSE(1)
+        << "ModelStreamInferHandler::StreamInferResponseComplete, "
+        << "skipping callback after stream closed (triton_grpc_error mode)";
+    if (iresponse != nullptr) {
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceResponseDelete(iresponse),
+          "deleting GRPC inference response");
     }
+    if (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) {
+      delete response_release_payload;
+    }
+    return;
   }
   // Increment the callback index
   uint32_t response_index = state->cb_count_++;
@@ -739,12 +753,19 @@ ModelStreamInferHandler::StreamInferResponseComplete(
         LOG_VERBOSE(1) << "GRPC streaming error detected with status: "
                        << status.error_code() << "Closing stream connection."
                        << std::endl;
+        // Mark the stream as closed BEFORE calling WriteGRPCErrorResponse,
+        // which triggers Finish() and eventual state release. Subsequent
+        // callbacks from the backend will see this flag and bail out
+        // without touching the (potentially released) state.
+        response_release_payload->grpc_stream_closed_.store(true);
         state->context_->WriteGRPCErrorResponse(state);
         TRITONSERVER_ErrorDelete(err);
         LOG_TRITONSERVER_ERROR(
             TRITONSERVER_InferenceResponseDelete(iresponse),
             "deleting GRPC inference response");
-        delete response_release_payload;
+        if (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) {
+          delete response_release_payload;
+        }
         return;
       }
     }
