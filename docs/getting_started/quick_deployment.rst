@@ -1,5 +1,5 @@
 ..
-.. Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+.. Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 ..
 .. Redistribution and use in source and binary forms, with or without
 .. modification, are permitted provided that the following conditions
@@ -29,12 +29,11 @@
 Quick Deployment Guide by backend
 ####
 
-.. include:: quick_start.rst
-
 .. toctree::
    :maxdepth: 1
    :hidden:
 
+   Quickstart <quickstart.md>
    TRT-LLM <llm.md>
    vLLM <../tutorials/Popular_Models_Guide/Llama2/vllm_guide.md>
    Python with HuggingFace <../tutorials/Quick_Deploy/HuggingFaceTransformers/README.md>

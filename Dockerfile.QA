@@ -1,4 +1,4 @@
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -139,7 +139,7 @@ RUN mkdir -p qa/common && \
     mkdir qa/L0_data_compression/models && \
     cp -r docs/examples/model_repository/simple qa/L0_data_compression/models && \
     cp bin/data_compressor_test qa/L0_data_compression/. && \
-    cp bin/backend_tensor_size_test qa/L0_input_validation/. && \
+    cp bin/tensor_size_test qa/L0_input_validation/. && \
     cp bin/metrics_api_test qa/L0_metrics/. && \
     cp bin/response_cache_test qa/L0_response_cache/. && \
     cp bin/request_cancellation_test qa/L0_request_cancellation/. && \

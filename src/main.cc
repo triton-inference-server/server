@@ -1,4 +1,4 @@
-// Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -180,10 +180,22 @@ StartSagemakerService(
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
+  size_t max_input_size = triton::server::HTTP_DEFAULT_MAX_INPUT_SIZE;
+  triton::server::RestrictedFeatures restricted_apis{};
+#ifdef TRITON_ENABLE_HTTP
+  // Reuse HTTP server settings for SageMaker endpoint behavior. In
+  // particular, --http-restricted-api and --http-max-input-size also apply
+  // to SageMaker requests. Without TRITON_ENABLE_HTTP, SageMaker falls back to
+  // default input size and unrestricted APIs (no command-line configuration for
+  // restricted APIs).
+  max_input_size = g_triton_params.http_max_input_size_;
+  restricted_apis = g_triton_params.http_restricted_apis_;
+#endif  // TRITON_ENABLE_HTTP
+
   TRITONSERVER_Error* err = triton::server::SagemakerAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.sagemaker_port_,
       g_triton_params.sagemaker_address_, g_triton_params.sagemaker_thread_cnt_,
-      service);
+      max_input_size, restricted_apis, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -204,10 +216,23 @@ StartVertexAiService(
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
+  size_t max_input_size = triton::server::HTTP_DEFAULT_MAX_INPUT_SIZE;
+  triton::server::RestrictedFeatures restricted_apis{};
+#ifdef TRITON_ENABLE_HTTP
+  // Reuse HTTP server settings for Vertex AI endpoint behavior. In
+  // particular, --http-restricted-api and --http-max-input-size also apply
+  // to Vertex AI requests. Without TRITON_ENABLE_HTTP, Vertex AI falls back to
+  // default input size and unrestricted APIs (no command-line configuration for
+  // restricted APIs).
+  max_input_size = g_triton_params.http_max_input_size_;
+  restricted_apis = g_triton_params.http_restricted_apis_;
+#endif  // TRITON_ENABLE_HTTP
+
   TRITONSERVER_Error* err = triton::server::VertexAiAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.vertex_ai_port_,
       g_triton_params.vertex_ai_address_, g_triton_params.vertex_ai_thread_cnt_,
-      g_triton_params.vertex_ai_default_model_, service);
+      max_input_size, restricted_apis, g_triton_params.vertex_ai_default_model_,
+      service);
   if (err == nullptr) {
     err = (*service)->Start();
   }

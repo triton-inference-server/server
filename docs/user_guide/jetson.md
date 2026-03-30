@@ -1,5 +1,5 @@
 <!--
-# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,7 +41,7 @@ Triton Inference Server support on JetPack includes:
 * [Model pipelines](architecture.md#ensemble-models)
 * [Extensible backends](https://github.com/triton-inference-server/backend)
 * [HTTP/REST and GRPC inference protocols](../customization_guide/inference_protocols.md)
-* [C API](../customization_guide/inference_protocols.md#in-process-triton-server-api)
+* [C API](../customization_guide/inprocess_c_api.md)
 
 Limitations on JetPack 5.0:
 
@@ -52,7 +52,7 @@ The CUDA execution provider is in Beta.
 * GPU metrics, GCS storage, S3 storage and Azure storage are not supported.
 
 On JetPack, although HTTP/REST and GRPC inference protocols are supported, for edge
-use cases, direct [C API integration](../customization_guide/inference_protocols.md#in-process-triton-server-api)
+use cases, direct [C API integration](../customization_guide/inprocess_c_api.md)
 is recommended.
 
 You can download the `.tgz` file for Jetson from the Triton Inference Server

@@ -1,4 +1,4 @@
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,8 +35,20 @@ from openai import BadRequestError, NotFoundError
 from openai_frontend.engine.utils.triton import (
     _parse_lora_configs as parse_lora_configs,
 )
+from openai_frontend.engine.utils.triton import (
+    _validate_lora_path_trtllm as validate_lora_path_trtllm,
+)
 
 from .utils import OpenAIServer
+
+
+def is_vllm_installed():
+    try:
+        import vllm as _
+
+        return True
+    except ImportError:
+        return False
 
 
 @pytest.mark.parametrize(
@@ -74,13 +86,62 @@ def test_parse_lora_configs(model_repository: str, model_name: str, expect_error
             )
 
 
-def is_vllm_installed():
+@pytest.mark.skipif(
+    is_vllm_installed(),
+    reason="VLLM backend does not validate LoRA paths",
+)
+@pytest.mark.parametrize(
+    "lora_path,expect_error,error_message",
+    [
+        # Valid relative path inside repo (requires .npy files to exist at runtime).
+        ("tensorrt_llm_bls/1/luotuo-lora-7b-0.1-weights", False, None),
+        ("tensorrt_llm_bls/1/Japanese-Alpaca-LoRA-7b-v0-weights", False, None),
+        # Absolute path not allowed.
+        (
+            os.path.join(
+                os.path.abspath(os.curdir),
+                "tests/tensorrtllm_models",
+                "tensorrt_llm_bls/1/luotuo-lora-7b-0.1-weights",
+            ),
+            True,
+            f"must be a relative path inside its model repository",
+        ),
+        ("/etc/passwd", True, "must be a relative path inside its model repository"),
+        # Path outside repo (traversal).
+        ("tensorrt_llm_bls/1//../1/luotuo-lora-7b-0.1-weights", False, None),
+        ("../outside/lora", True, "must be inside its model repository"),
+        ("subdir/../../etc/passwd", True, "must be inside its model repository"),
+        # LoRA directory not found.
+        ("tensorrt_llm_bls/10", True, "LoRA directory 'tensorrt_llm_bls/10' not found"),
+        (
+            "tensorrt_llm_bls/1/non_exist",
+            True,
+            "LoRA directory 'tensorrt_llm_bls/1/non_exist' not found",
+        ),
+        # LoRA file not found.
+        ("tensorrt_llm_bls/1", True, "LoRA file 'model.lora_weights.npy' not found"),
+    ],
+)
+def test_validate_lora_path_trtllm(
+    lora_path: str,
+    expect_error: bool,
+    error_message: str,
+):
+    lora_name = ""
+    repo_path = "tests/tensorrtllm_models"
     try:
-        import vllm as _
-
-        return True
-    except ImportError:
-        return False
+        validate_lora_path_trtllm(repo_path, lora_path, lora_name)
+    except Exception as e:
+        if not expect_error:
+            raise pytest.fail(
+                f"repo_path='{repo_path}' raised exception unexpectedly: {e}"
+            )
+        assert error_message in str(e)
+    else:
+        if expect_error:
+            raise pytest.fail(
+                f"lora_path='{repo_path}' did not raise exception as expected."
+            )
 
 
 class LoRATest(unittest.TestCase):

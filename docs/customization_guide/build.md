@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -58,8 +58,6 @@ Platforms](#building-on-unsupported-platforms) if you are attempting
 to build Triton on a platform that is not listed here.
 
 * [Ubuntu 22.04, x86-64](#building-for-ubuntu-2204)
-
-* [Jetpack 4.x, NVIDIA Jetson (Xavier, Nano, TX2)](#building-for-jetpack-4x)
 
 * [Windows 10, x86-64](#building-for-windows-10)
 

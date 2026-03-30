@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -57,7 +57,6 @@ class TestCompletions:
             ("top_p", 0.9),
             ("frequency_penalty", 0.5),
             ("presence_penalty", 0.2),
-            ("best_of", 1),
             ("n", 1),
             # logprobs is an integer for completions
             ("logprobs", 5),
@@ -359,7 +358,12 @@ class TestCompletions:
         ],
     )
     def test_completions_multiple_choices(
-        self, client, sampling_parameter_dict: dict, model: str, prompt: str
+        self,
+        client,
+        sampling_parameter_dict: dict,
+        backend: str,
+        model: str,
+        prompt: str,
     ):
         response = client.post(
             "/v1/completions",
@@ -370,7 +374,11 @@ class TestCompletions:
         # FIXME: Add support and test for success
         # Expected to fail when n or best_of > 1, only single choice supported for now
         assert response.status_code == 400
-        assert "only single choice" in response.json()["detail"]
+        if backend == "vllm" and "best_of" in sampling_parameter_dict:
+            error_message = "best_of is no longer supported in vLLM backend"
+        else:
+            error_message = "only single choice"
+        assert error_message in response.json()["detail"]
 
     @pytest.mark.skip(reason="Not Implemented Yet")
     def test_lora(self):

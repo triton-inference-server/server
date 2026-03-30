@@ -1,4 +1,4 @@
-# Copyright (c) 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -77,12 +77,10 @@ def update_and_get_license() -> str:
     """
     Updates the copyright year in the LICENSE file if necessary and then
     returns its contents.
+
+    Note: LICENSE file maintains a year range if it has an older starting year.
     """
-    # TODO: Check if this is right - if the license file needs to have a range,
-    # we need to remove the range before returning the license text.
-    #
-    # License file should always have the current year.
-    update_copyright_year(LICENSE_PATH, disallow_range=True)
+    update_copyright_year(LICENSE_PATH)
 
     with open(LICENSE_PATH, "r") as license_file:
         return license_file.read()
@@ -253,6 +251,11 @@ def rst(path):
 
 def add_copyrights(paths):
     for path in paths:
+        # Special case: LICENSE file only needs year update
+        if os.path.basename(path) == "LICENSE":
+            update_copyright_year(path)
+            continue
+
         for match, handler in FILE_TYPE_HANDLERS.items():
             if match(path):
                 handler(path)
@@ -370,5 +373,6 @@ def test_adding_new_copyrights(content, extension, expected):
     assert process_text(content, extension).startswith(expected)
 
 
-def test_license_has_no_range():
-    assert LICENSE_TEXT.startswith(f"Copyright (c) {current_year},")
+def test_license_has_current_year():
+    # LICENSE file should have the current year (either as single year or end of range)
+    assert f"{current_year}, NVIDIA CORPORATION" in LICENSE_TEXT

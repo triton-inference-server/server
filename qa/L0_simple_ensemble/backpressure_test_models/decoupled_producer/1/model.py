@@ -1,4 +1,4 @@
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,6 +25,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+import time
+
 import numpy as np
 import triton_python_backend_utils as pb_utils
 
@@ -38,13 +40,14 @@ class TritonPythonModel:
         for request in requests:
             # Get input - number of responses to produce
             in_tensor = pb_utils.get_input_tensor_by_name(request, "IN")
-            count = in_tensor.as_numpy()[0]
+            count = in_tensor.as_numpy().item()
 
             response_sender = request.get_response_sender()
+            out_tensor = pb_utils.Tensor("OUT", np.array([[0.5]], dtype=np.float32))
 
             # Produce 'count' responses, each with 0.5 as the output value
             for i in range(count):
-                out_tensor = pb_utils.Tensor("OUT", np.array([0.5], dtype=np.float32))
+                time.sleep(0.1)  # Simulate some processing delay
                 response = pb_utils.InferenceResponse(output_tensors=[out_tensor])
                 response_sender.send(response)
 

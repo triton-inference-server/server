@@ -1,5 +1,5 @@
 <!--
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,9 +34,9 @@ custom parameters that cannot be provided as inputs. Because this extension is
 supported, Triton reports “parameters” in the extensions field of its
 Server Metadata. This extension uses the optional "parameters"
 field in the KServe Protocol in
-[HTTP](https://kserve.github.io/website/0.10/modelserving/data_plane/v2_protocol/#inference-request-json-object)
+[HTTP](https://kserve.github.io/website/docs/concepts/architecture/data-plane/v2-protocol#inference-request-json-object)
 and
-[GRPC](https://kserve.github.io/website/0.10/modelserving/data_plane/v2_protocol/#parameters).
+[GRPC](https://kserve.github.io/website/docs/concepts/architecture/data-plane/v2-protocol#parameters).
 
 The following parameters are reserved for Triton's usage and should not be
 used as custom parameters:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -71,14 +71,14 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.65.0dev",
-    "triton_container_version": "26.01dev",
-    "upstream_container_version": "25.11",
-    "ort_version": "1.23.2",
-    "ort_openvino_version": "2025.4.0",
-    "standalone_openvino_version": "2025.4.0",
-    "dcgm_version": "4.4.2-1",
-    "vllm_version": "0.11.1",
+    "release_version": "2.67.0dev",
+    "triton_container_version": "26.03dev",
+    "upstream_container_version": "26.02",
+    "ort_version": "1.24.2",
+    "ort_openvino_version": "2026.0.0",
+    "standalone_openvino_version": "2026.0.0",
+    "dcgm_version": "4.5.2-1",
+    "vllm_version": "0.16.0",
     "rhel_py_version": "3.12.3",
 }
 
@@ -1116,7 +1116,8 @@ RUN pip3 install --upgrade \\
           docker \\
           virtualenv \\
           patchelf==0.17.2 \\
-          cmake==4.0.3
+          cmake==4.0.3 \\
+          pybind11[global]
 """
 
         df += f"""
@@ -1207,12 +1208,19 @@ def create_dockerfile_linux(
     df = """
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
-ARG BASE_IMAGE={}
-
 """.format(
         argmap["TRITON_VERSION"],
         argmap["TRITON_CONTAINER_VERSION"],
-        argmap["BASE_IMAGE"],
+    )
+    if "vllm" in backends and argmap["INFERENCE_IMAGE"] is None:
+        argmap[
+            "INFERENCE_IMAGE"
+        ] = f"nvcr.io/nvidia/vllm:{FLAGS.upstream_container_version}-py3"
+    df += """ARG BASE_IMAGE={}
+""".format(
+        argmap["INFERENCE_IMAGE"]
+        if argmap["INFERENCE_IMAGE"] is not None
+        else argmap["BASE_IMAGE"],
     )
 
     # PyTorch backends need extra CUDA and other
@@ -1272,21 +1280,10 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.13 backends
 """
     if "tensorrtllm" in backends:
         df += """
-# Install required packages for TRT-LLM models
-# Remove contents that are not needed in runtime
-# Setuptools has breaking changes in version 70.0.0, so fix it to 69.5.1
-# The generated code in grpc_service_pb2_grpc.py depends on grpcio>=1.64.0, so fix it to 1.64.0
 RUN ldconfig && \\
-    ARCH="$(uname -i)" && \\
-    rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \\
-    rm -fr ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \\
-    rm -fr ${TRT_ROOT}/samples ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples && \\
-    pip3 install --no-cache-dir transformers && \\
-    find /usr -name libtensorrt_llm.so -exec dirname {} \\; > /etc/ld.so.conf.d/tensorrt-llm.conf && \\
-    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \\; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \\
-    pip3 install --no-cache-dir  grpcio-tools==1.64.0 && \\
-    pip3 uninstall -y setuptools
-ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
+    find /opt/tritonserver -name lib*so -exec dirname {} \\; > /etc/ld.so.conf.d/tritonserver.conf && \\
+    ldconfig
+
 """
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -1363,7 +1360,7 @@ RUN yum install -y \\
         libb64-devel \\
         gperftools-devel \\
         wget \\
-        python3-pip \\
+        python3.12-pip \\
         numactl-devel
 
 RUN pip3 install patchelf==0.17.2
@@ -1465,44 +1462,6 @@ RUN apt-get update \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
 """
-
-    if "vllm" in backends:
-        df += f"""
-# Install required packages for vLLM models
-ARG BUILD_PUBLIC_VLLM="true"
-RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
-    --mount=type=secret,id=VLLM_INDEX_URL,env=VLLM_INDEX_URL \\
-    --mount=type=secret,id=PYTORCH_TRITON_URL,env=PYTORCH_TRITON_URL \\
-    --mount=type=secret,id=NVPL_SLIM_URL,env=NVPL_SLIM_URL \\
-    if [ "$BUILD_PUBLIC_VLLM" = "false" ]; then \\
-        if [ "$(uname -m)" = "x86_64" ]; then \\
-            pip3 install --no-cache-dir \\
-                mkl==2021.1.1 \\
-                mkl-include==2021.1.1 \\
-                mkl-devel==2021.1.1; \\
-        elif [ "$(uname -m)" = "aarch64" ]; then \\
-            echo "Downloading NVPL from: $NVPL_SLIM_URL" && \\
-            cd /tmp && \\
-            wget -O nvpl_slim_24.04.tar $NVPL_SLIM_URL && \\
-            tar -xf nvpl_slim_24.04.tar && \\
-            cp -r nvpl_slim_24.04/lib/* /usr/local/lib && \\
-            cp -r nvpl_slim_24.04/include/* /usr/local/include && \\
-            rm -rf nvpl_slim_24.04.tar nvpl_slim_24.04; \\
-        fi \\
-        && pip3 install --no-cache-dir --extra-index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
-        # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
-        && cd /tmp \\
-        && wget $PYTORCH_TRITON_URL \\
-        && pip install --no-cache-dir /tmp/pytorch_triton-*.whl \\
-        && rm /tmp/pytorch_triton-*.whl; \\
-    else \\
-        # public vLLM needed for vLLM backend
-        pip3 install vllm=={DEFAULT_TRITON_VERSION_MAP["vllm_version"]}; \\
-    fi
-
-ARG PYVER=3.12
-ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages/torch/lib:${{LD_LIBRARY_PATH}}
-"""
     if "tensorrtllm" in backends or "vllm" in backends:
         df += """
 ENV TRITON_CUDACRT_PATH=/usr/local/cuda/include \\
@@ -1583,6 +1542,7 @@ COPY --from=min_container /usr/local/cuda/lib64/libnvJitLink.so.13 /usr/local/cu
 COPY --from=min_container /usr/local/cuda/lib64/libcufile.so.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libnvrtc.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libcusparseLt.so.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libnvshmem_host.so.3 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
 COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1
@@ -1711,12 +1671,18 @@ def create_build_dockerfiles(
     else:
         base_image = "ubuntu:24.04"
 
+    if "inference" in images:
+        inference_image = images["inference"]
+    else:
+        inference_image = None
+
     dockerfileargmap = {
         "NVIDIA_BUILD_REF": "" if FLAGS.build_sha is None else FLAGS.build_sha,
         "NVIDIA_BUILD_ID": "<unknown>" if FLAGS.build_id is None else FLAGS.build_id,
         "TRITON_VERSION": FLAGS.version,
         "TRITON_CONTAINER_VERSION": FLAGS.container_version,
         "BASE_IMAGE": base_image,
+        "INFERENCE_IMAGE": inference_image,
         "DCGM_VERSION": FLAGS.dcgm_version,
     }
 
@@ -2092,11 +2058,6 @@ def backend_build(
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
     if be == "tensorrtllm":
-        github_organization = (
-            "https://github.com/NVIDIA"
-            if "triton-inference-server" in FLAGS.github_organization
-            else FLAGS.github_organization
-        )
         repository_name = "TensorRT-LLM"
         cmake_script.gitclone(repository_name, tag, be, github_organization)
     else:
@@ -2951,7 +2912,7 @@ if __name__ == "__main__":
             len(parts) != 2, "--image must specify <image-name>,<full-image-registry>"
         )
         fail_if(
-            parts[0] not in ["base", "gpu-base", "pytorch"],
+            parts[0] not in ["base", "gpu-base", "pytorch", "inference"],
             "unsupported value for --image",
         )
         log('image "{}": "{}"'.format(parts[0], parts[1]))

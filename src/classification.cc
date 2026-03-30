@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2025, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2026, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -89,6 +89,15 @@ TopkClassifications(
   }
 
   const size_t element_cnt = byte_size / dtype_byte_size;
+  // Prevent pathological memory / CPU usage from unbounded classification
+  // outputs.
+  constexpr size_t kMaxClassificationElements = 1'000'000;
+
+  if (element_cnt > kMaxClassificationElements) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        "classification output tensor too large");
+  }
 
   switch (datatype) {
     case TRITONSERVER_TYPE_UINT8:

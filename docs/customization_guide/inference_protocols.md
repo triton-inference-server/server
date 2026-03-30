@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@
 Clients can communicate with Triton using either an [HTTP/REST
 protocol](#httprest-and-grpc-protocols), a [GRPC
 protocol](#httprest-and-grpc-protocols), or by an [in-process C
-API](inprocess_c_api.md#in-process-triton-server-api) or its
+API](inprocess_c_api.md) or its
 [C++ wrapper](https://github.com/triton-inference-server/developer_tools/tree/main/server).
 
 ## HTTP/REST and GRPC Protocols
@@ -142,7 +142,7 @@ For client-side documentation, see [Client-Side GRPC Status Codes](https://githu
 
 #### GRPC Inference Handler Threads
 
-In general, using 2 threads per completion queue seems to give the best performance, see [gRPC Performance Best Practices] (https://grpc.io/docs/guides/performance/#c). However, in cases where the performance bottleneck is at the request handling step (e.g. ensemble models), increasing the number of gRPC inference handler threads may lead to a higher throughput.
+In general, using 2 threads per completion queue seems to give the best performance, see [gRPC Performance Best Practices](https://grpc.io/docs/guides/performance/#c). However, in cases where the performance bottleneck is at the request handling step (e.g. ensemble models), increasing the number of gRPC inference handler threads may lead to a higher throughput.
 
 * `--grpc-infer-thread-count`: 2 by default.
 
@@ -162,6 +162,11 @@ protocol group (GRPC) or restricted API group (HTTP):
 --grpc-restricted-protocol=<protocol_1>,<protocol_2>,...:<restricted-key>=<restricted-value>
 --http-restricted-api=<API_1>,API_2>,...:<restricted-key>=<restricted-value>
 ```
+
+When Vertex AI endpoint support is enabled, `--http-restricted-api`
+also applies to redirected Vertex AI requests.
+If Triton is built without `TRITON_ENABLE_HTTP`, Vertex AI falls back
+to default unrestricted API settings.
 
 The option can be specified multiple times to specifies multiple groups of
 protocols or APIs with different restriction settings.
