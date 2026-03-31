@@ -154,7 +154,7 @@ cp ./test_models/is_ready_fn_returns_true_decoupled/config.pbtxt \
     ./models/is_ready_fn_returns_true_decoupled/config.pbtxt
 
 # Start server with all models
-SERVER_ARGS="--model-repository=$(pwd)/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=$(pwd)/models --backend-directory=${BACKEND_DIR} --log-verbose=1 --strict-readiness=false"
 SERVER_LOG="./test_user_defined_model_readiness_function_server.log"
 CLIENT_LOG="./test_user_defined_model_readiness_function_client.log"
 
