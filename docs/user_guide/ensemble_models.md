@@ -198,9 +198,9 @@ Consider an example ensemble model with two steps where the upstream model is 10
 1. **Preprocessing model**: Produces 100 preprocessed requests/sec
 2. **Inference model**: Consumes 10 requests/sec
 
-Without backpressure, requests accumulate in the pipeline faster than they can be processed, eventually leading to out-of-memory errors.
+Without backpressure, requests accumulate in the pipeline faster than they can be processed, which eventually leads to out-of-memory errors.
 
-The `max_inflight_requests` field in the ensemble configuration defines a global limit on the number of concurrent in-flight requests allowed at each ensemble step, across all active ensemble requests. Once this limit is reached, scheduling for that step is paused (blocked) until downstream capacity becomes available, effectively preventing unbounded memory growth.
+The `max_inflight_requests` field in the ensemble configuration defines a limit on the number of concurrent in-flight requests allowed at each ensemble step. This limit is shared across all active requests for that ensemble model. When the limit is reached, new request scheduling for that step is paused until downstream models free up capacity. This prevents requests from accumulating indefinitely and keeps memory usage under control.
 
 ```
 ensemble_scheduling {
@@ -224,7 +224,7 @@ ensemble_scheduling {
 ```
 
 **Configuration:**
-* **`max_inflight_requests: 16`**: Allows up to 16 in-flight requests for a given step (for example, requests from `dali_preprocess` waiting for `onnx_inference` to complete) across all active ensemble requests. Once this global, per-step limit is reached, scheduling additional work for that step is blocked until capacity becomes available.
+* **`max_inflight_requests: 16`**: Limits the number of concurrent in-flight requests at a given ensemble step to 16 (for example, requests from `dali_preprocess` waiting for `onnx_inference` to complete). This limit is shared across all active requests for that ensemble model. Once the limit is reached, scheduling new work for that step is paused until downstream capacity becomes available.
 * **Default (`0`)**: No limit — allows an unlimited number of in-flight requests (original behavior).
 
 ### When to Use This Feature

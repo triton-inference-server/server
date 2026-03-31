@@ -99,7 +99,7 @@ each time with a new response. You can take a look at [grpc_server.cc](https://g
 
 When using decoupled models within an [ensemble pipeline](ensemble_models.md), you may experience unbounded memory growth if a decoupled model produces responses faster than downstream models can consume them.
 
-To avoid this, consider using the `max_inflight_requests` configuration field. This field sets a global limit on the number of concurrent in-flight requests allowed at each ensemble step across all active ensemble requests, helping to prevent unbounded memory growth.
+To prevent this, use the `max_inflight_requests` configuration field. This field sets a limit on the maximum number of concurrent requests allowed at each ensemble step. The limit is shared across all active requests for that ensemble model, which helps control memory usage and prevents it from growing without bound.
 
 For more details and examples, see [Managing Memory Usage in Ensemble Models](ensemble_models.md#managing-memory-usage-in-ensemble-models).
 
