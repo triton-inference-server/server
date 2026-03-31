@@ -1,4 +1,4 @@
-// Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -424,11 +424,11 @@ TritonParser::SetupOptions()
        "Specify the mode for model management. Options are \"none\", \"poll\" "
        "and \"explicit\". The default is \"none\". "
        "For \"none\", the server will load all models in the model "
-       "repository(s) at startup and will not make any changes to the load "
+       "repository(s) at startup and will not make any changes to the loaded "
        "models after that. For \"poll\", the server will poll the model "
        "repository(s) to detect changes and will load/unload models based on "
        "those changes. The poll rate is controlled by 'repository-poll-secs'. "
-       "For \"explicit\", model load and unload is initiated by using the "
+       "For \"explicit\", model load and unload are initiated by using the "
        "model control APIs, and only models specified with --load-model will "
        "be loaded at startup."});
   model_repo_options_.push_back(

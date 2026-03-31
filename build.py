@@ -71,9 +71,9 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.67.0dev",
-    "triton_container_version": "26.03dev",
-    "upstream_container_version": "26.02",
+    "release_version": "2.67.0",
+    "triton_container_version": "26.03",
+    "upstream_container_version": "26.03",
     "ort_version": "1.24.2",
     "ort_openvino_version": "2026.0.0",
     "standalone_openvino_version": "2026.0.0",
@@ -1360,7 +1360,7 @@ RUN yum install -y \\
         libb64-devel \\
         gperftools-devel \\
         wget \\
-        python3-pip \\
+        python3.12-pip \\
         numactl-devel
 
 RUN pip3 install patchelf==0.17.2

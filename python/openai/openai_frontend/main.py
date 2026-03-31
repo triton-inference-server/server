@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -150,6 +150,31 @@ def parse_args():
         default=16,
         help="The default maximum number of tokens to generate if not specified in the request. The default is 16.",
     )
+    triton_group.add_argument(
+        "--model-control-mode",
+        type=str,
+        default="none",
+        choices=["none", "explicit"],
+        help="Specify the mode for model management. Options are 'none', and 'explicit'. "
+        "The default is 'none'. For 'none', the server will load all models in the model "
+        "repository at startup and will not make any changes to the loaded "
+        "models after that. For 'explicit', model load and unload are initiated by using the "
+        "model control APIs, and only models specified with --load-model will "
+        "be loaded at startup.",
+    )
+    triton_group.add_argument(
+        "--load-model",
+        type=str,
+        action="append",
+        default=None,
+        help="Name of the model to be loaded on server startup. It may be specified "
+        "multiple times to add multiple models. To load ALL models at startup, "
+        "specify '*' as the model name with --load-model=* as the ONLY "
+        "--load-model argument, this does not imply any pattern matching. "
+        "Specifying --load-model=* in conjunction with another --load-model "
+        "argument will result in error. Note that this option will only take "
+        "effect if --model-control-mode is set to 'explicit'.",
+    )
 
     # OpenAI-Compatible Frontend (FastAPI)
     openai_group = parser.add_argument_group("Triton OpenAI-Compatible Frontend")
@@ -200,8 +225,25 @@ def main():
     args = parse_args()
 
     # Initialize a Triton Inference Server pointing at LLM models
+    model_control_mode = (
+        tritonserver.ModelControlMode.EXPLICIT
+        if args.model_control_mode == "explicit"
+        else tritonserver.ModelControlMode.NONE
+    )
+
+    load_models = args.load_model or []
+    if load_models and model_control_mode != tritonserver.ModelControlMode.EXPLICIT:
+        print(
+            "Error: Use of '--load-model' requires setting "
+            "'--model-control-mode=explicit' as well.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     server: tritonserver.Server = tritonserver.Server(
         model_repository=args.model_repository,
+        model_control_mode=model_control_mode,
+        startup_models=load_models,
         log_verbose=args.tritonserver_log_verbose_level,
         log_info=True,
         log_warn=True,
