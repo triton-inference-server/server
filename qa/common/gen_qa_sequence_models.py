@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -174,7 +174,7 @@ def create_plan_shape_tensor_modelfile(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -265,7 +265,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -382,7 +382,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -390,7 +390,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
 def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
-    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype):
         return
 
     if dtype != np.float32:
@@ -400,9 +400,9 @@ def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
 
 
 def create_plan_modelconfig(
-    models_dir, model_version, max_batch, dtype, shape, shape_tensor_input_dtype=None
+    models_dir, max_batch, dtype, shape, shape_tensor_input_dtype=None
 ):
-    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -559,7 +559,7 @@ instance_group [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -567,7 +567,7 @@ instance_group [
 
 
 def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -665,14 +665,14 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
 
-def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+def create_onnx_modelconfig(models_dir, max_batch, dtype, shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -743,7 +743,7 @@ sequence_batching {{
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -796,13 +796,13 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype, shape
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     traced.save(model_version_dir + "/model.pt")
 
 
-def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype, shape):
+def create_libtorch_modelconfig(models_dir, max_batch, dtype, shape):
     if not tu.validate_for_libtorch_model(
         dtype, dtype, dtype, shape, shape, shape, max_batch
     ):
@@ -880,7 +880,7 @@ instance_group [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -895,9 +895,7 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype, shape
             max_batch,
         ]
     )
-    if not tu.validate_for_openvino_model(
-        dtype, dtype, dtype, batch_dim + shape, batch_dim + shape, batch_dim + shape
-    ):
+    if not tu.validate_for_openvino_model(dtype, dtype, dtype, batch_dim + shape):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -916,7 +914,7 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype, shape
     openvino_save_model(model_version_dir, model)
 
 
-def create_openvino_modelconfig(models_dir, model_version, max_batch, dtype, shape):
+def create_openvino_modelconfig(models_dir, max_batch, dtype, shape):
     batch_dim = (
         []
         if max_batch == 0
@@ -924,9 +922,7 @@ def create_openvino_modelconfig(models_dir, model_version, max_batch, dtype, sha
             max_batch,
         ]
     )
-    if not tu.validate_for_openvino_model(
-        dtype, dtype, dtype, batch_dim + shape, batch_dim + shape, batch_dim + shape
-    ):
+    if not tu.validate_for_openvino_model(dtype, dtype, dtype, batch_dim + shape):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -986,7 +982,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -998,16 +994,12 @@ def create_shape_tensor_models(
 ):
     model_version = 1
 
-    create_plan_modelconfig(
-        models_dir, model_version, 8, dtype, shape, shape_tensor_input_dtype
-    )
+    create_plan_modelconfig(models_dir, 8, dtype, shape, shape_tensor_input_dtype)
     create_plan_shape_tensor_modelfile(
         models_dir, model_version, 8, dtype, shape, shape_tensor_input_dtype
     )
     if no_batch:
-        create_plan_modelconfig(
-            models_dir, model_version, 0, dtype, shape, shape_tensor_input_dtype
-        )
+        create_plan_modelconfig(models_dir, 0, dtype, shape, shape_tensor_input_dtype)
         create_plan_shape_tensor_modelfile(
             models_dir, model_version, 0, dtype, shape, shape_tensor_input_dtype
         )
@@ -1023,32 +1015,32 @@ def create_models(models_dir, dtype, shape, no_batch=True):
         if dtype == np.int8:
             suffix = [1, 1]
 
-        create_plan_modelconfig(models_dir, model_version, 8, dtype, shape + suffix)
+        create_plan_modelconfig(models_dir, 8, dtype, shape + suffix)
         create_plan_models(models_dir, model_version, 8, dtype, shape + suffix)
         if no_batch:
-            create_plan_modelconfig(models_dir, model_version, 0, dtype, shape + suffix)
+            create_plan_modelconfig(models_dir, 0, dtype, shape + suffix)
             create_plan_models(models_dir, model_version, 0, dtype, shape + suffix)
 
     if FLAGS.onnx:
-        create_onnx_modelconfig(models_dir, model_version, 8, dtype, shape)
+        create_onnx_modelconfig(models_dir, 8, dtype, shape)
         create_onnx_modelfile(models_dir, model_version, 8, dtype, shape)
         if no_batch:
-            create_onnx_modelconfig(models_dir, model_version, 0, dtype, shape)
+            create_onnx_modelconfig(models_dir, 0, dtype, shape)
             create_onnx_modelfile(models_dir, model_version, 0, dtype, shape)
 
     # Skip for PyTorch String I/O
     if FLAGS.libtorch and (dtype != np_dtype_string):
-        create_libtorch_modelconfig(models_dir, model_version, 8, dtype, shape)
+        create_libtorch_modelconfig(models_dir, 8, dtype, shape)
         create_libtorch_modelfile(models_dir, model_version, 8, dtype, shape)
         if no_batch:
-            create_libtorch_modelconfig(models_dir, model_version, 0, dtype, shape)
+            create_libtorch_modelconfig(models_dir, 0, dtype, shape)
             create_libtorch_modelfile(models_dir, model_version, 0, dtype, shape)
 
     if FLAGS.openvino:
-        create_openvino_modelconfig(models_dir, model_version, 8, dtype, shape)
+        create_openvino_modelconfig(models_dir, 8, dtype, shape)
         create_openvino_modelfile(models_dir, model_version, 8, dtype, shape)
         if no_batch:
-            create_openvino_modelconfig(models_dir, model_version, 0, dtype, shape)
+            create_openvino_modelconfig(models_dir, 0, dtype, shape)
             create_openvino_modelfile(models_dir, model_version, 0, dtype, shape)
 
     if FLAGS.ensemble:
