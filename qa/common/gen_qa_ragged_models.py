@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -129,7 +129,7 @@ def create_plan_modelfile(models_dir, model_version, dtype):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -261,7 +261,7 @@ def create_onnx_modelfile(models_dir, model_version, dtype):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
@@ -324,13 +324,13 @@ def create_libtorch_modelfile(models_dir, model_version, dtype):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     traced.save(model_version_dir + "/model.pt")
 
 
-def create_modelconfig(models_dir, max_batch, model_version, dtype, backend, platform):
+def create_modelconfig(models_dir, max_batch, dtype, backend, platform):
     version_policy_str = "{ latest { num_versions: 1 }}"
 
     backend_spec = """
@@ -402,7 +402,7 @@ dynamic_batching {{
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -455,7 +455,7 @@ def create_plan_itemshape_modelfile(models_dir, model_version, dtype):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -505,7 +505,7 @@ def create_onnx_itemshape_modelfile(models_dir, model_version, dtype):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
@@ -541,15 +541,13 @@ def create_libtorch_itemshape_modelfile(models_dir, model_version, dtype):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     traced.save(model_version_dir + "/model.pt")
 
 
-def create_itemshape_modelconfig(
-    models_dir, max_batch, model_version, dtype, backend, platform
-):
+def create_itemshape_modelconfig(models_dir, max_batch, dtype, backend, platform):
     version_policy_str = "{ latest { num_versions: 1 }}"
 
     backend_spec = """
@@ -601,7 +599,7 @@ dynamic_batching {{
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -611,29 +609,19 @@ dynamic_batching {{
 def create_batch_input_models(models_dir):
     model_version = 1
     if FLAGS.tensorrt:
-        create_modelconfig(models_dir, 4, model_version, np.float32, "tensorrt", "plan")
+        create_modelconfig(models_dir, 4, np.float32, "tensorrt", "plan")
         create_plan_modelfile(models_dir, model_version, np.float32)
-        create_itemshape_modelconfig(
-            models_dir, 4, model_version, np.float32, "tensorrt", "plan"
-        )
+        create_itemshape_modelconfig(models_dir, 4, np.float32, "tensorrt", "plan")
         create_plan_itemshape_modelfile(models_dir, model_version, np.float32)
     if FLAGS.onnx:
-        create_modelconfig(
-            models_dir, 4, model_version, np.float32, "onnxruntime", "onnx"
-        )
+        create_modelconfig(models_dir, 4, np.float32, "onnxruntime", "onnx")
         create_onnx_modelfile(models_dir, model_version, np.float32)
-        create_itemshape_modelconfig(
-            models_dir, 4, model_version, np.float32, "onnxruntime", "onnx"
-        )
+        create_itemshape_modelconfig(models_dir, 4, np.float32, "onnxruntime", "onnx")
         create_onnx_itemshape_modelfile(models_dir, model_version, np.float32)
     if FLAGS.libtorch:
-        create_modelconfig(
-            models_dir, 4, model_version, np.float32, "pytorch", "libtorch"
-        )
+        create_modelconfig(models_dir, 4, np.float32, "pytorch", "libtorch")
         create_libtorch_modelfile(models_dir, model_version, np.float32)
-        create_itemshape_modelconfig(
-            models_dir, 4, model_version, np.float32, "pytorch", "libtorch"
-        )
+        create_itemshape_modelconfig(models_dir, 4, np.float32, "pytorch", "libtorch")
         create_libtorch_itemshape_modelfile(models_dir, model_version, np.float32)
 
 
