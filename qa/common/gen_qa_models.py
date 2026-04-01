@@ -2119,23 +2119,23 @@ def create_models(
             print(
                 f"{_color_magenta}PyTorch: AOTI model generation requested{_color_reset}"
             )
-            # max-batch 8
-            if create_torch_aoti_modelfile(
-                models_dir,
-                model_version,
-                input_shape,
-                input_dtype,
-                output0_dtype,
-            ):
-                create_torch_aoti_modelconfig(
+            if input_dtype != np_dtype_string and output0_dtype == np_dtype_string:
+                if create_torch_aoti_modelfile(
                     models_dir,
+                    model_version,
                     input_shape,
-                    output0_shape,
                     input_dtype,
                     output0_dtype,
-                    output0_label_cnt,
-                    version_policy,
-                )
+                ):
+                    create_torch_aoti_modelconfig(
+                        models_dir,
+                        input_shape,
+                        output0_shape,
+                        input_dtype,
+                        output0_dtype,
+                        output0_label_cnt,
+                        version_policy,
+                    )
 
     if FLAGS.openvino:
         print(f"{_color_magenta}OpenVINO model generation requested{_color_reset}")
