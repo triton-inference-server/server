@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -61,7 +61,7 @@ def create_resnet50_torchtrt(models_dir, max_batch):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     torch.jit.save(trt_ts_module, model_version_dir + "/model.pt")
@@ -96,7 +96,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
