@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,13 +47,55 @@ TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
 pip3 install psutil
 
 RET=0
 rm -fr *.log
 
+# Test that shared memory registration is rejected when --allow-client-shm is not set
+SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --allow-client-shm=true"
+for client_type in http grpc; do
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
+    SERVER_LOG="./test_shm_disabled_by_default.$client_type.server.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    export CLIENT_TYPE=$client_type
+    TMP_CLIENT_LOG="./tmp_client.log"
+    echo "Test: test_shm_disabled_by_default, client type: $client_type" >>$TMP_CLIENT_LOG
+
+    set +e
+    python3 $SHM_TEST SharedMemoryTest.test_shm_disabled_by_default >>$TMP_CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $TMP_CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE 1
+        if [ $? -ne 0 ]; then
+            cat $TEST_RESULT_FILE
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+    cat $TMP_CLIENT_LOG >>$CLIENT_LOG
+    rm $TMP_CLIENT_LOG
+    kill $SERVER_PID
+    wait $SERVER_PID
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Server shut down non-gracefully\n***"
+        RET=1
+    fi
+    set -e
+done
+
+# Test shared memory registration with --allow-client-shm=true
+SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --allow-client-shm=true"
 for i in \
         test_invalid_create_shm \
         test_valid_create_set_register \

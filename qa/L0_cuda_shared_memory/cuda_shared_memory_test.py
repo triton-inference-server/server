@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -153,6 +153,19 @@ class CudaSharedMemoryTestBase(tu.TestResultCollector):
 
 
 class CudaSharedMemoryTest(CudaSharedMemoryTestBase):
+    def test_shm_disabled_by_default(self):
+        # Test that CUDA shared memory registration is rejected when the server
+        # is started without --allow-client-shm.
+        shm_op0_handle = cshm.create_shared_memory_region("dummy_data", 8, 0)
+        self._shm_handles.append(shm_op0_handle)
+        with self.assertRaisesRegex(
+            InferenceServerException,
+            "Client shared memory is disabled",
+        ):
+            self.triton_client.register_cuda_shared_memory(
+                "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8
+            )
+
     def test_invalid_create_shm(self):
         # Raises error since tried to create invalid cuda shared memory region
         with self.assertRaisesRegex(

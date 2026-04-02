@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,6 +37,44 @@ source ../common/util.sh
 RET=0
 rm -fr *.log
 
+# Test that CUDA shared memory registration is rejected when --allow-client-shm is not set
+for client_type in http grpc; do
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+    SERVER_LOG="./test_shm_disabled_by_default.$client_type.server.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    export CLIENT_TYPE=$client_type
+    CLIENT_LOG="./test_shm_disabled_by_default.$client_type.client.log"
+    echo "Test: test_shm_disabled_by_default, client type: $client_type" >>$CLIENT_LOG
+
+    set +e
+    python $SHM_TEST CudaSharedMemoryTest.test_shm_disabled_by_default >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE 1
+        if [ $? -ne 0 ]; then
+            cat $TEST_RESULT_FILE
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
+
+# Test CUDA shared memory registration with --allow-client-shm=true
+SERVER_ARGS_EXTRA="--allow-client-shm=true"
+
 for i in \
         test_invalid_create_shm \
         test_valid_create_set_register \
@@ -52,7 +90,7 @@ for i in \
         test_infer_offset_out_of_bound \
         test_infer_byte_size_out_of_bound; do
     for client_type in http grpc; do
-        SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+        SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
         SERVER_LOG="./$i.$client_type.server.log"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
@@ -88,7 +126,7 @@ for i in \
         test_exceeds_cshm_handle_size_limit \
         test_invalid_small_cshm_handle \
         test_valid_cshm_handle; do
-    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
     SERVER_LOG="./$i.server.log"
     CLIENT_LOG="./$i.client.log"
     run_server

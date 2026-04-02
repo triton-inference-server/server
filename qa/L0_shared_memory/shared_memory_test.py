@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -145,6 +145,19 @@ class SystemSharedMemoryTestBase(tu.TestResultCollector):
 
 
 class SharedMemoryTest(SystemSharedMemoryTestBase):
+    def test_shm_disabled_by_default(self):
+        # Test that system shared memory registration is rejected when the server
+        # is started without --allow-client-shm.
+        shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", 8)
+        self._shm_handles.append(shm_op0_handle)
+        with self.assertRaisesRegex(
+            utils.InferenceServerException,
+            "Client shared memory is disabled",
+        ):
+            self.triton_client.register_system_shared_memory(
+                "dummy_data", "/dummy_data", 8
+            )
+
     def test_invalid_create_shm(self):
         with self.assertRaisesRegex(
             shm.SharedMemoryException, "unable to create the shared memory region"

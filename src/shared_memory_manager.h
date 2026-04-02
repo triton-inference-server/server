@@ -1,4 +1,4 @@
-// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -47,7 +47,10 @@ namespace triton { namespace server {
 
 class SharedMemoryManager {
  public:
-  SharedMemoryManager() = default;
+  explicit SharedMemoryManager(bool allow_client_shm)
+      : allow_client_shm_(allow_client_shm)
+  {
+  }
   ~SharedMemoryManager();
 
   /// A struct that records the shared memory regions registered by the shared
@@ -198,5 +201,8 @@ class SharedMemoryManager {
   SharedMemoryStateMap shared_memory_map_;
   // A mutex to protect the concurrent access to shared_memory_map_
   std::mutex mu_;
+
+  // Flag to allow clients to register shared memory.
+  const bool allow_client_shm_;
 };
 }}  // namespace triton::server
