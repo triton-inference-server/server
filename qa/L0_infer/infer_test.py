@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -157,9 +157,6 @@ class InferTest(tu.TestResultCollector):
                     input_dtype,
                     output0_dtype,
                     output1_dtype,
-                    (input_size,),
-                    (input_size,),
-                    (input_size,),
                 ):
                     ensemble_prefix.append(prefix)
 
@@ -167,9 +164,6 @@ class InferTest(tu.TestResultCollector):
             input_dtype,
             output0_dtype,
             output1_dtype,
-            (input_size, 1, 1),
-            (input_size, 1, 1),
-            (input_size, 1, 1),
         ):
             for prefix in ensemble_prefix:
                 if "plan" in BACKENDS:
@@ -204,9 +198,6 @@ class InferTest(tu.TestResultCollector):
             input_dtype,
             output0_dtype,
             output1_dtype,
-            (input_size,),
-            (input_size,),
-            (input_size,),
         ):
             for prefix in ensemble_prefix:
                 if "onnx" in BACKENDS:
