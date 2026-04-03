@@ -108,11 +108,11 @@ class InferSizeLimitTest(tu.TestResultCollector):
             error_msg,
         )
         self.assertIn(
-            " bytes exceeds the maximum allowed input size",
+            " bytes exceeds the maximum allowed input size of ",
             error_msg,
         )
         self.assertIn(
-            "Use --http-max-input-size to increase the limit",
+            "Use --http-max-input-size to increase the limit.",
             error_msg,
         )
 
@@ -147,15 +147,15 @@ class InferSizeLimitTest(tu.TestResultCollector):
         )
         error_msg = response.content.decode()
         self.assertIn(
-            "Request JSON size of ",
+            "request JSON size of ",
             error_msg,
         )
         self.assertIn(
-            " bytes exceeds the maximum allowed input size",
+            " bytes exceeds the maximum allowed input size of ",
             error_msg,
         )
         self.assertIn(
-            "Use --http-max-input-size to increase the limit",
+            "Use --http-max-input-size to increase the limit.",
             error_msg,
         )
 
@@ -268,7 +268,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             error_msg,
         )
         self.assertIn(
-            " bytes exceeds the maximum allowed input size",
+            " bytes exceeds the maximum allowed input size of ",
             error_msg,
         )
         self.assertIn(
@@ -426,15 +426,15 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message contains size limit info
         error_msg = response.content.decode()
         self.assertIn(
-            "Request JSON size of ",
+            "request JSON size of ",
             error_msg,
         )
         self.assertIn(
-            " bytes exceeds the maximum allowed input size",
+            " bytes exceeds the maximum allowed input size of ",
             error_msg,
         )
         self.assertIn(
-            "Use --http-max-input-size to increase the limit",
+            "Use --http-max-input-size to increase the limit.",
             error_msg,
         )
 
@@ -522,11 +522,11 @@ class InferSizeLimitTest(tu.TestResultCollector):
             error_msg,
         )
         self.assertIn(
-            " bytes exceeds the maximum allowed input size",
+            " bytes exceeds the maximum allowed input size of ",
             error_msg,
         )
         self.assertIn(
-            "Use --http-max-input-size to increase the limit",
+            "Use --http-max-input-size to increase the limit.",
             error_msg,
         )
 

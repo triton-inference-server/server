@@ -3099,13 +3099,12 @@ HTTPAPIServer::EVBufferToJson(
     const size_t length, int n)
 {
   if (length > max_input_size_) {
-    auto overrun = length - max_input_size_;
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
-        ("Request JSON size of " + std::to_string(length) + " + " +
-         std::to_string(overrun) +
-         " bytes exceeds the maximum allowed input size. "
-         "Use --http-max-input-size to increase the limit.")
+        ("request JSON size of " + std::to_string(length) +
+         " bytes exceeds the maximum allowed input size of " +
+         std::to_string(max_input_size_) +
+         " bytes. Use --http-max-input-size to increase the limit.")
             .c_str());
   }
 
@@ -3648,14 +3647,14 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
     // allowed input size.
     if (byte_size + consumed_input_byte_size > max_input_size_ ||
         byte_size + consumed_input_byte_size < consumed_input_byte_size) {
-      auto overrun = byte_size + consumed_input_byte_size - max_input_size_;
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
-          (std::string("input '") + name + "' has size of " +
-           std::to_string(max_input_size_ - consumed_input_byte_size) + " + " +
-           std::to_string(overrun) +
-           " bytes exceeds the maximum allowed input size. "
-           "Use --http-max-input-size to increase the limit.")
+          (std::string("request size of ") +
+           std::to_string(consumed_input_byte_size) + " bytes with input '" +
+           name + "' of size " + std::to_string(byte_size) +
+           " bytes exceeds the maximum allowed input size of " +
+           std::to_string(max_input_size_) +
+           ". Use --http-max-input-size to increase the limit.")
               .c_str());
     }
 

@@ -282,7 +282,7 @@ class GenerateEndpointTest(tu.TestResultCollector):
         input_bytes = bytes(input_data)
         input_str = base64.b64encode(input_bytes).decode("utf-8")
         inputs = {"PROMPT": input_str, "STREAM": False}
-        error_msg = " bytes exceeds the maximum allowed input size. Use --http-max-input-size to increase the limit."
+        error_msg = " bytes exceeds the maximum allowed input size of "
         self.generate_expect_failure(self._model_name, inputs, error_msg)
 
         inputs = {
@@ -290,7 +290,7 @@ class GenerateEndpointTest(tu.TestResultCollector):
             "INPUT1": input_str[(len(input_str) // 2) :],
             "STREAM": False,
         }
-        error_msg = " bytes exceeds the maximum allowed input size. Use --http-max-input-size to increase the limit."
+        error_msg = " bytes exceeds the maximum allowed input size of "
         self.generate_expect_failure(self._model_name, inputs, error_msg)
 
     def test_duplicate_inputs(self):
