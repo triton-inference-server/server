@@ -275,7 +275,20 @@ class GenerateEndpointTest(tu.TestResultCollector):
             self.generate_expect_failure(self._model_name, inputs, error_msg)
             self.generate_stream_expect_failure(self._model_name, inputs, error_msg)
 
-    def test_type_size_explosion(self):
+    def test_json_dtype_size_expansion_exceeds_limit_error(self):
+        '''
+        Test that when the client sends a JSON input of byte[], that when it
+        expands to dtype[], it exceeds the maximum allowed input size and
+        returns an appropriate error message. The test sends a large base64
+        encoded string as input, which simulates a byte[] input that would
+        expand to a much larger dtype[] input on the server side when
+        `sizeof(dtype) > 1`.
+        The test checks that the error message indicates that the input size
+        exceeds the limit.
+        This is important to prevent clients from sending inputs that could
+        cause excessive memory usage on the server.
+        '''
+
         input_data = [1] * (
             64 * 1024 * 1024
         )  # 64MB input, which is large but still reasonable for HTTP request body

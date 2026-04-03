@@ -64,7 +64,19 @@ class InferSizeLimitTest(tu.TestResultCollector):
     def _get_infer_url(self, model_name):
         return f"http://localhost:8000/v2/models/{model_name}/infer"
 
-    def test_type_size_explosion(self):
+    def test_json_dtype_size_expansion_exceeds_limit_error(self):
+        '''
+        Test that when the client sends a JSON input of byte[], that when it
+        expands to dtype[], it exceeds the maximum allowed input size and
+        returns an appropriate error message. The test sends a large base64
+        encoded string as input, which simulates a byte[] input that would
+        expand to a much larger dtype[] input on the server side when
+        `sizeof(dtype) > 1`.
+        The test checks that the error message indicates that the input size
+        exceeds the limit.
+        This is important to prevent clients from sending inputs that could
+        cause excessive memory usage on the server.
+        '''
         model = "onnx_zero_1_float32"
 
         # Provided data is 64MB of int8, but the model expects FP32,
@@ -272,7 +284,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             error_msg,
         )
         self.assertIn(
-            "Use --http-max-input-size to increase the limit",
+            "Use --http-max-input-size to increase the limit.",
             error_msg,
         )
 

@@ -846,7 +846,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Run test to verify that large inputs fail with default limit
-python http_input_size_limit_test.py InferSizeLimitTest.test_type_size_explosion >> $CLIENT_LOG 2>&1
+python http_input_size_limit_test.py InferSizeLimitTest.test_json_dtype_size_expansion_exceeds_limit_error >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for type size explosion\n***"
