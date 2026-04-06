@@ -241,42 +241,37 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 
-<<<<<<< HEAD
-######## Test backpressure feature - 'max_inflight_requests' config option ########
-ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR="`pwd`/ensemble_backpressure_test_models"
-rm -rf ${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR}
-=======
 ######## Test parallel-step failed enqueue path in ensemble scheduler ########
-MODEL_DIR="`pwd`/parallel_failed_enqueue_test_models"
-rm -rf ${MODEL_DIR}
+PARALLEL_FAILED_ENQUEUE_MODEL_DIR="`pwd`/parallel_failed_enqueue_test_models"
+rm -rf ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}
 
-mkdir -p ${MODEL_DIR}/ensemble_parallel_step_failed_enqueue/1
-mkdir -p ${MODEL_DIR}/decoupled_producer_parallel_queue/1
-mkdir -p ${MODEL_DIR}/slow_consumer_queue_limited/1
-mkdir -p ${MODEL_DIR}/fast_consumer/1
-mkdir -p ${MODEL_DIR}/join_add_sub/1
+mkdir -p ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/ensemble_parallel_step_failed_enqueue/1
+mkdir -p ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/decoupled_producer_parallel_queue/1
+mkdir -p ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/slow_consumer_queue_limited/1
+mkdir -p ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/fast_consumer/1
+mkdir -p ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/join_add_sub/1
 
 # Producer emits repeated responses with a larger payload value so the
 # queue-limited branch fills first.
-cp ./backpressure_test_models/decoupled_producer/1/model.py \
-  ${MODEL_DIR}/decoupled_producer_parallel_queue/1
-cp ./backpressure_test_models/decoupled_producer/config.pbtxt \
-  ${MODEL_DIR}/decoupled_producer_parallel_queue/
+cp ${BACKPRESSURE_TEST_MODEL_DIR}/decoupled_producer/1/model.py \
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/decoupled_producer_parallel_queue/1
+cp ${BACKPRESSURE_TEST_MODEL_DIR}/decoupled_producer/config.pbtxt \
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/decoupled_producer_parallel_queue/
 sed -i 's/name: "decoupled_producer"/name: "decoupled_producer_parallel_queue"/g' \
-  ${MODEL_DIR}/decoupled_producer_parallel_queue/config.pbtxt
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/decoupled_producer_parallel_queue/config.pbtxt
 sed -i 's/0.5/2.0/g' \
-  ${MODEL_DIR}/decoupled_producer_parallel_queue/1/model.py
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/decoupled_producer_parallel_queue/1/model.py
 
 # Queue-limited branch used to trigger a failed enqueue.
 cp ../python_models/ground_truth/model.py \
-  ${MODEL_DIR}/slow_consumer_queue_limited/1
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/slow_consumer_queue_limited/1
 cp ../python_models/ground_truth/config.pbtxt \
-  ${MODEL_DIR}/slow_consumer_queue_limited/
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/slow_consumer_queue_limited/
 sed -i 's/name: "ground_truth"/name: "slow_consumer_queue_limited"/g' \
-  ${MODEL_DIR}/slow_consumer_queue_limited/config.pbtxt
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/slow_consumer_queue_limited/config.pbtxt
 sed -i 's/max_batch_size: 64/max_batch_size: 1/g' \
-  ${MODEL_DIR}/slow_consumer_queue_limited/config.pbtxt
-cat >> ${MODEL_DIR}/slow_consumer_queue_limited/config.pbtxt << 'EOF'
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/slow_consumer_queue_limited/config.pbtxt
+cat >> ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/slow_consumer_queue_limited/config.pbtxt << 'EOF'
 
 dynamic_batching {
   preferred_batch_size: [ 1 ]
@@ -287,20 +282,20 @@ dynamic_batching {
 EOF
 
 # Parallel branch with the same interface and no added delay.
-cp ../python_models/ground_truth/model.py ${MODEL_DIR}/fast_consumer/1
-cp ../python_models/ground_truth/config.pbtxt ${MODEL_DIR}/fast_consumer/
+cp ../python_models/ground_truth/model.py ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/fast_consumer/1
+cp ../python_models/ground_truth/config.pbtxt ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/fast_consumer/
 sed -i 's/name: "ground_truth"/name: "fast_consumer"/g' \
-  ${MODEL_DIR}/fast_consumer/config.pbtxt
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/fast_consumer/config.pbtxt
 sed -i 's/max_batch_size: 64/max_batch_size: 1/g' \
-  ${MODEL_DIR}/fast_consumer/config.pbtxt
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/fast_consumer/config.pbtxt
 sed -i 's/time.sleep(delay)/time.sleep(0)/g' \
-  ${MODEL_DIR}/fast_consumer/1/model.py
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/fast_consumer/1/model.py
 
 # Join both parallel branches into the ensemble output.
-cp ../python_models/join_add_sub/model.py ${MODEL_DIR}/join_add_sub/1
-cp ../python_models/join_add_sub/config.pbtxt ${MODEL_DIR}/join_add_sub/
+cp ../python_models/join_add_sub/model.py ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/join_add_sub/1
+cp ../python_models/join_add_sub/config.pbtxt ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/join_add_sub/
 
-cat > ${MODEL_DIR}/ensemble_parallel_step_failed_enqueue/config.pbtxt << 'EOF'
+cat > ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/ensemble_parallel_step_failed_enqueue/config.pbtxt << 'EOF'
 name: "ensemble_parallel_step_failed_enqueue"
 platform: "ensemble"
 max_batch_size: 0
@@ -385,7 +380,7 @@ SERVER_LOG="./ensemble_parallel_failed_enqueue_test_server.log"
 CLIENT_LOG="./ensemble_parallel_failed_enqueue_test_client.log"
 rm -f $SERVER_LOG $CLIENT_LOG
 
-SERVER_ARGS="--model-repository=${MODEL_DIR}"
+SERVER_ARGS="--model-repository=${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -398,6 +393,7 @@ PARALLEL_FAILED_ENQUEUE_LOOPS=${PARALLEL_FAILED_ENQUEUE_LOOPS:-1} \
 python $BACKPRESSURE_TEST_PY $TEST_NAME -v >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
+    cat $CLIENT_LOG
 else
     check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
@@ -425,32 +421,9 @@ kill $SERVER_PID > /dev/null 2>&1 || true
 wait $SERVER_PID > /dev/null 2>&1 || true
 
 
-######## Test ensemble backpressure feature (max_inflight_requests parameter) ########
-MODEL_DIR="`pwd`/backpressure_test_models"
-mkdir -p ${MODEL_DIR}/ensemble_disabled_max_inflight_requests/1
-
-rm -rf ${MODEL_DIR}/slow_consumer
-mkdir -p ${MODEL_DIR}/slow_consumer/1
-cp ../python_models/ground_truth/model.py ${MODEL_DIR}/slow_consumer/1
-cp ../python_models/ground_truth/config.pbtxt ${MODEL_DIR}/slow_consumer/
-sed -i 's/name: "ground_truth"/name: "slow_consumer"/g' ${MODEL_DIR}/slow_consumer/config.pbtxt
-
-# Create ensemble with "max_inflight_requests = 4"
-rm -rf ${MODEL_DIR}/ensemble_max_inflight_requests_limit_4
-mkdir -p ${MODEL_DIR}/ensemble_max_inflight_requests_limit_4/1
-cp ${MODEL_DIR}/ensemble_disabled_max_inflight_requests/config.pbtxt ${MODEL_DIR}/ensemble_max_inflight_requests_limit_4/
-sed -i 's/ensemble_scheduling {/ensemble_scheduling {\n  max_inflight_requests: 4/g' \
-  ${MODEL_DIR}/ensemble_max_inflight_requests_limit_4/config.pbtxt
-
-# Create ensemble with "max_inflight_requests = 1"
-rm -rf ${MODEL_DIR}/ensemble_max_inflight_requests_limit_1
-mkdir -p ${MODEL_DIR}/ensemble_max_inflight_requests_limit_1/1
-cp ${MODEL_DIR}/ensemble_disabled_max_inflight_requests/config.pbtxt ${MODEL_DIR}/ensemble_max_inflight_requests_limit_1/
-sed -i 's/platform: "ensemble"/name: "ensemble_max_inflight_requests_limit_1"\nplatform: "ensemble"/g' \
-  ${MODEL_DIR}/ensemble_max_inflight_requests_limit_1/config.pbtxt
-sed -i 's/ensemble_scheduling {/ensemble_scheduling {\n  max_inflight_requests: 1/g' \
-  ${MODEL_DIR}/ensemble_max_inflight_requests_limit_1/config.pbtxt
->>>>>>> 322782df (Add test cases)
+######## Test backpressure feature - 'max_inflight_requests' config option ########
+ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR="`pwd`/ensemble_backpressure_test_models"
+rm -rf ${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR}
 
 TEST_NAME="EnsembleBackpressureTest"
 SERVER_LOG="./ensemble_backpressure_test_server.log"

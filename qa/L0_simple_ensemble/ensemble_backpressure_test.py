@@ -46,17 +46,11 @@ from tritonclient.utils import InferenceServerException
 SERVER_URL = "localhost:8001"
 DEFAULT_RESPONSE_TIMEOUT = 60
 EXPECTED_INFER_OUTPUT = 0.5
-<<<<<<< HEAD
+MODEL_ENSEMBLE_PARALLEL_FAILED_ENQUEUE = "ensemble_parallel_step_failed_enqueue"
+EXPECTED_PARALLEL_FAILED_ENQUEUE_OUTPUT = 4.0
 
 NUM_REQUESTS = 16
 NUM_RESPONSES_PER_REQUEST = 8
-=======
-MODEL_ENSEMBLE_DISABLED = "ensemble_disabled_max_inflight_requests"
-MODEL_ENSEMBLE_LIMIT_4 = "ensemble_max_inflight_requests_limit_4"
-MODEL_ENSEMBLE_LIMIT_1 = "ensemble_max_inflight_requests_limit_1"
-MODEL_ENSEMBLE_PARALLEL_FAILED_ENQUEUE = "ensemble_parallel_step_failed_enqueue"
-EXPECTED_PARALLEL_FAILED_ENQUEUE_OUTPUT = 4.0
->>>>>>> 322782df (Add test cases)
 
 
 class UserData:
@@ -95,9 +89,7 @@ def collect_responses(user_data, timeout=DEFAULT_RESPONSE_TIMEOUT):
         try:
             result = user_data._response_queue.get(timeout=timeout)
         except queue.Empty:
-            raise Exception(
-                f"No response received within {timeout} seconds."
-            )
+            raise Exception(f"No response received within {timeout} seconds.")
 
         if isinstance(result, InferenceServerException):
             errors.append(result)
@@ -498,8 +490,10 @@ class EnsembleStepMaxQueueSizeTest(tu.TestResultCollector):
 class EnsembleParallelFailedEnqueueTest(tu.TestResultCollector):
     def _run_inference(self, expected_responses_count=32):
         """
-        Verify that a parallel ensemble step returns a queue-full error and
-        preserves valid responses that completed before the failure.
+        Exercise a fan-out ensemble where one parallel branch hits queue-full
+        first. Successful responses emitted before the failure should still be
+        correct, and the stream should terminate with exactly one queue-full
+        error.
         """
         user_data = UserData()
         with grpcclient.InferenceServerClient(SERVER_URL) as triton_client:
