@@ -297,43 +297,8 @@ sed -i 's/time.sleep(delay)/time.sleep(0)/g' \
   ${MODEL_DIR}/fast_consumer/1/model.py
 
 # Join both parallel branches into the ensemble output.
-cp ../python_models/add_sub/model.py ${MODEL_DIR}/join_add_sub/1
-cat > ${MODEL_DIR}/join_add_sub/config.pbtxt << 'EOF'
-name: "join_add_sub"
-backend: "python"
-max_batch_size: 1
-
-input [
-  {
-    name: "INPUT0"
-    data_type: TYPE_FP32
-    dims: [ 1 ]
-  }
-]
-input [
-  {
-    name: "INPUT1"
-    data_type: TYPE_FP32
-    dims: [ 1 ]
-  }
-]
-output [
-  {
-    name: "OUTPUT0"
-    data_type: TYPE_FP32
-    dims: [ 1 ]
-  }
-]
-output [
-  {
-    name: "OUTPUT1"
-    data_type: TYPE_FP32
-    dims: [ 1 ]
-  }
-]
-
-instance_group [{ kind: KIND_CPU }]
-EOF
+cp ../python_models/join_add_sub/model.py ${MODEL_DIR}/join_add_sub/1
+cp ../python_models/join_add_sub/config.pbtxt ${MODEL_DIR}/join_add_sub/
 
 cat > ${MODEL_DIR}/ensemble_parallel_step_failed_enqueue/config.pbtxt << 'EOF'
 name: "ensemble_parallel_step_failed_enqueue"
