@@ -30,6 +30,7 @@ import sys
 
 sys.path.append("../common")
 
+import os
 import queue
 import threading
 import time
@@ -45,9 +46,17 @@ from tritonclient.utils import InferenceServerException
 SERVER_URL = "localhost:8001"
 DEFAULT_RESPONSE_TIMEOUT = 60
 EXPECTED_INFER_OUTPUT = 0.5
+<<<<<<< HEAD
 
 NUM_REQUESTS = 16
 NUM_RESPONSES_PER_REQUEST = 8
+=======
+MODEL_ENSEMBLE_DISABLED = "ensemble_disabled_max_inflight_requests"
+MODEL_ENSEMBLE_LIMIT_4 = "ensemble_max_inflight_requests_limit_4"
+MODEL_ENSEMBLE_LIMIT_1 = "ensemble_max_inflight_requests_limit_1"
+MODEL_ENSEMBLE_PARALLEL_FAILED_ENQUEUE = "ensemble_parallel_step_failed_enqueue"
+EXPECTED_PARALLEL_FAILED_ENQUEUE_OUTPUT = 4.0
+>>>>>>> 322782df (Add test cases)
 
 
 class UserData:
@@ -76,7 +85,7 @@ def prepare_infer_args(input_value, enable_batching=False):
     return infer_input, outputs
 
 
-def collect_responses(user_data):
+def collect_responses(user_data, timeout=DEFAULT_RESPONSE_TIMEOUT):
     """
     Collect responses from user_data until the final response flag is seen.
     """
@@ -84,10 +93,10 @@ def collect_responses(user_data):
     responses = []
     while True:
         try:
-            result = user_data._response_queue.get(timeout=DEFAULT_RESPONSE_TIMEOUT)
+            result = user_data._response_queue.get(timeout=timeout)
         except queue.Empty:
             raise Exception(
-                f"No response received within {DEFAULT_RESPONSE_TIMEOUT} seconds."
+                f"No response received within {timeout} seconds."
             )
 
         if isinstance(result, InferenceServerException):
@@ -484,6 +493,67 @@ class EnsembleStepMaxQueueSizeTest(tu.TestResultCollector):
         """
         model_name = "ensemble_step2_enabled_max_queue_size"
         self._run_inference(model_name=model_name, expected_responses_count=32)
+
+
+class EnsembleParallelFailedEnqueueTest(tu.TestResultCollector):
+    def _run_inference(self, expected_responses_count=32):
+        """
+        Verify that a parallel ensemble step returns a queue-full error and
+        preserves valid responses that completed before the failure.
+        """
+        user_data = UserData()
+        with grpcclient.InferenceServerClient(SERVER_URL) as triton_client:
+            try:
+                inputs, outputs = prepare_infer_args(expected_responses_count)
+                triton_client.start_stream(callback=partial(callback, user_data))
+                triton_client.async_stream_infer(
+                    model_name=MODEL_ENSEMBLE_PARALLEL_FAILED_ENQUEUE,
+                    inputs=inputs,
+                    outputs=outputs,
+                )
+
+                errors, responses = collect_responses(user_data, timeout=15)
+                self.assertLess(
+                    len(responses),
+                    expected_responses_count,
+                    "Expected the parallel slow branch to queue-fill before all "
+                    "responses completed.",
+                )
+                self.assertEqual(
+                    len(errors),
+                    1,
+                    "Expected exactly one queue-full error from the parallel "
+                    "failed-enqueue path.",
+                )
+                self.assertIn(
+                    "Exceeds maximum queue size",
+                    str(errors[0]),
+                    f"Expected queue size error, got: {str(errors[0])}",
+                )
+
+                for idx, resp in enumerate(responses):
+                    output = resp.as_numpy("OUT")
+                    self.assertAlmostEqual(
+                        float(np.squeeze(output)),
+                        EXPECTED_PARALLEL_FAILED_ENQUEUE_OUTPUT,
+                        places=5,
+                        msg=f"Response {idx} has incorrect value - {output}",
+                    )
+            finally:
+                triton_client.stop_stream()
+
+    def test_parallel_step_failed_enqueue(self):
+        """
+        Repeat the same request according to PARALLEL_FAILED_ENQUEUE_LOOPS.
+        """
+        loop_count = int(os.environ.get("PARALLEL_FAILED_ENQUEUE_LOOPS", "1"))
+        self.assertGreaterEqual(
+            loop_count, 1, "PARALLEL_FAILED_ENQUEUE_LOOPS must be >= 1"
+        )
+
+        for iteration in range(loop_count):
+            with self.subTest(iteration=iteration):
+                self._run_inference()
 
 
 if __name__ == "__main__":
