@@ -65,7 +65,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         return f"http://localhost:8000/v2/models/{model_name}/infer"
 
     def test_json_dtype_size_expansion_exceeds_limit_error(self):
-        '''
+        """
         Test that when the client sends a JSON input of byte[], that when it
         expands to dtype[], it exceeds the maximum allowed input size and
         returns an appropriate error message. The test sends a large base64
@@ -76,7 +76,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         exceeds the limit.
         This is important to prevent clients from sending inputs that could
         cause excessive memory usage on the server.
-        '''
+        """
         model = "onnx_zero_1_float32"
 
         # Provided data is 64MB of int8, but the model expects FP32,
@@ -115,6 +115,9 @@ class InferSizeLimitTest(tu.TestResultCollector):
             f"Expected error code for type/size mismatch, got: {response.status_code}",
         )
         error_msg = response.content.decode()
+        print(
+            f"Error message: {error_msg}", flush=True
+        )  # Print the error message for debugging
         self.assertIn(
             "Request JSON size of ",
             error_msg,
@@ -158,6 +161,9 @@ class InferSizeLimitTest(tu.TestResultCollector):
             f"Expected error code for type/size mismatch, got: {response.status_code}",
         )
         error_msg = response.content.decode()
+        print(
+            f"Error message: {error_msg}", flush=True
+        )  # Print the error message for debugging
         self.assertIn(
             "request JSON size of ",
             error_msg,
