@@ -28,13 +28,12 @@
 ### Helpers ###
 
 function download_tensorrt_llm_models {
-    TENSORRTLLM_VERSION="$1"
-    TENSORRTLLM_DIR="$2"
+    TENSORRTLLM_DIR="$1"
     rm -rf ${TENSORRTLLM_DIR} && mkdir ${TENSORRTLLM_DIR}
     git clone --filter=blob:none --no-checkout https://github.com/triton-inference-server/TensorRT-LLM.git ${TENSORRTLLM_DIR}
     pushd ${TENSORRTLLM_DIR}
     git sparse-checkout set triton_backend/all_models
-    git checkout ${TENSORRTLLM_VERSION}
+    git checkout ${TENSORRTLLM_REPO_TAG}
     popd
 }
 
@@ -51,7 +50,7 @@ function install_deps() {
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
         # TODO: Remove this when the next stable version of TRT-LLM is available
         TENSORRTLLM_DIR="/workspace/TensorRT-LLM"
-        download_tensorrt_llm_models ${TENSORRTLLM_REPO_TAG} ${TENSORRTLLM_DIR}
+        download_tensorrt_llm_models ${TENSORRTLLM_DIR}
 
         prepare_tensorrtllm meta-llama/Meta-Llama-3.1-8B-Instruct tests/tensorrtllm_models /tmp/engines/llama/3.1-8b-instruct/ ${TENSORRTLLM_DIR}
         prepare_tensorrtllm mistralai/Mistral-Nemo-Instruct-2407 tests/tensorrtllm_mistral_models /tmp/engines/mistral/nemo-instruct-2407/ ${TENSORRTLLM_DIR}
