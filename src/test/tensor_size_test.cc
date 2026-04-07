@@ -173,25 +173,35 @@ assert_get_byte_size_success(
 {
   int64_t size;
   TRITONSERVER_Error* err;
+  inference::DataType core_dtype = tcore::TritonToDataType(dtype);
 
-  // Backend (old API)
+  // Backend (public old API)
   ASSERT_EQ(expected_size, tb::GetByteSize(dtype, shape));
 
-  // Backend (new API)
+  // Backend (public new API)
   err = tb::GetByteSize(dtype, shape, &size);
   ASSERT_EQ(err, nullptr);
   ASSERT_EQ(expected_size, size);
 
-  // Common
-  inference::DataType core_dtype = tcore::TritonToDataType(dtype);
+  // Common (public API)
   ASSERT_EQ(tc::GetByteSize(core_dtype, shape), expected_size);
 
-  // Core
+  // Core (internal helper)
   if (test_core) {
     size = 0;
     auto status = tcore::GetByteSize(core_dtype, shape, kTensorName, &size);
-    ASSERT_TRUE(status.IsOk()) << status.Message();
-    ASSERT_EQ(size, expected_size);
+    // Special case: rejects wildcard / non-fixed size with INVALID_ARG
+    if (expected_size == tc::WILDCARD_SIZE) {
+      ASSERT_FALSE(status.IsOk());
+      ASSERT_EQ(status.StatusCode(), triton::core::Status::Code::INVALID_ARG);
+      ASSERT_TRUE(
+          std::string(status.Message())
+              .find("contains one or more variable-size dimensions") !=
+          std::string::npos);
+    } else {
+      ASSERT_TRUE(status.IsOk()) << status.Message();
+      ASSERT_EQ(size, expected_size);
+    }
   }
 }
 
@@ -274,10 +284,6 @@ TEST_F(GetElementCountTest, GetElementCountWildcard)
   // Test 3: multiple -1 dims
   shape = {8, -1, -1};
   assert_get_element_count_success(shape, expected_cnt);
-
-  // Test 4: -1 dim before overflow
-  shape = {-1, 1LL << 32, 1LL << 31};
-  assert_get_element_count_success(shape, expected_cnt);
 }
 
 TEST_F(GetElementCountTest, GetElementCountZero)
@@ -323,6 +329,12 @@ TEST_F(GetElementCountTest, GetElementCountInvalidDim)
   error_msg = std::string("shape") + tb::ShapeToString(shape) +
               " contains an invalid dim.";
   assert_get_element_count_error(shape, ErrorCode::kInvalidDim, error_msg);
+
+  // Test 4: invalid dim after a wildcard
+  shape = {-1, -2};
+  error_msg = std::string("shape") + tb::ShapeToString(shape) +
+              " contains an invalid dim.";
+  assert_get_element_count_error(shape, ErrorCode::kInvalidDim, error_msg);
 }
 
 TEST_F(GetElementCountTest, GetElementCountOverflow)
@@ -339,9 +351,54 @@ TEST_F(GetElementCountTest, GetElementCountOverflow)
   shape = {1LL << 32, 1LL << 31};
   error_msg = "unexpected integer overflow while calculating element count.";
   assert_get_element_count_error(shape, ErrorCode::kOverflow, error_msg);
+}
+
+TEST_F(GetElementCountTest, GetElementCountMixed)
+{
+  std::vector<int64_t> shape;
+  std::string error_msg;
+
+  // Test 1: -1 dim before overflow
+  shape = {-1, 1LL << 32, 1LL << 31};
+  error_msg = "unexpected integer overflow while calculating element count.";
+  assert_get_element_count_error(shape, ErrorCode::kOverflow, error_msg);
+
+  // Test 2: -1 dim before overflow 2
+  shape = {1LL << 32, -1, 1LL << 31};
+  error_msg = "unexpected integer overflow while calculating element count.";
+  assert_get_element_count_error(shape, ErrorCode::kOverflow, error_msg);
 
   // Test 3: overflows before -1 dim
   shape = {1LL << 32, 1LL << 31, -1};
+  error_msg = "unexpected integer overflow while calculating element count.";
+  assert_get_element_count_error(shape, ErrorCode::kOverflow, error_msg);
+
+  // Test 4: -1 dim before invalid dim
+  shape = {-1, -2};
+  error_msg = std::string("shape") + tb::ShapeToString(shape) +
+              " contains an invalid dim.";
+  assert_get_element_count_error(shape, ErrorCode::kInvalidDim, error_msg);
+
+  // Test 5: invalid dim before -1 dim
+  shape = {-2, -1};
+  error_msg = std::string("shape") + tb::ShapeToString(shape) +
+              " contains an invalid dim.";
+  assert_get_element_count_error(shape, ErrorCode::kInvalidDim, error_msg);
+
+  // Test 6: invalid dim before overflow dim
+  shape = {-2, 1LL << 32, 1LL << 31};
+  error_msg = std::string("shape") + tb::ShapeToString(shape) +
+              " contains an invalid dim.";
+  assert_get_element_count_error(shape, ErrorCode::kInvalidDim, error_msg);
+
+  // Test 7: invalid dim before overflow dim 2
+  shape = {1LL << 32, -2, 1LL << 31};
+  error_msg = std::string("shape") + tb::ShapeToString(shape) +
+              " contains an invalid dim.";
+  assert_get_element_count_error(shape, ErrorCode::kInvalidDim, error_msg);
+
+  // Test 8: overflow dim before invalid dim
+  shape = {1LL << 32, 1LL << 31, -2};
   error_msg = "unexpected integer overflow while calculating element count.";
   assert_get_element_count_error(shape, ErrorCode::kOverflow, error_msg);
 }
@@ -399,7 +456,6 @@ TEST_F(GetByteSizeTest, GetByteSizeWildcard)
   auto status = tcore::GetByteSize(core_dtype, shape, kTensorName, &size);
   ASSERT_TRUE(status.IsOk()) << status.Message();
   ASSERT_EQ(size, sizeof(int32_t) * 8 * 8);
-
 
   // Test 3: invalid shape and element count overflows
   dtype = TRITONSERVER_TYPE_INVALID;
@@ -477,6 +533,57 @@ TEST_F(GetByteSizeTest, GetByteSizeOverflow)
 
   // Test 3: valid element count but byte size overflows
   shape = {1LL << 31, 1LL << 30};
+  error_msg = "unexpected integer overflow while calculating byte size.";
+  assert_get_byte_size_error(dtype, shape, ErrorCode::kOverflow, error_msg);
+}
+
+TEST_F(GetByteSizeTest, GetByteSizeMixed)
+{
+  TRITONSERVER_DataType dtype = TRITONSERVER_TYPE_INT32;
+  std::vector<int64_t> shape;
+  std::string error_msg;
+
+  // Test 1: wildcard dim before overflow
+  shape = {-1, 1LL << 32, 1LL << 31};
+  error_msg = "unexpected integer overflow while calculating byte size.";
+  assert_get_byte_size_error(dtype, shape, ErrorCode::kOverflow, error_msg);
+
+  // Test 2: wildcard dim before overflow 2
+  shape = {1LL << 32, -1, 1LL << 31};
+  error_msg = "unexpected integer overflow while calculating byte size.";
+  assert_get_byte_size_error(dtype, shape, ErrorCode::kOverflow, error_msg);
+
+  // Test 3: overflows before wildcard dim
+  shape = {1LL << 32, 1LL << 31, -1};
+  error_msg = "unexpected integer overflow while calculating byte size.";
+  assert_get_byte_size_error(dtype, shape, ErrorCode::kOverflow, error_msg);
+
+  // Test 4: wildcard dim before invalid dim
+  shape = {-1, -2};
+  error_msg = std::string("shape") + tb::ShapeToString(shape) +
+              " contains an invalid dim.";
+  assert_get_byte_size_error(dtype, shape, ErrorCode::kInvalidDim, error_msg);
+
+  // Test 5: invalid dim before wildcard dim
+  shape = {-2, -1};
+  error_msg = std::string("shape") + tb::ShapeToString(shape) +
+              " contains an invalid dim.";
+  assert_get_byte_size_error(dtype, shape, ErrorCode::kInvalidDim, error_msg);
+
+  // Test 6: invalid dim before overflow
+  shape = {-2, 1LL << 32, 1LL << 31};
+  error_msg = std::string("shape") + tb::ShapeToString(shape) +
+              " contains an invalid dim.";
+  assert_get_byte_size_error(dtype, shape, ErrorCode::kInvalidDim, error_msg);
+
+  // Test 7: invalid dim before overflow 2
+  shape = {1LL << 32, -2, 1LL << 31};
+  error_msg = std::string("shape") + tb::ShapeToString(shape) +
+              " contains an invalid dim.";
+  assert_get_byte_size_error(dtype, shape, ErrorCode::kInvalidDim, error_msg);
+
+  // Test 8: overflow before invalid dim
+  shape = {1LL << 32, 1LL << 31, -2};
   error_msg = "unexpected integer overflow while calculating byte size.";
   assert_get_byte_size_error(dtype, shape, ErrorCode::kOverflow, error_msg);
 }
