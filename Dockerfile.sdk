@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/cuda-dl-base:26.03-cuda13.2-inference-runtime-ubuntu24.04
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:26.03-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_REPO_ORGANIZATION=http://github.com/triton-inference-server
@@ -106,11 +106,7 @@ ARG TARGETPLATFORM
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
-RUN git clone \
-    --single-branch --depth=1 \
-    --separate-git-dir=/tmp/.git.client.${CI_JOB_ID} \
-    -b ${TRITON_CLIENT_REPO_TAG} ${TRITON_REPO_ORGANIZATION}/client.git client
-
+COPY ${TRITON_CLIENT_REPO_SUBDIR} client
 
 WORKDIR /workspace/client_build
 RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
@@ -143,6 +139,7 @@ FROM ${BASE_IMAGE}
 
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 ARG DCGM_VERSION
 ARG TRITON_REPO_ORGANIZATION
@@ -164,15 +161,15 @@ RUN apt-get update && \
             libtool \
             maven \
             perl \
-            python3.12-dev \
-            python3.12-venv \
+            python3 \
+            python3-dev \
+            python3-pdfkit \
+            python3-pip \
+            python3-setuptools \
+            python3-wheel \
             vim \
-            wget \
-    && rm -rf /var/lib/apt/lists/*
-
-ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
-RUN python3.12 -m venv /opt/venv-tritonserver \
-    && pip3 install "grpcio<1.68" "grpcio-tools<1.68"
+            wget && \
+    pip3 install "grpcio<1.68" "grpcio-tools<1.68"
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
@@ -217,6 +214,10 @@ RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
                datacenter-gpu-manager-4-core=1:${DCGM_VERSION} \
                datacenter-gpu-manager-4-dev=1:${DCGM_VERSION}; \
     fi
+
+# Build expects "python" executable (not python3).
+RUN rm -f /usr/bin/python && \
+    ln -s /usr/bin/python3 /usr/bin/python
 
 # Install Model Analyzer
 ARG TRITON_MODEL_ANALYZER_REPO_TAG
