@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -255,7 +255,7 @@ echo -n 'username:' > pswd
 echo "password" | openssl passwd -stdin -apr1 >> pswd
 nginx -c `pwd`/$NGINX_CONF
 
-python $BASIC_AUTH_TEST
+python $BASIC_AUTH_TEST >> ${CLIENT_LOG}.python.plugin.auth 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.python.plugin.auth
     RET=1
@@ -380,9 +380,15 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -397,9 +403,15 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -414,9 +426,15 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -431,9 +449,15 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "0" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] found in output when not expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -449,9 +473,15 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -465,7 +495,10 @@ if [ "$code" == "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\}" ./curl.out` != "1" ]; then
+if [ `grep -c "\{\"error\":\"Failed to parse 'data' field: shape does not match true shape\"\}" ./curl.out` != "1" ]; then
+    echo -e "\{\"error\":\"Failed to parse 'data' field: shape does not match true shape\"\} not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -479,6 +512,9 @@ if [ "$code" == "200" ]; then
     RET=1
 fi
 if [ `grep -c "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\}" ./curl.out` != "1" ]; then
+    echo -e "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\} not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -493,9 +529,15 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+    cat ./curl.out
+    echo ""
     RET=1
 fi
 
@@ -655,7 +697,7 @@ wait $SERVER_PID
 # https://github.com/mpetazzoni/sseclient
 pip install sseclient-py
 
-SERVER_ARGS="--model-repository=`pwd`/../python_models/generate_models"
+SERVER_ARGS="--model-repository=`pwd`/../python_models/generate_models --log-verbose=1"
 SERVER_LOG="./inference_server_generate_endpoint_test.log"
 CLIENT_LOG="./generate_endpoint_test.log"
 run_server
@@ -668,9 +710,9 @@ fi
 ## Python Unit Tests
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=generate_endpoint_test.py
-EXPECTED_NUM_TESTS=17
+EXPECTED_NUM_TESTS=18
 set +e
-python $PYTHON_TEST >$CLIENT_LOG 2>&1
+python $PYTHON_TEST > $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
@@ -800,6 +842,14 @@ python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_compr
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for compressed input\n***"
+    RET=1
+fi
+
+# Run test to verify that large inputs fail with default limit
+python http_input_size_limit_test.py InferSizeLimitTest.test_json_dtype_size_expansion_exceeds_limit_error >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Default Input Size Limit Test Failed for type size explosion\n***"
     RET=1
 fi
 set -e
