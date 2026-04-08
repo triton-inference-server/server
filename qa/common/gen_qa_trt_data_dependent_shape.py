@@ -86,6 +86,12 @@ def create_data_dependent_modelfile(
 
     # serialized model
     engine_bytes = builder.build_serialized_network(network, config)
+    if engine_bytes is None:
+        print(
+            f"warning: Skipping {model_name}: TRT engine build failed "
+            f"(NonZero op may not be supported on this GPU/TRT version)"
+        )
+        return
 
     model_version_dir = models_dir + "/" + model_name + "/1"
     try:
