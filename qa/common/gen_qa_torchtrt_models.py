@@ -28,10 +28,20 @@
 
 import argparse
 import os
+import sys
 
 import torch
-import torch_tensorrt
 import torchvision
+
+try:
+    import torch_tensorrt
+except ImportError:
+    print(
+        "WARNING: torch_tensorrt is not available in this environment. "
+        "Skipping Torch-TensorRT model generation.",
+        file=sys.stderr,
+    )
+    sys.exit(0)
 
 
 def create_resnet50_torchtrt(models_dir, max_batch):

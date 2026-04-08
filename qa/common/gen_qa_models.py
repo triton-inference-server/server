@@ -1409,6 +1409,15 @@ def create_torch_aoti_modelfile(
         output_dtype,
         None,
     )
+
+    # AOTI compiles tensor operations and does not support string (object) dtype
+    if input_dtype == np_dtype_string or output_dtype == np_dtype_string:
+        print(
+            f"{_color_yellow}warning: Skipping AOTI model {model_name}: "
+            f"string/object dtype is not supported for AOTI compilation{_color_reset}"
+        )
+        return False
+
     model_version_dir = f"{models_dir}/{model_name}/{model_version}"
 
     print(f"{_color_green}Creating model {model_name}{_color_reset}")

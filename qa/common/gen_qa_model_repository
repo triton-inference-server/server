@@ -364,6 +364,21 @@ else
         TRT_BRANCH="\${MAJOR}.\$((MINOR - 1))"
         echo "Fallback: cloning TensorRT release/\${TRT_BRANCH} (previous minor)"
         git clone -b release/\${TRT_BRANCH} --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
+      elif [ -n "\$MAJOR" ] && [ "\$MAJOR" -gt 0 ] 2>/dev/null; then
+        PREV_MAJOR=\$((MAJOR - 1))
+        echo "Fallback: MINOR is 0, querying remote for latest release/\${PREV_MAJOR}.x branch"
+        TRT_BRANCH=\$(git ls-remote --heads https://github.com/NVIDIA/TensorRT.git "refs/heads/release/\${PREV_MAJOR}.*" \
+          | awk -F'refs/heads/release/' '{print \$2}' \
+          | awk -F. '{print \$2, \$0}' \
+          | sort -k1,1n \
+          | tail -1 \
+          | awk '{print \$2}')
+        if [ -n "\$TRT_BRANCH" ]; then
+          echo "Fallback: cloning TensorRT release/\${TRT_BRANCH}"
+          git clone -b release/\${TRT_BRANCH} --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
+        else
+          exit 1
+        fi
       else
         exit 1
       fi
