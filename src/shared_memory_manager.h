@@ -51,6 +51,8 @@ class SharedMemoryManager {
       : allow_client_shm_(allow_client_shm)
   {
   }
+  SharedMemoryManager() = delete;
+  SharedMemoryManager(const SharedMemoryManager&) = delete;
   ~SharedMemoryManager();
 
   /// A struct that records the shared memory regions registered by the shared
