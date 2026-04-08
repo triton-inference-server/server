@@ -106,8 +106,8 @@ def create_plan_modelfile(
     network.mark_output(out0.get_output(0))
     network.mark_output(out1.get_output(0))
 
-    out0.get_output(0).dtype = trt_output0_dtype
-    out1.get_output(0).dtype = trt_output1_dtype
+    out0.set_output_type(0, trt_output0_dtype)
+    out1.set_output_type(0, trt_output1_dtype)
 
     in0.allowed_formats = 1 << int(trt_input_memory_format)
     in1.allowed_formats = 1 << int(trt_input_memory_format)

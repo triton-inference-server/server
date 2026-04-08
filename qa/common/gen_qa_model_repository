@@ -350,7 +350,7 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --tensorrt --models_dir=$TR
 chmod -R 777 $TRITON_MDLS_QA_RAGGED_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_format_models.py --models_dir=$TRITON_MDLS_QA_TRT_FORMAT_MODEL
 chmod -R 777 $TRITON_MDLS_QA_TRT_FORMAT_MODEL
-nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '${COLOR_WARNING}[WARNING]${COLOR_RESET} Skipping model generation for data dependent shape${COLOR_RESET}' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
+nvidia-smi --query-gpu=compute_cap | grep -qzE '10\.7|11\.0' && echo -e '${COLOR_WARNING}[WARNING]${COLOR_RESET} Skipping model generation for data dependent shape (NonZero not supported on this GPU)${COLOR_RESET}' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
 chmod -R 777 $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
 # Make shared library for custom Hardmax plugin.
 if [ -d "/usr/src/tensorrt/samples/python/onnx_custom_plugin" ]; then
