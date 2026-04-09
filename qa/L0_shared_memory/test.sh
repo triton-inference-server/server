@@ -53,11 +53,12 @@ pip3 install psutil
 RET=0
 rm -fr *.log
 
-# Test that shared memory registration is rejected when --allow-client-shm is not set
-SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --allow-client-shm=true"
+# Test that shared memory registration/unregistration is rejected and status
+# query is allowed when --allow-client-shm is not set (default is false).
+SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR}"
 for client_type in http grpc; do
     SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./test_shm_disabled_by_default.$client_type.server.log"
+    SERVER_LOG="./test_client_shm_disabled_by_default.$client_type.server.log"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -67,10 +68,10 @@ for client_type in http grpc; do
 
     export CLIENT_TYPE=$client_type
     TMP_CLIENT_LOG="./tmp_client.log"
-    echo "Test: test_shm_disabled_by_default, client type: $client_type" >>$TMP_CLIENT_LOG
+    echo "Test: test_client_shm_disabled_by_default, client type: $client_type" >>$TMP_CLIENT_LOG
 
     set +e
-    python3 $SHM_TEST SharedMemoryTest.test_shm_disabled_by_default >>$TMP_CLIENT_LOG 2>&1
+    python3 $SHM_TEST SharedMemoryTest.test_client_shm_disabled_by_default >>$TMP_CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $TMP_CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"

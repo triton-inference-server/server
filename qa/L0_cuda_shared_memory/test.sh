@@ -37,10 +37,11 @@ source ../common/util.sh
 RET=0
 rm -fr *.log
 
-# Test that CUDA shared memory registration is rejected when --allow-client-shm is not set
+# Test that shared memory registration/unregistration is rejected and status
+# query is allowed when --allow-client-shm is not set (default is false).
 for client_type in http grpc; do
     SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-    SERVER_LOG="./test_shm_disabled_by_default.$client_type.server.log"
+    SERVER_LOG="./test_client_shm_disabled_by_default.$client_type.server.log"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -49,11 +50,11 @@ for client_type in http grpc; do
     fi
 
     export CLIENT_TYPE=$client_type
-    CLIENT_LOG="./test_shm_disabled_by_default.$client_type.client.log"
-    echo "Test: test_shm_disabled_by_default, client type: $client_type" >>$CLIENT_LOG
+    CLIENT_LOG="./test_client_shm_disabled_by_default.$client_type.client.log"
+    echo "Test: test_client_shm_disabled_by_default, client type: $client_type" >>$CLIENT_LOG
 
     set +e
-    python $SHM_TEST CudaSharedMemoryTest.test_shm_disabled_by_default >>$CLIENT_LOG 2>&1
+    python $SHM_TEST CudaSharedMemoryTest.test_client_shm_disabled_by_default >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"

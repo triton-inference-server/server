@@ -175,6 +175,11 @@ class SharedMemoryManager {
       const std::string& name, TRITONSERVER_MemoryType memory_type,
       triton::common::TritonJson::Value* shm_status);
 
+  /// Returns whether register/unregister of system/CUDA shared memory (client
+  /// shared memory) is allowed.
+  /// \return boolean value indicating whether client shared memory is allowed.
+  inline bool AllowClientSharedMemory() const { return allow_client_shm_; }
+
   /// Removes the named shared memory block of the specified type from
   /// the manager. Any future attempt to get the details of this block
   /// will result in an array till another block with the same name is

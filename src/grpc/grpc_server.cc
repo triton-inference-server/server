@@ -1,4 +1,4 @@
-// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -1733,9 +1733,17 @@ CommonHandler::RegisterSystemSharedMemoryRegister()
           inference::SystemSharedMemoryRegisterRequest& request,
           inference::SystemSharedMemoryRegisterResponse* response,
           ::grpc::Status* status) {
-        TRITONSERVER_Error* err = shm_manager_->RegisterSystemSharedMemory(
-            request.name(), request.key(), request.offset(),
-            request.byte_size());
+        TRITONSERVER_Error* err = nullptr;
+        if (!shm_manager_->AllowClientSharedMemory()) {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
+              "Client shared memory is disabled. Start the server with "
+              "'--allow-client-shm=true' to enable.");
+        } else {
+          err = shm_manager_->RegisterSystemSharedMemory(
+              request.name(), request.key(), request.offset(),
+              request.byte_size());
+        }
 
         GrpcStatusUtil::Create(status, err);
         TRITONSERVER_ErrorDelete(err);
@@ -1773,7 +1781,12 @@ CommonHandler::RegisterSystemSharedMemoryUnregister()
           inference::SystemSharedMemoryUnregisterResponse* response,
           ::grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
-        if (request.name().empty()) {
+        if (!shm_manager_->AllowClientSharedMemory()) {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
+              "Client shared memory is disabled. Start the server with "
+              "'--allow-client-shm=true' to enable.");
+        } else if (request.name().empty()) {
           err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_CPU);
         } else {
           err =
@@ -1884,11 +1897,18 @@ CommonHandler::RegisterCudaSharedMemoryRegister()
           ::grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
 #ifdef TRITON_ENABLE_GPU
-        err = shm_manager_->RegisterCUDASharedMemory(
-            request.name(),
-            reinterpret_cast<const cudaIpcMemHandle_t*>(
-                request.raw_handle().c_str()),
-            request.byte_size(), request.device_id());
+        if (!shm_manager_->AllowClientSharedMemory()) {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
+              "Client shared memory is disabled. Start the server with "
+              "'--allow-client-shm=true' to enable.");
+        } else {
+          err = shm_manager_->RegisterCUDASharedMemory(
+              request.name(),
+              reinterpret_cast<const cudaIpcMemHandle_t*>(
+                  request.raw_handle().c_str()),
+              request.byte_size(), request.device_id());
+        }
 #else
         err = TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
@@ -1934,7 +1954,12 @@ CommonHandler::RegisterCudaSharedMemoryUnregister()
           inference::CudaSharedMemoryUnregisterResponse* response,
           ::grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
-        if (request.name().empty()) {
+        if (!shm_manager_->AllowClientSharedMemory()) {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
+              "Client shared memory is disabled. Start the server with "
+              "'--allow-client-shm=true' to enable.");
+        } else if (request.name().empty()) {
           err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_GPU);
         } else {
           err =

@@ -354,13 +354,6 @@ SharedMemoryManager::RegisterSystemSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
     const size_t byte_size)
 {
-  if (!allow_client_shm_) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNSUPPORTED,
-        "Client shared memory is disabled. Start the server with "
-        "'--allow-client-shm=true' to enable.");
-  }
-
   // Check if the shared memory key starts with the reserved prefix
   RETURN_IF_ERR(ValidateSharedMemoryKey(name, shm_key));
 
@@ -432,13 +425,6 @@ SharedMemoryManager::RegisterCUDASharedMemory(
     const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
     const size_t byte_size, const int device_id)
 {
-  if (!allow_client_shm_) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNSUPPORTED,
-        "Client shared memory is disabled. Start the server with "
-        "'--allow-client-shm=true' to enable.");
-  }
-
   // Serialize all operations that write/read current shared memory regions
   std::lock_guard<std::mutex> lock(mu_);
 

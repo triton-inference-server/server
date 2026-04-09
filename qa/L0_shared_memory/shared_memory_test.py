@@ -145,11 +145,18 @@ class SystemSharedMemoryTestBase(tu.TestResultCollector):
 
 
 class SharedMemoryTest(SystemSharedMemoryTestBase):
-    def test_shm_disabled_by_default(self):
-        # Test that system shared memory registration is rejected when the server
-        # is started without --allow-client-shm.
+    def test_client_shm_disabled_by_default(self):
+        # When the server is started without --allow-client-shm, registration and
+        # unregistration are rejected but querying status remains allowed (empty).
         shm_op0_handle = shm.create_shared_memory_region("dummy_data", "/dummy_data", 8)
         self._shm_handles.append(shm_op0_handle)
+
+        shm_status_before = self.triton_client.get_system_shared_memory_status()
+        if self.protocol == "http":
+            self.assertEqual(len(shm_status_before), 0)
+        else:
+            self.assertEqual(len(shm_status_before.regions), 0)
+
         with self.assertRaisesRegex(
             utils.InferenceServerException,
             "Client shared memory is disabled",
@@ -157,6 +164,19 @@ class SharedMemoryTest(SystemSharedMemoryTestBase):
             self.triton_client.register_system_shared_memory(
                 "dummy_data", "/dummy_data", 8
             )
+
+        with self.assertRaisesRegex(
+            utils.InferenceServerException,
+            "Client shared memory is disabled",
+        ):
+            self.triton_client.unregister_system_shared_memory("dummy_data")
+
+        shm_status_after = self.triton_client.get_system_shared_memory_status()
+        self.assertEqual(
+            shm_status_before,
+            shm_status_after,
+            "system shared memory status must be unchanged after failed register/unregister",
+        )
 
     def test_invalid_create_shm(self):
         with self.assertRaisesRegex(
