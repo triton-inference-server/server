@@ -38,7 +38,7 @@
 ## VLLM
 
 1. Launch the container and install dependencies:
-  - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
+  - Mounts the `~/.cache/huggingface` for re-use of downloaded models across runs, containers, etc.
   - Sets the [`HF_TOKEN`](https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#hftoken) environment variable to
     access gated models, make sure this is set in your local environment if needed.
 
@@ -347,7 +347,7 @@ multi_lora.json
 Currently, OpenAI-Compatible Frontend supports loading embedding models and embeddings endpoints via vLLM backend. Check [vLLM supported models](https://docs.vllm.ai/en/latest/models/supported_models.html#embedding) for all supported embedding models from vLLM.
 
 1. Launch the container and install dependencies:
-  - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
+  - Mounts the `~/.cache/huggingface` for re-use of downloaded models across runs, containers, etc.
   - Sets the [`HF_TOKEN`](https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#hftoken) environment variable to
     access gated models, make sure this is set in your local environment if needed.
 
@@ -442,7 +442,7 @@ curl -s http://localhost:9000/v1/embeddings \
   - [TRT-LLM Backend Quickstart](https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#quick-start)
 
 1. Launch the container:
-  - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
+  - Mounts the `~/.cache/huggingface` for re-use of downloaded models across runs, containers, etc.
   - Sets the [`HF_TOKEN`](https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#hftoken) environment variable to
     access gated models, make sure this is set in your local environment if needed.
 
