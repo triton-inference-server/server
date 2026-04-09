@@ -27,11 +27,6 @@
 -->
 [![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
->[!WARNING]
->You are currently on the `main` branch which tracks under-development progress
->towards the next release. The current release is version [2.67.0](https://github.com/triton-inference-server/server/releases/latest)
->and corresponds to the 26.03 container release on NVIDIA GPU Cloud (NGC).
-
 # Triton Inference Server
 
 Triton Inference Server is an open source inference serving software that
@@ -90,12 +85,12 @@ Inference Server with the
 
 ```bash
 # Step 1: Create the example model repository
-git clone -b r26.03 https://github.com/triton-inference-server/server.git
+git clone -b r26.04 https://github.com/triton-inference-server/server.git
 cd server/docs/examples
 ./fetch_models.sh
 
 # Step 2: Launch triton from the NGC Triton container
-docker run --gpus=1 --rm --net=host -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:26.03-py3 tritonserver --model-repository=/models --model-control-mode explicit --load-model densenet_onnx
+docker run --gpus=1 --rm --net=host -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:26.04-py3 tritonserver --model-repository=/models --model-control-mode explicit --load-model densenet_onnx
 
 # Step 3: Sending an Inference Request
 # In a separate console, launch the image_client example from the NGC Triton SDK container
