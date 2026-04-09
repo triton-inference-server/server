@@ -851,10 +851,10 @@ TritonParser::SetupOptions()
 
   shared_memory_options_.push_back(
       {OPTION_ALLOW_CLIENT_SHM, "allow-client-shm", Option::ArgBool,
-       "Allow clients to register and use shared memory regions (both CPU "
-       "system shared memory and GPU CUDA IPC shared memory) for inference "
-       "inputs and outputs. Internal shared memory used by backends such as "
-       "the Python backend is unaffected. Default is false."});
+       "Allow clients to register/unregister and use shared memory regions "
+       "(both CPU system shared memory and GPU CUDA IPC shared memory) for "
+       "inference inputs and outputs. Internal shared memory used by backends "
+       "such as the Python backend is unaffected. Default is false."});
 
   backend_options_.push_back(
       {OPTION_BACKEND_DIR, "backend-directory", Option::ArgStr,

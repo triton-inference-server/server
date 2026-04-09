@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -55,8 +55,17 @@ The “shared_memory_offset” parameter is optional and defaults to
 zero. The other two parameters are required. If only one of the two is
 given Triton will return an error.
 
-Note that there is no Windows support for shared memory yet. Jetson only
-supports system shared memory.
+> **Note**
+>
+> Client registration/unregistration and use of shared-memory regions require
+> the server to be started with `--allow-client-shm=true`. The default value is
+> `false`. Internal shared memory used by backends (for example, the Python
+> backend) is not affected by this option.
+
+> **Note**
+>
+> Shared memory is not supported on Windows. On Jetson, only system shared
+> memory is supported (CUDA shared memory is not).
 
 ## HTTP/REST
 
