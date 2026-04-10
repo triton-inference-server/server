@@ -55,14 +55,14 @@ The “shared_memory_offset” parameter is optional and defaults to
 zero. The other two parameters are required. If only one of the two is
 given Triton will return an error.
 
-> **Note**
+> [!NOTE]
 >
 > Client registration/unregistration and use of shared-memory regions require
 > the server to be started with `--allow-client-shm=true`. The default value is
 > `false`. Internal shared memory used by backends (for example, the Python
 > backend) is not affected by this option.
 
-> **Note**
+> [!NOTE]
 >
 > Shared memory is not supported on Windows. On Jetson, only system shared
 > memory is supported (CUDA shared memory is not).
