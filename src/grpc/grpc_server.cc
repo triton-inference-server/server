@@ -1736,9 +1736,7 @@ CommonHandler::RegisterSystemSharedMemoryRegister()
         TRITONSERVER_Error* err = nullptr;
         if (!shm_manager_->AllowClientSharedMemory()) {
           err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED,
-              "Client shared memory is disabled. Start the server with "
-              "'--allow-client-shm=true' to enable.");
+              TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
         } else {
           err = shm_manager_->RegisterSystemSharedMemory(
               request.name(), request.key(), request.offset(),
@@ -1783,9 +1781,7 @@ CommonHandler::RegisterSystemSharedMemoryUnregister()
         TRITONSERVER_Error* err = nullptr;
         if (!shm_manager_->AllowClientSharedMemory()) {
           err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED,
-              "Client shared memory is disabled. Start the server with "
-              "'--allow-client-shm=true' to enable.");
+              TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
         } else if (request.name().empty()) {
           err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_CPU);
         } else {
@@ -1899,9 +1895,7 @@ CommonHandler::RegisterCudaSharedMemoryRegister()
 #ifdef TRITON_ENABLE_GPU
         if (!shm_manager_->AllowClientSharedMemory()) {
           err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED,
-              "Client shared memory is disabled. Start the server with "
-              "'--allow-client-shm=true' to enable.");
+              TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
         } else {
           err = shm_manager_->RegisterCUDASharedMemory(
               request.name(),
@@ -1956,9 +1950,7 @@ CommonHandler::RegisterCudaSharedMemoryUnregister()
         TRITONSERVER_Error* err = nullptr;
         if (!shm_manager_->AllowClientSharedMemory()) {
           err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED,
-              "Client shared memory is disabled. Start the server with "
-              "'--allow-client-shm=true' to enable.");
+              TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
         } else if (request.name().empty()) {
           err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_GPU);
         } else {
