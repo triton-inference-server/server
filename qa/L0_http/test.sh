@@ -279,7 +279,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --model-control-mode=explicit"
+SERVER_ARGS="--allow-client-shm=true --backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --model-control-mode=explicit"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -310,7 +310,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --model-control-mode=explicit"
+SERVER_ARGS="--allow-client-shm=true --backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --model-control-mode=explicit"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -333,7 +333,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Test with dynamic sequence models
-SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_ARGS="--allow-client-shm=true --model-repository=`pwd`/models"
 SERVER_LOG="./inference_server_dyna.log"
 CLIENT_LOG="./client_dyna.log"
 run_server
@@ -360,7 +360,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Test combinations of binary and JSON data
-SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_ARGS="--allow-client-shm=true --model-repository=`pwd`/models"
 SERVER_LOG="./inference_server_binaryjson.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -549,7 +549,7 @@ rm -rf unit_test_models && mkdir unit_test_models
 cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 unit_test_models/.
 cp -r ${MODELDIR}/simple unit_test_models/.
 
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=unit_test_models
+SERVER_ARGS="--allow-client-shm=true --backend-directory=${BACKEND_DIR} --model-repository=unit_test_models
             --trace-file=global_unittest.log --trace-level=TIMESTAMPS --trace-rate=1"
 SERVER_LOG="./inference_server_cc_unit_test.log"
 CLIENT_LOG="./cc_unit_test.log"
@@ -579,7 +579,7 @@ cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 unit_test_models/.
 rm -rf unit_test_models/onnx_int32_int32_int32/1
 
 # Start with EXPLICIT mode and load onnx_float32_float32_float32
-SERVER_ARGS="--model-repository=`pwd`/unit_test_models \
+SERVER_ARGS="--allow-client-shm=true --model-repository=`pwd`/unit_test_models \
              --model-control-mode=explicit \
              --load-model=onnx_int32_int32_int32 \
              --strict-model-config=false"
@@ -697,7 +697,7 @@ wait $SERVER_PID
 # https://github.com/mpetazzoni/sseclient
 pip install sseclient-py
 
-SERVER_ARGS="--model-repository=`pwd`/../python_models/generate_models --log-verbose=1"
+SERVER_ARGS="--allow-client-shm=true --model-repository=`pwd`/../python_models/generate_models --log-verbose=1"
 SERVER_LOG="./inference_server_generate_endpoint_test.log"
 CLIENT_LOG="./generate_endpoint_test.log"
 run_server
@@ -733,7 +733,7 @@ wait $SERVER_PID
 ### Repeated API not allowed
 
 MODELDIR="`pwd`/models"
-SERVER_ARGS="--model-repository=${MODELDIR}
+SERVER_ARGS="--allow-client-shm=true --model-repository=${MODELDIR}
              --http-restricted-api=model-repository,health:k1=v1 \
              --http-restricted-api=metadata,health:k2=v2"
 SERVER_LOG="./http_restricted_endpoint_test.log"
@@ -755,7 +755,7 @@ fi
 ### Unknown API not allowed
 
 MODELDIR="`pwd`/models"
-SERVER_ARGS="--model-repository=${MODELDIR}
+SERVER_ARGS="--allow-client-shm=true --model-repository=${MODELDIR}
              --http-restricted-api=model-reposit,health:k1=v1 \
              --http-restricted-api=metadata,health:k2=v2"
 run_server
@@ -774,7 +774,7 @@ fi
 ### Test Restricted APIs ###
 ### Restricted model-repository, metadata, and inference
 
-SERVER_ARGS="--model-repository=${MODELDIR} \
+SERVER_ARGS="--allow-client-shm=true --model-repository=${MODELDIR} \
              --http-restricted-api=model-repository:admin-key=admin-value \
              --http-restricted-api=inference,metadata:infer-key=infer-value"
 run_server
@@ -805,7 +805,7 @@ cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float32 ${MODELDIR}/.
 cp -r ./models/simple_identity ${MODELDIR}/.
 
 # First run with default size limit - large inputs should fail
-SERVER_ARGS="--model-repository=${MODELDIR}"
+SERVER_ARGS="--allow-client-shm=true --model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_default_limit.log"
 CLIENT_LOG="./http_input_size_limit_default.log"
 run_server
@@ -858,7 +858,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Now run with increased size limit (128MB) - large inputs should succeed
-SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=$((2**27))"
+SERVER_ARGS="--allow-client-shm=true --model-repository=${MODELDIR} --http-max-input-size=$((2**27))"
 SERVER_LOG="./inference_server_increased_limit.log"
 CLIENT_LOG="./http_input_size_limit_increased.log"
 run_server
@@ -896,7 +896,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Test with zero max input size - should fail to start
-SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=0"
+SERVER_ARGS="--allow-client-shm=true --model-repository=${MODELDIR} --http-max-input-size=0"
 SERVER_LOG="./inference_server_zero_limit.log"
 CLIENT_LOG="./http_input_size_limit_zero.log"
 run_server
@@ -912,7 +912,7 @@ elif [ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_
 fi
 
 # Test with negative max input size - should fail to start
-SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=-1024"
+SERVER_ARGS="--allow-client-shm=true --model-repository=${MODELDIR} --http-max-input-size=-1024"
 SERVER_LOG="./inference_server_negative_limit.log"
 CLIENT_LOG="./http_input_size_limit_negative.log"
 run_server

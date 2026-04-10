@@ -206,7 +206,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message contains size limit info
         error_msg = response.content.decode()
         self.assertIn(
-            "exceeds the maximum allowed value",
+            " exceeds the maximum allowed value of ",
             error_msg,
             "Expected error message about exceeding max input size",
         )
@@ -366,7 +366,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message contains size limit info
         error_msg = response.content.decode()
         self.assertIn(
-            "exceeds the maximum allowed value",
+            " exceeds the maximum allowed value of ",
             error_msg,
             "Expected error message about exceeding max input size",
         )
@@ -622,7 +622,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message contains size limit info
         error_msg = response.content.decode()
         self.assertIn(
-            "exceeds the maximum allowed value",
+            " data size exceeds the maximum allowed value of ",
             error_msg,
             "Expected error message about exceeding max input size",
         )
@@ -696,7 +696,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
 
         error_msg = response.content.decode()
         self.assertIn(
-            "exceeds the maximum allowed value",
+            " data size exceeds the maximum allowed value of ",
             error_msg,
             "Expected error message about exceeding max input size",
         )
