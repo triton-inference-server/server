@@ -50,13 +50,13 @@ for client_type in http grpc; do
     fi
 
     export CLIENT_TYPE=$client_type
-    CLIENT_LOG="./test_client_shm_disabled_by_default.$client_type.client.log"
-    echo "Test: test_client_shm_disabled_by_default, client type: $client_type" >>$CLIENT_LOG
+    TEST_CLIENT_LOG="./test_client_shm_disabled_by_default.$client_type.client.log"
+    echo "Test: test_client_shm_disabled_by_default, client type: $client_type" >>$TEST_CLIENT_LOG
 
     set +e
-    python $SHM_TEST CudaSharedMemoryTest.test_client_shm_disabled_by_default >>$CLIENT_LOG 2>&1
+    python $SHM_TEST CudaSharedMemoryTest.test_client_shm_disabled_by_default >>$TEST_CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
+        cat $TEST_CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     else

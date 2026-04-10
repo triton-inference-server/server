@@ -311,7 +311,7 @@ warmup_cuda_cache() {
             ]
         }'
 
-    $EXIT_CODE = $?
+    EXIT_CODE=$?
     if [ $EXIT_CODE -ne 0 ]; then
         echo -e "\n***\n*** Test Failed\n***"
         echo -e "\n***\n*** exit code: $EXIT_CODE\n***"
