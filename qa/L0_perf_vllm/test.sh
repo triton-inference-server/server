@@ -42,6 +42,7 @@ export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:=0}
 EXPORT_FILE=profile-export-vllm-model.json
 
 pip3 install tritonclient
+pip3 install perf_analyzer
 rm -rf $MODEL_REPO $EXPORT_FILE *.tjson *.json *.csv
 
 mkdir -p $MODEL_REPO/$MODEL_NAME/1
