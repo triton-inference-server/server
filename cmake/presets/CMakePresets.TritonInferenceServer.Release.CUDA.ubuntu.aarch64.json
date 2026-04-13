@@ -1,0 +1,67 @@
+{
+  "version": 6,
+  "vendor": {
+    "triton": {
+      "component": "TritonInferenceServer",
+      "platform": "Ubuntu aarch64 with NVIDIA GPU (CUDA) — Jetson Orin, Grace Hopper",
+      "notes": [
+        "GPU-enabled server build for Ubuntu on aarch64.",
+        "Targets Jetson Orin (SM 8.7) and Grace Hopper (SM 9.0).",
+        "SageMaker and Vertex AI endpoints enabled."
+      ],
+      "conan_install": [
+        "conan install server/",
+        "  --profile:host=server/conan/profiles/linux-gcc13-release-aarch64",
+        "  --profile:build=server/conan/profiles/linux-gcc13-release",
+        "  -o '&:enable_gpu=True'",
+        "  -o '&:enable_grpc=True'",
+        "  -o '&:enable_http=True'",
+        "  -o '&:enable_metrics=True'",
+        "  --build=missing",
+        "  --output-folder=server/build/triton-inference-server-release-cuda-ubuntu-aarch64/conan",
+        "",
+        "cmake --preset triton-inference-server-release-cuda-ubuntu-aarch64",
+        "cmake --build --preset triton-inference-server-release-cuda-ubuntu-aarch64"
+      ]
+    }
+  },
+  "configurePresets": [
+    {
+      "name": "triton-inference-server-release-cuda-ubuntu-aarch64",
+      "displayName": "TritonInferenceServer — Release, CUDA, Ubuntu, aarch64",
+      "description": "GPU-enabled release build for Ubuntu Linux on aarch64 (Jetson Orin = SM 8.7, Grace Hopper = SM 9.0).",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "${sourceDir}/build/${presetName}/conan/generators/conan_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_BUILD_TYPE":              "Release",
+        "TRITON_ENABLE_GPU":             "ON",
+        "TRITON_ENABLE_HTTP":            "ON",
+        "TRITON_ENABLE_GRPC":            "ON",
+        "TRITON_ENABLE_METRICS":         "ON",
+        "TRITON_ENABLE_METRICS_GPU":     "ON",
+        "TRITON_ENABLE_METRICS_CPU":     "ON",
+        "TRITON_ENABLE_ENSEMBLE":        "ON",
+        "TRITON_ENABLE_SAGEMAKER":       "ON",
+        "TRITON_ENABLE_VERTEX_AI":       "ON",
+        "TRITON_MIN_COMPUTE_CAPABILITY": "8.7",
+        "CMAKE_CUDA_ARCHITECTURES":      "87;90"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "triton-inference-server-release-cuda-ubuntu-aarch64",
+      "configurePreset": "triton-inference-server-release-cuda-ubuntu-aarch64",
+      "jobs": 8
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "triton-inference-server-release-cuda-ubuntu-aarch64",
+      "configurePreset": "triton-inference-server-release-cuda-ubuntu-aarch64",
+      "filter": { "exclude": { "label": "requires-gpu" } }
+    }
+  ]
+}

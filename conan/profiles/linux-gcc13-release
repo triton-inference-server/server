@@ -1,0 +1,15 @@
+[settings]
+os=Linux
+arch=x86_64
+compiler=gcc
+compiler.version=13
+compiler.libcxx=libstdc++11
+compiler.cppstd=17
+build_type=Release
+
+[conf]
+tools.cmake:cmake_program=/home/user/.venv/bin/cmake
+
+[buildenv]
+CC=/usr/bin/gcc-13
+CXX=/usr/bin/g++-13

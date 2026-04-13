@@ -1,0 +1,63 @@
+{
+  "version": 6,
+  "vendor": {
+    "triton": {
+      "component": "TritonClient",
+      "platform": "Ubuntu aarch64 with NVIDIA GPU (CUDA) — Jetson Orin, Grace Hopper",
+      "notes": [
+        "GPU-enabled client build for aarch64.",
+        "Targets Jetson Orin (SM 8.7) and Grace Hopper (SM 9.0).",
+        "Run cmake from the client/ source directory."
+      ],
+      "conan_install": [
+        "conan install client/",
+        "  --profile:host=server/conan/profiles/linux-gcc13-release-aarch64",
+        "  --profile:build=server/conan/profiles/linux-gcc13-release",
+        "  -o '&:enable_gpu=True'",
+        "  -o '&:enable_grpc=True'",
+        "  -o '&:enable_http=True'",
+        "  --build=missing",
+        "  --output-folder=client/build/triton-client-release-cuda-ubuntu-aarch64/conan",
+        "",
+        "cmake --preset triton-client-release-cuda-ubuntu-aarch64",
+        "cmake --build --preset triton-client-release-cuda-ubuntu-aarch64"
+      ]
+    }
+  },
+  "configurePresets": [
+    {
+      "name": "triton-client-release-cuda-ubuntu-aarch64",
+      "displayName": "TritonClient — Release, CUDA, Ubuntu, aarch64",
+      "description": "GPU-enabled client library build for Ubuntu Linux on aarch64 (Jetson Orin, Grace Hopper).",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "${sourceDir}/build/${presetName}/conan/generators/conan_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_BUILD_TYPE":               "Release",
+        "TRITON_ENABLE_GPU":              "ON",
+        "TRITON_ENABLE_CC_HTTP":          "ON",
+        "TRITON_ENABLE_CC_GRPC":          "ON",
+        "TRITON_ENABLE_PYTHON_HTTP":      "ON",
+        "TRITON_ENABLE_PYTHON_GRPC":      "ON",
+        "TRITON_ENABLE_PERF_ANALYZER":    "ON",
+        "TRITON_ENABLE_EXAMPLES":         "ON",
+        "TRITON_ENABLE_TESTS":            "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "triton-client-release-cuda-ubuntu-aarch64",
+      "configurePreset": "triton-client-release-cuda-ubuntu-aarch64",
+      "jobs": 8
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "triton-client-release-cuda-ubuntu-aarch64",
+      "configurePreset": "triton-client-release-cuda-ubuntu-aarch64",
+      "filter": { "exclude": { "label": "requires-gpu" } }
+    }
+  ]
+}

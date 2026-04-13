@@ -1,0 +1,73 @@
+{
+  "version": 6,
+  "vendor": {
+    "triton": {
+      "component": "TritonTRTLLMBackend",
+      "platform": "Ubuntu aarch64 with NVIDIA GPU (CUDA) — Grace Hopper (GH200)",
+      "notes": [
+        "TensorRT-LLM backend build for Ubuntu on aarch64.",
+        "Primary target: NVIDIA Grace Hopper Superchip (GH200, SM 9.0).",
+        "The TensorRT-LLM library must be installed as a Python wheel before the build:",
+        "  pip install tensorrt-llm  --extra-index-url https://pypi.nvidia.com",
+        "Requires CUDA 12.x and TensorRT 10.x for aarch64.",
+        "Run cmake from the server/ source directory."
+      ],
+      "conan_install": [
+        "pip install tensorrt-llm --extra-index-url https://pypi.nvidia.com",
+        "",
+        "conan install server/",
+        "  --profile:host=server/conan/profiles/linux-gcc13-release-aarch64",
+        "  --profile:build=server/conan/profiles/linux-gcc13-release",
+        "  -o '&:enable_gpu=True'",
+        "  -o '&:enable_grpc=True'",
+        "  -o '&:enable_http=True'",
+        "  -o '&:enable_metrics=True'",
+        "  --build=missing",
+        "  --output-folder=server/build/triton-trtllm-backend-release-cuda-ubuntu-aarch64/conan",
+        "",
+        "cmake --preset triton-trtllm-backend-release-cuda-ubuntu-aarch64",
+        "cmake --build --preset triton-trtllm-backend-release-cuda-ubuntu-aarch64",
+        "cmake --build --preset triton-trtllm-backend-release-cuda-ubuntu-aarch64 --target tensorrtllm-backend"
+      ]
+    }
+  },
+  "configurePresets": [
+    {
+      "name": "triton-trtllm-backend-release-cuda-ubuntu-aarch64",
+      "displayName": "TritonTRTLLMBackend — Release, CUDA, Ubuntu, aarch64",
+      "description": "Triton server + TensorRT-LLM backend for Ubuntu Linux on aarch64 (Grace Hopper GH200 = SM 9.0). Requires tensorrt-llm wheel installed before cmake configure.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "${sourceDir}/build/${presetName}/conan/generators/conan_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS":       "ON",
+        "CMAKE_BUILD_TYPE":                    "Release",
+        "TRITON_ENABLE_GPU":                   "ON",
+        "TRITON_ENABLE_HTTP":                  "ON",
+        "TRITON_ENABLE_GRPC":                  "ON",
+        "TRITON_ENABLE_METRICS":               "ON",
+        "TRITON_ENABLE_METRICS_GPU":           "ON",
+        "TRITON_ENABLE_METRICS_CPU":           "ON",
+        "TRITON_ENABLE_ENSEMBLE":              "ON",
+        "TRITON_MIN_COMPUTE_CAPABILITY":       "9.0",
+        "CMAKE_CUDA_ARCHITECTURES":            "90",
+        "TRITON_ENABLE_TENSORRTLLM_BACKEND":   "ON",
+        "TRITON_FETCH_MISSING_BACKENDS":       "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "triton-trtllm-backend-release-cuda-ubuntu-aarch64",
+      "configurePreset": "triton-trtllm-backend-release-cuda-ubuntu-aarch64",
+      "jobs": 8
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "triton-trtllm-backend-release-cuda-ubuntu-aarch64",
+      "configurePreset": "triton-trtllm-backend-release-cuda-ubuntu-aarch64",
+      "filter": { "exclude": { "label": "requires-gpu" } }
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "version": 6,
+  "vendor": {
+    "triton": {
+      "component": "TritonInferenceServer",
+      "platform": "Ubuntu x86_64, CPU-only (no NVIDIA GPU required)",
+      "notes": [
+        "CPU-only server build — no CUDA toolkit required.",
+        "Suitable for backends: identity, repeat, ensemble, square, Python, ONNX Runtime (CPU), OpenVINO.",
+        "SageMaker and Vertex AI endpoints enabled."
+      ],
+      "conan_install": [
+        "conan install server/",
+        "  --profile:host=server/conan/profiles/linux-gcc13-release",
+        "  --profile:build=server/conan/profiles/linux-gcc13-release",
+        "  -o '&:enable_gpu=False'",
+        "  -o '&:enable_grpc=True'",
+        "  -o '&:enable_http=True'",
+        "  -o '&:enable_metrics=True'",
+        "  --build=missing",
+        "  --output-folder=server/build/triton-inference-server-release-cpu-ubuntu-x86_64/conan",
+        "",
+        "cmake --preset triton-inference-server-release-cpu-ubuntu-x86_64",
+        "cmake --build --preset triton-inference-server-release-cpu-ubuntu-x86_64",
+        "cmake --build --preset triton-inference-server-release-cpu-ubuntu-x86_64 --target wheels"
+      ]
+    }
+  },
+  "configurePresets": [
+    {
+      "name": "triton-inference-server-release-cpu-ubuntu-x86_64",
+      "displayName": "TritonInferenceServer — Release, CPU-only, Ubuntu, x86_64",
+      "description": "CPU-only release build for Ubuntu Linux on x86_64. No CUDA required.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "${sourceDir}/build/${presetName}/conan/generators/conan_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_BUILD_TYPE":          "Release",
+        "TRITON_ENABLE_GPU":         "OFF",
+        "TRITON_ENABLE_METRICS_GPU": "OFF",
+        "TRITON_ENABLE_HTTP":        "ON",
+        "TRITON_ENABLE_GRPC":        "ON",
+        "TRITON_ENABLE_METRICS":     "ON",
+        "TRITON_ENABLE_METRICS_CPU": "ON",
+        "TRITON_ENABLE_ENSEMBLE":    "ON",
+        "TRITON_ENABLE_SAGEMAKER":   "ON",
+        "TRITON_ENABLE_VERTEX_AI":   "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "triton-inference-server-release-cpu-ubuntu-x86_64",
+      "configurePreset": "triton-inference-server-release-cpu-ubuntu-x86_64",
+      "jobs": 8
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "triton-inference-server-release-cpu-ubuntu-x86_64",
+      "configurePreset": "triton-inference-server-release-cpu-ubuntu-x86_64",
+      "filter": { "exclude": { "label": "requires-gpu" } }
+    }
+  ]
+}

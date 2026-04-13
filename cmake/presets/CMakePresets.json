@@ -1,0 +1,46 @@
+{
+  "version": 6,
+  "vendor": {
+    "triton": {
+      "description": "Platform-specific preset catalog for all Triton components. Include this file from CMakeUserPresets.json to activate all platform presets.",
+      "components": [
+        "TritonInferenceServer  — server binary + backends (run cmake from server/)",
+        "TritonClient           — C++/Python client libraries (run cmake from client/)",
+        "TritonPerfAnalyzer     — standalone benchmark tool, manylinux only (run cmake from perf_analyzer/)",
+        "TritonVLLMBackend      — server + vLLM Python backend (run cmake from server/)",
+        "TritonTRTLLMBackend    — server + TensorRT-LLM backend (run cmake from server/; install tensorrt-llm wheel first)"
+      ],
+      "usage": [
+        "After running 'conan install', add to CMakeUserPresets.json:",
+        "  {",
+        "    \"version\": 6,",
+        "    \"include\": [",
+        "      \"build/<preset-name>/conan/generators/CMakePresets.json\",",
+        "      \"<path-to-server>/cmake/presets/CMakePresets.json\"",
+        "    ]",
+        "  }",
+        "",
+        "Then: cmake --preset triton-inference-server-release-cuda-ubuntu-x86_64"
+      ]
+    }
+  },
+  "include": [
+    "CMakePresets.TritonInferenceServer.Release.CUDA.ubuntu.x86_64.json",
+    "CMakePresets.TritonInferenceServer.Release.CUDA.ubuntu.aarch64.json",
+    "CMakePresets.TritonInferenceServer.Release.CUDA.manylinux.x86_64.json",
+    "CMakePresets.TritonInferenceServer.Release.CUDA.manylinux.aarch64.json",
+    "CMakePresets.TritonInferenceServer.Release.CPU.ubuntu.x86_64.json",
+    "CMakePresets.TritonInferenceServer.Release.CPU.ubuntu.aarch64.json",
+    "CMakePresets.TritonClient.Release.CUDA.ubuntu.x86_64.json",
+    "CMakePresets.TritonClient.Release.CUDA.ubuntu.aarch64.json",
+    "CMakePresets.TritonClient.Release.CUDA.manylinux.x86_64.json",
+    "CMakePresets.TritonClient.Release.CUDA.manylinux.aarch64.json",
+    "CMakePresets.TritonClient.Release.CPU.ubuntu.x86_64.json",
+    "CMakePresets.TritonClient.Release.CPU.ubuntu.aarch64.json",
+    "CMakePresets.TritonPerfAnalyzer.Release.manylinux.x86_64.json",
+    "CMakePresets.TritonPerfAnalyzer.Release.manylinux.aarch64.json",
+    "CMakePresets.TritonVLLMBackend.Release.CUDA.ubuntu.x86_64.json",
+    "CMakePresets.TritonTRTLLMBackend.Release.CUDA.ubuntu.x86_64.json",
+    "CMakePresets.TritonTRTLLMBackend.Release.CUDA.ubuntu.aarch64.json"
+  ]
+}

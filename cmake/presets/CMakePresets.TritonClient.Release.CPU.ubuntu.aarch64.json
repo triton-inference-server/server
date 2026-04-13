@@ -1,0 +1,64 @@
+{
+  "version": 6,
+  "vendor": {
+    "triton": {
+      "component": "TritonClient",
+      "platform": "Ubuntu aarch64, CPU-only (Graviton, Neoverse, Apple Silicon dev)",
+      "notes": [
+        "CPU-only client build for aarch64 — no CUDA required.",
+        "Targets AWS Graviton, Ampere Altra, and NVIDIA Grace (CPU die).",
+        "Run cmake from the client/ source directory."
+      ],
+      "conan_install": [
+        "conan install client/",
+        "  --profile:host=server/conan/profiles/linux-gcc13-release-aarch64",
+        "  --profile:build=server/conan/profiles/linux-gcc13-release",
+        "  -o '&:enable_gpu=False'",
+        "  -o '&:enable_grpc=True'",
+        "  -o '&:enable_http=True'",
+        "  --build=missing",
+        "  --output-folder=client/build/triton-client-release-cpu-ubuntu-aarch64/conan",
+        "",
+        "cmake --preset triton-client-release-cpu-ubuntu-aarch64",
+        "cmake --build --preset triton-client-release-cpu-ubuntu-aarch64",
+        "cmake --build --preset triton-client-release-cpu-ubuntu-aarch64 --target wheels"
+      ]
+    }
+  },
+  "configurePresets": [
+    {
+      "name": "triton-client-release-cpu-ubuntu-aarch64",
+      "displayName": "TritonClient — Release, CPU-only, Ubuntu, aarch64",
+      "description": "CPU-only client library build for Ubuntu Linux on aarch64.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "${sourceDir}/build/${presetName}/conan/generators/conan_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_BUILD_TYPE":               "Release",
+        "TRITON_ENABLE_GPU":              "OFF",
+        "TRITON_ENABLE_CC_HTTP":          "ON",
+        "TRITON_ENABLE_CC_GRPC":          "ON",
+        "TRITON_ENABLE_PYTHON_HTTP":      "ON",
+        "TRITON_ENABLE_PYTHON_GRPC":      "ON",
+        "TRITON_ENABLE_PERF_ANALYZER":    "ON",
+        "TRITON_ENABLE_EXAMPLES":         "ON",
+        "TRITON_ENABLE_TESTS":            "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "triton-client-release-cpu-ubuntu-aarch64",
+      "configurePreset": "triton-client-release-cpu-ubuntu-aarch64",
+      "jobs": 8
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "triton-client-release-cpu-ubuntu-aarch64",
+      "configurePreset": "triton-client-release-cpu-ubuntu-aarch64",
+      "filter": { "exclude": { "label": "requires-gpu" } }
+    }
+  ]
+}
