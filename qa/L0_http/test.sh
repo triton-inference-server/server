@@ -26,15 +26,15 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-if [ "$#" -ge 1 ]; then
+if [[ "$#" -ge 1 ]]; then
     REPO_VERSION=$1
 fi
-if [ -z "$REPO_VERSION" ]; then
+if [[ -z "$REPO_VERSION" ]]; then
     echo -e "Repository version must be specified"
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
-if [ ! -z "$TEST_REPO_ARCH" ]; then
+if [[ ! -z "$TEST_REPO_ARCH" ]]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
@@ -80,7 +80,7 @@ if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
     SIMPLE_SHM_CLIENT=${SDKDIR}/python/simple_http_shm_client
     SIMPLE_CUDASHM_CLIENT=${SDKDIR}/python/simple_http_cudashm_client
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT=${SDKDIR}/python/reuse_infer_objects_client
-    # [FIXME] point to proper client
+    # [[FIXME]] point to proper client
     CC_UNIT_TEST=${SDKDIR}/python/cc_client_test
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
@@ -132,7 +132,7 @@ CLIENT_LOG=`pwd`/client.log
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 
 run_server
-if [ "$SERVER_PID" == "0" ]; then
+if [[ "$SERVER_PID" == "0" ]]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
@@ -142,7 +142,7 @@ set +e
 
 # Test health
 python $SIMPLE_HEALTH_CLIENT_PY -v >> ${CLIENT_LOG}.health 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat ${CLIENT_LOG}.health
     RET=1
 fi
@@ -162,23 +162,23 @@ for i in \
         ; do
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"
-    if [ $SUFFIX == "image_client" ]; then
+    if [[ $SUFFIX == "image_client" ]]; then
         python $i -m densenet_onnx -s INCEPTION -a -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.async.${SUFFIX}" 2>&1
-        if [ `grep -c VULTURE ${CLIENT_LOG}.async.${SUFFIX}` != "1" ]; then
+        if [[ `grep -c VULTURE ${CLIENT_LOG}.async.${SUFFIX}` != "1" ]]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.async.${SUFFIX}
             RET=1
         fi
         python $i -m densenet_onnx -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
-        if [ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
+        if [[ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.${SUFFIX}
             RET=1
         fi
-    # elif [ $SUFFIX == "ensemble_image_client" ]; then
+    # elif [[ $SUFFIX == "ensemble_image_client" ]]; then
     #     python $i -c 1 ../images >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     #     for result in "SPORTS CAR" "COFFEE MUG" "VULTURE"; do
-    #         if [ `grep -c "$result" ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
+    #         if [[ `grep -c "$result" ${CLIENT_LOG}.${SUFFIX}` != "1" ]]; then
     #             echo -e "\n***\n*** Failed. Expected 1 $result result\n***"
     #             RET=1
     #         fi
@@ -187,7 +187,7 @@ for i in \
         python $i -v >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
     fi
 
-    if [ $? -ne 0 ]; then
+    if [[ $? -ne 0 ]]; then
         cat "${CLIENT_LOG}.${SUFFIX}"
         RET=1
     fi
@@ -195,18 +195,18 @@ done
 
 # Test while reusing the InferInput and InferRequestedOutput objects
 $SIMPLE_REUSE_INFER_OBJECTS_CLIENT_PY -v >> ${CLIENT_LOG}.reuse 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat ${CLIENT_LOG}.reuse
     RET=1
 fi
 
 # Test with the base path in url.
 $SIMPLE_INFER_CLIENT_PY -u localhost:8000/base_path -v >> ${CLIENT_LOG}.base_path_url 2>&1
-if [ $? -eq 0 ]; then
+if [[ $? -eq 0 ]]; then
     cat ${CLIENT_LOG}.base_path_url
     RET=1
 fi
-if [ $(cat ${CLIENT_LOG}.base_path_url | grep "POST /base_path/v2/models/simple/infer" | wc -l) -eq 0 ]; then
+if [[ $(cat ${CLIENT_LOG}.base_path_url | grep "POST /base_path/v2/models/simple/infer" | wc -l) -eq 0 ]]; then
     cat ${CLIENT_LOG}.base_path_url
     RET=1
 fi
@@ -224,7 +224,7 @@ for i in \
    SUFFIX="${BASE%.*}"
 
     $i -v -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
-    if [ $? -ne 0 ]; then
+    if [[ $? -ne 0 ]]; then
         cat ${CLIENT_LOG}.c++.${SUFFIX}
         RET=1
     fi
@@ -232,20 +232,20 @@ done
 
 # Test with json input and output data
 $SIMPLE_STRING_INFER_CLIENT --json-input-data --json-output-data >> ${CLIENT_LOG}.c++.json 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat ${CLIENT_LOG}.c++.json
     RET=1
 fi
 
 # Test while reusing the InferInput and InferRequestedOutput objects
 $SIMPLE_REUSE_INFER_OBJECTS_CLIENT -v >> ${CLIENT_LOG}.c++.reuse 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat ${CLIENT_LOG}.c++.reuse
     RET=1
 fi
 
 python $CLIENT_PLUGIN_TEST >> ${CLIENT_LOG}.python.plugin 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat ${CLIENT_LOG}.python.plugin
     RET=1
 fi
@@ -256,7 +256,7 @@ echo "password" | openssl passwd -stdin -apr1 >> pswd
 nginx -c `pwd`/$NGINX_CONF
 
 python $BASIC_AUTH_TEST >> ${CLIENT_LOG}.python.plugin.auth 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat ${CLIENT_LOG}.python.plugin.auth
     RET=1
 fi
@@ -264,11 +264,11 @@ service nginx stop
 
 # Test with the base path in url.
 $SIMPLE_INFER_CLIENT -u localhost:8000/base_path -v >> ${CLIENT_LOG}.c++.base_path_url 2>&1
-if [ $? -eq 0 ]; then
+if [[ $? -eq 0 ]]; then
     cat ${CLIENT_LOG}.c++.base_path_url
     RET=1
 fi
-if [ $(cat ${CLIENT_LOG}.c++.base_path_url | grep "POST /base_path/v2/models/simple/infer" | wc -l) -eq 0 ]; then
+if [[ $(cat ${CLIENT_LOG}.c++.base_path_url | grep "POST /base_path/v2/models/simple/infer" | wc -l) -eq 0 ]]; then
     cat ${CLIENT_LOG}.c++.base_path_url
     RET=1
 fi
@@ -281,7 +281,7 @@ wait $SERVER_PID
 
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --model-control-mode=explicit"
 run_server
-if [ "$SERVER_PID" == "0" ]; then
+if [[ "$SERVER_PID" == "0" ]]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
@@ -291,16 +291,16 @@ set +e
 
 # Test Model Control API
 python $SIMPLE_MODEL_CONTROL_PY -v >> ${CLIENT_LOG}.model_control 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
 fi
 
-if [ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]; then
+if [[ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
 fi
-if [ $(cat ${SERVER_LOG} | grep "Invalid config override" | wc -l) -eq 0 ]; then
+if [[ $(cat ${SERVER_LOG} | grep "Invalid config override" | wc -l) -eq 0 ]]; then
     cat ${SERVER_LOG}
     RET=1
 fi
@@ -312,7 +312,7 @@ wait $SERVER_PID
 
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --model-control-mode=explicit"
 run_server
-if [ "$SERVER_PID" == "0" ]; then
+if [[ "$SERVER_PID" == "0" ]]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
@@ -322,7 +322,7 @@ set +e
 
 # Test Model Control API
 $SIMPLE_MODEL_CONTROL -v >> ${CLIENT_LOG}.c++.model_control 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat ${CLIENT_LOG}.c++.model_control
     RET=1
 fi
@@ -337,7 +337,7 @@ SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server_dyna.log"
 CLIENT_LOG="./client_dyna.log"
 run_server
-if [ "$SERVER_PID" == "0" ]; then
+if [[ "$SERVER_PID" == "0" ]]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
@@ -349,7 +349,7 @@ for i in \
     $SIMPLE_SEQUENCE_INFER_CLIENT_PY; do
 
     $i -v -d >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
+    if [[ $? -ne 0 ]]; then
         RET=1
     fi
 done
@@ -363,7 +363,7 @@ wait $SERVER_PID
 SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server_binaryjson.log"
 run_server
-if [ "$SERVER_PID" == "0" ]; then
+if [[ "$SERVER_PID" == "0" ]]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
@@ -372,21 +372,21 @@ fi
 # no parameters, no outputs == json output
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]},{"name":"INPUT1","datatype":"INT32","shape":[[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]}]}' localhost:8000/v2/models/simple/infer`
 set -e
-if [ "$code" != "200" ]; then
+if [[ "$code" != "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
-    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
+if [[ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]]" ./curl.out` != "1" ]; then
+    echo -e "\[[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
 fi
-if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
-    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+if [[ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]]" ./curl.out` != "1" ]; then
+    echo -e "\[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
@@ -395,21 +395,21 @@ fi
 # binary_data=true on INPUT0, binary_data=false on INPUT1
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}],"outputs":[{"name":"OUTPUT0","parameters":{"binary_data":true}},{"name":"OUTPUT1","parameters":{"binary_data":false}}]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]},{"name":"INPUT1","datatype":"INT32","shape":[[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]}],"outputs":[[{"name":"OUTPUT0","parameters":{"binary_data":true}},{"name":"OUTPUT1","parameters":{"binary_data":false}}]]}' localhost:8000/v2/models/simple/infer`
 set -e
-if [ "$code" != "200" ]; then
+if [[ "$code" != "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
-    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
+if [[ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]]" ./curl.out` != "0" ]; then
+    echo -e "\[[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]] found in output when not expected"
     cat ./curl.out
     echo ""
     RET=1
 fi
-if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
-    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+if [[ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]]" ./curl.out` != "1" ]; then
+    echo -e "\[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
@@ -418,21 +418,21 @@ fi
 # binary_data=true on INPUT0, binary_data not given on INPUT1
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}],"outputs":[{"name":"OUTPUT0","parameters":{"binary_data":true}},{"name":"OUTPUT1"}]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]},{"name":"INPUT1","datatype":"INT32","shape":[[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]}],"outputs":[[{"name":"OUTPUT0","parameters":{"binary_data":true}},{"name":"OUTPUT1"}]]}' localhost:8000/v2/models/simple/infer`
 set -e
-if [ "$code" != "200" ]; then
+if [[ "$code" != "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
-    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
+if [[ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]]" ./curl.out` != "0" ]; then
+    echo -e "\[[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]] found in output when not expected"
     cat ./curl.out
     echo ""
     RET=1
 fi
-if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
-    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+if [[ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]]" ./curl.out` != "1" ]; then
+    echo -e "\[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
@@ -441,21 +441,21 @@ fi
 # binary_data_output=true, no outputs requested
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"parameters":{"binary_data_output":true},"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"parameters":{"binary_data_output":true},"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]},{"name":"INPUT1","datatype":"INT32","shape":[[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]}]}' localhost:8000/v2/models/simple/infer`
 set -e
-if [ "$code" != "200" ]; then
+if [[ "$code" != "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
-    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
+if [[ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]]" ./curl.out` != "0" ]; then
+    echo -e "\[[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]] found in output when not expected"
     cat ./curl.out
     echo ""
     RET=1
 fi
-if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "0" ]; then
-    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] found in output when not expected"
+if [[ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]]" ./curl.out` != "0" ]; then
+    echo -e "\[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]] found in output when not expected"
     cat ./curl.out
     echo ""
     RET=1
@@ -465,21 +465,21 @@ fi
 # binary_data=false on INPUT0, binary_data not given on INPUT1
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"parameters":{"binary_data_output":true},"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}],"outputs":[{"name":"OUTPUT0","parameters":{"binary_data":false}},{"name":"OUTPUT1"}]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"parameters":{"binary_data_output":true},"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]},{"name":"INPUT1","datatype":"INT32","shape":[[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]}],"outputs":[[{"name":"OUTPUT0","parameters":{"binary_data":false}},{"name":"OUTPUT1"}]]}' localhost:8000/v2/models/simple/infer`
 set -e
-if [ "$code" != "200" ]; then
+if [[ "$code" != "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
-    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
+if [[ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]]" ./curl.out` != "1" ]; then
+    echo -e "\[[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
 fi
-if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
-    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+if [[ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]]" ./curl.out` != "1" ]; then
+    echo -e "\[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
@@ -488,14 +488,14 @@ fi
 # Send bad request where the 'data' field misaligns with the 'shape' field of the input
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]}]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]]}]}' localhost:8000/v2/models/simple/infer`
 set -e
-if [ "$code" == "200" ]; then
+if [[ "$code" == "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "\{\"error\":\"Failed to parse 'data' field: shape does not match true shape\"\}" ./curl.out` != "1" ]; then
+if [[ `grep -c "\{\"error\":\"Failed to parse 'data' field: shape does not match true shape\"\}" ./curl.out` != "1" ]]; then
     echo -e "\{\"error\":\"Failed to parse 'data' field: shape does not match true shape\"\} not found in output when expected"
     cat ./curl.out
     echo ""
@@ -504,14 +504,14 @@ fi
 
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18]}]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18]]}]}' localhost:8000/v2/models/simple/infer`
 set -e
-if [ "$code" == "200" ]; then
+if [[ "$code" == "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\}" ./curl.out` != "1" ]; then
+if [[ `grep -c "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\}" ./curl.out` != "1" ]]; then
     echo -e "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\} not found in output when expected"
     cat ./curl.out
     echo ""
@@ -521,21 +521,21 @@ fi
 # Check if the server is still working after the above bad requests
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]},{"name":"INPUT1","datatype":"INT32","shape":[[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]}]}' localhost:8000/v2/models/simple/infer`
 set -e
-if [ "$code" != "200" ]; then
+if [[ "$code" != "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
-    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
+if [[ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]]" ./curl.out` != "1" ]; then
+    echo -e "\[[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
 fi
-if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
-    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
+if [[ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]]" ./curl.out` != "1" ]; then
+    echo -e "\[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
@@ -554,7 +554,7 @@ SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=unit_test_mod
 SERVER_LOG="./inference_server_cc_unit_test.log"
 CLIENT_LOG="./cc_unit_test.log"
 run_server
-if [ "$SERVER_PID" == "0" ]; then
+if [[ "$SERVER_PID" == "0" ]]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
@@ -563,7 +563,7 @@ fi
 set +e
 # Run all unit tests except load
 $CC_UNIT_TEST --gtest_filter=HTTP*:-*Load* >> ${CLIENT_LOG} 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat ${CLIENT_LOG}
     RET=1
 fi
@@ -591,7 +591,7 @@ for i in \
    "LoadWithConfigOverride" \
    ; do
     run_server
-    if [ "$SERVER_PID" == "0" ]; then
+    if [[ "$SERVER_PID" == "0" ]]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
         cat $SERVER_LOG
         exit 1
@@ -599,7 +599,7 @@ for i in \
 
     set +e
     $CC_UNIT_TEST --gtest_filter=HTTP*$i >> ${CLIENT_LOG}.$i 2>&1
-    if [ $? -ne 0 ]; then
+    if [[ $? -ne 0 ]]; then
         cat ${CLIENT_LOG}.$i
         RET=1
     fi
@@ -614,14 +614,14 @@ PYTHON_HTTP_AIO_TEST=python_http_aio_test.py
 CLIENT_LOG=`pwd`/python_http_aio_test.log
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 run_server
-if [ "$SERVER_PID" == "0" ]; then
+if [[ "$SERVER_PID" == "0" ]]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
 fi
 set +e
 python $PYTHON_HTTP_AIO_TEST > $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Python HTTP AsyncIO Test Failed\n***"
     RET=1
@@ -648,7 +648,7 @@ cp -r ${MODELDIR}/onnx_zero_1_float32 ${MODELDIR}/onnx_zero_1_float32_queue && \
         sed -i "s/onnx_zero_1_float32/onnx_zero_1_float32_queue/" config.pbtxt && \
         echo "dynamic_batching { " >> config.pbtxt && \
         echo "    max_queue_delay_microseconds: 1000000" >> config.pbtxt && \
-        echo "    preferred_batch_size: [ 8 ]" >> config.pbtxt && \
+        echo "    preferred_batch_size: [[ 8 ]]" >> config.pbtxt && \
         echo "    default_queue_policy {" >> config.pbtxt && \
         echo "        max_queue_size: 1" >> config.pbtxt && \
         echo "    }" >> config.pbtxt && \
@@ -664,7 +664,7 @@ SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_http_test.log"
 CLIENT_LOG="./http_test.log"
 run_server
-if [ "$SERVER_PID" == "0" ]; then
+if [[ "$SERVER_PID" == "0" ]]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
@@ -675,12 +675,12 @@ PYTHON_TEST=http_test.py
 EXPECTED_NUM_TESTS=13
 set +e
 python $PYTHON_TEST >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat $CLIENT_LOG
     RET=1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
+    if [[ $? -ne 0 ]]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
         RET=1
@@ -701,7 +701,7 @@ SERVER_ARGS="--model-repository=`pwd`/../python_models/generate_models --log-ver
 SERVER_LOG="./inference_server_generate_endpoint_test.log"
 CLIENT_LOG="./generate_endpoint_test.log"
 run_server
-if [ "$SERVER_PID" == "0" ]; then
+if [[ "$SERVER_PID" == "0" ]]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
@@ -713,12 +713,12 @@ PYTHON_TEST=generate_endpoint_test.py
 EXPECTED_NUM_TESTS=18
 set +e
 python $PYTHON_TEST > $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat $CLIENT_LOG
     RET=1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
+    if [[ $? -ne 0 ]]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
         RET=1
@@ -740,12 +740,12 @@ SERVER_LOG="./http_restricted_endpoint_test.log"
 CLIENT_LOG="./http_restricted_endpoint_test.log"
 run_server
 EXPECTED_MSG="api 'health' can not be specified in multiple config groups"
-if [ "$SERVER_PID" != "0" ]; then
+if [[ "$SERVER_PID" != "0" ]]; then
     echo -e "\n***\n*** Expect fail to start $SERVER\n***"
     kill $SERVER_PID
     wait $SERVER_PID
     RET=1
-elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
+elif [[ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]]; then
     echo -e "\n***\n*** Failed. Expected ${EXPECTED_MSG} to be found in log\n***"
     cat $SERVER_LOG
     RET=1
@@ -760,12 +760,12 @@ SERVER_ARGS="--model-repository=${MODELDIR}
              --http-restricted-api=metadata,health:k2=v2"
 run_server
 EXPECTED_MSG="unknown restricted api 'model-reposit'"
-if [ "$SERVER_PID" != "0" ]; then
+if [[ "$SERVER_PID" != "0" ]]; then
     echo -e "\n***\n*** Expect fail to start $SERVER\n***"
     kill $SERVER_PID
     wait $SERVER_PID
     RET=1
-elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
+elif [[ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]]; then
     echo -e "\n***\n*** Failed. Expected ${EXPECTED_MSG} to be found in log\n***"
     cat $SERVER_LOG
     RET=1
@@ -778,7 +778,7 @@ SERVER_ARGS="--model-repository=${MODELDIR} \
              --http-restricted-api=model-repository:admin-key=admin-value \
              --http-restricted-api=inference,metadata:infer-key=infer-value"
 run_server
-if [ "$SERVER_PID" == "0" ]; then
+if [[ "$SERVER_PID" == "0" ]]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
@@ -786,7 +786,7 @@ fi
 set +e
 
 python $RESTRICTED_API_TEST RestrictedAPITest > $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Python HTTP Restricted Protocol Test Failed\n***"
     RET=1
@@ -809,7 +809,7 @@ SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_default_limit.log"
 CLIENT_LOG="./http_input_size_limit_default.log"
 run_server
-if [ "$SERVER_PID" == "0" ]; then
+if [[ "$SERVER_PID" == "0" ]]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
@@ -818,28 +818,28 @@ fi
 set +e
 # Run test to verify that large inputs fail with default limit
 python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_raw_binary >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for raw binary input\n***"
     RET=1
 fi
 
 python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_json >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for JSON input\n***"
     RET=1
 fi
 
 python http_input_size_limit_test.py InferSizeLimitTest.test_large_string_in_json >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for large string in JSON\n***"
     RET=1
 fi
 
 python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_compressed >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for compressed input\n***"
     RET=1
@@ -847,7 +847,7 @@ fi
 
 # Run test to verify that large inputs fail with default limit
 python http_input_size_limit_test.py InferSizeLimitTest.test_json_dtype_size_expansion_exceeds_limit_error >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for type size explosion\n***"
     RET=1
@@ -862,7 +862,7 @@ SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=$((2**27))"
 SERVER_LOG="./inference_server_increased_limit.log"
 CLIENT_LOG="./http_input_size_limit_increased.log"
 run_server
-if [ "$SERVER_PID" == "0" ]; then
+if [[ "$SERVER_PID" == "0" ]]; then
     echo -e "\n***\n*** Failed to start $SERVER with increased HTTP input size limit\n***"
     cat $SERVER_LOG
     exit 1
@@ -871,21 +871,21 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python http_input_size_limit_test.py InferSizeLimitTest.test_large_input_raw_binary >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Input Size Limit Test Failed for raw binary input with increased limits\n***"
     RET=1
 fi
 
 python http_input_size_limit_test.py InferSizeLimitTest.test_large_input_json >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Input Size Limit Test Failed for JSON input with increased limits\n***"
     RET=1
 fi
 
 python http_input_size_limit_test.py InferSizeLimitTest.test_large_input_compressed >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Input Size Limit Test Failed for compressed input with increased limits\n***"
     RET=1
@@ -900,12 +900,12 @@ SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=0"
 SERVER_LOG="./inference_server_zero_limit.log"
 CLIENT_LOG="./http_input_size_limit_zero.log"
 run_server
-if [ "$SERVER_PID" != "0" ]; then
+if [[ "$SERVER_PID" != "0" ]]; then
     echo -e "\n***\n*** Server should not start with zero max input size\n***"
     kill $SERVER_PID
     wait $SERVER_PID
     RET=1
-elif [ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_LOG}` != "1" ]; then
+elif [[ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_LOG}` != "1" ]]; then
     echo -e "\n***\n*** Failed. Expected '--http-max-input-size must be greater than 0' to be found in log\n***"
     cat $SERVER_LOG
     RET=1
@@ -916,12 +916,12 @@ SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=-1024"
 SERVER_LOG="./inference_server_negative_limit.log"
 CLIENT_LOG="./http_input_size_limit_negative.log"
 run_server
-if [ "$SERVER_PID" != "0" ]; then
+if [[ "$SERVER_PID" != "0" ]]; then
     echo -e "\n***\n*** Server should not start with negative max input size\n***"
     kill $SERVER_PID
     wait $SERVER_PID
     RET=1
-elif [ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_LOG}` != "1" ]; then
+elif [[ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_LOG}` != "1" ]]; then
     echo -e "\n***\n*** Failed. Expected '--http-max-input-size must be greater than 0' to be found in log\n***"
     cat $SERVER_LOG
     RET=1
@@ -935,7 +935,7 @@ SERVER_ARGS="--model-repository=${MODELDIR} --log-verbose=1 --model-control-mode
 SERVER_LOG="./inference_server_request_many_chunks.log"
 
 run_server
-if [ "$SERVER_PID" == "0" ]; then
+if [[ "$SERVER_PID" == "0" ]]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
@@ -943,7 +943,7 @@ fi
 
 set +e
 python $REQUEST_MANY_CHUNKS_PY -v >> ${CLIENT_LOG} 2>&1
-if [ $? -ne 0 ]; then
+if [[ $? -ne 0 ]]; then
     echo -e "\n***\n*** HTTP Request Many Chunks Test Failed\n***"
     cat $SERVER_LOG
     cat $CLIENT_LOG
@@ -954,7 +954,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-if [ $RET -eq 0 ]; then
+if [[ $RET -eq 0 ]]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
     echo -e "\n***\n*** Test FAILED\n***"
