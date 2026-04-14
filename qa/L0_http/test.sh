@@ -954,6 +954,31 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+MODELDIR="`pwd`/models"
+CLIENT_LOG="./client.nested_json_crash.log"
+SERVER_ARGS="--model-repository=${MODELDIR} --log-verbose=1 --model-control-mode=explicit --load-model=simple_identity"
+SERVER_LOG="./nested_json_crash.log"
+
+run_server
+if [[ "$SERVER_PID" == "0" ]]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python nested_json_crash.py --model simple_identity >> ${CLIENT_LOG} 2>&1
+if [[ $? -ne 0 ]]; then
+    echo -e "\n***\n*** Nested JSON Crash Test Failed\n***"
+    cat $SERVER_LOG
+    cat $CLIENT_LOG
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [[ $RET -eq 0 ]]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
