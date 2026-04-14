@@ -789,7 +789,8 @@ class HTTPAPIServer : public HTTPServer {
   // Maximum number of concurrent model repository control operations
   // (load/unload) that can run off the evhtp worker threads. Each request
   // spawns a detached thread; this limit prevents thread explosion.
-  // Sourced from --model-load-thread-count. 0 disables async (synchronous).
+  // Configured via control_request_concurrency; main.cc wires it from
+  // --model-load-thread-count. 0 disables async (synchronous).
   int max_control_requests_;
   std::atomic<int> control_request_cnt_{0};
 };
