@@ -29,6 +29,7 @@ import argparse
 
 import requests
 
+
 def _get_server_url():
     return "http://localhost:8000"
 
@@ -89,14 +90,10 @@ def main():
         print(f"Success (status_code: {response.status_code}).")
 
     except requests.exceptions.ConnectionError:
-        print(
-            "Failure: Connection aborted!"
-        )
+        print("Failure: Connection aborted!")
         exit(1)
     except requests.exceptions.ReadTimeout:
-        print(
-            "Failure: Request timed out. "
-        )
+        print("Failure: Request timed out. ")
         exit(2)
     except Exception as e:
         print(f"Failure: An unexpected error occurred: {e}")
