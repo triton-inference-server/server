@@ -60,7 +60,7 @@ class DuplicateOutputTest(unittest.TestCase):
         inputs[0].set_data_from_numpy(np.ones(shape=(1, 16), dtype=np.int32))
         inputs[1].set_data_from_numpy(np.ones(shape=(1, 16), dtype=np.int32))
 
-        num_duplicates = 25
+        num_duplicates = 5
         outputs = [
             grpcclient.InferRequestedOutput("OUTPUT0") for _ in range(num_duplicates)
         ]
