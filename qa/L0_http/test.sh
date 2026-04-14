@@ -660,7 +660,7 @@ cp -r ./models/simple_identity ${MODELDIR}/simple_identity_int64 && \
         sed -i "s/TYPE_STRING/TYPE_INT64/" config.pbtxt && \
         sed -i "s/simple_identity/simple_identity_int64/" config.pbtxt)
 
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --model-control-mode=explicit --load-model=*"
 SERVER_LOG="./inference_server_http_test.log"
 CLIENT_LOG="./http_test.log"
 run_server
