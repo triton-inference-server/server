@@ -50,7 +50,7 @@ if [ -z "$TEST_VALGRIND" ]; then
     TEST_VALGRIND="0"
 fi
 
-if [ -z "$TEST_CUDA_SHARED_MEMORY" ]; then
+if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
     TEST_CUDA_SHARED_MEMORY="0"
 fi
 
