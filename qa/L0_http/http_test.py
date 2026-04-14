@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -368,7 +368,7 @@ class HttpTest(tu.TestResultCollector):
                 error_message,
             )
             self.assertIn(
-                "exceeds the maximum allowed value",
+                " exceeds the maximum allowed input size. ",
                 error_message,
             )
         except ValueError:

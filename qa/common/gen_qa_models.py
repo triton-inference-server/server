@@ -192,7 +192,7 @@ def create_plan_dynamic_rf_modelfile(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -364,7 +364,7 @@ def create_plan_dynamic_modelfile(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -481,7 +481,7 @@ def create_plan_fixed_rf_modelfile(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -569,7 +569,7 @@ def create_plan_fixed_modelfile(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -594,9 +594,6 @@ def create_plan_modelfile(
         input_dtype,
         output0_dtype,
         output1_dtype,
-        input_shape,
-        output0_shape,
-        output1_shape,
     ):
         return
 
@@ -713,9 +710,6 @@ def create_plan_modelconfig(
         input_dtype,
         output0_dtype,
         output1_dtype,
-        input_shape,
-        output0_shape,
-        output1_shape,
     ):
         return
 
@@ -870,9 +864,6 @@ def create_onnx_modelfile(
         input_dtype,
         output0_dtype,
         output1_dtype,
-        input_shape,
-        output0_shape,
-        output1_shape,
     ):
         return
 
@@ -961,7 +952,7 @@ def create_onnx_modelfile(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
@@ -970,7 +961,6 @@ def create_onnx_modelfile(
 def create_onnx_modelconfig(
     models_dir,
     max_batch,
-    model_version,
     input_shape,
     output0_shape,
     output1_shape,
@@ -984,9 +974,6 @@ def create_onnx_modelconfig(
         input_dtype,
         output0_dtype,
         output1_dtype,
-        input_shape,
-        output0_shape,
-        output1_shape,
     ):
         return
 
@@ -1422,6 +1409,15 @@ def create_torch_aoti_modelfile(
         output_dtype,
         None,
     )
+
+    # AOTI compiles tensor operations and does not support string (object) dtype
+    if input_dtype == np_dtype_string or output_dtype == np_dtype_string:
+        print(
+            f"{_color_yellow}warning: Skipping AOTI model {model_name}: "
+            f"string/object dtype is not supported for AOTI compilation{_color_reset}"
+        )
+        return False
+
     model_version_dir = f"{models_dir}/{model_name}/{model_version}"
 
     print(f"{_color_green}Creating model {model_name}{_color_reset}")
@@ -1532,7 +1528,6 @@ def create_torchvision_aoti_modelfile(
 def create_libtorch_modelconfig(
     models_dir,
     max_batch,
-    model_version,
     input_shape,
     output0_shape,
     output1_shape,
@@ -1766,8 +1761,6 @@ def create_openvino_modelfile(
         output0_dtype,
         output1_dtype,
         batch_dim + input_shape,
-        batch_dim + output0_shape,
-        batch_dim + output1_shape,
     ):
         return
 
@@ -1804,7 +1797,6 @@ def create_openvino_modelfile(
 def create_openvino_modelconfig(
     models_dir,
     max_batch,
-    model_version,
     input_shape,
     output0_shape,
     output1_shape,
@@ -1820,8 +1812,6 @@ def create_openvino_modelconfig(
         output0_dtype,
         output1_dtype,
         batch_dim + input_shape,
-        batch_dim + output0_shape,
-        batch_dim + output1_shape,
     ):
         return
 
@@ -2014,7 +2004,6 @@ def create_models(
         create_onnx_modelconfig(
             models_dir,
             8,
-            model_version,
             input_shape,
             output0_shape,
             output1_shape,
@@ -2039,7 +2028,6 @@ def create_models(
         create_onnx_modelconfig(
             models_dir,
             0,
-            model_version,
             input_shape,
             output0_shape,
             output1_shape,
@@ -2067,7 +2055,6 @@ def create_models(
         create_libtorch_modelconfig(
             models_dir,
             8,
-            model_version,
             input_shape,
             output0_shape,
             output1_shape,
@@ -2092,7 +2079,6 @@ def create_models(
         create_libtorch_modelconfig(
             models_dir,
             0,
-            model_version,
             input_shape,
             output0_shape,
             output1_shape,
@@ -2143,7 +2129,6 @@ def create_models(
         create_openvino_modelconfig(
             models_dir,
             8,
-            model_version,
             input_shape,
             output0_shape,
             output1_shape,
@@ -2168,7 +2153,6 @@ def create_models(
         create_openvino_modelconfig(
             models_dir,
             0,
-            model_version,
             input_shape,
             output0_shape,
             output1_shape,

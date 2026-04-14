@@ -66,7 +66,7 @@ log_message.status "Changing working directory to the script directory to: " "${
 cd ${TRITON_MDLS_BASE_SCRIPT_DIR}
 
 log_message.status "define: default values"
-TRITON_VERSION=${TRITON_VERSION:=26.02}
+TRITON_VERSION=${TRITON_VERSION:=26.03}
 ONNX_VERSION=1.20.1
 ONNX_OPSET=0
 OPENVINO_VERSION=2024.5.0
@@ -350,7 +350,7 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --tensorrt --models_dir=$TR
 chmod -R 777 $TRITON_MDLS_QA_RAGGED_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_format_models.py --models_dir=$TRITON_MDLS_QA_TRT_FORMAT_MODEL
 chmod -R 777 $TRITON_MDLS_QA_TRT_FORMAT_MODEL
-nvidia-smi --query-gpu=compute_cap | grep -qz 11.0 && echo -e '${COLOR_WARNING}[WARNING]${COLOR_RESET} Skipping model generation for data dependent shape${COLOR_RESET}' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
+nvidia-smi --query-gpu=compute_cap | grep -qzE '10\.7|11\.0' && echo -e '${COLOR_WARNING}[WARNING]${COLOR_RESET} Skipping model generation for data dependent shape (NonZero not supported on this GPU)${COLOR_RESET}' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
 chmod -R 777 $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
 # Make shared library for custom Hardmax plugin.
 if [ -d "/usr/src/tensorrt/samples/python/onnx_custom_plugin" ]; then
@@ -364,6 +364,21 @@ else
         TRT_BRANCH="\${MAJOR}.\$((MINOR - 1))"
         echo "Fallback: cloning TensorRT release/\${TRT_BRANCH} (previous minor)"
         git clone -b release/\${TRT_BRANCH} --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
+      elif [ -n "\$MAJOR" ] && [ "\$MAJOR" -gt 0 ] 2>/dev/null; then
+        PREV_MAJOR=\$((MAJOR - 1))
+        echo "Fallback: MINOR is 0, querying remote for latest release/\${PREV_MAJOR}.x branch"
+        TRT_BRANCH=\$(git ls-remote --heads https://github.com/NVIDIA/TensorRT.git "refs/heads/release/\${PREV_MAJOR}.*" \
+          | awk -F'refs/heads/release/' '{print \$2}' \
+          | awk -F. '{print \$2, \$0}' \
+          | sort -k1,1n \
+          | tail -1 \
+          | awk '{print \$2}')
+        if [ -n "\$TRT_BRANCH" ]; then
+          echo "Fallback: cloning TensorRT release/\${TRT_BRANCH}"
+          git clone -b release/\${TRT_BRANCH} --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
+        else
+          exit 1
+        fi
       else
         exit 1
       fi

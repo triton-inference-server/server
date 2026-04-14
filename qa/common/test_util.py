@@ -75,7 +75,13 @@ def shape_to_dims_str(shape):
 
 
 def validate_for_trt_model(
-    input_dtype, output0_dtype, output1_dtype, input_shape, output0_shape, output1_shape
+    input_dtype,
+    output0_dtype,
+    output1_dtype,
+    # Unused arguments for consistency with validate_for_libtorch_model
+    input_shape=None,
+    output0_shape=None,
+    output1_shape=None,
 ):
     """Return True if input and output dtypes are supported by a TRT model."""
     supported_datatypes = [
@@ -113,9 +119,6 @@ def validate_for_ensemble_model(
     input_dtype,
     output0_dtype,
     output1_dtype,
-    input_shape,
-    output0_shape,
-    output1_shape,
 ):
     """Return True if input and output dtypes are supported by the ensemble type."""
 
@@ -148,7 +151,13 @@ def validate_for_ensemble_model(
 
 
 def validate_for_onnx_model(
-    input_dtype, output0_dtype, output1_dtype, input_shape, output0_shape, output1_shape
+    input_dtype,
+    output0_dtype,
+    output1_dtype,
+    # Unused arguments for consistency with validate_for_libtorch_model
+    input_shape=None,
+    output0_shape=None,
+    output1_shape=None,
 ):
     """Return True if input and output dtypes are supported by a Onnx model."""
 
@@ -227,7 +236,10 @@ def validate_for_libtorch_model(
 
 
 def validate_for_openvino_model(
-    input_dtype, output0_dtype, output1_dtype, input_shape, output0_shape, output1_shape
+    input_dtype,
+    output0_dtype,
+    output1_dtype,
+    input_shape,
 ):
     """Return True if input and output dtypes are supported by an OpenVino model."""
 

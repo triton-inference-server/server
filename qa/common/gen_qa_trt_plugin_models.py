@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -78,9 +78,6 @@ def create_plan_modelfile(
         input_dtype,
         output0_dtype,
         output0_dtype,
-        input_shape,
-        output0_shape,
-        output0_shape,
     ):
         return
 
@@ -147,7 +144,7 @@ def create_plan_modelfile(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -157,7 +154,6 @@ def create_plan_modelfile(
 def create_plan_modelconfig(
     models_dir,
     max_batch,
-    model_version,
     plugin_name,
     input_shape,
     output0_shape,
@@ -168,9 +164,6 @@ def create_plan_modelconfig(
         input_dtype,
         output0_dtype,
         output0_dtype,
-        input_shape,
-        output0_shape,
-        output0_shape,
     ):
         return
 
@@ -219,7 +212,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -233,7 +226,6 @@ def create_plugin_models(models_dir):
     create_plan_modelconfig(
         models_dir,
         8,
-        model_version,
         "CustomHardmax",
         (2, 2),
         (2, 2),
@@ -254,7 +246,6 @@ def create_plugin_models(models_dir):
     create_plan_modelconfig(
         models_dir,
         0,
-        model_version,
         "CustomHardmax",
         (16, 1, 1),
         (16, 1, 1),

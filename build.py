@@ -71,14 +71,13 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.67.0dev",
-    "triton_container_version": "26.03dev",
-    "upstream_container_version": "26.02",
-    "ort_version": "1.24.2",
+    "release_version": "2.69.0dev",
+    "triton_container_version": "26.05dev",
+    "upstream_container_version": "26.03",
+    "ort_version": "1.24.4",
     "ort_openvino_version": "2026.0.0",
     "standalone_openvino_version": "2026.0.0",
-    "dcgm_version": "4.5.2-1",
-    "vllm_version": "0.16.0",
+    "dcgm_version": "4.5.3-1",
     "rhel_py_version": "3.12.3",
 }
 
@@ -1360,7 +1359,7 @@ RUN yum install -y \\
         libb64-devel \\
         gperftools-devel \\
         wget \\
-        python3-pip \\
+        python3.12-pip \\
         numactl-devel
 
 RUN pip3 install patchelf==0.17.2
@@ -2728,12 +2727,6 @@ if __name__ == "__main__":
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["dcgm_version"],
         help="This flag sets the DCGM version for Triton Inference Server to be built. Default: the latest supported version.",
-    )
-    parser.add_argument(
-        "--vllm-version",
-        required=False,
-        default=DEFAULT_TRITON_VERSION_MAP["vllm_version"],
-        help="This flag sets the vLLM version for Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
         "--rhel-py-version",
