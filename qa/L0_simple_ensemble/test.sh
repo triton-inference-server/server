@@ -241,6 +241,186 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 
+######## Test parallel-step failed enqueue path in ensemble scheduler ########
+PARALLEL_FAILED_ENQUEUE_MODEL_DIR="`pwd`/parallel_failed_enqueue_test_models"
+rm -rf ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}
+
+mkdir -p ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/ensemble_parallel_step_failed_enqueue/1
+mkdir -p ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/decoupled_producer_parallel_queue/1
+mkdir -p ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/slow_consumer_queue_limited/1
+mkdir -p ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/fast_consumer/1
+mkdir -p ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/join_add_sub/1
+
+# Producer emits repeated responses with a larger payload value so the
+# queue-limited branch fills first.
+cp ${BACKPRESSURE_TEST_MODEL_DIR}/decoupled_producer/1/model.py \
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/decoupled_producer_parallel_queue/1
+cp ${BACKPRESSURE_TEST_MODEL_DIR}/decoupled_producer/config.pbtxt \
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/decoupled_producer_parallel_queue/
+sed -i 's/name: "decoupled_producer"/name: "decoupled_producer_parallel_queue"/g' \
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/decoupled_producer_parallel_queue/config.pbtxt
+sed -i 's/0.5/2.0/g' \
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/decoupled_producer_parallel_queue/1/model.py
+
+# Queue-limited branch used to trigger a failed enqueue.
+cp ../python_models/ground_truth/model.py \
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/slow_consumer_queue_limited/1
+cp ../python_models/ground_truth/config.pbtxt \
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/slow_consumer_queue_limited/
+sed -i 's/name: "ground_truth"/name: "slow_consumer_queue_limited"/g' \
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/slow_consumer_queue_limited/config.pbtxt
+sed -i 's/max_batch_size: 64/max_batch_size: 1/g' \
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/slow_consumer_queue_limited/config.pbtxt
+cat >> ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/slow_consumer_queue_limited/config.pbtxt << 'EOF'
+
+dynamic_batching {
+  preferred_batch_size: [ 1 ]
+  default_queue_policy {
+    max_queue_size: 1
+  }
+}
+EOF
+
+# Parallel branch with the same interface and no added delay.
+cp ../python_models/ground_truth/model.py ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/fast_consumer/1
+cp ../python_models/ground_truth/config.pbtxt ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/fast_consumer/
+sed -i 's/name: "ground_truth"/name: "fast_consumer"/g' \
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/fast_consumer/config.pbtxt
+sed -i 's/max_batch_size: 64/max_batch_size: 1/g' \
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/fast_consumer/config.pbtxt
+sed -i 's/time.sleep(delay)/time.sleep(0)/g' \
+  ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/fast_consumer/1/model.py
+
+# Join both parallel branches into the ensemble output.
+cp ../python_models/join_add_sub/model.py ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/join_add_sub/1
+cp ../python_models/join_add_sub/config.pbtxt ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/join_add_sub/
+
+cat > ${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}/ensemble_parallel_step_failed_enqueue/config.pbtxt << 'EOF'
+name: "ensemble_parallel_step_failed_enqueue"
+platform: "ensemble"
+max_batch_size: 0
+
+input [
+  {
+    name: "IN"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+
+output [
+  {
+    name: "OUT"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
+
+ensemble_scheduling {
+  step [
+    {
+      model_name: "decoupled_producer_parallel_queue"
+      model_version: -1
+      input_map {
+        key: "IN"
+        value: "IN"
+      }
+      output_map {
+        key: "OUT"
+        value: "intermediate"
+      }
+    },
+    {
+      model_name: "slow_consumer_queue_limited"
+      model_version: -1
+      input_map {
+        key: "INPUT0"
+        value: "intermediate"
+      }
+      output_map {
+        key: "OUTPUT0"
+        value: "slow_out"
+      }
+    },
+    {
+      model_name: "fast_consumer"
+      model_version: -1
+      input_map {
+        key: "INPUT0"
+        value: "intermediate"
+      }
+      output_map {
+        key: "OUTPUT0"
+        value: "fast_out"
+      }
+    },
+    {
+      model_name: "join_add_sub"
+      model_version: -1
+      input_map {
+        key: "INPUT0"
+        value: "slow_out"
+      }
+      input_map {
+        key: "INPUT1"
+        value: "fast_out"
+      }
+      output_map {
+        key: "OUTPUT0"
+        value: "OUT"
+      }
+    }
+  ]
+}
+EOF
+
+BACKPRESSURE_TEST_PY=./ensemble_backpressure_test.py
+TEST_NAME="EnsembleParallelFailedEnqueueTest.test_parallel_step_failed_enqueue"
+SERVER_LOG="./ensemble_parallel_failed_enqueue_test_server.log"
+CLIENT_LOG="./ensemble_parallel_failed_enqueue_test_client.log"
+rm -f $SERVER_LOG $CLIENT_LOG
+
+SERVER_ARGS="--model-repository=${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+PARALLEL_FAILED_ENQUEUE_LOOPS=${PARALLEL_FAILED_ENQUEUE_LOOPS:-1} \
+python $BACKPRESSURE_TEST_PY $TEST_NAME -v >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+    cat $CLIENT_LOG
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+
+if ! kill -0 $SERVER_PID > /dev/null 2>&1; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Server exited during parallel failed enqueue test\n***"
+    RET=1
+else
+    wait_for_server_live $SERVER_PID 5
+    if [ "$WAIT_RET" != "0" ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** Server did not remain live after parallel failed enqueue test\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID > /dev/null 2>&1 || true
+wait $SERVER_PID > /dev/null 2>&1 || true
+
+
 ######## Test backpressure feature - 'max_inflight_requests' config option ########
 ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR="`pwd`/ensemble_backpressure_test_models"
 rm -rf ${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR}
