@@ -61,8 +61,8 @@ def main():
     )
     parser.add_argument(
         "--model",
-        default="onnx_zero_1_float32",
-        help="Target model name in the Triton Server (default: onnx_zero_1_float32)",
+        default="simple_identity",
+        help="Target model name in the Triton Server (default: simple_identity)",
     )
 
     args = parser.parse_args()
