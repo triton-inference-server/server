@@ -103,7 +103,7 @@ else
 fi
 
 SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR}"
-if [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
+if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
     SERVER_ARGS_EXTRA="${SERVER_ARGS_EXTRA} --allow-client-shm=true"
 fi
 source ../common/util.sh
