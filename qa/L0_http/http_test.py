@@ -423,6 +423,47 @@ class HttpTest(tu.TestResultCollector):
                     except ValueError:
                         self.fail("Response is not valid JSON")
 
+    def test_duplicate_output_names(self):
+        """Test that duplicate output names are rejected"""
+        model = "onnx_zero_1_float32"
+        input_data = np.arange(8, dtype=np.float32).flatten().tolist()
+
+        num_duplicates = 25
+        payload = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "datatype": "FP32",
+                    "shape": [1, 8],
+                    "data": [input_data],
+                }
+            ],
+            "outputs": [{"name": "OUTPUT0"} for _ in range(num_duplicates)],
+        }
+
+        headers = {"Content-Type": "application/json"}
+        r = requests.post(self._get_infer_url(model), json=payload, headers=headers)
+        self.assertEqual(
+            400,
+            r.status_code,
+            "Expected error code 400 for duplicate output names; got: {}".format(
+                r.status_code
+            ),
+        )
+        error_message = r.json().get("error", "")
+        self.assertIn(
+            "Duplicate output name 'OUTPUT0' is not allowed in a request", error_message
+        )
+
+        # Verify server is still healthy after the bad request
+        health_url = "http://localhost:8000/v2/health/live"
+        health_r = requests.get(health_url)
+        self.assertEqual(
+            200,
+            health_r.status_code,
+            "Server is not healthy after duplicate output request",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

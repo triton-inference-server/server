@@ -49,6 +49,35 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
+class DuplicateOutputTest(unittest.TestCase):
+    def test_duplicate_output_names_rejected(self):
+        """Test that duplicate output names in a gRPC infer request are rejected."""
+        client = grpcclient.InferenceServerClient(url="localhost:8001")
+        inputs = [
+            grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
+            grpcclient.InferInput("INPUT1", [1, 16], "INT32"),
+        ]
+        inputs[0].set_data_from_numpy(np.ones(shape=(1, 16), dtype=np.int32))
+        inputs[1].set_data_from_numpy(np.ones(shape=(1, 16), dtype=np.int32))
+
+        num_duplicates = 25
+        outputs = [
+            grpcclient.InferRequestedOutput("OUTPUT0") for _ in range(num_duplicates)
+        ]
+
+        with self.assertRaises(InferenceServerException) as ctx:
+            client.infer(model_name="simple", inputs=inputs, outputs=outputs)
+        self.assertIn(
+            "Duplicate output name 'OUTPUT0' is not allowed in a request",
+            str(ctx.exception),
+        )
+
+        self.assertTrue(
+            client.is_server_live(),
+            "Server is not healthy after duplicate output request",
+        )
+
+
 class RestrictedProtocolTest(unittest.TestCase):
     def setUp(self):
         self.client_ = grpcclient.InferenceServerClient(url="localhost:8001")

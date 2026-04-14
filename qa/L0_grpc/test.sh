@@ -349,6 +349,14 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+# Test duplicate output names are rejected
+python $PYTHON_UNIT_TEST DuplicateOutputTest >> ${CLIENT_LOG}.duplicate_output 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.duplicate_output
+    echo -e "\n***\n*** Python GRPC Duplicate Output Test Failed\n***"
+    RET=1
+fi
+
 set -e
 kill $SERVER_PID
 wait $SERVER_PID

@@ -2736,6 +2736,15 @@ HTTPAPIServer::ParseJsonTritonIO(
       RETURN_MSG_IF_ERR(
           request_output.MemberAsString("name", &output_name, &output_name_len),
           "Unable to parse 'name'");
+
+      if (infer_req->alloc_payload_.output_map_.count(output_name) > 0) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("Duplicate output name '") + output_name +
+             "' is not allowed in a request")
+                .c_str());
+      }
+
       RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddRequestedOutput(
           irequest, output_name));
 

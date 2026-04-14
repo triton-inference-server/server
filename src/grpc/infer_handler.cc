@@ -343,9 +343,19 @@ SetInferenceRequestMetadata(
         input.shape().data(), input.shape_size()));
   }
 
-  for (const auto& output : request.outputs()) {
-    RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddRequestedOutput(
-        inference_request, output.name().c_str()));
+  {
+    std::unordered_set<std::string> seen_outputs;
+    for (const auto& output : request.outputs()) {
+      if (!seen_outputs.insert(output.name()).second) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("Duplicate output name '") + output.name() +
+             "' is not allowed in a request")
+                .c_str());
+      }
+      RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddRequestedOutput(
+          inference_request, output.name().c_str()));
+    }
   }
 
   return nullptr;  // Success
