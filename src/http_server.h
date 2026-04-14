@@ -29,7 +29,6 @@
 #include <re2/re2.h>
 
 #include <atomic>
-#include <functional>
 #include <list>
 #include <map>
 #include <memory>
@@ -423,21 +422,8 @@ class HTTPAPIServer : public HTTPServer {
 
     // Deferred onto the evhtp thread via evthr_defer. Sends the reply
     // and resumes the paused request. Deletes the ControlRequestClass.
-    static void ReplyCallback(evthr_t* thr, void* arg, void* shared)
-    {
-      auto* ctrl_req = reinterpret_cast<ControlRequestClass*>(arg);
-      evhtp_request_t* req = ctrl_req->req_;
-      if (req != nullptr) {
-        if (ctrl_req->err_ != nullptr) {
-          EVBufferAddErrorJson(req->buffer_out, ctrl_req->err_);
-          evhtp_send_reply(req, HttpCodeFromError(ctrl_req->err_));
-        } else {
-          evhtp_send_reply(req, EVHTP_RES_OK);
-        }
-        evhtp_request_resume(req);
-      }
-      delete ctrl_req;
-    }
+    // Defined in http_server.cc because it uses file-local helper functions.
+    static void ReplyCallback(evthr_t* thr, void* arg, void* shared);
 
     evhtp_request_t* req_;
     evthr_t* thread_;

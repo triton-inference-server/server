@@ -1481,8 +1481,9 @@ HTTPAPIServer::HandleRepositoryControl(
             delete params;
           }
         };
-    // Use shared_ptr so the lambda closure can be copyable (required by
-    // std::function) while still using a custom deleter.
+    // Use shared_ptr for these containers because they are captured by value
+    // in the lambda passed to std::thread, ensuring the data outlives the
+    // thread and is properly cleaned up when all references are released.
     std::shared_ptr<std::vector<TRITONSERVER_Parameter*>> params(
         new std::vector<TRITONSERVER_Parameter*>(), param_deleter);
     // local variables to store the decoded file content, the data must
@@ -1567,15 +1568,29 @@ HTTPAPIServer::HandleRepositoryControl(
 
     // Spawn a detached thread for the blocking call. Thread creation
     // overhead is acceptable for model load/unload operations.
-    std::thread([ctrl_req, raw_server, model_name, params, binary_files,
-                 const_params, cnt_ptr]() {
-      ctrl_req->err_ = TRITONSERVER_ServerLoadModelWithParameters(
-          raw_server, model_name.c_str(), const_params->data(),
-          const_params->size());
-      cnt_ptr->fetch_sub(1, std::memory_order_acq_rel);
-      evthr_defer(
-          ctrl_req->thread_, ControlRequestClass::ReplyCallback, ctrl_req);
-    }).detach();
+    // Wrap in try/catch to handle std::system_error if thread creation fails.
+    try {
+      std::thread([ctrl_req, raw_server, model_name, params, binary_files,
+                   const_params, cnt_ptr]() {
+        ctrl_req->err_ = TRITONSERVER_ServerLoadModelWithParameters(
+            raw_server, model_name.c_str(), const_params->data(),
+            const_params->size());
+        cnt_ptr->fetch_sub(1, std::memory_order_acq_rel);
+        evthr_defer(
+            ctrl_req->thread_, ControlRequestClass::ReplyCallback, ctrl_req);
+      }).detach();
+    }
+    catch (const std::system_error& e) {
+      // Thread creation failed — clean up and return error synchronously.
+      control_request_cnt_.fetch_sub(1, std::memory_order_acq_rel);
+      // ctrl_req has already paused the request; we must resume it.
+      evhtp_request_resume(req);
+      delete ctrl_req;
+      RETURN_AND_RESPOND_WITH_ERR(
+          req, EVHTP_RES_SERVERR,
+          (std::string("Failed to spawn load thread: ") + e.what()).c_str());
+      return;
+    }
     return;
   }
 
@@ -1639,19 +1654,32 @@ HTTPAPIServer::HandleRepositoryControl(
     TRITONSERVER_Server* raw_server = server_.get();
     auto* cnt_ptr = &control_request_cnt_;
 
-    std::thread([ctrl_req, raw_server, model_name, unload_dependents,
-                 cnt_ptr]() {
-      if (unload_dependents) {
-        ctrl_req->err_ = TRITONSERVER_ServerUnloadModelAndDependents(
-            raw_server, model_name.c_str());
-      } else {
-        ctrl_req->err_ =
-            TRITONSERVER_ServerUnloadModel(raw_server, model_name.c_str());
-      }
-      cnt_ptr->fetch_sub(1, std::memory_order_acq_rel);
-      evthr_defer(
-          ctrl_req->thread_, ControlRequestClass::ReplyCallback, ctrl_req);
-    }).detach();
+    // Wrap in try/catch to handle std::system_error if thread creation fails.
+    try {
+      std::thread([ctrl_req, raw_server, model_name, unload_dependents,
+                   cnt_ptr]() {
+        if (unload_dependents) {
+          ctrl_req->err_ = TRITONSERVER_ServerUnloadModelAndDependents(
+              raw_server, model_name.c_str());
+        } else {
+          ctrl_req->err_ =
+              TRITONSERVER_ServerUnloadModel(raw_server, model_name.c_str());
+        }
+        cnt_ptr->fetch_sub(1, std::memory_order_acq_rel);
+        evthr_defer(
+            ctrl_req->thread_, ControlRequestClass::ReplyCallback, ctrl_req);
+      }).detach();
+    }
+    catch (const std::system_error& e) {
+      // Thread creation failed — clean up and return error synchronously.
+      control_request_cnt_.fetch_sub(1, std::memory_order_acq_rel);
+      evhtp_request_resume(req);
+      delete ctrl_req;
+      RETURN_AND_RESPOND_WITH_ERR(
+          req, EVHTP_RES_SERVERR,
+          (std::string("Failed to spawn unload thread: ") + e.what()).c_str());
+      return;
+    }
     return;
   }
 
@@ -3949,6 +3977,24 @@ HTTPAPIServer::HandleInfer(
   RETURN_AND_CALLBACK_IF_ERR(err, error_callback);
   infer_request.release();
   request_release_payload.release();
+}
+
+void
+HTTPAPIServer::ControlRequestClass::ReplyCallback(
+    evthr_t* thr, void* arg, void* shared)
+{
+  auto* ctrl_req = reinterpret_cast<ControlRequestClass*>(arg);
+  evhtp_request_t* req = ctrl_req->req_;
+  if (req != nullptr) {
+    if (ctrl_req->err_ != nullptr) {
+      EVBufferAddErrorJson(req->buffer_out, ctrl_req->err_);
+      evhtp_send_reply(req, HttpCodeFromError(ctrl_req->err_));
+    } else {
+      evhtp_send_reply(req, EVHTP_RES_OK);
+    }
+    evhtp_request_resume(req);
+  }
+  delete ctrl_req;
 }
 
 void
