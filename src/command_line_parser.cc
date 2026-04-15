@@ -377,7 +377,8 @@ enum TritonOptionId {
   OPTION_HOST_POLICY,
   OPTION_MODEL_LOAD_GPU_LIMIT,
   OPTION_MODEL_NAMESPACING,
-  OPTION_ENABLE_PEER_ACCESS
+  OPTION_ENABLE_PEER_ACCESS,
+  OPTION_ALLOW_CLIENT_SHM
 };
 
 void
@@ -848,6 +849,13 @@ TritonParser::SetupOptions()
        "limit, the load will be rejected. If not specified, the limit will "
        "not be set."});
 
+  shared_memory_options_.push_back(
+      {OPTION_ALLOW_CLIENT_SHM, "allow-client-shm", Option::ArgBool,
+       "Allow clients to register/unregister and use shared memory regions "
+       "(both CPU system shared memory and GPU CUDA IPC shared memory) for "
+       "inference inputs and outputs. Internal shared memory used by backends "
+       "such as the Python backend is unaffected. Default is false."});
+
   backend_options_.push_back(
       {OPTION_BACKEND_DIR, "backend-directory", Option::ArgStr,
        "The global directory searched for backend shared libraries. Default is "
@@ -930,6 +938,7 @@ TritonParser::SetupOptionGroups()
   option_groups_.emplace_back("Rate Limiter", rate_limiter_options_);
   option_groups_.emplace_back(
       "Memory/Device Management", memory_device_options_);
+  option_groups_.emplace_back("Shared Memory", shared_memory_options_);
   option_groups_.emplace_back("DEPRECATED", deprecated_options_);
 }
 
@@ -1780,6 +1789,9 @@ TritonParser::Parse(int argc, char** argv)
           break;
         case OPTION_ENABLE_PEER_ACCESS:
           lparams.enable_peer_access_ = ParseOption<bool>(optarg);
+          break;
+        case OPTION_ALLOW_CLIENT_SHM:
+          lparams.allow_client_shm_ = ParseOption<bool>(optarg);
           break;
       }
     }
