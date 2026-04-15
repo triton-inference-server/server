@@ -43,7 +43,8 @@
         "TRITON_ENABLE_PYTHON_GRPC":      "ON",
         "TRITON_ENABLE_PERF_ANALYZER":    "ON",
         "TRITON_ENABLE_EXAMPLES":         "ON",
-        "TRITON_ENABLE_TESTS":            "ON"
+        "TRITON_ENABLE_TESTS":            "ON",
+        "CMAKE_CUDA_RUNTIME_LIBRARY":     "Shared"
       }
     }
   ],

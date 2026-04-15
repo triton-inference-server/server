@@ -47,7 +47,8 @@
         "TRITON_ENABLE_SAGEMAKER":       "ON",
         "TRITON_ENABLE_VERTEX_AI":       "ON",
         "TRITON_MIN_COMPUTE_CAPABILITY": "7.5",
-        "CMAKE_CUDA_ARCHITECTURES":      "75;80;86;89;90"
+        "CMAKE_CUDA_ARCHITECTURES":      "75;80;86;89;90",
+        "CMAKE_CUDA_RUNTIME_LIBRARY":    "Shared"
       }
     }
   ],

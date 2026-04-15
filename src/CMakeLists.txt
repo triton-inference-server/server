@@ -46,6 +46,7 @@ endif() # TRITON_ENABLE_GRPC
 #
 if(${TRITON_ENABLE_GPU})
   find_package(CUDAToolkit REQUIRED)
+  set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
   message(STATUS "Using CUDA ${CUDA_VERSION}")
 endif() # TRITON_ENABLE_GPU
 
@@ -767,6 +768,7 @@ if (NOT WIN32)
         triton-common-error             # from repo-common
         triton-core-serverapi           # from repo-core
         triton-core-serverstub          # from repo-core
+        rapidjson
         CUDA::cudart
       )
 

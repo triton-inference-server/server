@@ -207,37 +207,10 @@ endmacro()
 
 set(TRITON_CORE_HEADERS_ONLY OFF)
 
-# Enable protobuf and gRPC in common before adding it as a subdirectory so
-# that model_config.pb.h and proto targets are generated when core/src needs them.
-set(TRITON_COMMON_ENABLE_PROTOBUF ON CACHE BOOL "Enable protobuf in common" FORCE)
-if(TRITON_ENABLE_GRPC)
-  set(TRITON_COMMON_ENABLE_GRPC ON CACHE BOOL "Enable gRPC in common" FORCE)
-endif()
-set(TRITON_COMMON_ENABLE_JSON ON CACHE BOOL "Enable JSON in common" FORCE)
-
-triton_add_internal_repo(
-  triton-common TRITON_COMMON_SOURCE_DIR
-  "https://github.com/triton-inference-server/common.git"
-  TRITON_COMMON_REPO_TAG triton-common)
-
-triton_add_internal_repo(
-  triton-core TRITON_CORE_SOURCE_DIR
-  "https://github.com/triton-inference-server/core.git"
-  TRITON_CORE_REPO_TAG triton-core-top)
-
-triton_add_internal_repo(
-  triton-backend TRITON_BACKEND_SOURCE_DIR
-  "https://github.com/triton-inference-server/backend.git"
-  TRITON_BACKEND_REPO_TAG triton-backend)
-
-# Compatibility aliases for legacy FetchContent variable names still used by
-# tests in server/src/test/ (repo-core_SOURCE_DIR, etc.).
-set(repo-common_SOURCE_DIR "${TRITON_COMMON_SOURCE_DIR}"  CACHE INTERNAL "")
-set(repo-core_SOURCE_DIR   "${TRITON_CORE_SOURCE_DIR}"    CACHE INTERNAL "")
-set(repo-backend_SOURCE_DIR "${TRITON_BACKEND_SOURCE_DIR}" CACHE INTERNAL "")
-
 #
-# External C++ deps — resolved by Conan; conan_toolchain.cmake sets CMAKE_PREFIX_PATH
+# External C++ deps — resolved by Conan; conan_toolchain.cmake sets CMAKE_PREFIX_PATH.
+# These must be found BEFORE add_subdirectory(core) so that imported targets
+# (e.g. cnmem::cnmem) exist when core/src/CMakeLists.txt evaluates them.
 #
 find_package(re2 REQUIRED)
 find_package(Protobuf CONFIG REQUIRED)
@@ -278,9 +251,40 @@ if(TRITON_ENABLE_AZURE_STORAGE)
 endif()
 
 if(TRITON_ENABLE_GPU)
+  # Must be found before add_subdirectory(core): core/src/CMakeLists.txt uses
+  # if(TARGET cnmem::cnmem) to select the Conan-provided target vs the fallback.
   find_package(cnmem CONFIG REQUIRED)
   find_package(DCGM CONFIG REQUIRED)
 endif()
+
+# Enable protobuf and gRPC in common before adding it as a subdirectory so
+# that model_config.pb.h and proto targets are generated when core/src needs them.
+set(TRITON_COMMON_ENABLE_PROTOBUF ON CACHE BOOL "Enable protobuf in common" FORCE)
+if(TRITON_ENABLE_GRPC)
+  set(TRITON_COMMON_ENABLE_GRPC ON CACHE BOOL "Enable gRPC in common" FORCE)
+endif()
+set(TRITON_COMMON_ENABLE_JSON ON CACHE BOOL "Enable JSON in common" FORCE)
+
+triton_add_internal_repo(
+  triton-common TRITON_COMMON_SOURCE_DIR
+  "https://github.com/triton-inference-server/common.git"
+  TRITON_COMMON_REPO_TAG triton-common)
+
+triton_add_internal_repo(
+  triton-core TRITON_CORE_SOURCE_DIR
+  "https://github.com/triton-inference-server/core.git"
+  TRITON_CORE_REPO_TAG triton-core-top)
+
+triton_add_internal_repo(
+  triton-backend TRITON_BACKEND_SOURCE_DIR
+  "https://github.com/triton-inference-server/backend.git"
+  TRITON_BACKEND_REPO_TAG triton-backend)
+
+# Compatibility aliases for legacy FetchContent variable names still used by
+# tests in server/src/test/ (repo-core_SOURCE_DIR, etc.).
+set(repo-common_SOURCE_DIR "${TRITON_COMMON_SOURCE_DIR}"  CACHE INTERNAL "")
+set(repo-core_SOURCE_DIR   "${TRITON_CORE_SOURCE_DIR}"    CACHE INTERNAL "")
+set(repo-backend_SOURCE_DIR "${TRITON_BACKEND_SOURCE_DIR}" CACHE INTERNAL "")
 
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(TRITON_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/install)
