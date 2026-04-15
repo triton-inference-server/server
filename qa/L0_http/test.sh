@@ -80,7 +80,7 @@ if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
     SIMPLE_SHM_CLIENT=${SDKDIR}/python/simple_http_shm_client
     SIMPLE_CUDASHM_CLIENT=${SDKDIR}/python/simple_http_cudashm_client
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT=${SDKDIR}/python/reuse_infer_objects_client
-    # [[FIXME]] point to proper client
+    # [FIXME] point to proper client
     CC_UNIT_TEST=${SDKDIR}/python/cc_client_test
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
@@ -372,21 +372,21 @@ fi
 # no parameters, no outputs == json output
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]},{"name":"INPUT1","datatype":"INT32","shape":[[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]}]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}' localhost:8000/v2/models/simple/infer`
 set -e
 if [[ "$code" != "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [[ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]]" ./curl.out` != "1" ]; then
-    echo -e "\[[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]] not found in output when expected"
+if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
 fi
-if [[ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]]" ./curl.out` != "1" ]; then
-    echo -e "\[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]] not found in output when expected"
+if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
@@ -395,21 +395,21 @@ fi
 # binary_data=true on INPUT0, binary_data=false on INPUT1
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]},{"name":"INPUT1","datatype":"INT32","shape":[[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]}],"outputs":[[{"name":"OUTPUT0","parameters":{"binary_data":true}},{"name":"OUTPUT1","parameters":{"binary_data":false}}]]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}],"outputs":[{"name":"OUTPUT0","parameters":{"binary_data":true}},{"name":"OUTPUT1","parameters":{"binary_data":false}}]}' localhost:8000/v2/models/simple/infer`
 set -e
 if [[ "$code" != "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [[ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]]" ./curl.out` != "0" ]; then
-    echo -e "\[[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]] found in output when not expected"
+if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
     cat ./curl.out
     echo ""
     RET=1
 fi
-if [[ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]]" ./curl.out` != "1" ]; then
-    echo -e "\[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]] not found in output when expected"
+if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
@@ -418,21 +418,21 @@ fi
 # binary_data=true on INPUT0, binary_data not given on INPUT1
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]},{"name":"INPUT1","datatype":"INT32","shape":[[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]}],"outputs":[[{"name":"OUTPUT0","parameters":{"binary_data":true}},{"name":"OUTPUT1"}]]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}],"outputs":[{"name":"OUTPUT0","parameters":{"binary_data":true}},{"name":"OUTPUT1"}]}' localhost:8000/v2/models/simple/infer`
 set -e
 if [[ "$code" != "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [[ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]]" ./curl.out` != "0" ]; then
-    echo -e "\[[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]] found in output when not expected"
+if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
     cat ./curl.out
     echo ""
     RET=1
 fi
-if [[ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]]" ./curl.out` != "1" ]; then
-    echo -e "\[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]] not found in output when expected"
+if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
@@ -441,21 +441,21 @@ fi
 # binary_data_output=true, no outputs requested
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"parameters":{"binary_data_output":true},"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]},{"name":"INPUT1","datatype":"INT32","shape":[[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]}]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"parameters":{"binary_data_output":true},"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}' localhost:8000/v2/models/simple/infer`
 set -e
 if [[ "$code" != "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [[ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]]" ./curl.out` != "0" ]; then
-    echo -e "\[[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]] found in output when not expected"
+if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
     cat ./curl.out
     echo ""
     RET=1
 fi
-if [[ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]]" ./curl.out` != "0" ]; then
-    echo -e "\[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]] found in output when not expected"
+if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "0" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] found in output when not expected"
     cat ./curl.out
     echo ""
     RET=1
@@ -465,21 +465,21 @@ fi
 # binary_data=false on INPUT0, binary_data not given on INPUT1
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"parameters":{"binary_data_output":true},"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]},{"name":"INPUT1","datatype":"INT32","shape":[[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]}],"outputs":[[{"name":"OUTPUT0","parameters":{"binary_data":false}},{"name":"OUTPUT1"}]]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"parameters":{"binary_data_output":true},"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}],"outputs":[{"name":"OUTPUT0","parameters":{"binary_data":false}},{"name":"OUTPUT1"}]}' localhost:8000/v2/models/simple/infer`
 set -e
 if [[ "$code" != "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [[ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]]" ./curl.out` != "1" ]; then
-    echo -e "\[[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]] not found in output when expected"
+if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
 fi
-if [[ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]]" ./curl.out` != "1" ]; then
-    echo -e "\[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]] not found in output when expected"
+if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
@@ -488,7 +488,7 @@ fi
 # Send bad request where the 'data' field misaligns with the 'shape' field of the input
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]]}]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]}]}' localhost:8000/v2/models/simple/infer`
 set -e
 if [[ "$code" == "200" ]]; then
     cat ./curl.out
@@ -504,7 +504,7 @@ fi
 
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18]]}]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18]}]}' localhost:8000/v2/models/simple/infer`
 set -e
 if [[ "$code" == "200" ]]; then
     cat ./curl.out
@@ -521,21 +521,21 @@ fi
 # Check if the server is still working after the above bad requests
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[[{"name":"INPUT0","datatype":"INT32","shape":[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]},{"name":"INPUT1","datatype":"INT32","shape":[[1,16]],"data":[[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]]}]}' localhost:8000/v2/models/simple/infer`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}' localhost:8000/v2/models/simple/infer`
 set -e
 if [[ "$code" != "200" ]]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [[ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]]" ./curl.out` != "1" ]; then
-    echo -e "\[[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]] not found in output when expected"
+if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
+    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
 fi
-if [[ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]]" ./curl.out` != "1" ]; then
-    echo -e "\[[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]] not found in output when expected"
+if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
+    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
     cat ./curl.out
     echo ""
     RET=1
@@ -648,7 +648,7 @@ cp -r ${MODELDIR}/onnx_zero_1_float32 ${MODELDIR}/onnx_zero_1_float32_queue && \
         sed -i "s/onnx_zero_1_float32/onnx_zero_1_float32_queue/" config.pbtxt && \
         echo "dynamic_batching { " >> config.pbtxt && \
         echo "    max_queue_delay_microseconds: 1000000" >> config.pbtxt && \
-        echo "    preferred_batch_size: [[ 8 ]]" >> config.pbtxt && \
+        echo "    preferred_batch_size: [ 8 ]" >> config.pbtxt && \
         echo "    default_queue_policy {" >> config.pbtxt && \
         echo "        max_queue_size: 1" >> config.pbtxt && \
         echo "    }" >> config.pbtxt && \
