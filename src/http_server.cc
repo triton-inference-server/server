@@ -2204,7 +2204,10 @@ HTTPAPIServer::HandleSystemSharedMemory(
       }
     }
   } else if (action == "register") {
-    if (region_name.empty()) {
+    if (!shm_manager_->AllowClientSharedMemory()) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
+    } else if (region_name.empty()) {
       err = TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           "'region name' is necessary to register system shared memory region");
@@ -2251,7 +2254,10 @@ HTTPAPIServer::HandleSystemSharedMemory(
       }
     }
   } else if (action == "unregister") {
-    if (region_name.empty()) {
+    if (!shm_manager_->AllowClientSharedMemory()) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
+    } else if (region_name.empty()) {
       err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_CPU);
     } else {
       err = shm_manager_->Unregister(region_name, TRITONSERVER_MEMORY_CPU);
@@ -2293,7 +2299,10 @@ HTTPAPIServer::HandleCudaSharedMemory(
       }
     }
   } else if (action == "register") {
-    if (region_name.empty()) {
+    if (!shm_manager_->AllowClientSharedMemory()) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
+    } else if (region_name.empty()) {
       err = TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           "'region name' is necessary to register cuda shared memory region");
@@ -2355,7 +2364,10 @@ HTTPAPIServer::HandleCudaSharedMemory(
 #endif  // TRITON_ENABLE_GPU
     }
   } else if (action == "unregister") {
-    if (region_name.empty()) {
+    if (!shm_manager_->AllowClientSharedMemory()) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
+    } else if (region_name.empty()) {
       err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_GPU);
     } else {
       err = shm_manager_->Unregister(region_name, TRITONSERVER_MEMORY_GPU);
