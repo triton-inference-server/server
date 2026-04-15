@@ -84,7 +84,7 @@ RUN apt-get update && \
             software-properties-common \
             vim \
             wget && \
-    pip3 install --upgrade "grpcio-tools<1.68" cmake==4.0.3
+    pip3 install --upgrade "grpcio-tools<1.68" cmake==4.0.3 auditwheel
 
 ENV CMAKE_POLICY_MINIMUM_REQUIRED=3.5
 
