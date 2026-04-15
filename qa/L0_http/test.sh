@@ -966,6 +966,8 @@ if [[ "$SERVER_PID" == "0" ]]; then
     exit 1
 fi
 
+echo "Test Nested JSON Crash"
+echo "----------------------------------------------------------------------"
 set +e
 python nested_json_crash.py --model simple_identity >> ${CLIENT_LOG} 2>&1
 if [[ $? -ne 0 ]]; then
@@ -973,8 +975,11 @@ if [[ $? -ne 0 ]]; then
     cat $SERVER_LOG
     cat $CLIENT_LOG
     RET=1
+else
+    echo "Passed"
 fi
 set -e
+echo "----------------------------------------------------------------------"
 
 kill $SERVER_PID
 wait $SERVER_PID

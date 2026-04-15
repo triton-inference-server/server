@@ -30,15 +30,7 @@ import argparse
 import requests
 
 
-def _get_server_url():
-    return "http://localhost:8000"
-
-
-def _get_infer_url(model_name: str, server_url: str = _get_server_url()):
-    return f"{server_url}/v2/models/{model_name}/infer"
-
-
-def generate_nested_json(depth):
+def _generate_nested_json(depth: int):
     # Create the nested array structure: [[[[...]]]]
     nested_array = ("[" * depth) + "1" + ("]" * depth)
 
@@ -47,6 +39,14 @@ def generate_nested_json(depth):
     # before validating the fields.
     payload = f'{{"inputs": [{{"name": "INPUT0", "shape": [1], "datatype": "INT32", "data": {nested_array}}}]}}'
     return payload
+
+
+def _get_server_url():
+    return "http://localhost:8000"
+
+
+def _get_infer_url(model_name: str, server_url: str = _get_server_url()):
+    return f"{server_url}/v2/models/{model_name}/infer"
 
 
 def main():
@@ -72,7 +72,7 @@ def main():
 
     print(f"Inference URL: {infer_url}")
 
-    payload = generate_nested_json(args.depth)
+    payload = _generate_nested_json(args.depth)
 
     print(f"Payload depth: {args.depth}...")
     print(f"Payload size: {len(payload)} bytes")
