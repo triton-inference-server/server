@@ -1,4 +1,4 @@
-// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -47,7 +47,12 @@ namespace triton { namespace server {
 
 class SharedMemoryManager {
  public:
-  SharedMemoryManager() = default;
+  explicit SharedMemoryManager(bool allow_client_shm)
+      : allow_client_shm_(allow_client_shm)
+  {
+  }
+  SharedMemoryManager() = delete;
+  SharedMemoryManager(const SharedMemoryManager&) = delete;
   ~SharedMemoryManager();
 
   /// A struct that records the shared memory regions registered by the shared
@@ -170,6 +175,11 @@ class SharedMemoryManager {
       const std::string& name, TRITONSERVER_MemoryType memory_type,
       triton::common::TritonJson::Value* shm_status);
 
+  /// Returns whether register/unregister of system/CUDA shared memory (client
+  /// shared memory) is allowed.
+  /// \return boolean value indicating whether client shared memory is allowed.
+  inline bool AllowClientSharedMemory() const { return allow_client_shm_; }
+
   /// Removes the named shared memory block of the specified type from
   /// the manager. Any future attempt to get the details of this block
   /// will result in an array till another block with the same name is
@@ -198,5 +208,8 @@ class SharedMemoryManager {
   SharedMemoryStateMap shared_memory_map_;
   // A mutex to protect the concurrent access to shared_memory_map_
   std::mutex mu_;
+
+  // Flag to allow clients to register shared memory.
+  const bool allow_client_shm_;
 };
 }}  // namespace triton::server

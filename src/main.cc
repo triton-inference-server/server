@@ -507,7 +507,8 @@ main(int argc, char** argv)
   triton::server::TraceManager* trace_manager;
 
   // Manager for shared memory blocks.
-  auto shm_manager = std::make_shared<triton::server::SharedMemoryManager>();
+  auto shm_manager = std::make_shared<triton::server::SharedMemoryManager>(
+      g_triton_params.allow_client_shm_);
 
   // Create the server...
   TRITONSERVER_Server* server_ptr = nullptr;
