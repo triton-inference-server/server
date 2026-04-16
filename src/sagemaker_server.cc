@@ -349,7 +349,7 @@ SagemakerAPIServer::ParseSageMakerRequest(
     (*parse_map)["target_model"] = model_name_string.c_str();
   }
 
-  LOG_INFO << "Loading SageMaker TargetModel: " << target_model;
+  LOG_INFO << "Loading SageMaker TargetModel: " << (*parse_map)["target_model"];
 
   return;
 }
