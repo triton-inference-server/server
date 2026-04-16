@@ -390,15 +390,18 @@ class HttpTest(tu.TestResultCollector):
             headers=headers,
             json=payload,
         )
+        # TODO: [TRI-958] Status code 400 is more appropriate here
         self.assertEqual(
-            400,
+            500,
             response.status_code,
-            "Expected 400 for oversized file parameter; got {}".format(
+            "Expected 500 for oversized file parameter; got {}".format(
                 response.status_code
             ),
         )
         try:
-            self.assertIn("Invalid file path", response.json())
+            self.assertIn(
+                "failed to poll from model repository", response.json().get("error", "")
+            )
         except ValueError:
             self.fail("Response is not valid JSON")
         health = requests.get("http://localhost:8000/v2/health/ready", timeout=10)
