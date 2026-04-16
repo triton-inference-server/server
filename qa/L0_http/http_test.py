@@ -423,6 +423,34 @@ class HttpTest(tu.TestResultCollector):
                     except ValueError:
                         self.fail("Response is not valid JSON")
 
+    def test_repository_index_deeply_nested_json(self):
+        """Test for deeply nested JSON on model repository index."""
+        depth = 250000
+        nested = ("[" * depth) + "true" + ("]" * depth)
+        payload = '{"ready":' + nested + "}"
+
+        # Keep request below default --http-max-input-size so parsing path is exercised.
+        self.assertLess(len(payload), 64 * 1024 * 1024)
+
+        response = requests.post(
+            "http://localhost:8000/v2/repository/index",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=60,
+        )
+        self.assertNotEqual(
+            500,
+            response.status_code,
+            "Expected repository index request to fail on invalid 'ready' type.",
+        )
+
+        live_response = requests.get("http://localhost:8000/v2/health/live", timeout=10)
+        self.assertEqual(
+            200,
+            live_response.status_code,
+            "Expected server to remain live after deeply nested JSON request.",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
