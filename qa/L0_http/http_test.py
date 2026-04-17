@@ -438,7 +438,7 @@ class HttpTest(tu.TestResultCollector):
             headers={"Content-Type": "application/json"},
             timeout=60,
         )
-        self.assertNotEqual(
+        self.assertEqual(
             500,
             response.status_code,
             "Expected repository index request to fail on invalid 'ready' type.",
