@@ -129,7 +129,7 @@ rm -f *.log.*
 set -e
 
 CLIENT_LOG=`pwd`/client.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --allow-client-shm=true"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -612,7 +612,7 @@ done
 # Run python http aio unit test
 PYTHON_HTTP_AIO_TEST=python_http_aio_test.py
 CLIENT_LOG=`pwd`/python_http_aio_test.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --allow-client-shm=true"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,7 +50,7 @@ rm -rf ${DATADIR}
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_trt_format_model_repository/ ${DATADIR}
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR"
+SERVER_ARGS="--model-repository=$DATADIR --allow-client-shm=true"
 source ../common/util.sh
 
 rm -f *.log*
