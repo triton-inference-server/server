@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,9 +45,17 @@ CLIENT_LOG="./client.log"
 SHAPE_TENSOR_TEST=trt_shape_tensor_test.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --allow-client-shm=true"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
+
+if [ -z "$TEST_SYSTEM_SHARED_MEMORY" ]; then
+    TEST_SYSTEM_SHARED_MEMORY="0"
+fi
+
+if [ -z "$TEST_CUDA_SHARED_MEMORY" ]; then
+    TEST_CUDA_SHARED_MEMORY="0"
+fi
 
 rm -fr  *.log
 rm -fr models && mkdir models
@@ -220,6 +228,9 @@ for i in \
     test_dynaseq_different_shape_values_parallel \
     ;do
     SERVER_ARGS="--model-repository=`pwd`/models"
+    if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
+        SERVER_ARGS="${SERVER_ARGS} --allow-client-shm=true"
+    fi
     SERVER_LOG="./$i.server.log"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
