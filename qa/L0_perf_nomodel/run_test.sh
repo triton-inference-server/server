@@ -59,7 +59,7 @@ if [ "$ARCH" != "aarch64" ]; then
     DATADIR="/data/inferenceserver/${REPO_VERSION}"
 fi
 
-if ["$SHARED_MEMORY" != "none"]; then
+if [ "$SHARED_MEMORY" != "none" ]; then
     SERVER_ARGS="${SERVER_ARGS} --allow-client-shm=true"
 fi
 
