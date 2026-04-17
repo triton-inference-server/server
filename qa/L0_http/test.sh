@@ -931,7 +931,7 @@ fi
 MODELDIR="`pwd`/models"
 REQUEST_MANY_CHUNKS_PY="http_request_many_chunks.py"
 CLIENT_LOG="./client.http_request_many_chunks.log"
-SERVER_ARGS="--model-repository=${MODELDIR} --log-verbose=1 --model-control-mode=explicit --load-model=simple"
+SERVER_ARGS="--model-repository=${MODELDIR} --allow-client-shm=true --log-verbose=1 --model-control-mode=explicit --load-model=simple"
 SERVER_LOG="./inference_server_request_many_chunks.log"
 
 run_server
