@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -69,7 +69,7 @@ export TEST_FAIL_WITH_QUERY_RESULT=1
 export TEST_BYTE_SIZE=4
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_ARGS="--model-repository=`pwd`/models --allow-client-shm=true"
 SERVER_LOG="./inference_server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
