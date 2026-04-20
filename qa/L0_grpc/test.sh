@@ -158,7 +158,7 @@ rm -f *.log.*
 set -e
 
 CLIENT_LOG=`pwd`/client.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --allow-client-shm=true"
 source ../common/util.sh
 
 run_server
@@ -577,7 +577,7 @@ done
 # Run python grpc aio unit test
 PYTHON_GRPC_AIO_TEST=python_grpc_aio_test.py
 CLIENT_LOG=`pwd`/python_grpc_aio_test.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --allow-client-shm=true"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

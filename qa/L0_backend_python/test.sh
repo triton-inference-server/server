@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -65,9 +65,6 @@ export PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="12"}
 export PYTHON_BACKEND_REPO_TAG=$PYTHON_BACKEND_REPO_TAG
 
 BASE_SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-# Set the default byte size to 5MBs to avoid going out of shared memory. The
-# environment that this job runs on has only 1GB of shared-memory available.
-SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
 
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
@@ -177,6 +174,9 @@ fi
 
 pip3 install pytest requests virtualenv
 
+# Set the default byte size to 5MBs to avoid going out of shared memory. The
+# environment that this job runs on has only 1GB of shared-memory available.
+SERVER_ARGS="$BASE_SERVER_ARGS --allow-client-shm=true --backend-config=python,shm-default-byte-size=5242880"
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -205,6 +205,7 @@ and shared memory pages after starting triton equals to $current_num_pages \n***
     RET=1
 fi
 
+SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
 prev_num_pages=`get_shm_pages`
 # Triton non-graceful exit
 run_server

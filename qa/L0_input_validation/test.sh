@@ -126,7 +126,7 @@ cp -r $DATADIR/qa_model_repository/onnx_object_int32_int32 models/.
 cp -r $DATADIR/qa_shapetensor_model_repository/plan_nobatch_zero_1_float32_int32 models/.
 cp -r $DATADIR/qa_shapetensor_model_repository/plan_zero_1_float32_int32 models/.
 
-SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_ARGS="--model-repository=`pwd`/models --allow-client-shm=true"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
