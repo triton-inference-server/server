@@ -49,7 +49,7 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(result)
 
 
-class DuplicateOutputTest(unittest.TestCase):
+class GrpcTest(unittest.TestCase):
     def test_duplicate_output_names_rejected(self):
         """Test that duplicate output names in a gRPC infer request are rejected."""
         client = grpcclient.InferenceServerClient(url="localhost:8001")
