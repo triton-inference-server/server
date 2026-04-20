@@ -323,7 +323,7 @@ warmup_cuda_cache() {
 }
 
 # [TRI-830] Send a simple request to warmup CUDA_CACHE for GB300 before testing.
-if [[ "${TEST_REPO_ARCH,,}" == *gb300* ]]; then
+if nvidia-smi --query-gpu=name --format=csv,noheader | grep -qiF 'GB300'; then
     warmup_cuda_cache onnx 2
 fi
 
