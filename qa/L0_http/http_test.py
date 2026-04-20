@@ -439,9 +439,14 @@ class HttpTest(tu.TestResultCollector):
             timeout=60,
         )
         self.assertEqual(
-            500,
+            400,
             response.status_code,
             "Expected repository index request to fail on invalid 'ready' type.",
+        )
+        self.assertIn("error", response.json())
+        self.assertIn(
+            "Invalid value for 'ready': expected a boolean",
+            response.json()["error"],
         )
 
         live_response = requests.get("http://localhost:8000/v2/health/live", timeout=10)

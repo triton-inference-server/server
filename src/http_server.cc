@@ -1413,7 +1413,13 @@ HTTPAPIServer::HandleRepositoryIndex(
   if (buffer_len > 0) {
     triton::common::TritonJson::Value ready_json;
     if (index_request.Find("ready", &ready_json)) {
-      err = ready_json.AsBool(&ready);
+      if (!ready_json.IsBool()) {
+        err = TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "Invalid value for 'ready': expected a boolean");
+      } else {
+        err = ready_json.AsBool(&ready);
+      }
     }
   }
 
