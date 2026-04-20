@@ -428,7 +428,7 @@ class HttpTest(tu.TestResultCollector):
         model = "onnx_zero_1_float32"
         input_data = np.arange(8, dtype=np.float32).flatten().tolist()
 
-        num_duplicates = 5
+        num_duplicates = 2
         payload = {
             "inputs": [
                 {
