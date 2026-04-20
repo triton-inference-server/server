@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -153,11 +153,9 @@ fi
 # we need to replace the text here as well to match the normalized version.
 WHLVERSION=`cat /workspace/TRITON_VERSION | sed 's/dev/\.dev0/'`
 if [[ "aarch64" != $(uname -m) ]] ; then
-    WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl \
-          tritonclient-${WHLVERSION}-py3-none-manylinux1_x86_64.whl"
+    WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl"
 else
-    WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl \
-          tritonclient-${WHLVERSION}-py3-none-manylinux2014_aarch64.whl"
+    WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl"
 fi
 for l in $WHLS; do
     if [[ ! -f "triton_client/python/$l" ]]; then
