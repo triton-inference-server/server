@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,6 +49,14 @@ try:
             self.root_is_pure = False
 
         def get_tag(self):
+            # NOTE: the wheel bundles a CPython-ABI-specific binding
+            # (tritonfrontend/_c/<pybind>.so, e.g. "cpython-312-..."),
+            # which means it is only loadable under the matching
+            # interpreter. We currently emit a "py3-none-<plat>" tag
+            # for backwards compatibility with consumers that expect
+            # the existing filename shape; promote to "cp<XY>-cp<XY>"
+            # when we are ready to gate installs on the exact CPython
+            # version (see TRI-983).
             pyver, abi, plat = "py3", "none", PLATFORM_FLAG
             return pyver, abi, plat
 

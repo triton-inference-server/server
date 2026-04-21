@@ -1002,7 +1002,8 @@ RUN pip3 install --upgrade pip \\
           docker \\
           virtualenv \\
           patchelf==0.17.2 \\
-          cmake==4.0.3
+          cmake==4.0.3 \\
+          auditwheel
 """
     df += f"""
 # Install boost version >= 1.78 for boost::span

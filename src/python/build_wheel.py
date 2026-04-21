@@ -131,10 +131,84 @@ def main():
     p.wait()
     fail_if(p.returncode != 0, "setup.py failed")
 
-    cpdir("dist", FLAGS.dest_dir)
+    # Post-process with auditwheel so the wheel is tagged with a proper
+    # manylinux_2_X_<arch> platform (required by canonical PyPI). When
+    # auditwheel is unavailable in the build image we keep the
+    # linux_<arch> wheel and emit a warning; the Poetry/pip lock-file
+    # problem is already solved by the distinct filename, and the tag can
+    # be fixed up in a follow-up publish step if needed.
+    _repair_wheel_with_auditwheel(FLAGS.whl_dir, FLAGS.dest_dir)
 
     print(f"=== Output wheel file is in: {FLAGS.dest_dir}")
     touch(os.path.join(FLAGS.dest_dir, "stamp.whl"))
+
+
+def _repair_wheel_with_auditwheel(whl_dir, dest_dir):
+    """Upgrade a linux_<arch> wheel to manylinux_2_X_<arch>.
+
+    Ports the pattern established for tritonclient in TRI-286:
+      1. auditwheel repair   — auto-discovers the minimum manylinux tag
+         by inspecting glibc symbol requirements of the embedded .so.
+      2. python -m wheel tags fallback — used when auditwheel reports
+         "no ELF" (the wheel has no native extension, e.g. a downstream
+         build disabled bindings). Mirrors the documented fallback.
+      3. No-op with warning — when auditwheel is not installed in the
+         build image, keep the linux_<arch> wheel as-is so the build
+         does not regress.
+    """
+    if shutil.which("auditwheel") is None:
+        print(
+            "=== WARNING: auditwheel not found on PATH; keeping linux_<arch> "
+            "wheel as-is. Install auditwheel in the build image to produce "
+            "PyPI-acceptable manylinux_2_X_<arch> wheels.",
+            file=sys.stderr,
+        )
+        cpdir("dist", dest_dir)
+        return
+
+    dist_dir = os.path.join(whl_dir, "dist")
+    wheels = [
+        os.path.join(dist_dir, w) for w in os.listdir(dist_dir) if w.endswith(".whl")
+    ]
+    fail_if(not wheels, "no wheel produced by setup.py")
+
+    for wheel_path in wheels:
+        print(f"=== Running auditwheel repair on {wheel_path}")
+        r = subprocess.run(
+            ["auditwheel", "repair", wheel_path, "--wheel-dir", dest_dir],
+            capture_output=True,
+            text=True,
+        )
+        # `auditwheel` logs via Python's logging module, which writes to
+        # stderr — the "no ELF" sentinel only appears there, not in
+        # stdout. See TRI-286 root-cause write-up.
+        if r.returncode != 0 and "no ELF" in r.stderr:
+            arch = os.uname().machine
+            manylinux_tag = f"manylinux_2_28_{arch}"
+            print(
+                f"=== Pure-Python wheel detected; falling back to wheel tags "
+                f"({manylinux_tag})"
+            )
+            copied = os.path.join(dest_dir, os.path.basename(wheel_path))
+            shutil.copy(wheel_path, copied)
+            # `wheel tags --remove` replaces the linux_<arch> wheel in
+            # dest_dir with the correctly-tagged manylinux one.
+            r2 = subprocess.run(
+                [
+                    "python3",
+                    "-m",
+                    "wheel",
+                    "tags",
+                    "--platform-tag",
+                    manylinux_tag,
+                    "--remove",
+                    copied,
+                ]
+            )
+            fail_if(r2.returncode != 0, "wheel tags fallback failed")
+        elif r.returncode != 0:
+            sys.stderr.write(r.stderr)
+            fail_if(True, "auditwheel repair failed")
 
 
 if __name__ == "__main__":
