@@ -1810,19 +1810,21 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             "tritonserver_builder",
         ]
 
-        # Propagate wheel-naming context from the host / CLI flags into
-        # the build container so build_wheel.py can compose the full
-        # wheel filename. See TRI-983.
+        # Propagate wheel-naming context from build.py's CLI flags
+        # into the build container so build_wheel.py can compose the
+        # full wheel filename. See TRI-983. Both values come from
+        # FLAGS (the canonical source), not inherited from the host
+        # env, so they are defined in both CI and local builds:
         #
-        # * NVIDIA_BUILD_ID — from --build-id (fed in CI by
-        #   `--build-id=${CI_JOB_ID}` per the existing Triton
-        #   convention). Feeds the PEP 427 build-tag slot between
-        #   version and python-tag.
-        # * NVIDIA_UPSTREAM_VERSION — set by GitLab CI as a top-level
-        #   pipeline variable. Feeds the PEP 440 local-version segment
-        #   "+nv<X>". The "-e NAME" form inherits the value from the
-        #   host env without naming it, so unset vars propagate as
-        #   unset.
+        # * NVIDIA_BUILD_ID — from --build-id. In CI, .gitlab-ci.yml
+        #   passes `--build-id=${CI_JOB_ID}` per the existing Triton
+        #   convention. Feeds the PEP 427 build-tag slot between
+        #   version and python-tag. Skipped when --build-id was not
+        #   supplied (local builds).
+        # * NVIDIA_UPSTREAM_VERSION — from --upstream-container-version
+        #   (CI: `--upstream-container-version=${NVIDIA_UPSTREAM_VERSION}`;
+        #   local: defaults to the value in DEFAULT_TRITON_VERSION_MAP).
+        #   Feeds the PEP 440 local-version segment "+nv<X>".
         #
         # CUDA_VERSION is intentionally NOT propagated: the CUDA base
         # image already sets it as an ENV inside the container, and
@@ -1833,7 +1835,11 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         # fallback), which is where it is reliably set.
         if FLAGS.build_id is not None:
             runargs += ["-e", f"NVIDIA_BUILD_ID={FLAGS.build_id}"]
-        runargs += ["-e", "NVIDIA_UPSTREAM_VERSION"]
+        if FLAGS.upstream_container_version:
+            runargs += [
+                "-e",
+                f"NVIDIA_UPSTREAM_VERSION={FLAGS.upstream_container_version}",
+            ]
 
         if not FLAGS.no_container_interactive:
             runargs += ["-it"]
