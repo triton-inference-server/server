@@ -123,6 +123,14 @@ def main():
     plat_name = sysconfig.get_platform().replace("-", "_").replace(".", "_")
     print("=== Building wheel")
     args = ["python3", "setup.py", "bdist_wheel", "--plat-name", plat_name]
+    # PEP 427 "build tag": an optional numeric segment between version
+    # and python-tag that lets two wheels of the same version coexist
+    # (e.g. reruns of the same CI pipeline). Preferred source is
+    # CI_PIPELINE_ID (GitLab) with a BUILD_NUMBER fallback — both are
+    # guaranteed to start with a digit as required by PEP 427.
+    build_number = os.environ.get("CI_PIPELINE_ID") or os.environ.get("BUILD_NUMBER")
+    if build_number:
+        args += ["--build-number", build_number]
 
     wenv = os.environ.copy()
     wenv["VERSION"] = FLAGS.triton_version
