@@ -930,7 +930,7 @@ FROM ${BASE_IMAGE}
 
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
-ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
+ENV CMAKE_POLICY_VERSION_MINIMUM=3.5
 """
     df += """
 # Install docker docker buildx
@@ -994,8 +994,14 @@ RUN ccache -p
     df += change_default_python_version_rhel(FLAGS.rhel_py_version)
     df += """
 
-RUN pip3 install --upgrade pip \\
-      && pip3 install --upgrade \\
+# Create a dedicated virtualenv so pip installs are isolated from the
+# distro-managed system Python. Subsequent RUN steps pick up the
+# venv's pip/python via PATH.
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+
+RUN pip install --upgrade pip \\
+      && pip install --upgrade \\
           build \\
           wheel \\
           setuptools \\
@@ -1048,7 +1054,7 @@ FROM ${BASE_IMAGE}
 
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
-ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
+ENV CMAKE_POLICY_VERSION_MINIMUM=3.5
 """
     # Install the windows- or linux-specific buildbase dependencies
     if target_platform() == "windows":
@@ -1109,7 +1115,13 @@ RUN apt-get update \\
             wget \\
       && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --upgrade \\
+# Create a dedicated virtualenv so pip installs are isolated from the
+# distro-managed system Python. Subsequent RUN steps pick up the
+# venv's pip/python via PATH.
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+
+RUN pip install --upgrade \\
           build \\
           wheel \\
           setuptools \\
@@ -1196,7 +1208,6 @@ WORKDIR /workspace
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -1440,8 +1451,14 @@ RUN yum install -y \\
             # Requires openssl-devel to be installed first for pyenv build to be successful
             df += change_default_python_version_rhel(FLAGS.rhel_py_version)
             df += """
-RUN pip3 install --upgrade pip \\
-    && pip3 install --upgrade \\
+# Create a dedicated virtualenv so pip installs are isolated from the
+# distro-managed system Python. Built after pyenv has provided the
+# desired Python version so the venv inherits that interpreter.
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+
+RUN pip install --upgrade pip \\
+    && pip install --upgrade \\
         wheel \\
         setuptools \\
         \"numpy<2\" \\
@@ -1453,15 +1470,23 @@ RUN pip3 install --upgrade pip \\
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
             python3 \\
+            python3-venv \\
             libarchive-dev \\
             python3-pip \\
             python3-wheel \\
             python3-setuptools \\
             libpython3-dev \\
-      && pip3 install --upgrade \\
-            \"numpy<2\" \\
-            virtualenv \\
       && rm -rf /var/lib/apt/lists/*
+
+# Create a dedicated virtualenv so pip installs are isolated from the
+# distro-managed system Python. Subsequent RUN steps pick up the
+# venv's pip/python via PATH.
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+
+RUN pip install --upgrade \\
+        \"numpy<2\" \\
+        virtualenv
 """
     if "tensorrtllm" in backends or "vllm" in backends:
         df += """
