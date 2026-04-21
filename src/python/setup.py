@@ -27,30 +27,34 @@
 
 import os
 
-from setuptools import find_packages, setup
+from setuptools import Distribution, find_packages, setup
 
 if "VERSION" not in os.environ:
     raise Exception("envvar VERSION must be specified")
 
 VERSION = os.environ["VERSION"]
 
+
 # The wheel bundles a CPython-ABI-specific binding
 # (tritonfrontend/_c/<pybind>.so, filename encodes e.g. "cpython-312-..."),
 # so the wheel is only loadable under the matching interpreter and arch.
-# Marking the root impure lets setuptools/wheel auto-derive the correct
-# python/ABI/platform tags (e.g. "cp312-cp312-linux_x86_64") instead of
-# the misleading "py3-none-any" fallback. The --plat-name flag forwarded
-# by build_wheel.py is picked up by bdist_wheel's stock finalize_options.
-try:
-    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
+# The binding is copied into package_data at build time rather than
+# declared via setup(ext_modules=...), so setuptools would otherwise
+# treat the distribution as pure-Python and emit "Root-Is-Purelib: true"
+# in the WHEEL metadata — which auditwheel rejects when it finds the
+# .so embedded in the purelib tree.
+#
+# Signaling has_ext_modules()=True via a custom Distribution subclass
+# is the canonical way to tell setuptools the wheel is binary without
+# triggering a fake compilation step. setuptools then:
+#   - sets Root-Is-Purelib to false (required for auditwheel repair),
+#   - auto-derives the correct cp<XY>-cp<XY>-linux_<arch> tag from
+#     the current interpreter and sysconfig.get_platform().
+# See TRI-983.
+class BinaryDistribution(Distribution):
+    def has_ext_modules(self):
+        return True
 
-    class bdist_wheel(_bdist_wheel):
-        def finalize_options(self):
-            _bdist_wheel.finalize_options(self)
-            self.root_is_pure = False
-
-except ImportError:
-    bdist_wheel = None
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 
@@ -102,7 +106,7 @@ setup(
         "": platform_package_data,
     },
     zip_safe=False,
-    cmdclass={"bdist_wheel": bdist_wheel},
+    distclass=BinaryDistribution,
     data_files=data_files,
     install_requires=["tritonserver", "pydantic==2.10.6"],
     extras_require={"GPU": gpu_extras, "test": test_extras, "all": all_extras},
