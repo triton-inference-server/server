@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,6 +32,7 @@ import re
 import shutil
 import subprocess
 import sys
+import sysconfig
 from distutils.dir_util import copy_tree
 from tempfile import mkstemp
 
@@ -115,8 +116,13 @@ def main():
     shutil.copyfile("setup.py", os.path.join(FLAGS.whl_dir, "setup.py"))
 
     os.chdir(FLAGS.whl_dir)
+    # The wheel ships an arch-specific CPython extension
+    # (tritonfrontend/_c/<pybind>.so). Pass --plat-name so the wheel is
+    # tagged with the current platform (e.g. linux_x86_64 / linux_aarch64)
+    # instead of the misleading "none-any".
+    plat_name = sysconfig.get_platform().replace("-", "_").replace(".", "_")
     print("=== Building wheel")
-    args = ["python3", "setup.py", "bdist_wheel"]
+    args = ["python3", "setup.py", "bdist_wheel", "--plat-name", plat_name]
 
     wenv = os.environ.copy()
     wenv["VERSION"] = FLAGS.triton_version
