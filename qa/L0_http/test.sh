@@ -129,7 +129,7 @@ rm -f *.log.*
 set -e
 
 CLIENT_LOG=`pwd`/client.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --allow-client-shm=true"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -612,7 +612,7 @@ done
 # Run python http aio unit test
 PYTHON_HTTP_AIO_TEST=python_http_aio_test.py
 CLIENT_LOG=`pwd`/python_http_aio_test.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --allow-client-shm=true"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -660,7 +660,7 @@ cp -r ./models/simple_identity ${MODELDIR}/simple_identity_int64 && \
         sed -i "s/TYPE_STRING/TYPE_INT64/" config.pbtxt && \
         sed -i "s/simple_identity/simple_identity_int64/" config.pbtxt)
 
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --model-control-mode=explicit --load-model=*"
 SERVER_LOG="./inference_server_http_test.log"
 CLIENT_LOG="./http_test.log"
 run_server
@@ -672,7 +672,7 @@ fi
 
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=http_test.py
-EXPECTED_NUM_TESTS=13
+EXPECTED_NUM_TESTS=14
 set +e
 python $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -931,7 +931,7 @@ fi
 MODELDIR="`pwd`/models"
 REQUEST_MANY_CHUNKS_PY="http_request_many_chunks.py"
 CLIENT_LOG="./client.http_request_many_chunks.log"
-SERVER_ARGS="--model-repository=${MODELDIR} --log-verbose=1 --model-control-mode=explicit --load-model=simple"
+SERVER_ARGS="--model-repository=${MODELDIR} --allow-client-shm=true --log-verbose=1 --model-control-mode=explicit --load-model=simple"
 SERVER_LOG="./inference_server_request_many_chunks.log"
 
 run_server

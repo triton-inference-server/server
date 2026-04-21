@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -241,7 +241,7 @@ wait $SERVER_PID
 
 # Test all APIs other than infer
 export TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC=2
-SERVER_ARGS="${SERVER_ARGS} --model-control-mode=explicit --load-model=custom_identity_int32 --log-verbose 2"
+SERVER_ARGS="${SERVER_ARGS} --model-control-mode=explicit --allow-client-shm=true --load-model=custom_identity_int32 --log-verbose 2"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

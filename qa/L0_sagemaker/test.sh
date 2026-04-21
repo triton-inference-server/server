@@ -554,6 +554,14 @@ else
         RET=1
     fi
 fi
+
+# Verify that loading without X-Amzn-SageMaker-Target-Model header logs the model name.
+grep "Loading SageMaker TargetModel: sm_mme_model_1" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected TargetModel log with model name\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
 set -e
 
 unset SAGEMAKER_MULTI_MODEL
