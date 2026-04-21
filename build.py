@@ -1254,8 +1254,6 @@ FROM {} AS min_container
 ##  Production stage: Create container with just inference server executable
 ############################################################################
 FROM ${BASE_IMAGE}
-
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """
 
     df += dockerfile_prepare_container_linux(
@@ -1375,7 +1373,15 @@ RUN yum install -y \\
         python3.12-pip \\
         numactl-devel
 
-RUN pip3 install patchelf==0.17.2
+# patchelf is distributed as a Python wheel but is a standalone CLI
+# tool. Install it into a throwaway venv, copy the binary to
+# /usr/local/bin, then remove the venv — this avoids polluting the
+# main /opt/venv-tritonserver venv and survives any later venv
+# recreation (e.g. when pyenv provides a different Python).
+RUN python3 -m venv /tmp/patchelf-venv \\
+    && /tmp/patchelf-venv/bin/pip install patchelf==0.17.2 \\
+    && cp /tmp/patchelf-venv/bin/patchelf /usr/local/bin/patchelf \\
+    && rm -rf /tmp/patchelf-venv
 
 """
     else:
@@ -1579,10 +1585,16 @@ COPY --from=min_container /opt/hpcx/ucx/lib/libuct.so.0 /opt/hpcx/ucx/lib/libuct
 
 COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9
 
-# patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so
+# patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so.
+# Install into a throwaway venv, copy the binary to /usr/local/bin,
+# then remove the venv — keeps the main /opt/venv-tritonserver clean
+# and avoids dependency on python3-venv in the runtime image.
 RUN apt-get update \\
-      && apt-get install -y --no-install-recommends openmpi-bin
-RUN pip3 install patchelf==0.17.2
+      && apt-get install -y --no-install-recommends openmpi-bin python3-venv
+RUN python3 -m venv /tmp/patchelf-venv \\
+    && /tmp/patchelf-venv/bin/pip install patchelf==0.17.2 \\
+    && cp /tmp/patchelf-venv/bin/patchelf /usr/local/bin/patchelf \\
+    && rm -rf /tmp/patchelf-venv
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
 """.format(
