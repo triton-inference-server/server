@@ -1096,8 +1096,6 @@ RUN apt-get update \\
             libgoogle-perftools-dev \\
             python3-dev \\
             python3-pip \\
-            python3-wheel \\
-            python3-setuptools \\
             rapidjson-dev \\
             scons \\
             software-properties-common \\
