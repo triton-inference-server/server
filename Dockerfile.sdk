@@ -211,7 +211,7 @@ RUN pip3 install genai-perf
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         [ "$(uname -m)" != "x86_64" ] && arch="sbsa" || arch="x86_64" && \
         curl -o /tmp/cuda-keyring.deb \
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/"$arch"/cuda-keyring_1.1-1_all.deb \
+        "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/${arch}/cuda-keyring_1.1-1_all.deb" \
         && apt -y install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
         apt update && \
         apt install --yes --no-install-recommends \
