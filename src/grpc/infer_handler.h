@@ -34,7 +34,6 @@
 #include <regex>
 #include <shared_mutex>
 #include <thread>
-#include <unordered_set>
 
 #include "../tracer.h"
 #include "grpc_handler.h"

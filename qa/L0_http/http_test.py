@@ -451,9 +451,7 @@ class HttpTest(tu.TestResultCollector):
             ),
         )
         error_message = r.json().get("error", "")
-        self.assertIn(
-            "Duplicate output name 'OUTPUT0' is not allowed in a request", error_message
-        )
+        self.assertIn("output 'OUTPUT0' already exists in request", error_message)
 
         # Verify server is still healthy after the bad request
         health_url = "http://localhost:8000/v2/health/live"

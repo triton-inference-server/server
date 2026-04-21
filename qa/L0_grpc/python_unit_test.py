@@ -68,7 +68,7 @@ class GrpcTest(unittest.TestCase):
         with self.assertRaises(InferenceServerException) as ctx:
             client.infer(model_name="simple", inputs=inputs, outputs=outputs)
         self.assertIn(
-            "Duplicate output name 'OUTPUT0' is not allowed in a request",
+            "output 'OUTPUT0' already exists in request",
             str(ctx.exception),
         )
 
