@@ -1810,24 +1810,30 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             "tritonserver_builder",
         ]
 
-        # Propagate wheel-naming env vars from the host (CI runner or
-        # local shell) into the build container so build_wheel.py can
-        # compose the full wheel filename: CI_PIPELINE_ID feeds the
-        # PEP 427 build-tag slot; NVIDIA_UPSTREAM_VERSION and
-        # CUDA_VERSION feed the PEP 440 local-version segment
-        # (+nv<X>.cu<Y>). See TRI-983. The "-e NAME" form inherits
-        # the value from the host env without naming the value, so
-        # unset vars simply propagate as unset.
-        runargs += [
-            "-e",
-            "CI_PIPELINE_ID",
-            "-e",
-            "BUILD_NUMBER",
-            "-e",
-            "NVIDIA_UPSTREAM_VERSION",
-            "-e",
-            "CUDA_VERSION",
-        ]
+        # Propagate wheel-naming context from the host / CLI flags into
+        # the build container so build_wheel.py can compose the full
+        # wheel filename. See TRI-983.
+        #
+        # * NVIDIA_BUILD_ID — from --build-id (fed in CI by
+        #   `--build-id=${CI_JOB_ID}` per the existing Triton
+        #   convention). Feeds the PEP 427 build-tag slot between
+        #   version and python-tag.
+        # * NVIDIA_UPSTREAM_VERSION — set by GitLab CI as a top-level
+        #   pipeline variable. Feeds the PEP 440 local-version segment
+        #   "+nv<X>". The "-e NAME" form inherits the value from the
+        #   host env without naming it, so unset vars propagate as
+        #   unset.
+        #
+        # CUDA_VERSION is intentionally NOT propagated: the CUDA base
+        # image already sets it as an ENV inside the container, and
+        # the host/CI runner does not. Passing "-e CUDA_VERSION" with
+        # an empty host value would override (and erase) the
+        # container's value. build_wheel.py reads CUDA_VERSION from
+        # the container-local env (with a /usr/local/cuda/version.json
+        # fallback), which is where it is reliably set.
+        if FLAGS.build_id is not None:
+            runargs += ["-e", f"NVIDIA_BUILD_ID={FLAGS.build_id}"]
+        runargs += ["-e", "NVIDIA_UPSTREAM_VERSION"]
 
         if not FLAGS.no_container_interactive:
             runargs += ["-it"]

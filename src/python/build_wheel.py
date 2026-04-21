@@ -55,6 +55,32 @@ def cpdir(src, dest):
     copy_tree(src, dest, preserve_symlinks=1)
 
 
+def _detect_cuda_version():
+    """Detect the CUDA toolkit version visible to the build.
+
+    Prefers the CUDA_VERSION env var (set by official NVIDIA base
+    images); falls back to parsing /usr/local/cuda/version.json which
+    is the canonical location for the installed toolkit. Returns the
+    raw string (e.g. "13.2.1") or None when CUDA is not available.
+
+    CUDA_VERSION is only reliably set inside the build container (the
+    CUDA base image exports it) and must not be propagated from the
+    host — see the matching comment in build.py's docker-run
+    invocation.
+    """
+    v = os.environ.get("CUDA_VERSION")
+    if v:
+        return v
+    try:
+        import json as _json
+
+        with open("/usr/local/cuda/version.json") as f:
+            data = _json.load(f)
+        return data.get("cuda", {}).get("version")
+    except (OSError, ValueError, KeyError):
+        return None
+
+
 def _compose_version(base_version):
     """Compose the full wheel version string.
 
@@ -68,7 +94,7 @@ def _compose_version(base_version):
 
     Sources:
       NVIDIA_UPSTREAM_VERSION  - set by GitLab CI (e.g. "26.04")
-      CUDA_VERSION             - set by the CUDA base image (e.g. "13.2")
+      CUDA_VERSION / toolkit   - discovered by _detect_cuda_version()
     Both are optional; if neither is present the version is returned
     unchanged so local non-CI builds stay stable.
     """
@@ -76,7 +102,7 @@ def _compose_version(base_version):
     nv = os.environ.get("NVIDIA_UPSTREAM_VERSION")
     if nv:
         local.append(f"nv{nv}")
-    cuda = os.environ.get("CUDA_VERSION")
+    cuda = _detect_cuda_version()
     if cuda:
         # "13.2" / "13.2.0" / "13.2.1" -> "cu132"
         parts = cuda.split(".")
@@ -155,14 +181,17 @@ def main():
     plat_name = sysconfig.get_platform().replace("-", "_").replace(".", "_")
     print("=== Building wheel")
     args = ["python3", "setup.py", "bdist_wheel", "--plat-name", plat_name]
-    # PEP 427 "build tag": an optional numeric segment between version
-    # and python-tag that lets two wheels of the same version coexist
-    # (e.g. reruns of the same CI pipeline). Preferred source is
-    # CI_PIPELINE_ID (GitLab) with a BUILD_NUMBER fallback — both are
-    # guaranteed to start with a digit as required by PEP 427.
-    build_number = os.environ.get("CI_PIPELINE_ID") or os.environ.get("BUILD_NUMBER")
-    if build_number:
-        args += ["--build-number", build_number]
+    # PEP 427 "build tag": an optional segment between version and
+    # python-tag that lets two wheels of the same version coexist
+    # (e.g. reruns of the same CI job). Source is NVIDIA_BUILD_ID,
+    # which is set on the build container from --build-id; in CI
+    # .gitlab-ci.yml already passes `--build-id=${CI_JOB_ID}` so the
+    # value is a monotonic numeric ID. Skip the slot when the value
+    # does not start with a digit (required by PEP 427) or is the
+    # "<unknown>" default emitted for local builds without --build-id.
+    build_tag = os.environ.get("NVIDIA_BUILD_ID")
+    if build_tag and build_tag[:1].isdigit():
+        args += ["--build-number", build_tag]
 
     wenv = os.environ.copy()
     wenv["VERSION"] = _compose_version(FLAGS.triton_version)
