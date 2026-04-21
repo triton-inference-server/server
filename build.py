@@ -1113,10 +1113,13 @@ RUN apt-get update \\
 
 RUN pip3 install --upgrade \\
           build \\
+          wheel \\
+          setuptools \\
           docker \\
           virtualenv \\
           patchelf==0.17.2 \\
           cmake==4.0.3 \\
+          auditwheel \\
           pybind11[global]
 """
 
@@ -1805,6 +1808,25 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             "/workspace/build",
             "--name",
             "tritonserver_builder",
+        ]
+
+        # Propagate wheel-naming env vars from the host (CI runner or
+        # local shell) into the build container so build_wheel.py can
+        # compose the full wheel filename: CI_PIPELINE_ID feeds the
+        # PEP 427 build-tag slot; NVIDIA_UPSTREAM_VERSION and
+        # CUDA_VERSION feed the PEP 440 local-version segment
+        # (+nv<X>.cu<Y>). See TRI-983. The "-e NAME" form inherits
+        # the value from the host env without naming the value, so
+        # unset vars simply propagate as unset.
+        runargs += [
+            "-e",
+            "CI_PIPELINE_ID",
+            "-e",
+            "BUILD_NUMBER",
+            "-e",
+            "NVIDIA_UPSTREAM_VERSION",
+            "-e",
+            "CUDA_VERSION",
         ]
 
         if not FLAGS.no_container_interactive:

@@ -26,20 +26,21 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
-import sys
 
 from setuptools import find_packages, setup
-
-if "--plat-name" in sys.argv:
-    PLATFORM_FLAG = sys.argv[sys.argv.index("--plat-name") + 1]
-else:
-    PLATFORM_FLAG = "any"
 
 if "VERSION" not in os.environ:
     raise Exception("envvar VERSION must be specified")
 
 VERSION = os.environ["VERSION"]
 
+# The wheel bundles a CPython-ABI-specific binding
+# (tritonfrontend/_c/<pybind>.so, filename encodes e.g. "cpython-312-..."),
+# so the wheel is only loadable under the matching interpreter and arch.
+# Marking the root impure lets setuptools/wheel auto-derive the correct
+# python/ABI/platform tags (e.g. "cp312-cp312-linux_x86_64") instead of
+# the misleading "py3-none-any" fallback. The --plat-name flag forwarded
+# by build_wheel.py is picked up by bdist_wheel's stock finalize_options.
 try:
     from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
@@ -47,18 +48,6 @@ try:
         def finalize_options(self):
             _bdist_wheel.finalize_options(self)
             self.root_is_pure = False
-
-        def get_tag(self):
-            # NOTE: the wheel bundles a CPython-ABI-specific binding
-            # (tritonfrontend/_c/<pybind>.so, e.g. "cpython-312-..."),
-            # which means it is only loadable under the matching
-            # interpreter. We currently emit a "py3-none-<plat>" tag
-            # for backwards compatibility with consumers that expect
-            # the existing filename shape; promote to "cp<XY>-cp<XY>"
-            # when we are ready to gate installs on the exact CPython
-            # version (see TRI-983).
-            pyver, abi, plat = "py3", "none", PLATFORM_FLAG
-            return pyver, abi, plat
 
 except ImportError:
     bdist_wheel = None

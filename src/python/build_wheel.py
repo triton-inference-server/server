@@ -55,6 +55,38 @@ def cpdir(src, dest):
     copy_tree(src, dest, preserve_symlinks=1)
 
 
+def _compose_version(base_version):
+    """Compose the full wheel version string.
+
+    The base version comes from TRITON_VERSION and may already include a
+    PEP 440 pre-release suffix (e.g. "2.69.0.dev0"). Append a PEP 440
+    local-version segment describing the NVIDIA container release and
+    CUDA toolkit the wheel was built against, so consumers can tell an
+    nv26.04 wheel from an nv26.05 wheel (same upstream Triton version)
+    and a cu132 wheel from a cu128 wheel. The local-version segment is
+    purely informational and does not affect pip's version comparison.
+
+    Sources:
+      NVIDIA_UPSTREAM_VERSION  - set by GitLab CI (e.g. "26.04")
+      CUDA_VERSION             - set by the CUDA base image (e.g. "13.2")
+    Both are optional; if neither is present the version is returned
+    unchanged so local non-CI builds stay stable.
+    """
+    local = []
+    nv = os.environ.get("NVIDIA_UPSTREAM_VERSION")
+    if nv:
+        local.append(f"nv{nv}")
+    cuda = os.environ.get("CUDA_VERSION")
+    if cuda:
+        # "13.2" / "13.2.0" / "13.2.1" -> "cu132"
+        parts = cuda.split(".")
+        if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+            local.append(f"cu{parts[0]}{parts[1]}")
+    if local:
+        return f"{base_version}+{'.'.join(local)}"
+    return base_version
+
+
 def sed(pattern, replace, source, dest=None):
     name = None
     if dest:
@@ -133,7 +165,7 @@ def main():
         args += ["--build-number", build_number]
 
     wenv = os.environ.copy()
-    wenv["VERSION"] = FLAGS.triton_version
+    wenv["VERSION"] = _compose_version(FLAGS.triton_version)
     wenv["TRITON_PYBIND"] = PYBIND_LIB
     p = subprocess.Popen(args, env=wenv)
     p.wait()
