@@ -1101,7 +1101,7 @@ RUN apt-get update \\
             libb64-dev \\
             libgoogle-perftools-dev \\
             python3-dev \\
-            python3-pip \\
+            python3-venv \\
             rapidjson-dev \\
             scons \\
             software-properties-common \\
