@@ -232,13 +232,17 @@ def main():
     # PEP 427 requires the build tag to start with a digit. Skip the
     # slot when the value does not satisfy that constraint or is the
     # "<unknown>" default emitted for local builds without --build-id.
-    build_tag = (
-        os.environ.get("CI_PIPELINE_ID")
-        or os.environ.get("NVIDIA_BUILD_ID")
-        or os.environ.get("BUILD_NUMBER")
-    )
+    if os.environ.get("PYPI_RELEASE", "").lower() in ("1", "true", "yes"):
+        build_tag = None
+    else:
+        build_tag = (
+            os.environ.get("CI_PIPELINE_ID")
+            or os.environ.get("NVIDIA_BUILD_ID")
+            or os.environ.get("BUILD_NUMBER")
+        )
     print(
         f"=== Wheel build-tag inputs: "
+        f"PYPI_RELEASE={os.environ.get('PYPI_RELEASE')!r} "
         f"CI_PIPELINE_ID={os.environ.get('CI_PIPELINE_ID')!r} "
         f"NVIDIA_BUILD_ID={os.environ.get('NVIDIA_BUILD_ID')!r} "
         f"BUILD_NUMBER={os.environ.get('BUILD_NUMBER')!r} "
