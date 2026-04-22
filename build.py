@@ -1260,6 +1260,20 @@ FROM ${BASE_IMAGE}
         argmap, backends, FLAGS.enable_gpu, target_machine()
     )
 
+    # Create a dedicated virtualenv so the wheel + openai-requirements
+    # pip installs below run in isolation from the distro-managed
+    # system Python (replaces the legacy PIP_BREAK_SYSTEM_PACKAGES=1
+    # escape hatch). If the python-backend branch above already
+    # created /opt/venv-tritonserver (on top of pyenv / Ubuntu
+    # python3), re-running `python3 -m venv` is a safe no-op; on
+    # minimal builds without the python backend this is the first
+    # creation. Derived images (Dockerfile.QA) inherit the venv via
+    # PATH.
+    df += """
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+"""
+
     df += f"""
 WORKDIR /opt
 COPY --chown=1000:1000 build/install tritonserver
@@ -1271,7 +1285,7 @@ RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     "tritonfrontend-*.whl" | xargs -I {{}} pip install --upgrade {{}}[{FLAGS.triton_wheels_dependencies_group}]
 
-RUN pip3 install -r python/openai/requirements.txt
+RUN pip install -r python/openai/requirements.txt
 
 """
     if not FLAGS.no_core_build:
@@ -1374,14 +1388,13 @@ RUN yum install -y \\
         numactl-devel
 
 # patchelf is distributed as a Python wheel but is a standalone CLI
-# tool. Install it into a throwaway venv, copy the binary to
-# /usr/local/bin, then remove the venv — this avoids polluting the
-# main /opt/venv-tritonserver venv and survives any later venv
-# recreation (e.g. when pyenv provides a different Python).
-RUN python3 -m venv /tmp/patchelf-venv \\
-    && /tmp/patchelf-venv/bin/pip install patchelf==0.17.2 \\
-    && cp /tmp/patchelf-venv/bin/patchelf /usr/local/bin/patchelf \\
-    && rm -rf /tmp/patchelf-venv
+# tool. Install it into a dedicated venv and symlink the binary into
+# /usr/local/bin. Keeping the venv around (vs cp-and-discard) makes
+# future upgrades idempotent (`pip install -U patchelf` in the venv),
+# and avoids polluting the main /opt/venv-tritonserver venv.
+RUN python3 -m venv /opt/patchelf-venv \\
+    && /opt/patchelf-venv/bin/pip install patchelf==0.17.2 \\
+    && ln -s /opt/patchelf-venv/bin/patchelf /usr/local/bin/patchelf
 
 """
     else:
@@ -1406,6 +1419,7 @@ RUN apt-get update \\
               wget \\
               {backend_dependencies} \\
               python3-pip \\
+              python3-venv \\
       && rm -rf /var/lib/apt/lists/*
 """.format(
             backend_dependencies=backend_dependencies
@@ -1586,15 +1600,15 @@ COPY --from=min_container /opt/hpcx/ucx/lib/libuct.so.0 /opt/hpcx/ucx/lib/libuct
 COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9
 
 # patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so.
-# Install into a throwaway venv, copy the binary to /usr/local/bin,
-# then remove the venv — keeps the main /opt/venv-tritonserver clean
-# and avoids dependency on python3-venv in the runtime image.
+# Install into a dedicated venv and symlink the binary into
+# /usr/local/bin. Keeping the venv around (vs cp-and-discard) makes
+# future upgrades idempotent and avoids polluting the main
+# /opt/venv-tritonserver venv.
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends openmpi-bin python3-venv
-RUN python3 -m venv /tmp/patchelf-venv \\
-    && /tmp/patchelf-venv/bin/pip install patchelf==0.17.2 \\
-    && cp /tmp/patchelf-venv/bin/patchelf /usr/local/bin/patchelf \\
-    && rm -rf /tmp/patchelf-venv
+RUN python3 -m venv /opt/patchelf-venv \\
+    && /opt/patchelf-venv/bin/pip install patchelf==0.17.2 \\
+    && ln -s /opt/patchelf-venv/bin/patchelf /usr/local/bin/patchelf
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
 """.format(
