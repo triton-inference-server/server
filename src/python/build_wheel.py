@@ -92,17 +92,43 @@ def _compose_version(base_version):
     and a cu132 wheel from a cu128 wheel. The local-version segment is
     purely informational and does not affect pip's version comparison.
 
-    Sources:
-      NVIDIA_UPSTREAM_VERSION  - set by GitLab CI (e.g. "26.04")
-      CUDA_VERSION / toolkit   - discovered by _detect_cuda_version()
-    Both are optional; if neither is present the version is returned
-    unchanged so local non-CI builds stay stable.
+    Sources for NVIDIA upstream version (first non-empty wins):
+      NVIDIA_UPSTREAM_VERSION        - propagated by build.py via
+                                       `docker run -e` from
+                                       FLAGS.upstream_container_version.
+      NVIDIA_TRITON_SERVER_VERSION   - set as ENV in the buildbase image
+                                       at image-build time from the
+                                       TRITON_CONTAINER_VERSION ARG
+                                       (survives even if the docker-run
+                                       `-e` forwarding is not applied).
+      TRITON_CONTAINER_VERSION       - set as ENV in some downstream
+                                       images; same value as above in CI.
+    Source for CUDA toolkit version:
+      CUDA_VERSION / toolkit         - discovered by _detect_cuda_version()
+
+    All sources are optional; if none is present the version is returned
+    unchanged so local non-CI builds stay stable. Each detection
+    outcome is logged to stderr so any future gap is self-announcing
+    in the build log rather than surfacing only as a missing suffix in
+    the wheel filename.
     """
+    nv = (
+        os.environ.get("NVIDIA_UPSTREAM_VERSION")
+        or os.environ.get("NVIDIA_TRITON_SERVER_VERSION")
+        or os.environ.get("TRITON_CONTAINER_VERSION")
+    )
+    cuda = _detect_cuda_version()
+    print(
+        f"=== Wheel local-version inputs: "
+        f"NVIDIA_UPSTREAM_VERSION={os.environ.get('NVIDIA_UPSTREAM_VERSION')!r} "
+        f"NVIDIA_TRITON_SERVER_VERSION={os.environ.get('NVIDIA_TRITON_SERVER_VERSION')!r} "
+        f"TRITON_CONTAINER_VERSION={os.environ.get('TRITON_CONTAINER_VERSION')!r} "
+        f"-> nv={nv!r}, cuda={cuda!r}",
+        file=sys.stderr,
+    )
     local = []
-    nv = os.environ.get("NVIDIA_UPSTREAM_VERSION")
     if nv:
         local.append(f"nv{nv}")
-    cuda = _detect_cuda_version()
     if cuda:
         # "13.2" / "13.2.0" / "13.2.1" -> "cu132"
         parts = cuda.split(".")

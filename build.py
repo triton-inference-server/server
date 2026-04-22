@@ -2933,6 +2933,15 @@ if __name__ == "__main__":
 
     log("container version {}".format(FLAGS.container_version))
     log("upstream container version {}".format(FLAGS.upstream_container_version))
+    # Explicit visibility for wheel-naming inputs (see TRI-983). If
+    # these are empty here, the wheel filename will lack the expected
+    # build-tag / local-version segments and the log below tells us
+    # which link in the chain dropped the value.
+    log(
+        "wheel-naming inputs: --build-id={!r}, --upstream-container-version={!r}".format(
+            FLAGS.build_id, FLAGS.upstream_container_version
+        )
+    )
 
     for ep in FLAGS.endpoint:
         log(f'endpoint "{ep}"')
