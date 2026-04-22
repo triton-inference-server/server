@@ -1387,14 +1387,9 @@ RUN dnf install -y \\
         re2-devel \\
         wget
 
-# patchelf is distributed as a Python wheel but is a standalone CLI
-# tool. Install it into a dedicated venv and symlink the binary into
-# /usr/local/bin. Keeping the venv around (vs cp-and-discard) makes
-# future upgrades idempotent (`pip install -U patchelf` in the venv),
-# and avoids polluting the main /opt/venv-tritonserver venv.
-RUN python3 -m venv /opt/patchelf-venv \\
-    && /opt/patchelf-venv/bin/pip install patchelf==0.17.2 \\
-    && ln -sf /opt/patchelf-venv/bin/patchelf /usr/local/bin/patchelf
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+RUN pip install patchelf==0.17.2
 
 """
     else:
@@ -1600,15 +1595,11 @@ COPY --from=min_container /opt/hpcx/ucx/lib/libuct.so.0 /opt/hpcx/ucx/lib/libuct
 COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9
 
 # patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so.
-# Install into a dedicated venv and symlink the binary into
-# /usr/local/bin. Keeping the venv around (vs cp-and-discard) makes
-# future upgrades idempotent and avoids polluting the main
-# /opt/venv-tritonserver venv.
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends openmpi-bin python3-venv
-RUN python3 -m venv /opt/patchelf-venv \\
-    && /opt/patchelf-venv/bin/pip install patchelf==0.17.2 \\
-    && ln -sf /opt/patchelf-venv/bin/patchelf /usr/local/bin/patchelf
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+RUN pip install patchelf==0.17.2
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
 """.format(

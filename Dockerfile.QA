@@ -66,7 +66,9 @@ RUN apt-get update && \
             software-properties-common && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install cmake==4.0.3
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+RUN pip install cmake==4.0.3
 ENV CMAKE_POLICY_VERSION_MINIMUM=3.5
 
 # Add densenet_onnx model to example repo
@@ -348,7 +350,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-RUN pip3 install --upgrade "numpy<2" pillow attrdict future "grpcio<1.68" requests gsutil \
+RUN pip install --upgrade "numpy<2" pillow attrdict future "grpcio<1.68" requests gsutil \
                            "awscli<=1.36.40" six "grpcio-channelz<1.68" prettytable virtualenv \
                            check-jsonschema
 
@@ -377,7 +379,7 @@ COPY --chown=1000:1000 --from=sdk /workspace/qa/ qa/
 RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
     find qa/pkgs/ -maxdepth 1 -type f -name \
     "tritonclient-*-py3-none-any.whl" | xargs printf -- '%s[all]' | \
-    xargs pip3 install --upgrade
+    xargs pip install --upgrade
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
 
