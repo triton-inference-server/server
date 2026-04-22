@@ -443,7 +443,6 @@ class HttpTest(tu.TestResultCollector):
             response.status_code,
             "Expected repository index request to fail on invalid 'ready' type.",
         )
-        self.assertIn("error", response.json())
         self.assertIn(
             "Invalid value for 'ready': expected a boolean",
             response.json()["error"],
