@@ -1859,21 +1859,27 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             "tritonserver_builder",
         ]
 
-        # Propagate wheel-naming context from build.py's CLI flags
-        # into the build container so build_wheel.py can compose the
-        # full wheel filename. See TRI-983. Both values come from
-        # FLAGS (the canonical source), not inherited from the host
-        # env, so they are defined in both CI and local builds:
+        # Propagate wheel-naming context into the build container so
+        # build_wheel.py can compose the full wheel filename. See
+        # TRI-983. Both CLI flags and host env vars are checked so the
+        # value is defined in CI and local builds alike:
         #
         # * NVIDIA_BUILD_ID — from --build-id. In CI, .gitlab-ci.yml
         #   passes `--build-id=${CI_JOB_ID}` per the existing Triton
-        #   convention. Feeds the PEP 427 build-tag slot between
-        #   version and python-tag. Skipped when --build-id was not
-        #   supplied (local builds).
-        # * NVIDIA_UPSTREAM_VERSION — from --upstream-container-version
-        #   (CI: `--upstream-container-version=${NVIDIA_UPSTREAM_VERSION}`;
-        #   local: defaults to the value in DEFAULT_TRITON_VERSION_MAP).
-        #   Feeds the PEP 440 local-version segment "+nv<X>".
+        #   convention. One of several candidates build_wheel.py uses
+        #   for the PEP 427 build-tag slot.
+        # * CI_PIPELINE_ID — inherited from the GitLab runner's env
+        #   when set; build_wheel.py prefers this over NVIDIA_BUILD_ID
+        #   because it matches the identifier used in the RHEL .zip
+        #   artifact naming convention (.gitlab-ci.yml) and makes all
+        #   wheels in a pipeline share one build tag.
+        # * NVIDIA_UPSTREAM_VERSION — primarily from
+        #   --upstream-container-version (CI:
+        #   `--upstream-container-version=${NVIDIA_UPSTREAM_VERSION}`;
+        #   local: DEFAULT_TRITON_VERSION_MAP default). Falls back to
+        #   the host env var when the CLI flag is empty so the
+        #   +nv<X> local-version segment is still applied even if
+        #   someone invokes build.py with `--upstream-container-version=`.
         #
         # CUDA_VERSION is intentionally NOT propagated: the CUDA base
         # image already sets it as an ENV inside the container, and
@@ -1884,10 +1890,16 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         # fallback), which is where it is reliably set.
         if FLAGS.build_id is not None:
             runargs += ["-e", f"NVIDIA_BUILD_ID={FLAGS.build_id}"]
-        if FLAGS.upstream_container_version:
+        ci_pipeline_id = os.environ.get("CI_PIPELINE_ID")
+        if ci_pipeline_id:
+            runargs += ["-e", f"CI_PIPELINE_ID={ci_pipeline_id}"]
+        upstream_version = FLAGS.upstream_container_version or os.environ.get(
+            "NVIDIA_UPSTREAM_VERSION"
+        )
+        if upstream_version:
             runargs += [
                 "-e",
-                f"NVIDIA_UPSTREAM_VERSION={FLAGS.upstream_container_version}",
+                f"NVIDIA_UPSTREAM_VERSION={upstream_version}",
             ]
 
         if not FLAGS.no_container_interactive:
@@ -2938,8 +2950,12 @@ if __name__ == "__main__":
     # build-tag / local-version segments and the log below tells us
     # which link in the chain dropped the value.
     log(
-        "wheel-naming inputs: --build-id={!r}, --upstream-container-version={!r}".format(
-            FLAGS.build_id, FLAGS.upstream_container_version
+        "wheel-naming inputs: --build-id={!r}, --upstream-container-version={!r}, "
+        "CI_PIPELINE_ID={!r}, env NVIDIA_UPSTREAM_VERSION={!r}".format(
+            FLAGS.build_id,
+            FLAGS.upstream_container_version,
+            os.environ.get("CI_PIPELINE_ID"),
+            os.environ.get("NVIDIA_UPSTREAM_VERSION"),
         )
     )
 
