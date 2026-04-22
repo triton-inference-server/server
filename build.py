@@ -1864,14 +1864,13 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         # TRI-983. Both CLI flags and host env vars are checked so the
         # value is defined in CI and local builds alike:
         #
-        # * CI_JOB_ID — GitLab job ID; used by build_wheel.py as the
-        #   PEP 427 build-tag (the numeric segment between version and
-        #   python-tag in the wheel filename). Unique per wheel-build
-        #   job, matching the identifier in .gitlab-ci.yml artifact
-        #   naming. Preferred over NVIDIA_BUILD_ID.
-        # * NVIDIA_BUILD_ID — from --build-id. In CI, .gitlab-ci.yml
-        #   passes `--build-id=${CI_JOB_ID}` per the existing Triton
-        #   convention; serves as fallback when CI_JOB_ID is not set.
+        # * CI_PIPELINE_ID — GitLab pipeline ID; shared across all jobs
+        #   in one pipeline so tritonserver and tritonfrontend wheels
+        #   from the same release carry the same PEP 427 build tag.
+        #   In CI, pass `--build-id=${CI_PIPELINE_ID}` to build.py.
+        # * NVIDIA_BUILD_ID — from --build-id; the primary vehicle for
+        #   CI_PIPELINE_ID into the container. build_wheel.py falls back
+        #   to this when CI_PIPELINE_ID is not exported directly.
         # * NVIDIA_UPSTREAM_VERSION — primarily from
         #   --upstream-container-version (CI:
         #   `--upstream-container-version=${NVIDIA_UPSTREAM_VERSION}`;
@@ -1890,9 +1889,9 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         # container's value. build_wheel.py reads CUDA_VERSION from
         # the container-local env (with a /usr/local/cuda/version.json
         # fallback), which is where it is reliably set.
-        ci_job_id = os.environ.get("CI_JOB_ID")
-        if ci_job_id:
-            runargs += ["-e", f"CI_JOB_ID={ci_job_id}"]
+        ci_pipeline_id = os.environ.get("CI_PIPELINE_ID")
+        if ci_pipeline_id:
+            runargs += ["-e", f"CI_PIPELINE_ID={ci_pipeline_id}"]
         if FLAGS.build_id is not None:
             runargs += ["-e", f"NVIDIA_BUILD_ID={FLAGS.build_id}"]
         upstream_version = FLAGS.upstream_container_version or os.environ.get(
@@ -2956,10 +2955,10 @@ if __name__ == "__main__":
     # which link in the chain dropped the value.
     log(
         "wheel-naming inputs: --build-id={!r}, --upstream-container-version={!r}, "
-        "CI_JOB_ID={!r}, env NVIDIA_UPSTREAM_VERSION={!r}, PYPI_RELEASE={!r}".format(
+        "CI_PIPELINE_ID={!r}, env NVIDIA_UPSTREAM_VERSION={!r}, PYPI_RELEASE={!r}".format(
             FLAGS.build_id,
             FLAGS.upstream_container_version,
-            os.environ.get("CI_JOB_ID"),
+            os.environ.get("CI_PIPELINE_ID"),
             os.environ.get("NVIDIA_UPSTREAM_VERSION"),
             os.environ.get("PYPI_RELEASE"),
         )

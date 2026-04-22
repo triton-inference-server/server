@@ -221,24 +221,25 @@ def main():
     # python-tag that lets two wheels of the same version coexist
     # (e.g. re-runs of the same pipeline). Sources, first non-empty
     # and usable wins:
-    #   CI_JOB_ID       - GitLab job ID; unique per wheel-build job and
-    #                     matches the identifier stamped into the wheel
-    #                     filename in .gitlab-ci.yml artifact naming.
-    #   NVIDIA_BUILD_ID - set from build.py's --build-id flag (CI feeds
-    #                     ${CI_JOB_ID} there too); fallback for builds
-    #                     that do not export CI_JOB_ID directly.
+    #   CI_PIPELINE_ID  - GitLab pipeline ID; shared by all jobs in one
+    #                     pipeline so tritonserver and tritonfrontend
+    #                     wheels from the same release carry the same
+    #                     tag. In CI, build.py is invoked with
+    #                     `--build-id=${CI_PIPELINE_ID}`.
+    #   NVIDIA_BUILD_ID - set from build.py's --build-id flag; primary
+    #                     vehicle for CI_PIPELINE_ID into the container.
     #   BUILD_NUMBER    - generic CI systems that use this instead.
     # PEP 427 requires the build tag to start with a digit. Skip the
     # slot when the value does not satisfy that constraint or is the
     # "<unknown>" default emitted for local builds without --build-id.
     build_tag = (
-        os.environ.get("CI_JOB_ID")
+        os.environ.get("CI_PIPELINE_ID")
         or os.environ.get("NVIDIA_BUILD_ID")
         or os.environ.get("BUILD_NUMBER")
     )
     print(
         f"=== Wheel build-tag inputs: "
-        f"CI_JOB_ID={os.environ.get('CI_JOB_ID')!r} "
+        f"CI_PIPELINE_ID={os.environ.get('CI_PIPELINE_ID')!r} "
         f"NVIDIA_BUILD_ID={os.environ.get('NVIDIA_BUILD_ID')!r} "
         f"BUILD_NUMBER={os.environ.get('BUILD_NUMBER')!r} "
         f"-> build-tag={build_tag!r}",
