@@ -1374,18 +1374,18 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
     if target_platform() == "rhel":
         df += """
 # Common dependencies.
-RUN yum install -y \\
+RUN dnf install -y \\
         git \\
         gperf \\
-        re2-devel \\
-        openssl-devel \\
-        libtool \\
-        libcurl-devel \\
-        libb64-devel \\
         gperftools-devel \\
-        wget \\
-        python3.12-pip \\
-        numactl-devel
+        libb64-devel \\
+        libcurl-devel \\
+        libtool \\
+        numactl-devel \\
+        openssl-devel \\
+        python3.12-venv \\
+        re2-devel \\
+        wget
 
 # patchelf is distributed as a Python wheel but is a standalone CLI
 # tool. Install it into a dedicated venv and symlink the binary into
@@ -1394,7 +1394,7 @@ RUN yum install -y \\
 # and avoids polluting the main /opt/venv-tritonserver venv.
 RUN python3 -m venv /opt/patchelf-venv \\
     && /opt/patchelf-venv/bin/pip install patchelf==0.17.2 \\
-    && ln -s /opt/patchelf-venv/bin/patchelf /usr/local/bin/patchelf
+    && ln -sf /opt/patchelf-venv/bin/patchelf /usr/local/bin/patchelf
 
 """
     else:
@@ -1608,7 +1608,7 @@ RUN apt-get update \\
       && apt-get install -y --no-install-recommends openmpi-bin python3-venv
 RUN python3 -m venv /opt/patchelf-venv \\
     && /opt/patchelf-venv/bin/pip install patchelf==0.17.2 \\
-    && ln -s /opt/patchelf-venv/bin/patchelf /usr/local/bin/patchelf
+    && ln -sf /opt/patchelf-venv/bin/patchelf /usr/local/bin/patchelf
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
 """.format(
