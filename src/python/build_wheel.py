@@ -92,6 +92,10 @@ def _compose_version(base_version):
     and a cu132 wheel from a cu128 wheel. The local-version segment is
     purely informational and does not affect pip's version comparison.
 
+    When PYPI_RELEASE=true the local-version suffix is omitted entirely:
+    PyPI rejects uploads whose version contains a '+' local segment, so
+    public release builds must use the bare version.
+
     Sources for NVIDIA upstream version (first non-empty wins):
       NVIDIA_UPSTREAM_VERSION        - propagated by build.py via
                                        `docker run -e` from
@@ -112,6 +116,12 @@ def _compose_version(base_version):
     in the build log rather than surfacing only as a missing suffix in
     the wheel filename.
     """
+    if os.environ.get("PYPI_RELEASE", "").lower() in ("1", "true", "yes"):
+        print(
+            "=== PYPI_RELEASE set: omitting local-version suffix for PyPI compatibility",
+            file=sys.stderr,
+        )
+        return base_version
     nv = (
         os.environ.get("NVIDIA_UPSTREAM_VERSION")
         or os.environ.get("NVIDIA_TRITON_SERVER_VERSION")
@@ -209,27 +219,26 @@ def main():
     args = ["python3", "setup.py", "bdist_wheel", "--plat-name", plat_name]
     # PEP 427 "build tag": an optional segment between version and
     # python-tag that lets two wheels of the same version coexist
-    # (e.g. reruns of the same CI pipeline). Sources, first non-empty
+    # (e.g. re-runs of the same pipeline). Sources, first non-empty
     # and usable wins:
-    #   CI_PIPELINE_ID   - GitLab pipeline-scoped ID, matches the
-    #                      identifier used in RHEL .zip artifact
-    #                      naming (.gitlab-ci.yml). Preferred so all
-    #                      wheels in a pipeline share one build tag.
-    #   NVIDIA_BUILD_ID  - set from build.py's --build-id flag
-    #                      (CI feeds ${CI_JOB_ID}); falls back for
-    #                      non-CI builds that pass --build-id.
-    #   BUILD_NUMBER     - generic CI systems that set this instead.
+    #   CI_JOB_ID       - GitLab job ID; unique per wheel-build job and
+    #                     matches the identifier stamped into the wheel
+    #                     filename in .gitlab-ci.yml artifact naming.
+    #   NVIDIA_BUILD_ID - set from build.py's --build-id flag (CI feeds
+    #                     ${CI_JOB_ID} there too); fallback for builds
+    #                     that do not export CI_JOB_ID directly.
+    #   BUILD_NUMBER    - generic CI systems that use this instead.
     # PEP 427 requires the build tag to start with a digit. Skip the
     # slot when the value does not satisfy that constraint or is the
     # "<unknown>" default emitted for local builds without --build-id.
     build_tag = (
-        os.environ.get("CI_PIPELINE_ID")
+        os.environ.get("CI_JOB_ID")
         or os.environ.get("NVIDIA_BUILD_ID")
         or os.environ.get("BUILD_NUMBER")
     )
     print(
         f"=== Wheel build-tag inputs: "
-        f"CI_PIPELINE_ID={os.environ.get('CI_PIPELINE_ID')!r} "
+        f"CI_JOB_ID={os.environ.get('CI_JOB_ID')!r} "
         f"NVIDIA_BUILD_ID={os.environ.get('NVIDIA_BUILD_ID')!r} "
         f"BUILD_NUMBER={os.environ.get('BUILD_NUMBER')!r} "
         f"-> build-tag={build_tag!r}",
