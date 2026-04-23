@@ -374,10 +374,17 @@ COPY --chown=1000:1000 --from=sdk /workspace/qa/ qa/
 
 # Remove CI tests that are meant to run only on build image and
 # install the tritonserver/triton python client APIs.
-RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
-    find qa/pkgs/ -maxdepth 1 -type f -name \
-    "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
-    xargs pip3 install --upgrade
+RUN rm -fr qa/L0_copyrights qa/L0_build_variants
+
+
+RUN --mount=type=secret,id=triton_ci_pip_extra_values,env=TRITON_CI_PYPI_EXTRA_VALUES \
+    if [ -n "${TRITON_CI_PYPI_EXTRA_VALUES}" ]; then \
+        find qa/pkgs/ -maxdepth 1 -type f -name \
+        "tritonclient-*linux*.whl" -exec pip3 install --upgrade ${TRITON_CI_PYPI_EXTRA_VALUES} {} \; ; \
+    else \
+        find qa/pkgs/ -maxdepth 1 -type f -name \
+        "tritonclient-*linux*.whl" -exec pip3 install --upgrade {} \; ; \
+    fi
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
 
