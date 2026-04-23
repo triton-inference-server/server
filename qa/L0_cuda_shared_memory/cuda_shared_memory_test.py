@@ -756,7 +756,7 @@ class CudaSharedMemoryTestRawHttpRequest(unittest.TestCase):
         try:
             error_message = response.json().get("error", "")
             self.assertIn(
-                "Request JSON size",
+                "request JSON size",
                 error_message,
             )
             self.assertIn(

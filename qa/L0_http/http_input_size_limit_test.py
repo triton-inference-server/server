@@ -119,7 +119,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             f"Error message: {error_msg}", flush=True
         )  # Print the error message for debugging
         self.assertIn(
-            "Request JSON size of ",
+            "request JSON size of ",
             error_msg,
         )
         self.assertIn(
@@ -282,7 +282,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message contains size limit info
         error_msg = response.content.decode()
         self.assertIn(
-            "Request JSON size of ",
+            "request JSON size of ",
             error_msg,
         )
         self.assertIn(
@@ -536,7 +536,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message
         error_msg = response.content.decode()
         self.assertIn(
-            "Request JSON size of ",
+            "request JSON size of ",
             error_msg,
         )
         self.assertIn(
