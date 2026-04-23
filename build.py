@@ -74,7 +74,7 @@ DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.68.0",
     "triton_container_version": "26.04",
     "upstream_container_version": "26.04",
-    "ort_version": "1.25.0",
+    "ort_version": "1.24.4",
     "ort_openvino_version": "2026.1.0",
     "standalone_openvino_version": "2026.1.0",
     "dcgm_version": "4.5.3-1",
