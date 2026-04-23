@@ -103,6 +103,9 @@ else
 fi
 
 SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR}"
+if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
+    SERVER_ARGS_EXTRA="${SERVER_ARGS_EXTRA} --allow-client-shm=true"
+fi
 source ../common/util.sh
 
 RET=0
@@ -308,8 +311,10 @@ warmup_cuda_cache() {
             ]
         }'
 
-    if [ $? -ne 0 ]; then
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -ne 0 ]; then
         echo -e "\n***\n*** Test Failed\n***"
+        echo -e "\n***\n*** exit code: $EXIT_CODE\n***"
         RET=1
     fi
     set -e
@@ -317,8 +322,8 @@ warmup_cuda_cache() {
     kill_server
 }
 
-# [TRI-830] Send a simpple request to warmup CUDA_CACHE for GB300 before testing.
-if [[ $TEST_REPO_ARCH == "gb300_arm_103" ]]; then
+# [TRI-830] Send a simple request to warmup CUDA_CACHE for GB300 before testing.
+if nvidia-smi --query-gpu=name --format=csv,noheader | grep -qiF 'GB300'; then
     warmup_cuda_cache onnx 2
 fi
 

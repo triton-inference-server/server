@@ -1,4 +1,4 @@
-// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -44,6 +44,11 @@ constexpr char kAcceptEncodingHTTPHeader[] = "Accept-Encoding";
 constexpr char kContentEncodingHTTPHeader[] = "Content-Encoding";
 constexpr char kContentTypeHeader[] = "Content-Type";
 constexpr char kContentLengthHeader[] = "Content-Length";
+
+// The error message for client shared memory is disabled by default.
+constexpr char kClientShmDisabledErrorStr[] =
+    "Client shared memory is disabled. Start the server with "
+    "'--allow-client-shm=true' to enable.";
 
 // This prefix is reserved for shm regions created internally by Triton
 constexpr char kTritonSharedMemoryRegionPrefix[] =

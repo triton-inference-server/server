@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -109,6 +109,9 @@ fi
 
 # Allow more time to exit. Ensemble brings in too many models
 SERVER_ARGS_EXTRA="--exit-timeout-secs=${SERVER_TIMEOUT} --backend-directory=${BACKEND_DIR} --backend-config=python,stub-timeout-seconds=120 --backend-config=python,shm-default-byte-size=${DEFAULT_SHM_SIZE_BYTES}"
+if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
+    SERVER_ARGS_EXTRA="${SERVER_ARGS_EXTRA} --allow-client-shm=true"
+fi
 SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh

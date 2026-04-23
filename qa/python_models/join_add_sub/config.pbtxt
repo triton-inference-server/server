@@ -1,5 +1,4 @@
-/*
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,13 +23,38 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
 
-// Dummy data for testing ReadTheDocs footer insertion
-// This mimics RTD data for a project that uses both versions + languages
-let READTHEDOCS_DATA = {
-  project: "frc-docs",
-  version: "latest",
-  language: "en",
-  proxied_api_host: "https://readthedocs.org",
-};
+name: "join_add_sub"
+backend: "python"
+max_batch_size: 1
+
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
+input [
+  {
+    name: "INPUT1"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
+
+instance_group [{ kind: KIND_CPU }]
