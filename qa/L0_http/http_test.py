@@ -374,6 +374,43 @@ class HttpTest(tu.TestResultCollector):
         except ValueError:
             self.fail("Response is not valid JSON")
 
+    def test_load_oversized_file_parameter(self):
+        # Single path component longer than NAME_MAX (255 on typical Linux) must
+        # be rejected without terminating the server (filesystem_error handled).
+        long_path = "file:" + ("A" * 256)
+        payload = {
+            "parameters": {
+                long_path: "YQ==",
+                "config": "{}",
+            }
+        }
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(
+            self._get_load_model_url("onnx_zero_1_float32"),
+            headers=headers,
+            json=payload,
+        )
+        # TODO: [TRI-958] Status code 400 is more appropriate here
+        self.assertEqual(
+            500,
+            response.status_code,
+            "Expected 500 for oversized file parameter; got {}".format(
+                response.status_code
+            ),
+        )
+        try:
+            self.assertIn(
+                "failed to poll from model repository", response.json().get("error", "")
+            )
+        except ValueError:
+            self.fail("Response is not valid JSON")
+        health = requests.get("http://localhost:8000/v2/health/ready", timeout=10)
+        self.assertEqual(
+            200,
+            health.status_code,
+            "server must stay up after rejected load",
+        )
+
     def test_json_recursion_depth_limit(self):
         """Test that server properly handles and rejects deeply nested JSON."""
 
