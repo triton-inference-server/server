@@ -64,8 +64,8 @@ class SharedMemoryManager {
         void* mapped_addr, const TRITONSERVER_MemoryType kind,
         const int64_t device_id)
         : name_(name), shm_key_(shm_key), offset_(offset),
-          byte_size_(byte_size), shm_fd_(shm_fd), mapped_addr_(mapped_addr),
-          kind_(kind), device_id_(device_id), awaiting_unregister_(false)
+          byte_size_(byte_size), mapped_addr_(mapped_addr), kind_(kind),
+          device_id_(device_id), awaiting_unregister_(false)
     {
     }
 
@@ -73,7 +73,6 @@ class SharedMemoryManager {
     std::string shm_key_;
     size_t offset_;
     size_t byte_size_;
-    int shm_fd_;
     void* mapped_addr_;
     TRITONSERVER_MemoryType kind_;
     int64_t device_id_;
