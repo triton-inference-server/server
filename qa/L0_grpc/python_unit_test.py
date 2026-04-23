@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,6 +47,35 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(error)
     else:
         user_data._completed_requests.put(result)
+
+
+class GrpcTest(unittest.TestCase):
+    def test_duplicate_output_names_rejected(self):
+        """Test that duplicate output names in a gRPC infer request are rejected."""
+        client = grpcclient.InferenceServerClient(url="localhost:8001")
+        inputs = [
+            grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
+            grpcclient.InferInput("INPUT1", [1, 16], "INT32"),
+        ]
+        inputs[0].set_data_from_numpy(np.ones(shape=(1, 16), dtype=np.int32))
+        inputs[1].set_data_from_numpy(np.ones(shape=(1, 16), dtype=np.int32))
+
+        num_duplicates = 2
+        outputs = [
+            grpcclient.InferRequestedOutput("OUTPUT0") for _ in range(num_duplicates)
+        ]
+
+        with self.assertRaises(InferenceServerException) as ctx:
+            client.infer(model_name="simple", inputs=inputs, outputs=outputs)
+        self.assertIn(
+            "output 'OUTPUT0' already exists in request",
+            str(ctx.exception),
+        )
+
+        self.assertTrue(
+            client.is_server_live(),
+            "Server is not healthy after duplicate output request",
+        )
 
 
 class RestrictedProtocolTest(unittest.TestCase):

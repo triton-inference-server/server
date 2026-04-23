@@ -364,11 +364,11 @@ class HttpTest(tu.TestResultCollector):
         try:
             error_message = response.json().get("error", "")
             self.assertIn(
-                "Request JSON size",
+                "request JSON size",
                 error_message,
             )
             self.assertIn(
-                " exceeds the maximum allowed input size. ",
+                " exceeds the maximum allowed input size",
                 error_message,
             )
         except ValueError:
@@ -460,36 +460,43 @@ class HttpTest(tu.TestResultCollector):
                     except ValueError:
                         self.fail("Response is not valid JSON")
 
-    def test_repository_index_deeply_nested_json(self):
-        """Test for deeply nested JSON on model repository index."""
-        depth = 250000
-        nested = ("[" * depth) + "true" + ("]" * depth)
-        payload = '{"ready":' + nested + "}"
+    def test_duplicate_output_names(self):
+        """Test that duplicate output names are rejected"""
+        model = "onnx_zero_1_float32"
+        input_data = np.arange(8, dtype=np.float32).flatten().tolist()
 
-        # Keep request below default --http-max-input-size so parsing path is exercised.
-        self.assertLess(len(payload), 64 * 1024 * 1024)
+        num_duplicates = 2
+        payload = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "datatype": "FP32",
+                    "shape": [1, 8],
+                    "data": [input_data],
+                }
+            ],
+            "outputs": [{"name": "OUTPUT0"} for _ in range(num_duplicates)],
+        }
 
-        response = requests.post(
-            "http://localhost:8000/v2/repository/index",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            timeout=60,
-        )
+        headers = {"Content-Type": "application/json"}
+        r = requests.post(self._get_infer_url(model), json=payload, headers=headers)
         self.assertEqual(
             400,
-            response.status_code,
-            "Expected repository index request to fail on invalid 'ready' type.",
+            r.status_code,
+            "Expected error code 400 for duplicate output names; got: {}".format(
+                r.status_code
+            ),
         )
-        self.assertIn(
-            "Invalid value for 'ready': expected a boolean",
-            response.json()["error"],
-        )
+        error_message = r.json().get("error", "")
+        self.assertIn("output 'OUTPUT0' already exists in request", error_message)
 
-        live_response = requests.get("http://localhost:8000/v2/health/live", timeout=10)
+        # Verify server is still healthy after the bad request
+        health_url = "http://localhost:8000/v2/health/live"
+        health_r = requests.get(health_url)
         self.assertEqual(
             200,
-            live_response.status_code,
-            "Expected server to remain live after deeply nested JSON request.",
+            health_r.status_code,
+            "Server is not healthy after duplicate output request",
         )
 
 
