@@ -1,4 +1,4 @@
-// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -357,7 +357,7 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   // Check if the shared memory key starts with the reserved prefix
   RETURN_IF_ERR(ValidateSharedMemoryKey(name, shm_key));
 
-  std::lock_guard<std::mutex> lock(mu_);
+  std::lock_guard<std::mutex> lock{mu_};
 
   if (shared_memory_map_.find(name) != shared_memory_map_.end()) {
     return TRITONSERVER_ErrorNew(
@@ -367,23 +367,10 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   }
 
   // register
-  void* mapped_addr;
-  int shm_fd = -1;
+  void* mapped_addr{nullptr};
+  int shm_fd{-1};
 
-  // don't re-open if shared memory is already open
-  for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
-       ++itr) {
-    if (itr->second->shm_key_ == shm_key) {
-      // FIXME: Consider invalid file descriptors after close
-      shm_fd = itr->second->shm_fd_;
-      break;
-    }
-  }
-
-  // open and set new shm_fd if new shared memory key
-  if (shm_fd == -1) {
-    RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_fd));
-  }
+  RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_fd));
 
   // Enforce that registered region is in-bounds of shm file object.
   RETURN_IF_ERR(
@@ -426,7 +413,7 @@ SharedMemoryManager::RegisterCUDASharedMemory(
     const size_t byte_size, const int device_id)
 {
   // Serialize all operations that write/read current shared memory regions
-  std::lock_guard<std::mutex> lock(mu_);
+  std::lock_guard<std::mutex> lock{mu_};
 
   // If name is already in shared_memory_map_ then return error saying already
   // registered
