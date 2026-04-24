@@ -195,13 +195,24 @@ COPY qa/images/mug.jpg images/mug.jpg
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
-RUN pip3 install --upgrade "numpy<2" pillow attrdict && \
-    find install/python/ -maxdepth 1 -type f -name \
-         "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
-    xargs pip3 install --upgrade
+RUN pip3 install --upgrade "numpy<2" pillow attrdict
+
+RUN --mount=type=secret,id=triton_ci_pip_extra_values,env=TRITON_CI_PYPI_EXTRA_VALUES \
+    if [ -n "${TRITON_CI_PYPI_EXTRA_VALUES}" ]; then \
+        find install/python/ -maxdepth 1 -type f -name \
+            "tritonclient-*linux*.whl" -exec pip3 install --upgrade ${TRITON_CI_PYPI_EXTRA_VALUES} {}[all] \; ; \
+    else \
+        find install/python/ -maxdepth 1 -type f -name \
+            "tritonclient-*linux*.whl" -exec pip3 install --upgrade {}[all] \; ; \
+    fi
 
 # Install GenAI-Perf
-RUN pip3 install genai-perf
+RUN --mount=type=secret,id=triton_ci_pip_extra_values,env=TRITON_CI_PYPI_EXTRA_VALUES \
+    if [ -n "${TRITON_CI_PYPI_EXTRA_VALUES}" ]; then \
+       pip3 install --upgrade ${TRITON_CI_PYPI_EXTRA_VALUES} genai-perf ; \
+    else \
+        pip3 install --upgrade genai-perf ; \
+    fi
 
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \

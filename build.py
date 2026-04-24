@@ -75,10 +75,10 @@ DEFAULT_TRITON_VERSION_MAP = {
     "triton_container_version": "26.04",
     "upstream_container_version": "26.04",
     "ort_version": "1.24.4",
-    "ort_openvino_version": "2026.0.0",
-    "standalone_openvino_version": "2026.0.0",
+    "ort_openvino_version": "2026.1.0",
+    "standalone_openvino_version": "2026.1.0",
     "dcgm_version": "4.5.3-1",
-    "vllm_version": "0.16.0",
+    "vllm_version": "0.19.0",
     "rhel_py_version": "3.12.3",
 }
 
