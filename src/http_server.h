@@ -28,6 +28,7 @@
 #include <evhtp/evhtp.h>
 #include <re2/re2.h>
 
+#include <atomic>
 #include <list>
 #include <map>
 #include <memory>
@@ -36,6 +37,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 #include "common.h"
 #include "data_compressor.h"
@@ -198,7 +200,8 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
       const int32_t port, const bool reuse_port, const std::string& address,
       const std::string& header_forward_pattern, const int thread_cnt,
-      const size_t max_input_size, const RestrictedFeatures& restricted_apis,
+      const int control_request_concurrency, const size_t max_input_size,
+      const RestrictedFeatures& restricted_apis,
       std::unique_ptr<HTTPServer>* http_server);
 
   static TRITONSERVER_Error* Create(
@@ -380,6 +383,53 @@ class HTTPAPIServer : public HTTPServer {
     evhtp_res response_code_{EVHTP_RES_OK};
   };
 
+  // Lightweight request class for model repository control operations
+  // (load/unload). Follows the same async pattern as InferRequestClass:
+  // capture the evhtp thread, pause the request, do blocking work off-thread,
+  // then defer the reply back via evthr_defer.
+  class ControlRequestClass {
+   public:
+    explicit ControlRequestClass(evhtp_request_t* req)
+        : req_(req), thread_(nullptr), err_(nullptr)
+    {
+      evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
+      thread_ = htpconn->thread;
+      evhtp_request_pause(req);
+      evhtp_request_set_hook(
+          req_, evhtp_hook_on_request_fini,
+          (evhtp_hook)(void*)ControlRequestFiniHook,
+          reinterpret_cast<void*>(this));
+    }
+
+    ~ControlRequestClass()
+    {
+      if (req_ != nullptr) {
+        evhtp_request_unset_hook(req_, evhtp_hook_on_request_fini);
+      }
+      if (err_ != nullptr) {
+        TRITONSERVER_ErrorDelete(err_);
+      }
+    }
+
+    // Called by evhtp when the connection is closed before we reply.
+    // Nulls req_ so ReplyCallback will skip the reply safely.
+    static evhtp_res ControlRequestFiniHook(evhtp_request* req, void* arg)
+    {
+      auto* ctrl_req = reinterpret_cast<ControlRequestClass*>(arg);
+      ctrl_req->req_ = nullptr;
+      return EVHTP_RES_OK;
+    }
+
+    // Deferred onto the evhtp thread via evthr_defer. Sends the reply
+    // and resumes the paused request. Deletes the ControlRequestClass.
+    // Defined in http_server.cc because it uses file-local helper functions.
+    static void ReplyCallback(evthr_t* thr, void* arg, void* shared);
+
+    evhtp_request_t* req_;
+    evthr_t* thread_;
+    TRITONSERVER_Error* err_;
+  };
+
   class GenerateRequestClass : public InferRequestClass {
    public:
     explicit GenerateRequestClass(
@@ -503,6 +553,7 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const int32_t port, const bool reuse_port, const std::string& address,
       const std::string& header_forward_pattern, const int thread_cnt,
+      const int control_request_concurrency,
       const size_t max_input_size = HTTP_DEFAULT_MAX_INPUT_SIZE,
       const RestrictedFeatures& restricted_apis = {});
 
@@ -720,6 +771,14 @@ class HTTPAPIServer : public HTTPServer {
   RestrictedFeatures restricted_apis_{};
   bool RespondIfRestricted(
       evhtp_request_t* req, const Restriction& restriction);
+
+  // Maximum number of concurrent model repository control operations
+  // (load/unload) that can run off the evhtp worker threads. Each request
+  // spawns a detached thread; this limit prevents thread explosion.
+  // Configured via control_request_concurrency; main.cc wires it from
+  // --model-load-thread-count. 0 disables async (synchronous).
+  int max_control_requests_;
+  std::atomic<int> control_request_cnt_{0};
 };
 
 }}  // namespace triton::server
