@@ -1,4 +1,4 @@
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -58,6 +58,13 @@ if(TRITON_ENABLE_GRPC)
   set(TRITON_COMMON_ENABLE_PROTOBUF ON)
   set(TRITON_COMMON_ENABLE_GRPC ON)
 endif() # TRITON_ENABLE_GRPC
+
+# protobuf
+#
+if(TRITON_ENABLE_HTTP OR TRITON_ENABLE_METRICS OR TRITON_ENABLE_SAGEMAKER OR
+   TRITON_ENABLE_VERTEX_AI)
+  set(TRITON_COMMON_ENABLE_PROTOBUF ON)
+endif()
 
 FetchContent_MakeAvailable(repo-common repo-core repo-backend)
 
@@ -405,6 +412,17 @@ if(${TRITON_ENABLE_HTTP}
       libevhtp::evhtp
       re2::re2
   )
+
+  # model_config.h (GetElementCount, etc.) needs Protobuf + generated protos.
+  if(TARGET triton-common-model-config)
+    target_link_libraries(
+      http-endpoint-library
+      PUBLIC
+        triton-common-model-config
+        proto-library
+        protobuf::libprotobuf
+    )
+  endif()
 
   target_include_directories(
     http-endpoint-library

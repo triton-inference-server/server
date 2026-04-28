@@ -56,10 +56,6 @@ constexpr char kTritonSharedMemoryRegionPrefix[] =
 
 constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 
-/// The value for a dimension in a shape that indicates that that
-/// dimension can take on any size.
-constexpr int WILDCARD_DIM = -1;
-
 // Maximum allowed depth for JSON parsing
 constexpr int32_t HTTP_MAX_JSON_NESTING_DEPTH = 100;
 
@@ -166,15 +162,6 @@ TRITONSERVER_Error* GetModelVersionFromString(
 /// \return The environment variable or the default value if not set.
 std::string GetEnvironmentVariableOrDefault(
     const std::string& variable_name, const std::string& default_value);
-
-/// Get the number of elements in a shape.
-///
-/// \param dims The shape.
-/// \return The number of elements, -1 if the number of elements
-/// cannot be determined because the shape contains one or more
-/// wildcard dimensions, -2 if the shape contains an invalid dim,
-/// or -3 if the number is too large to represent as an int64_t.
-int64_t GetElementCount(const std::vector<int64_t>& dims);
 
 /// Convert shape to string representation.
 ///
