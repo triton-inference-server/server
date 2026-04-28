@@ -930,7 +930,7 @@ FROM ${BASE_IMAGE}
 
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
-ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
+ENV CMAKE_POLICY_VERSION_MINIMUM=3.5
 """
     df += """
 # Install docker docker buildx
@@ -994,15 +994,22 @@ RUN ccache -p
     df += change_default_python_version_rhel(FLAGS.rhel_py_version)
     df += """
 
-RUN pip3 install --upgrade pip \\
-      && pip3 install --upgrade \\
+# Create a dedicated virtualenv so pip installs are isolated from the
+# distro-managed system Python. Subsequent RUN steps pick up the
+# venv's pip/python via PATH.
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+
+RUN pip install --upgrade pip \\
+      && pip install --upgrade \\
           build \\
           wheel \\
           setuptools \\
           docker \\
           virtualenv \\
           patchelf==0.17.2 \\
-          cmake==4.0.3
+          cmake==4.0.3 \\
+          auditwheel
 """
     df += f"""
 # Install boost version >= 1.78 for boost::span
@@ -1047,7 +1054,7 @@ FROM ${BASE_IMAGE}
 
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
-ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
+ENV CMAKE_POLICY_VERSION_MINIMUM=3.5
 """
     # Install the windows- or linux-specific buildbase dependencies
     if target_platform() == "windows":
@@ -1094,9 +1101,7 @@ RUN apt-get update \\
             libb64-dev \\
             libgoogle-perftools-dev \\
             python3-dev \\
-            python3-pip \\
-            python3-wheel \\
-            python3-setuptools \\
+            python3-venv \\
             rapidjson-dev \\
             scons \\
             software-properties-common \\
@@ -1110,12 +1115,21 @@ RUN apt-get update \\
             wget \\
       && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --upgrade \\
+# Create a dedicated virtualenv so pip installs are isolated from the
+# distro-managed system Python. Subsequent RUN steps pick up the
+# venv's pip/python via PATH.
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+
+RUN pip install --upgrade \\
           build \\
+          wheel \\
+          setuptools \\
           docker \\
           virtualenv \\
           patchelf==0.17.2 \\
           cmake==4.0.3 \\
+          auditwheel \\
           pybind11[global]
 """
 
@@ -1194,7 +1208,6 @@ WORKDIR /workspace
 
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
 ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -1241,13 +1254,25 @@ FROM {} AS min_container
 ##  Production stage: Create container with just inference server executable
 ############################################################################
 FROM ${BASE_IMAGE}
-
-ENV PIP_BREAK_SYSTEM_PACKAGES=1
 """
 
     df += dockerfile_prepare_container_linux(
         argmap, backends, FLAGS.enable_gpu, target_machine()
     )
+
+    # Create a dedicated virtualenv so the wheel + openai-requirements
+    # pip installs below run in isolation from the distro-managed
+    # system Python (replaces the legacy PIP_BREAK_SYSTEM_PACKAGES=1
+    # escape hatch). If the python-backend branch above already
+    # created /opt/venv-tritonserver (on top of pyenv / Ubuntu
+    # python3), re-running `python3 -m venv` is a safe no-op; on
+    # minimal builds without the python backend this is the first
+    # creation. Derived images (Dockerfile.QA) inherit the venv via
+    # PATH.
+    df += """
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+"""
 
     df += f"""
 WORKDIR /opt
@@ -1260,7 +1285,7 @@ RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     "tritonfrontend-*.whl" | xargs -I {{}} pip install --upgrade {{}}[{FLAGS.triton_wheels_dependencies_group}]
 
-RUN pip3 install -r python/openai/requirements.txt
+RUN pip install -r python/openai/requirements.txt
 
 """
     if not FLAGS.no_core_build:
@@ -1349,20 +1374,22 @@ RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
     if target_platform() == "rhel":
         df += """
 # Common dependencies.
-RUN yum install -y \\
+RUN dnf install -y \\
         git \\
         gperf \\
-        re2-devel \\
-        openssl-devel \\
-        libtool \\
-        libcurl-devel \\
-        libb64-devel \\
         gperftools-devel \\
-        wget \\
-        python3.12-pip \\
-        numactl-devel
+        libb64-devel \\
+        libcurl-devel \\
+        libtool \\
+        numactl-devel \\
+        openssl-devel \\
+        python3.12-venv \\
+        re2-devel \\
+        wget
 
-RUN pip3 install patchelf==0.17.2
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+RUN pip install patchelf==0.17.2
 
 """
     else:
@@ -1387,6 +1414,7 @@ RUN apt-get update \\
               wget \\
               {backend_dependencies} \\
               python3-pip \\
+              python3-venv \\
       && rm -rf /var/lib/apt/lists/*
 """.format(
             backend_dependencies=backend_dependencies
@@ -1438,8 +1466,14 @@ RUN yum install -y \\
             # Requires openssl-devel to be installed first for pyenv build to be successful
             df += change_default_python_version_rhel(FLAGS.rhel_py_version)
             df += """
-RUN pip3 install --upgrade pip \\
-    && pip3 install --upgrade \\
+# Create a dedicated virtualenv so pip installs are isolated from the
+# distro-managed system Python. Built after pyenv has provided the
+# desired Python version so the venv inherits that interpreter.
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+
+RUN pip install --upgrade pip \\
+    && pip install --upgrade \\
         wheel \\
         setuptools \\
         \"numpy<2\" \\
@@ -1451,15 +1485,23 @@ RUN pip3 install --upgrade pip \\
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
             python3 \\
+            python3-venv \\
             libarchive-dev \\
             python3-pip \\
             python3-wheel \\
             python3-setuptools \\
             libpython3-dev \\
-      && pip3 install --upgrade \\
-            \"numpy<2\" \\
-            virtualenv \\
       && rm -rf /var/lib/apt/lists/*
+
+# Create a dedicated virtualenv so pip installs are isolated from the
+# distro-managed system Python. Subsequent RUN steps pick up the
+# venv's pip/python via PATH.
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+
+RUN pip install --upgrade \\
+        \"numpy<2\" \\
+        virtualenv
 """
     if "tensorrtllm" in backends or "vllm" in backends:
         df += """
@@ -1552,10 +1594,12 @@ COPY --from=min_container /opt/hpcx/ucx/lib/libuct.so.0 /opt/hpcx/ucx/lib/libuct
 
 COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.9
 
-# patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so
+# patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so.
 RUN apt-get update \\
-      && apt-get install -y --no-install-recommends openmpi-bin
-RUN pip3 install patchelf==0.17.2
+      && apt-get install -y --no-install-recommends openmpi-bin python3-venv
+RUN python3 -m venv /opt/venv-tritonserver
+ENV PATH="/opt/venv-tritonserver/bin:${PATH}"
+RUN pip install patchelf==0.17.2
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
 """.format(
@@ -1805,6 +1849,53 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             "--name",
             "tritonserver_builder",
         ]
+
+        # Propagate wheel-naming context into the build container so
+        # build_wheel.py can compose the full wheel filename. See
+        # TRI-983. Both CLI flags and host env vars are checked so the
+        # value is defined in CI and local builds alike:
+        #
+        # * CI_PIPELINE_ID — GitLab pipeline ID; shared across all jobs
+        #   in one pipeline so tritonserver and tritonfrontend wheels
+        #   from the same release carry the same PEP 427 build tag.
+        #   In CI, pass `--build-id=${CI_PIPELINE_ID}` to build.py.
+        # * NVIDIA_BUILD_ID — from --build-id; the primary vehicle for
+        #   CI_PIPELINE_ID into the container. build_wheel.py falls back
+        #   to this when CI_PIPELINE_ID is not exported directly.
+        # * NVIDIA_UPSTREAM_VERSION — primarily from
+        #   --upstream-container-version (CI:
+        #   `--upstream-container-version=${NVIDIA_UPSTREAM_VERSION}`;
+        #   local: DEFAULT_TRITON_VERSION_MAP default). Falls back to
+        #   the host env var when the CLI flag is empty so the
+        #   +nv<X> local-version segment is still applied even if
+        #   someone invokes build.py with `--upstream-container-version=`.
+        # * PYPI_RELEASE — when "true", build_wheel.py omits the
+        #   +nv<X>.cu<Y> local-version suffix so the resulting wheel
+        #   can be uploaded to PyPI (which rejects local versions).
+        #
+        # CUDA_VERSION is intentionally NOT propagated: the CUDA base
+        # image already sets it as an ENV inside the container, and
+        # the host/CI runner does not. Passing "-e CUDA_VERSION" with
+        # an empty host value would override (and erase) the
+        # container's value. build_wheel.py reads CUDA_VERSION from
+        # the container-local env (with a /usr/local/cuda/version.json
+        # fallback), which is where it is reliably set.
+        ci_pipeline_id = os.environ.get("CI_PIPELINE_ID")
+        if ci_pipeline_id:
+            runargs += ["-e", f"CI_PIPELINE_ID={ci_pipeline_id}"]
+        if FLAGS.build_id is not None:
+            runargs += ["-e", f"NVIDIA_BUILD_ID={FLAGS.build_id}"]
+        upstream_version = FLAGS.upstream_container_version or os.environ.get(
+            "NVIDIA_UPSTREAM_VERSION"
+        )
+        if upstream_version:
+            runargs += [
+                "-e",
+                f"NVIDIA_UPSTREAM_VERSION={upstream_version}",
+            ]
+        pypi_release = os.environ.get("PYPI_RELEASE")
+        if pypi_release:
+            runargs += ["-e", f"PYPI_RELEASE={pypi_release}"]
 
         if not FLAGS.no_container_interactive:
             runargs += ["-it"]
@@ -2849,6 +2940,20 @@ if __name__ == "__main__":
 
     log("container version {}".format(FLAGS.container_version))
     log("upstream container version {}".format(FLAGS.upstream_container_version))
+    # Explicit visibility for wheel-naming inputs (see TRI-983). If
+    # these are empty here, the wheel filename will lack the expected
+    # build-tag / local-version segments and the log below tells us
+    # which link in the chain dropped the value.
+    log(
+        "wheel-naming inputs: --build-id={!r}, --upstream-container-version={!r}, "
+        "CI_PIPELINE_ID={!r}, env NVIDIA_UPSTREAM_VERSION={!r}, PYPI_RELEASE={!r}".format(
+            FLAGS.build_id,
+            FLAGS.upstream_container_version,
+            os.environ.get("CI_PIPELINE_ID"),
+            os.environ.get("NVIDIA_UPSTREAM_VERSION"),
+            os.environ.get("PYPI_RELEASE"),
+        )
+    )
 
     for ep in FLAGS.endpoint:
         log(f'endpoint "{ep}"')

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,34 +26,35 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
-import sys
 
-from setuptools import find_packages, setup
-
-if "--plat-name" in sys.argv:
-    PLATFORM_FLAG = sys.argv[sys.argv.index("--plat-name") + 1]
-else:
-    PLATFORM_FLAG = "any"
+from setuptools import Distribution, find_packages, setup
 
 if "VERSION" not in os.environ:
     raise Exception("envvar VERSION must be specified")
 
 VERSION = os.environ["VERSION"]
 
-try:
-    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
-    class bdist_wheel(_bdist_wheel):
-        def finalize_options(self):
-            _bdist_wheel.finalize_options(self)
-            self.root_is_pure = False
+# The wheel bundles a CPython-ABI-specific binding
+# (tritonfrontend/_c/<pybind>.so, filename encodes e.g. "cpython-312-..."),
+# so the wheel is only loadable under the matching interpreter and arch.
+# The binding is copied into package_data at build time rather than
+# declared via setup(ext_modules=...), so setuptools would otherwise
+# treat the distribution as pure-Python and emit "Root-Is-Purelib: true"
+# in the WHEEL metadata — which auditwheel rejects when it finds the
+# .so embedded in the purelib tree.
+#
+# Signaling has_ext_modules()=True via a custom Distribution subclass
+# is the canonical way to tell setuptools the wheel is binary without
+# triggering a fake compilation step. setuptools then:
+#   - sets Root-Is-Purelib to false (required for auditwheel repair),
+#   - auto-derives the correct cp<XY>-cp<XY>-linux_<arch> tag from
+#     the current interpreter and sysconfig.get_platform().
+# See TRI-983.
+class BinaryDistribution(Distribution):
+    def has_ext_modules(self):
+        return True
 
-        def get_tag(self):
-            pyver, abi, plat = "py3", "none", PLATFORM_FLAG
-            return pyver, abi, plat
-
-except ImportError:
-    bdist_wheel = None
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 
@@ -105,7 +106,7 @@ setup(
         "": platform_package_data,
     },
     zip_safe=False,
-    cmdclass={"bdist_wheel": bdist_wheel},
+    distclass=BinaryDistribution,
     data_files=data_files,
     install_requires=["tritonserver", "pydantic==2.10.6"],
     extras_require={"GPU": gpu_extras, "test": test_extras, "all": all_extras},

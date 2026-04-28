@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,6 +32,7 @@ import re
 import shutil
 import subprocess
 import sys
+import sysconfig
 from distutils.dir_util import copy_tree
 from tempfile import mkstemp
 
@@ -52,6 +53,100 @@ def touch(path):
 
 def cpdir(src, dest):
     copy_tree(src, dest, preserve_symlinks=1)
+
+
+def _detect_cuda_version():
+    """Detect the CUDA toolkit version visible to the build.
+
+    Prefers the CUDA_VERSION env var (set by official NVIDIA base
+    images); falls back to parsing /usr/local/cuda/version.json which
+    is the canonical location for the installed toolkit. Returns the
+    raw string (e.g. "13.2.1") or None when CUDA is not available.
+
+    CUDA_VERSION is only reliably set inside the build container (the
+    CUDA base image exports it) and must not be propagated from the
+    host — see the matching comment in build.py's docker-run
+    invocation.
+    """
+    v = os.environ.get("CUDA_VERSION")
+    if v:
+        return v
+    try:
+        import json as _json
+
+        with open("/usr/local/cuda/version.json") as f:
+            data = _json.load(f)
+        return data.get("cuda", {}).get("version")
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def _compose_version(base_version):
+    """Compose the full wheel version string.
+
+    The base version comes from TRITON_VERSION and may already include a
+    PEP 440 pre-release suffix (e.g. "2.69.0.dev0"). Append a PEP 440
+    local-version segment describing the NVIDIA container release and
+    CUDA toolkit the wheel was built against, so consumers can tell an
+    nv26.04 wheel from an nv26.05 wheel (same upstream Triton version)
+    and a cu132 wheel from a cu128 wheel. The local-version segment is
+    purely informational and does not affect pip's version comparison.
+
+    When PYPI_RELEASE=true the local-version suffix is omitted entirely:
+    PyPI rejects uploads whose version contains a '+' local segment, so
+    public release builds must use the bare version.
+
+    Sources for NVIDIA upstream version (first non-empty wins):
+      NVIDIA_UPSTREAM_VERSION        - propagated by build.py via
+                                       `docker run -e` from
+                                       FLAGS.upstream_container_version.
+      NVIDIA_TRITON_SERVER_VERSION   - set as ENV in the buildbase image
+                                       at image-build time from the
+                                       TRITON_CONTAINER_VERSION ARG
+                                       (survives even if the docker-run
+                                       `-e` forwarding is not applied).
+      TRITON_CONTAINER_VERSION       - set as ENV in some downstream
+                                       images; same value as above in CI.
+    Source for CUDA toolkit version:
+      CUDA_VERSION / toolkit         - discovered by _detect_cuda_version()
+
+    All sources are optional; if none is present the version is returned
+    unchanged so local non-CI builds stay stable. Each detection
+    outcome is logged to stderr so any future gap is self-announcing
+    in the build log rather than surfacing only as a missing suffix in
+    the wheel filename.
+    """
+    if os.environ.get("PYPI_RELEASE", "").lower() in ("1", "true", "yes"):
+        print(
+            "=== PYPI_RELEASE set: omitting local-version suffix for PyPI compatibility",
+            file=sys.stderr,
+        )
+        return base_version
+    nv = (
+        os.environ.get("NVIDIA_UPSTREAM_VERSION")
+        or os.environ.get("NVIDIA_TRITON_SERVER_VERSION")
+        or os.environ.get("TRITON_CONTAINER_VERSION")
+    )
+    cuda = _detect_cuda_version()
+    print(
+        f"=== Wheel local-version inputs: "
+        f"NVIDIA_UPSTREAM_VERSION={os.environ.get('NVIDIA_UPSTREAM_VERSION')!r} "
+        f"NVIDIA_TRITON_SERVER_VERSION={os.environ.get('NVIDIA_TRITON_SERVER_VERSION')!r} "
+        f"TRITON_CONTAINER_VERSION={os.environ.get('TRITON_CONTAINER_VERSION')!r} "
+        f"-> nv={nv!r}, cuda={cuda!r}",
+        file=sys.stderr,
+    )
+    local = []
+    if nv:
+        local.append(f"nv{nv}")
+    if cuda:
+        # "13.2" / "13.2.0" / "13.2.1" -> "cu132"
+        parts = cuda.split(".")
+        if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+            local.append(f"cu{parts[0]}{parts[1]}")
+    if local:
+        return f"{base_version}+{'.'.join(local)}"
+    return base_version
 
 
 def sed(pattern, replace, source, dest=None):
@@ -115,20 +210,133 @@ def main():
     shutil.copyfile("setup.py", os.path.join(FLAGS.whl_dir, "setup.py"))
 
     os.chdir(FLAGS.whl_dir)
+    # The wheel ships an arch-specific CPython extension
+    # (tritonfrontend/_c/<pybind>.so). Pass --plat-name so the wheel is
+    # tagged with the current platform (e.g. linux_x86_64 / linux_aarch64)
+    # instead of the misleading "none-any".
+    plat_name = sysconfig.get_platform().replace("-", "_").replace(".", "_")
     print("=== Building wheel")
-    args = ["python3", "setup.py", "bdist_wheel"]
+    args = ["python3", "setup.py", "bdist_wheel", "--plat-name", plat_name]
+    # PEP 427 "build tag": an optional segment between version and
+    # python-tag that lets two wheels of the same version coexist
+    # (e.g. re-runs of the same pipeline). Sources, first non-empty
+    # and usable wins:
+    #   CI_PIPELINE_ID  - GitLab pipeline ID; shared by all jobs in one
+    #                     pipeline so tritonserver and tritonfrontend
+    #                     wheels from the same release carry the same
+    #                     tag. In CI, build.py is invoked with
+    #                     `--build-id=${CI_PIPELINE_ID}`.
+    #   NVIDIA_BUILD_ID - set from build.py's --build-id flag; primary
+    #                     vehicle for CI_PIPELINE_ID into the container.
+    #   BUILD_NUMBER    - generic CI systems that use this instead.
+    # PEP 427 requires the build tag to start with a digit. Skip the
+    # slot when the value does not satisfy that constraint or is the
+    # "<unknown>" default emitted for local builds without --build-id.
+    if os.environ.get("PYPI_RELEASE", "").lower() in ("1", "true", "yes"):
+        build_tag = None
+    else:
+        build_tag = (
+            os.environ.get("CI_PIPELINE_ID")
+            or os.environ.get("NVIDIA_BUILD_ID")
+            or os.environ.get("BUILD_NUMBER")
+        )
+    print(
+        f"=== Wheel build-tag inputs: "
+        f"PYPI_RELEASE={os.environ.get('PYPI_RELEASE')!r} "
+        f"CI_PIPELINE_ID={os.environ.get('CI_PIPELINE_ID')!r} "
+        f"NVIDIA_BUILD_ID={os.environ.get('NVIDIA_BUILD_ID')!r} "
+        f"BUILD_NUMBER={os.environ.get('BUILD_NUMBER')!r} "
+        f"-> build-tag={build_tag!r}",
+        file=sys.stderr,
+    )
+    if build_tag and build_tag != "<unknown>" and build_tag[:1].isdigit():
+        args += ["--build-number", build_tag]
 
     wenv = os.environ.copy()
-    wenv["VERSION"] = FLAGS.triton_version
+    wenv["VERSION"] = _compose_version(FLAGS.triton_version)
     wenv["TRITON_PYBIND"] = PYBIND_LIB
     p = subprocess.Popen(args, env=wenv)
     p.wait()
     fail_if(p.returncode != 0, "setup.py failed")
 
-    cpdir("dist", FLAGS.dest_dir)
+    # Post-process with auditwheel so the wheel is tagged with a proper
+    # manylinux_2_X_<arch> platform (required by canonical PyPI). When
+    # auditwheel is unavailable in the build image we keep the
+    # linux_<arch> wheel and emit a warning; the Poetry/pip lock-file
+    # problem is already solved by the distinct filename, and the tag can
+    # be fixed up in a follow-up publish step if needed.
+    _repair_wheel_with_auditwheel(FLAGS.whl_dir, FLAGS.dest_dir)
 
     print(f"=== Output wheel file is in: {FLAGS.dest_dir}")
     touch(os.path.join(FLAGS.dest_dir, "stamp.whl"))
+
+
+def _repair_wheel_with_auditwheel(whl_dir, dest_dir):
+    """Upgrade a linux_<arch> wheel to manylinux_2_X_<arch>.
+
+    Ports the pattern established for tritonclient in TRI-286:
+      1. auditwheel repair   — auto-discovers the minimum manylinux tag
+         by inspecting glibc symbol requirements of the embedded .so.
+      2. python -m wheel tags fallback — used when auditwheel reports
+         "no ELF" (the wheel has no native extension, e.g. a downstream
+         build disabled bindings). Mirrors the documented fallback.
+      3. No-op with warning — when auditwheel is not installed in the
+         build image, keep the linux_<arch> wheel as-is so the build
+         does not regress.
+    """
+    if shutil.which("auditwheel") is None:
+        print(
+            "=== WARNING: auditwheel not found on PATH; keeping linux_<arch> "
+            "wheel as-is. Install auditwheel in the build image to produce "
+            "PyPI-acceptable manylinux_2_X_<arch> wheels.",
+            file=sys.stderr,
+        )
+        cpdir("dist", dest_dir)
+        return
+
+    dist_dir = os.path.join(whl_dir, "dist")
+    wheels = [
+        os.path.join(dist_dir, w) for w in os.listdir(dist_dir) if w.endswith(".whl")
+    ]
+    fail_if(not wheels, "no wheel produced by setup.py")
+
+    for wheel_path in wheels:
+        print(f"=== Running auditwheel repair on {wheel_path}")
+        r = subprocess.run(
+            ["auditwheel", "repair", wheel_path, "--wheel-dir", dest_dir],
+            capture_output=True,
+            text=True,
+        )
+        # `auditwheel` logs via Python's logging module, which writes to
+        # stderr — the "no ELF" sentinel only appears there, not in
+        # stdout. See TRI-286 root-cause write-up.
+        if r.returncode != 0 and "no ELF" in r.stderr:
+            arch = os.uname().machine
+            manylinux_tag = f"manylinux_2_28_{arch}"
+            print(
+                f"=== Pure-Python wheel detected; falling back to wheel tags "
+                f"({manylinux_tag})"
+            )
+            copied = os.path.join(dest_dir, os.path.basename(wheel_path))
+            shutil.copy(wheel_path, copied)
+            # `wheel tags --remove` replaces the linux_<arch> wheel in
+            # dest_dir with the correctly-tagged manylinux one.
+            r2 = subprocess.run(
+                [
+                    "python3",
+                    "-m",
+                    "wheel",
+                    "tags",
+                    "--platform-tag",
+                    manylinux_tag,
+                    "--remove",
+                    copied,
+                ]
+            )
+            fail_if(r2.returncode != 0, "wheel tags fallback failed")
+        elif r.returncode != 0:
+            sys.stderr.write(r.stderr)
+            fail_if(True, "auditwheel repair failed")
 
 
 if __name__ == "__main__":
