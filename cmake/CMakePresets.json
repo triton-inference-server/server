@@ -1,0 +1,88 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "vendor": {
+    "note": "AUTHORITATIVE PRESET FILE. When building from server/ all downstream repos (core, common, backend) are included via add_subdirectory and inherit these variables. Downstream repos have their own CMakePresets.json for standalone builds only."
+  },
+  "configurePresets": [
+    {
+      "name": "conan-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "${sourceDir}/build/${presetName}/conan/generators/conan_toolchain.cmake",
+      "cacheVariables": { "CMAKE_EXPORT_COMPILE_COMMANDS": "ON" }
+    },
+    {
+      "name": "release",
+      "inherits": "conan-base",
+      "displayName": "Release (GPU + HTTP + gRPC + Metrics)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE":      "Release",
+        "TRITON_ENABLE_GPU":     "ON",
+        "TRITON_ENABLE_HTTP":    "ON",
+        "TRITON_ENABLE_GRPC":    "ON",
+        "TRITON_ENABLE_METRICS": "ON"
+      }
+    },
+    {
+      "name": "debug",
+      "inherits": "conan-base",
+      "displayName": "Debug (GPU + HTTP + gRPC + Metrics)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE":      "Debug",
+        "TRITON_ENABLE_GPU":     "ON",
+        "TRITON_ENABLE_HTTP":    "ON",
+        "TRITON_ENABLE_GRPC":    "ON",
+        "TRITON_ENABLE_METRICS": "ON"
+      }
+    },
+    {
+      "name": "cpu-only",
+      "inherits": "conan-base",
+      "displayName": "Release CPU-only",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE":          "Release",
+        "TRITON_ENABLE_GPU":         "OFF",
+        "TRITON_ENABLE_METRICS_GPU": "OFF",
+        "TRITON_ENABLE_HTTP":        "ON",
+        "TRITON_ENABLE_GRPC":        "ON",
+        "TRITON_ENABLE_METRICS":     "ON"
+      }
+    },
+    {
+      "name": "all-features",
+      "inherits": "conan-base",
+      "displayName": "Release - all features (no cloud storage)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE":                   "Release",
+        "TRITON_ENABLE_GPU":                  "ON",
+        "TRITON_ENABLE_HTTP":                 "ON",
+        "TRITON_ENABLE_GRPC":                 "ON",
+        "TRITON_ENABLE_METRICS":              "ON",
+        "TRITON_ENABLE_METRICS_GPU":          "ON",
+        "TRITON_ENABLE_METRICS_CPU":          "ON",
+        "TRITON_ENABLE_TRACING":              "ON",
+        "TRITON_ENABLE_ENSEMBLE":             "ON",
+        "TRITON_ENABLE_GCS":                  "OFF",
+        "TRITON_ENABLE_S3":                   "OFF",
+        "TRITON_ENABLE_AZURE_STORAGE":        "OFF",
+        "TRITON_ENABLE_IDENTITY_BACKEND":     "ON",
+        "TRITON_ENABLE_REPEAT_BACKEND":       "ON",
+        "TRITON_ENABLE_SQUARE_BACKEND":       "ON",
+        "TRITON_ENABLE_PYTHON_BACKEND":       "OFF",
+        "TRITON_ENABLE_ONNXRUNTIME_BACKEND":  "OFF",
+        "TRITON_ENABLE_PYTORCH_BACKEND":      "OFF",
+        "TRITON_ENABLE_TENSORRT_BACKEND":     "OFF",
+        "TRITON_ENABLE_VLLM_BACKEND":         "OFF",
+        "TRITON_ENABLE_TENSORRTLLM_BACKEND":  "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "release",      "configurePreset": "release" },
+    { "name": "debug",        "configurePreset": "debug" },
+    { "name": "cpu-only",     "configurePreset": "cpu-only" },
+    { "name": "all-features", "configurePreset": "all-features" }
+  ]
+}

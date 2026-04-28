@@ -57,7 +57,6 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
     PRIVATE
       ${CMAKE_CURRENT_SOURCE_DIR}/..
       ${GTEST_INCLUDE_DIRS}
-      ${LIBEVENT_INCLUDE_DIRS}
   )
 
   target_link_libraries(
@@ -67,7 +66,8 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
       triton-core-serverstub  # from repo-core
       GTest::gtest
       GTest::gtest_main
-      ${LIBEVENT_LIBRARIES}
+      libevent::core
+      libevent::extra
       -lz
   )
 

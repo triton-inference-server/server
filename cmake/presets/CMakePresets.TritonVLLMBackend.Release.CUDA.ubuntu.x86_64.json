@@ -1,0 +1,72 @@
+{
+  "version": 6,
+  "vendor": {
+    "triton": {
+      "component": "TritonVLLMBackend",
+      "platform": "Ubuntu x86_64 with NVIDIA GPU (CUDA)",
+      "notes": [
+        "vLLM backend build for Ubuntu on x86_64.",
+        "The vLLM backend is Python-only — CMake configures the server and enables",
+        "the backend stub so the vLLM Python package is discovered at runtime.",
+        "Install vLLM and its Triton shim before deployment:",
+        "  pip install vllm",
+        "  pip install tritonclient[all]",
+        "Requires CUDA toolkit and an NVIDIA driver (Ampere or newer recommended)."
+      ],
+      "conan_install": [
+        "conan install server/",
+        "  --profile:host=server/conan/profiles/linux-gcc13-release",
+        "  --profile:build=server/conan/profiles/linux-gcc13-release",
+        "  -o '&:enable_gpu=True'",
+        "  -o '&:enable_grpc=True'",
+        "  -o '&:enable_http=True'",
+        "  -o '&:enable_metrics=True'",
+        "  --build=missing",
+        "  --output-folder=server/build/triton-vllm-backend-release-cuda-ubuntu-x86_64/conan",
+        "",
+        "cmake --preset triton-vllm-backend-release-cuda-ubuntu-x86_64",
+        "cmake --build --preset triton-vllm-backend-release-cuda-ubuntu-x86_64",
+        "cmake --build --preset triton-vllm-backend-release-cuda-ubuntu-x86_64 --target vllm-backend"
+      ]
+    }
+  },
+  "configurePresets": [
+    {
+      "name": "triton-vllm-backend-release-cuda-ubuntu-x86_64",
+      "displayName": "TritonVLLMBackend — Release, CUDA, Ubuntu, x86_64",
+      "description": "Triton server + vLLM backend for Ubuntu Linux on x86_64. vLLM backend is Python-only; this preset wires the backend into the server build.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "${sourceDir}/build/${presetName}/conan/generators/conan_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS":  "ON",
+        "CMAKE_BUILD_TYPE":               "Release",
+        "TRITON_ENABLE_GPU":              "ON",
+        "TRITON_ENABLE_HTTP":             "ON",
+        "TRITON_ENABLE_GRPC":             "ON",
+        "TRITON_ENABLE_METRICS":          "ON",
+        "TRITON_ENABLE_METRICS_GPU":      "ON",
+        "TRITON_ENABLE_METRICS_CPU":      "ON",
+        "TRITON_ENABLE_ENSEMBLE":         "ON",
+        "TRITON_MIN_COMPUTE_CAPABILITY":  "8.0",
+        "CMAKE_CUDA_ARCHITECTURES":       "80;86;89;90",
+        "TRITON_ENABLE_VLLM_BACKEND":     "ON",
+        "TRITON_FETCH_MISSING_BACKENDS":  "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "triton-vllm-backend-release-cuda-ubuntu-x86_64",
+      "configurePreset": "triton-vllm-backend-release-cuda-ubuntu-x86_64",
+      "jobs": 8
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "triton-vllm-backend-release-cuda-ubuntu-x86_64",
+      "configurePreset": "triton-vllm-backend-release-cuda-ubuntu-x86_64",
+      "filter": { "exclude": { "label": "requires-gpu" } }
+    }
+  ]
+}

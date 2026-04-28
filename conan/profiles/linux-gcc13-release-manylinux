@@ -1,0 +1,19 @@
+[settings]
+os=Linux
+arch=x86_64
+compiler=gcc
+compiler.version=13
+compiler.libcxx=libstdc++11
+compiler.cppstd=17
+build_type=Release
+
+[buildenv]
+CC=/usr/bin/gcc-13
+CXX=/usr/bin/g++-13
+PATH=+/home/user/.venv/bin
+
+[conf]
+# Target manylinux2014 (glibc 2.17+) — use the manylinux sysroot when available.
+# Set CONAN_SYSROOT in the environment to point to the manylinux sysroot if
+# cross-compiling; for native builds this profile is equivalent to linux-gcc13-release.
+tools.build:sysroot=

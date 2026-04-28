@@ -30,10 +30,20 @@ project(tritonserver LANGUAGES C CXX)
 
 include(CMakeDependentOption)
 
+# Expose local cmake/ modules (FindDCGM, TritonCheckCxxAbi, etc.)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# Validate that the C++ ABI (_GLIBCXX_USE_CXX11_ABI) matches the ABI used
+# to compile Conan-provided binary packages.  Must run after the toolchain
+# file (conan_toolchain.cmake) has been processed so CONAN_COMPILER_LIBCXX
+# is populated.
+include(TritonCheckCxxAbi)
+triton_check_cxx_abi()
+
 # Use C++17 standard as Triton's minimum required.
 set(TRITON_MIN_CXX_STANDARD 17 CACHE STRING "The minimum C++ standard which features are requested to build this target.")
 
-set(TRITON_VERSION "0.0.0" CACHE STRING "The version of the Triton shared library" )
+set(TRITON_VERSION "0.0.0" CACHE STRING "The version of the Triton shared library")
 
 option(TRITON_ENABLE_LOGGING "Include logging support in server" ON)
 option(TRITON_ENABLE_STATS "Include statistics collections in server" ON)
@@ -41,9 +51,9 @@ option(TRITON_ENABLE_TRACING "Include tracing support in server" OFF)
 option(TRITON_ENABLE_NVTX "Include NVTX support in server" OFF)
 option(TRITON_ENABLE_GPU "Enable GPU support in server" ON)
 option(TRITON_ENABLE_MALI_GPU "Enable Arm Mali GPU support in server" OFF)
-option(TRITON_IGPU_BUILD "Enable options for iGPU compilation in sever" OFF)
+option(TRITON_IGPU_BUILD "Enable options for iGPU compilation in server" OFF)
 set(TRITON_MIN_COMPUTE_CAPABILITY "7.5" CACHE STRING
-    "The minimum CUDA compute capability supported by Triton" )
+    "The minimum CUDA compute capability supported by Triton")
 set(TRITON_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for Triton Server build")
 
 # Ensemble
@@ -71,18 +81,72 @@ option(TRITON_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
 # ASAN
 option(TRITON_ENABLE_ASAN "Build with address sanitizer" OFF)
 
-# Repo tags
-set(TRITON_REPO_ORGANIZATION "https://github.com/triton-inference-server" CACHE STRING "Git repository to pull from")
-set(TRITON_THIRD_PARTY_REPO_TAG "main" CACHE STRING
-    "Tag for triton-inference-server/third_party repo")
-set(TRITON_COMMON_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/common repo")
-set(TRITON_CORE_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/core repo")
-set(TRITON_BACKEND_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/backend repo")
+# Skip FetchContent/ExternalProject for third-party deps when Conan provides them
+option(TRITON_SKIP_THIRD_PARTY_FETCH
+  "Skip FetchContent/ExternalProject for third-party deps (provided by Conan)" ON)
 
-# Third-party location
-set(TRITON_THIRD_PARTY_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/third-party" CACHE STRING "Location of third-party build")
-set(TRITON_THIRD_PARTY_SRC_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/third-party-src" CACHE STRING "Location of third-party source")
+# ---------------------------------------------------------------------------
+# Backend implementations — each defaults OFF; toggle ON to include in build.
+# Source dirs default to sibling checkout paths; override via -D if needed.
+# ---------------------------------------------------------------------------
+option(TRITON_ENABLE_PYTHON_BACKEND      "Build Python backend"          OFF)
+option(TRITON_ENABLE_ONNXRUNTIME_BACKEND "Build ONNX Runtime backend"    OFF)
+option(TRITON_ENABLE_PYTORCH_BACKEND     "Build PyTorch backend"         OFF)
+option(TRITON_ENABLE_TENSORRT_BACKEND    "Build TensorRT backend"        OFF)
+option(TRITON_ENABLE_OPENVINO_BACKEND    "Build OpenVINO backend"        OFF)
+option(TRITON_ENABLE_DALI_BACKEND        "Build DALI backend"            OFF)
+option(TRITON_ENABLE_FIL_BACKEND         "Build FIL backend"             OFF)
+option(TRITON_ENABLE_VLLM_BACKEND        "Build vLLM backend"            OFF)
+option(TRITON_ENABLE_TENSORRTLLM_BACKEND "Build TensorRT-LLM backend"    OFF)
+option(TRITON_ENABLE_IDENTITY_BACKEND    "Build Identity (test) backend" OFF)
+option(TRITON_ENABLE_REPEAT_BACKEND      "Build Repeat (test) backend"   OFF)
+option(TRITON_ENABLE_SQUARE_BACKEND      "Build Square (test) backend"   OFF)
 
+# Source dirs — prefer sibling checkouts; FetchContent is the fallback.
+# Override per-backend with -DTRITON_<NAME>_BACKEND_SOURCE_DIR=<path>.
+set(TRITON_PYTHON_BACKEND_SOURCE_DIR      "${CMAKE_CURRENT_SOURCE_DIR}/../python_backend"
+    CACHE PATH "Local checkout of python_backend repo")
+set(TRITON_ONNXRUNTIME_BACKEND_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../onnxruntime_backend"
+    CACHE PATH "Local checkout of onnxruntime_backend repo")
+set(TRITON_PYTORCH_BACKEND_SOURCE_DIR     "${CMAKE_CURRENT_SOURCE_DIR}/../pytorch_backend"
+    CACHE PATH "Local checkout of pytorch_backend repo")
+set(TRITON_TENSORRT_BACKEND_SOURCE_DIR    "${CMAKE_CURRENT_SOURCE_DIR}/../tensorrt_backend"
+    CACHE PATH "Local checkout of tensorrt_backend repo")
+set(TRITON_OPENVINO_BACKEND_SOURCE_DIR    "${CMAKE_CURRENT_SOURCE_DIR}/../openvino_backend"
+    CACHE PATH "Local checkout of openvino_backend repo")
+set(TRITON_DALI_BACKEND_SOURCE_DIR        "${CMAKE_CURRENT_SOURCE_DIR}/../dali_backend"
+    CACHE PATH "Local checkout of dali_backend repo")
+set(TRITON_FIL_BACKEND_SOURCE_DIR         "${CMAKE_CURRENT_SOURCE_DIR}/../fil_backend"
+    CACHE PATH "Local checkout of fil_backend repo")
+set(TRITON_VLLM_BACKEND_SOURCE_DIR        "${CMAKE_CURRENT_SOURCE_DIR}/../vllm_backend"
+    CACHE PATH "Local checkout of vllm_backend repo")
+set(TRITON_TENSORRTLLM_BACKEND_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tensorrtllm_backend"
+    CACHE PATH "Local checkout of tensorrtllm_backend repo")
+set(TRITON_IDENTITY_BACKEND_SOURCE_DIR    "${CMAKE_CURRENT_SOURCE_DIR}/../identity_backend"
+    CACHE PATH "Local checkout of identity_backend repo")
+set(TRITON_REPEAT_BACKEND_SOURCE_DIR      "${CMAKE_CURRENT_SOURCE_DIR}/../repeat_backend"
+    CACHE PATH "Local checkout of repeat_backend repo")
+set(TRITON_SQUARE_BACKEND_SOURCE_DIR      "${CMAKE_CURRENT_SOURCE_DIR}/../square_backend"
+    CACHE PATH "Local checkout of square_backend repo")
+
+# Git tags used when a backend is fetched (no local checkout found).
+# Override per-backend with -DTRITON_<NAME>_BACKEND_REPO_TAG=<ref>.
+set(TRITON_PYTHON_BACKEND_REPO_TAG      "main" CACHE STRING "Git ref for python_backend FetchContent")
+set(TRITON_ONNXRUNTIME_BACKEND_REPO_TAG "main" CACHE STRING "Git ref for onnxruntime_backend FetchContent")
+set(TRITON_PYTORCH_BACKEND_REPO_TAG     "main" CACHE STRING "Git ref for pytorch_backend FetchContent")
+set(TRITON_TENSORRT_BACKEND_REPO_TAG    "main" CACHE STRING "Git ref for tensorrt_backend FetchContent")
+set(TRITON_OPENVINO_BACKEND_REPO_TAG    "main" CACHE STRING "Git ref for openvino_backend FetchContent")
+set(TRITON_DALI_BACKEND_REPO_TAG        "main" CACHE STRING "Git ref for dali_backend FetchContent")
+set(TRITON_FIL_BACKEND_REPO_TAG         "main" CACHE STRING "Git ref for fil_backend FetchContent")
+set(TRITON_VLLM_BACKEND_REPO_TAG        "main" CACHE STRING "Git ref for vllm_backend FetchContent")
+set(TRITON_TENSORRTLLM_BACKEND_REPO_TAG "main" CACHE STRING "Git ref for tensorrtllm_backend FetchContent")
+set(TRITON_IDENTITY_BACKEND_REPO_TAG    "main" CACHE STRING "Git ref for identity_backend FetchContent")
+set(TRITON_REPEAT_BACKEND_REPO_TAG      "main" CACHE STRING "Git ref for repeat_backend FetchContent")
+set(TRITON_SQUARE_BACKEND_REPO_TAG      "main" CACHE STRING "Git ref for square_backend FetchContent")
+
+#
+# Validation
+#
 if(TRITON_ENABLE_METRICS AND NOT TRITON_ENABLE_STATS)
   message(FATAL_ERROR "TRITON_ENABLE_METRICS=ON requires TRITON_ENABLE_STATS=ON")
 endif()
@@ -91,15 +155,15 @@ if(TRITON_ENABLE_TRACING AND NOT TRITON_ENABLE_STATS)
   message(FATAL_ERROR "TRITON_ENABLE_TRACING=ON requires TRITON_ENABLE_STATS=ON")
 endif()
 
-if (TRITON_ENABLE_METRICS_CPU AND NOT TRITON_ENABLE_METRICS)
+if(TRITON_ENABLE_METRICS_CPU AND NOT TRITON_ENABLE_METRICS)
   message(FATAL_ERROR "TRITON_ENABLE_METRICS_CPU=ON requires TRITON_ENABLE_METRICS=ON")
 endif()
 
-if (TRITON_ENABLE_METRICS_GPU AND NOT TRITON_ENABLE_METRICS)
+if(TRITON_ENABLE_METRICS_GPU AND NOT TRITON_ENABLE_METRICS)
   message(FATAL_ERROR "TRITON_ENABLE_METRICS_GPU=ON requires TRITON_ENABLE_METRICS=ON")
 endif()
 
-if (TRITON_ENABLE_METRICS_GPU AND NOT TRITON_ENABLE_GPU)
+if(TRITON_ENABLE_METRICS_GPU AND NOT TRITON_ENABLE_GPU)
   message(FATAL_ERROR "TRITON_ENABLE_METRICS_GPU=ON requires TRITON_ENABLE_GPU=ON")
 endif()
 
@@ -108,80 +172,119 @@ if(TRITON_ENABLE_ASAN AND TRITON_ENABLE_GPU)
 endif()
 
 #
-# Dependencies
+# Internal Triton repos — prefer local checkouts, fall back to FetchContent.
+# Override source dirs via -DTRITON_*_SOURCE_DIR=<path>.
+# Override fetch tags via -DTRITON_*_REPO_TAG=<branch|tag|SHA>.
 #
+set(TRITON_COMMON_SOURCE_DIR  "${CMAKE_CURRENT_SOURCE_DIR}/../common"
+    CACHE PATH "Local checkout of triton-inference-server/common (empty = FetchContent)")
+set(TRITON_CORE_SOURCE_DIR    "${CMAKE_CURRENT_SOURCE_DIR}/../core"
+    CACHE PATH "Local checkout of triton-inference-server/core (empty = FetchContent)")
+set(TRITON_BACKEND_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../backend"
+    CACHE PATH "Local checkout of triton-inference-server/backend (empty = FetchContent)")
+
+set(TRITON_COMMON_REPO_TAG  "main" CACHE STRING "Git tag/branch for common when using FetchContent")
+set(TRITON_CORE_REPO_TAG    "main" CACHE STRING "Git tag/branch for core when using FetchContent")
+set(TRITON_BACKEND_REPO_TAG "main" CACHE STRING "Git tag/branch for backend when using FetchContent")
+
 include(FetchContent)
 
-FetchContent_Declare(
-  repo-core
-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/core.git
-  GIT_TAG ${TRITON_CORE_REPO_TAG}
-)
-FetchContent_Declare(
-  repo-third-party
-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/third_party.git
-  GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
-)
+macro(triton_add_internal_repo _name _src_dir _repo_url _repo_tag _subdir)
+  if(EXISTS "${${_src_dir}}/CMakeLists.txt")
+    message(STATUS "triton/${_name}: using local checkout at ${${_src_dir}}")
+    add_subdirectory(${${_src_dir}} ${_subdir})
+  else()
+    message(STATUS "triton/${_name}: local checkout not found — fetching ${${_repo_tag}} from ${_repo_url}")
+    FetchContent_Declare(
+      ${_name}
+      GIT_REPOSITORY ${_repo_url}
+      GIT_TAG        ${${_repo_tag}}
+      GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(${_name})
+  endif()
+endmacro()
 
-# Some libs are installed to ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib64 instead
-# of ${TRITON_THIRD_PARTY_INSTALL_PREFIX}/{LIB}/lib on Centos
-set(LIB_DIR "lib")
-if(LINUX)
-  file(STRINGS "/etc/os-release" DISTRO_ID_LIKE REGEX "ID_LIKE")
-  if(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
-    set (LIB_DIR "lib64")
-  endif(${DISTRO_ID_LIKE} MATCHES "rhel|centos")
-endif(LINUX)
 set(TRITON_CORE_HEADERS_ONLY OFF)
 
-FetchContent_MakeAvailable(repo-third-party repo-core)
-
 #
-# Triton server executable and examples
+# External C++ deps — resolved by Conan; conan_toolchain.cmake sets CMAKE_PREFIX_PATH.
+# These must be found BEFORE add_subdirectory(core) so that imported targets
+# (e.g. cnmem::cnmem) exist when core/src/CMakeLists.txt evaluates them.
 #
+find_package(re2 REQUIRED)
+find_package(Protobuf CONFIG REQUIRED)
+find_package(RapidJSON CONFIG REQUIRED)
+find_package(Boost REQUIRED)
 
-# Need to use ExternalProject for our builds so that we can get the
-# correct dependencies between Triton executable and the
-# ExternalProject dependencies (found in the third_party repo)
-include(ExternalProject)
-
-# If CMAKE_TOOLCHAIN_FILE is set, propagate that hint path to the external
-# projects.
-set(_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE "")
-if (CMAKE_TOOLCHAIN_FILE)
-  set(_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE "-DCMAKE_TOOLCHAIN_FILE:PATH=${CMAKE_TOOLCHAIN_FILE}")
+if(TRITON_ENABLE_GRPC)
+  find_package(gRPC CONFIG REQUIRED)
 endif()
 
-# If VCPKG_TARGET_TRIPLET is set, propagate that hint path to the external
-# projects.
-set(_CMAKE_ARGS_VCPKG_TARGET_TRIPLET "")
-if (VCPKG_TARGET_TRIPLET)
-  set(_CMAKE_ARGS_VCPKG_TARGET_TRIPLET "-DVCPKG_TARGET_TRIPLET:STRING=${VCPKG_TARGET_TRIPLET}")
+if(TRITON_ENABLE_HTTP OR TRITON_ENABLE_METRICS OR
+   TRITON_ENABLE_SAGEMAKER OR TRITON_ENABLE_VERTEX_AI)
+  find_package(Libevent CONFIG REQUIRED)
+  find_package(libevhtp CONFIG REQUIRED)
 endif()
 
-# If OPENSSL_ROOT_DIR is set, propagate that hint path to the external
-# projects with OpenSSL dependency.
-set(_CMAKE_ARGS_OPENSSL_ROOT_DIR "")
-if (OPENSSL_ROOT_DIR)
-  set(_CMAKE_ARGS_OPENSSL_ROOT_DIR "-DOPENSSL_ROOT_DIR:PATH=${OPENSSL_ROOT_DIR}")
+if(TRITON_ENABLE_METRICS)
+  find_package(prometheus-cpp CONFIG REQUIRED)
 endif()
 
-# Location where protobuf-config.cmake will be installed varies by
-# platform
-if (WIN32)
-  set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/cmake")
-else()
-  set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/${LIB_DIR}/cmake/protobuf")
+if(TRITON_ENABLE_TRACING)
+  find_package(opentelemetry-cpp CONFIG REQUIRED)
+  find_package(CURL CONFIG REQUIRED)
+  find_package(nlohmann_json CONFIG REQUIRED)
 endif()
 
-# Triton with Opentelemetry is not supported on Windows
-# FIXME: add location for Windows, when support is added
-# JIRA DLIS-4786
-if (WIN32)
-  set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "")
-else()
-  set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/opentelemetry-cpp/${LIB_DIR}/cmake/opentelemetry-cpp")
+if(TRITON_ENABLE_GCS)
+  find_package(google_cloud_cpp_storage CONFIG REQUIRED)
+  find_package(Crc32c CONFIG REQUIRED)
 endif()
+
+if(TRITON_ENABLE_S3)
+  find_package(AWSSDK CONFIG REQUIRED COMPONENTS s3)
+endif()
+
+if(TRITON_ENABLE_AZURE_STORAGE)
+  find_package(azure-storage-blobs-cpp CONFIG REQUIRED)
+endif()
+
+if(TRITON_ENABLE_GPU)
+  # Must be found before add_subdirectory(core): core/src/CMakeLists.txt uses
+  # if(TARGET cnmem::cnmem) to select the Conan-provided target vs the fallback.
+  find_package(cnmem CONFIG REQUIRED)
+  find_package(DCGM CONFIG REQUIRED)
+endif()
+
+# Enable protobuf and gRPC in common before adding it as a subdirectory so
+# that model_config.pb.h and proto targets are generated when core/src needs them.
+set(TRITON_COMMON_ENABLE_PROTOBUF ON CACHE BOOL "Enable protobuf in common" FORCE)
+if(TRITON_ENABLE_GRPC)
+  set(TRITON_COMMON_ENABLE_GRPC ON CACHE BOOL "Enable gRPC in common" FORCE)
+endif()
+set(TRITON_COMMON_ENABLE_JSON ON CACHE BOOL "Enable JSON in common" FORCE)
+
+triton_add_internal_repo(
+  triton-common TRITON_COMMON_SOURCE_DIR
+  "https://github.com/triton-inference-server/common.git"
+  TRITON_COMMON_REPO_TAG triton-common)
+
+triton_add_internal_repo(
+  triton-core TRITON_CORE_SOURCE_DIR
+  "https://github.com/triton-inference-server/core.git"
+  TRITON_CORE_REPO_TAG triton-core-top)
+
+triton_add_internal_repo(
+  triton-backend TRITON_BACKEND_SOURCE_DIR
+  "https://github.com/triton-inference-server/backend.git"
+  TRITON_BACKEND_REPO_TAG triton-backend)
+
+# Compatibility aliases for legacy FetchContent variable names still used by
+# tests in server/src/test/ (repo-core_SOURCE_DIR, etc.).
+set(repo-common_SOURCE_DIR "${TRITON_COMMON_SOURCE_DIR}"  CACHE INTERNAL "")
+set(repo-core_SOURCE_DIR   "${TRITON_CORE_SOURCE_DIR}"    CACHE INTERNAL "")
+set(repo-backend_SOURCE_DIR "${TRITON_BACKEND_SOURCE_DIR}" CACHE INTERNAL "")
 
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(TRITON_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/install)
@@ -189,81 +292,311 @@ else()
   set(TRITON_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
-set(TRITON_DEPENDS triton-core protobuf googletest re2)
-if(${TRITON_ENABLE_GCS})
-  set(TRITON_DEPENDS ${TRITON_DEPENDS} google-cloud-cpp)
-endif() # TRITON_ENABLE_GCS
-if(${TRITON_ENABLE_S3})
-  set(TRITON_DEPENDS ${TRITON_DEPENDS} aws-sdk-cpp)
-endif() # TRITON_ENABLE_S3
-if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
-  set(TRITON_DEPENDS ${TRITON_DEPENDS} libevent libevhtp)
-endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS || TRITON_ENABLE_SAGEMAKER || TRITON_ENABLE_VERTEX_AI
-if(${TRITON_ENABLE_GRPC})
-  set(TRITON_DEPENDS ${TRITON_DEPENDS} grpc)
-endif() # TRITON_ENABLE_GRPC
-if(NOT WIN32 AND ${TRITON_ENABLE_TRACING})
-  set(TRITON_DEPENDS ${TRITON_DEPENDS} opentelemetry-cpp)
-endif() # TRITON_ENABLE_TRACING
+#
+# Triton server executable
+#
+add_subdirectory(src)
 
-ExternalProject_Add(triton-server
-  PREFIX triton-server
-  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
-  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/triton-server"
-  CMAKE_CACHE_ARGS
-    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
-    ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
-    ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
-    ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
-    -DGTEST_ROOT:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/googletest
-    -DgRPC_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/grpc/lib/cmake/grpc
-    -Dc-ares_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/c-ares/${LIB_DIR}/cmake/c-ares
-    -Dre2_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/re2/${LIB_DIR}/cmake/re2
-    -Dabsl_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/absl/${LIB_DIR}/cmake/absl
-    -DCURL_DIR:STRING=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/curl/${LIB_DIR}/cmake/CURL
-    -Dnlohmann_json_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/nlohmann_json/share/cmake/nlohmann_json
-    -DLibevent_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevent/lib/cmake/libevent
-    -Dlibevhtp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevhtp/lib/cmake/libevhtp
-    -Dstorage_client_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/${LIB_DIR}/cmake/storage_client
-    -Dgoogle_cloud_cpp_common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/${LIB_DIR}/cmake/google_cloud_cpp_common
-    -DCrc32c_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/crc32c/${LIB_DIR}/cmake/Crc32c
-    -DAWSSDK_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/cmake/AWSSDK
-    -Daws-cpp-sdk-core_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/cmake/aws-cpp-sdk-core
-    -Daws-cpp-sdk-s3_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/cmake/aws-cpp-sdk-s3
-    -Daws-c-event-stream_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-event-stream/cmake
-    -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-c-common/cmake
-    -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/aws-checksums/cmake
-    -Dopentelemetry-cpp_DIR:PATH=${_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR}
-    -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION}
-    -DTRITON_IGPU_BUILD:BOOL=${TRITON_IGPU_BUILD}
-    -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG}
-    -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
-    -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
-    -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG}
-    -DTRITON_EXTRA_LIB_PATHS:PATH=${TRITON_EXTRA_LIB_PATHS}
-    -DTRITON_ENABLE_ASAN:BOOL=${TRITON_ENABLE_ASAN}
-    -DTRITON_ENABLE_NVTX:BOOL=${TRITON_ENABLE_NVTX}
-    -DTRITON_ENABLE_TRACING:BOOL=${TRITON_ENABLE_TRACING}
-    -DTRITON_ENABLE_LOGGING:BOOL=${TRITON_ENABLE_LOGGING}
-    -DTRITON_ENABLE_STATS:BOOL=${TRITON_ENABLE_STATS}
-    -DTRITON_ENABLE_GPU:BOOL=${TRITON_ENABLE_GPU}
-    -DTRITON_ENABLE_MALI_GPU:BOOL=${TRITON_ENABLE_MALI_GPU}
-    -DTRITON_ENABLE_HTTP:BOOL=${TRITON_ENABLE_HTTP}
-    -DTRITON_ENABLE_SAGEMAKER:BOOL=${TRITON_ENABLE_SAGEMAKER}
-    -DTRITON_ENABLE_VERTEX_AI:BOOL=${TRITON_ENABLE_VERTEX_AI}
-    -DTRITON_ENABLE_GRPC:BOOL=${TRITON_ENABLE_GRPC}
-    -DTRITON_MIN_COMPUTE_CAPABILITY:STRING=${TRITON_MIN_COMPUTE_CAPABILITY}
-    -DTRITON_ENABLE_METRICS:BOOL=${TRITON_ENABLE_METRICS}
-    -DTRITON_ENABLE_METRICS_GPU:BOOL=${TRITON_ENABLE_METRICS_GPU}
-    -DTRITON_ENABLE_METRICS_CPU:BOOL=${TRITON_ENABLE_METRICS_CPU}
-    -DTRITON_ENABLE_GCS:BOOL=${TRITON_ENABLE_GCS}
-    -DTRITON_ENABLE_AZURE_STORAGE:BOOL=${TRITON_ENABLE_AZURE_STORAGE}
-    -DTRITON_ENABLE_S3:BOOL=${TRITON_ENABLE_S3}
-    -DTRITON_ENABLE_TENSORRT:BOOL=${TRITON_ENABLE_TENSORRT}
-    -DTRITON_ENABLE_ENSEMBLE:BOOL=${TRITON_ENABLE_ENSEMBLE}
-    -DTRITON_MIN_CXX_STANDARD:STRING=${TRITON_MIN_CXX_STANDARD}
-    -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
-    -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
-    -DTRITON_VERSION:STRING=${TRITON_VERSION}
-  DEPENDS ${TRITON_DEPENDS}
+# ---------------------------------------------------------------------------
+# Backend implementations
+#
+# Each backend is included via add_subdirectory.  When enabled but no local
+# checkout is found, FetchContent downloads the repo automatically (requires
+# network access at configure time).
+#
+# Build a single backend:
+#   cmake --build --preset <preset> --target <name>-backend
+#
+# Build all enabled backends:
+#   cmake --build --preset <preset> --target backends
+#
+# Install all enabled backends (produces deployable backend packages):
+#   cmake --install build/<preset> --prefix /opt/tritonserver
+#
+# For standalone backend builds (without the full server), backends can link
+# against the triton::tritonserver_stub interface target which provides the
+# TRITONSERVER_* API headers without requiring libtritonserver.so at build time.
+# ---------------------------------------------------------------------------
+
+# Controls whether missing backend checkouts are fetched automatically.
+option(TRITON_FETCH_MISSING_BACKENDS
+  "Automatically fetch backends via FetchContent when local checkout is absent" ON)
+
+# All backends pass these flags into their sub-build so they skip their own
+# FetchContent fetches for common/core (already in scope from this build).
+set(_backend_passthrough
+  -DTRITON_SKIP_THIRD_PARTY_FETCH=ON
+  -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU}
 )
+
+# _triton_backend_label tracks which add_subdirectory labels were registered
+# so we can build the 'backends' aggregate target afterwards.
+set(_triton_backend_labels "")
+
+macro(triton_add_backend _opt _dir _repo_name _repo_tag_var _label)
+  if(${_opt})
+    if(EXISTS "${${_dir}}/CMakeLists.txt")
+      message(STATUS "triton/${_repo_name}: using local checkout at ${${_dir}}")
+      add_subdirectory("${${_dir}}" "${_label}")
+      list(APPEND _triton_backend_labels "${_label}")
+    elseif(EXISTS "${${_dir}}")
+      # Directory present but no CMakeLists.txt — Python-only backend.
+      # No CMake compilation step; deployment is via pip install / wheel.
+      message(STATUS "triton/${_repo_name}: Python-only backend at ${${_dir}} — no CMake build step")
+    elseif(TRITON_FETCH_MISSING_BACKENDS)
+      message(STATUS "triton/${_repo_name}: not found locally — fetching "
+              "https://github.com/triton-inference-server/${_repo_name}.git "
+              "@${${_repo_tag_var}}")
+      FetchContent_Declare(
+        ${_repo_name}
+        GIT_REPOSITORY "https://github.com/triton-inference-server/${_repo_name}.git"
+        GIT_TAG        "${${_repo_tag_var}}"
+        GIT_SHALLOW    TRUE
+        SOURCE_DIR     "${${_dir}}"
+      )
+      FetchContent_GetProperties(${_repo_name})
+      if(NOT ${_repo_name}_POPULATED)
+        FetchContent_Populate(${_repo_name})
+      endif()
+      if(EXISTS "${${_dir}}/CMakeLists.txt")
+        add_subdirectory("${${_dir}}" "${_label}")
+        list(APPEND _triton_backend_labels "${_label}")
+      else()
+        message(STATUS "triton/${_repo_name}: fetched — Python-only backend, no CMake build step")
+      endif()
+    else()
+      message(WARNING
+        "${_opt}=ON but '${${_dir}}' not found and "
+        "TRITON_FETCH_MISSING_BACKENDS=OFF — skipping ${_repo_name}")
+    endif()
+  endif()
+endmacro()
+
+triton_add_backend(TRITON_ENABLE_PYTHON_BACKEND      TRITON_PYTHON_BACKEND_SOURCE_DIR
+  python_backend      TRITON_PYTHON_BACKEND_REPO_TAG      python_backend)
+triton_add_backend(TRITON_ENABLE_ONNXRUNTIME_BACKEND TRITON_ONNXRUNTIME_BACKEND_SOURCE_DIR
+  onnxruntime_backend TRITON_ONNXRUNTIME_BACKEND_REPO_TAG onnxruntime_backend)
+triton_add_backend(TRITON_ENABLE_PYTORCH_BACKEND     TRITON_PYTORCH_BACKEND_SOURCE_DIR
+  pytorch_backend     TRITON_PYTORCH_BACKEND_REPO_TAG     pytorch_backend)
+triton_add_backend(TRITON_ENABLE_TENSORRT_BACKEND    TRITON_TENSORRT_BACKEND_SOURCE_DIR
+  tensorrt_backend    TRITON_TENSORRT_BACKEND_REPO_TAG    tensorrt_backend)
+triton_add_backend(TRITON_ENABLE_OPENVINO_BACKEND    TRITON_OPENVINO_BACKEND_SOURCE_DIR
+  openvino_backend    TRITON_OPENVINO_BACKEND_REPO_TAG    openvino_backend)
+triton_add_backend(TRITON_ENABLE_DALI_BACKEND        TRITON_DALI_BACKEND_SOURCE_DIR
+  dali_backend        TRITON_DALI_BACKEND_REPO_TAG        dali_backend)
+triton_add_backend(TRITON_ENABLE_FIL_BACKEND         TRITON_FIL_BACKEND_SOURCE_DIR
+  fil_backend         TRITON_FIL_BACKEND_REPO_TAG         fil_backend)
+triton_add_backend(TRITON_ENABLE_VLLM_BACKEND        TRITON_VLLM_BACKEND_SOURCE_DIR
+  vllm_backend        TRITON_VLLM_BACKEND_REPO_TAG        vllm_backend)
+triton_add_backend(TRITON_ENABLE_TENSORRTLLM_BACKEND TRITON_TENSORRTLLM_BACKEND_SOURCE_DIR
+  tensorrtllm_backend TRITON_TENSORRTLLM_BACKEND_REPO_TAG tensorrtllm_backend)
+triton_add_backend(TRITON_ENABLE_IDENTITY_BACKEND    TRITON_IDENTITY_BACKEND_SOURCE_DIR
+  identity_backend    TRITON_IDENTITY_BACKEND_REPO_TAG    identity_backend)
+triton_add_backend(TRITON_ENABLE_REPEAT_BACKEND      TRITON_REPEAT_BACKEND_SOURCE_DIR
+  repeat_backend      TRITON_REPEAT_BACKEND_REPO_TAG      repeat_backend)
+triton_add_backend(TRITON_ENABLE_SQUARE_BACKEND      TRITON_SQUARE_BACKEND_SOURCE_DIR
+  square_backend      TRITON_SQUARE_BACKEND_REPO_TAG      square_backend)
+
+# 'backends' aggregate target — builds all enabled backends via cmake --target backends.
+# Individual targets: cmake --build --preset <p> --target <name>-backend
+# (each backend's CMakeLists.txt is expected to define install() rules that place
+#  the backend .so under ${CMAKE_INSTALL_PREFIX}/backends/<name>/)
+add_custom_target(backends
+  COMMENT "Building all enabled backend implementations"
+)
+foreach(_bl ${_triton_backend_labels})
+  # Create a per-backend target alias: python-backend, onnxruntime-backend, etc.
+  # The label (e.g. "python_backend") maps to the add_subdirectory binary subdir;
+  # cmake --build with that subdir name builds all targets from that backend.
+  string(REPLACE "_" "-" _backend_target_name "${_bl}")
+  add_custom_target("${_backend_target_name}"
+    COMMAND ${CMAKE_COMMAND} --build "${CMAKE_BINARY_DIR}/${_bl}"
+                             --config $<CONFIG>
+    COMMENT "Building ${_bl}"
+    VERBATIM
+  )
+  add_dependencies(backends "${_backend_target_name}")
+endforeach()
+
+# ---------------------------------------------------------------------------
+# Triton plugins: repository agents and cache providers
+#
+# These are server-side extension plugins that are shipped alongside the server
+# but live in separate repositories.  Each can be built standalone from its own
+# checkout, or included here via the same local-checkout / FetchContent pattern.
+#
+# Build a single plugin:
+#   cmake --build --preset <preset> --target <name>
+#
+# Build all enabled plugins:
+#   cmake --build --preset <preset> --target plugins
+# ---------------------------------------------------------------------------
+
+option(TRITON_ENABLE_CHECKSUM_REPO_AGENT "Build checksum repository agent" OFF)
+option(TRITON_ENABLE_LOCAL_CACHE        "Build local response cache"       OFF)
+option(TRITON_ENABLE_REDIS_CACHE        "Build Redis response cache"       OFF)
+
+set(TRITON_CHECKSUM_REPO_AGENT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../checksum_repository_agent"
+    CACHE PATH "Local checkout of checksum_repository_agent repo")
+set(TRITON_LOCAL_CACHE_SOURCE_DIR         "${CMAKE_CURRENT_SOURCE_DIR}/../local_cache"
+    CACHE PATH "Local checkout of local_cache repo")
+set(TRITON_REDIS_CACHE_SOURCE_DIR         "${CMAKE_CURRENT_SOURCE_DIR}/../redis_cache"
+    CACHE PATH "Local checkout of redis_cache repo")
+
+set(TRITON_CHECKSUM_REPO_AGENT_REPO_TAG "main" CACHE STRING "Git ref for checksum_repository_agent FetchContent")
+set(TRITON_LOCAL_CACHE_REPO_TAG         "main" CACHE STRING "Git ref for local_cache FetchContent")
+set(TRITON_REDIS_CACHE_REPO_TAG         "main" CACHE STRING "Git ref for redis_cache FetchContent")
+
+set(_triton_plugin_labels "")
+
+macro(triton_add_plugin _opt _dir _repo_name _repo_tag_var _label)
+  if(${_opt})
+    if(EXISTS "${${_dir}}/CMakeLists.txt")
+      message(STATUS "triton/${_repo_name}: using local checkout at ${${_dir}}")
+      add_subdirectory("${${_dir}}" "${_label}")
+    elseif(TRITON_FETCH_MISSING_BACKENDS)
+      message(STATUS "triton/${_repo_name}: not found locally — fetching "
+              "https://github.com/triton-inference-server/${_repo_name}.git "
+              "@${${_repo_tag_var}}")
+      FetchContent_Declare(
+        ${_repo_name}
+        GIT_REPOSITORY "https://github.com/triton-inference-server/${_repo_name}.git"
+        GIT_TAG        "${${_repo_tag_var}}"
+        GIT_SHALLOW    TRUE
+        SOURCE_DIR     "${${_dir}}"
+      )
+      FetchContent_MakeAvailable(${_repo_name})
+    else()
+      message(WARNING
+        "${_opt}=ON but '${${_dir}}' not found and "
+        "TRITON_FETCH_MISSING_BACKENDS=OFF — skipping ${_repo_name}")
+    endif()
+    list(APPEND _triton_plugin_labels "${_label}")
+  endif()
+endmacro()
+
+triton_add_plugin(TRITON_ENABLE_CHECKSUM_REPO_AGENT TRITON_CHECKSUM_REPO_AGENT_SOURCE_DIR
+  checksum_repository_agent TRITON_CHECKSUM_REPO_AGENT_REPO_TAG checksum_repository_agent)
+triton_add_plugin(TRITON_ENABLE_LOCAL_CACHE TRITON_LOCAL_CACHE_SOURCE_DIR
+  local_cache TRITON_LOCAL_CACHE_REPO_TAG local_cache)
+triton_add_plugin(TRITON_ENABLE_REDIS_CACHE TRITON_REDIS_CACHE_SOURCE_DIR
+  redis_cache TRITON_REDIS_CACHE_REPO_TAG redis_cache)
+
+# 'plugins' aggregate target — builds all enabled repo agents and cache providers.
+add_custom_target(plugins
+  COMMENT "Building all enabled Triton plugin extensions"
+)
+foreach(_pl ${_triton_plugin_labels})
+  string(REPLACE "_" "-" _plugin_target_name "${_pl}")
+  add_custom_target("${_plugin_target_name}"
+    COMMAND ${CMAKE_COMMAND} --build "${CMAKE_BINARY_DIR}/${_pl}"
+                             --config $<CONFIG>
+    COMMENT "Building ${_pl}"
+    VERBATIM
+  )
+  add_dependencies(plugins "${_plugin_target_name}")
+endforeach()
+
+# ---------------------------------------------------------------------------
+# Client & perf_analyzer — optional; buildable without the server library.
+# When TRITON_SERVER_LIBRARY is empty/not found, downstream CMakeLists.txt
+# must link against the stub target (provided via core/include/):
+#   target_link_libraries(<target> PRIVATE triton::tritonserver_stub)
+# ---------------------------------------------------------------------------
+option(TRITON_ENABLE_CLIENT       "Build Triton client libraries"  OFF)
+option(TRITON_ENABLE_PERF_ANALYZER "Build perf_analyzer tool"      OFF)
+
+set(TRITON_CLIENT_SOURCE_DIR       "${CMAKE_CURRENT_SOURCE_DIR}/../client"
+    CACHE PATH "Local checkout of client repo")
+set(TRITON_PERF_ANALYZER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../perf_analyzer"
+    CACHE PATH "Local checkout of perf_analyzer repo")
+
+set(TRITON_CLIENT_REPO_TAG       "main" CACHE STRING "Git ref for client FetchContent fallback")
+set(TRITON_PERF_ANALYZER_REPO_TAG "main" CACHE STRING "Git ref for perf_analyzer FetchContent fallback")
+
+# Provide a header-only stub target so client/perf_analyzer can build
+# without libtritonserver.so present (they communicate via gRPC/HTTP only).
+if(TRITON_ENABLE_CLIENT OR TRITON_ENABLE_PERF_ANALYZER)
+  if(NOT TARGET triton::tritonserver_stub)
+    add_library(tritonserver_stub INTERFACE)
+    add_library(triton::tritonserver_stub ALIAS tritonserver_stub)
+    target_include_directories(tritonserver_stub INTERFACE
+      ${TRITON_CORE_SOURCE_DIR}/include)
+  endif()
+endif()
+
+if(TRITON_ENABLE_CLIENT)
+  triton_add_internal_repo(
+    triton-client TRITON_CLIENT_SOURCE_DIR
+    "https://github.com/triton-inference-server/client.git"
+    TRITON_CLIENT_REPO_TAG client)
+endif()
+
+if(TRITON_ENABLE_PERF_ANALYZER)
+  if(EXISTS "${TRITON_PERF_ANALYZER_SOURCE_DIR}/CMakeLists.txt")
+    message(STATUS "triton/perf_analyzer: using local checkout at ${TRITON_PERF_ANALYZER_SOURCE_DIR}")
+    add_subdirectory(${TRITON_PERF_ANALYZER_SOURCE_DIR} perf_analyzer)
+  else()
+    message(STATUS "triton/perf_analyzer: local checkout not found — fetching ${TRITON_PERF_ANALYZER_REPO_TAG}")
+    FetchContent_Declare(
+      triton-perf-analyzer
+      GIT_REPOSITORY "https://github.com/triton-inference-server/perf_analyzer.git"
+      GIT_TAG        ${TRITON_PERF_ANALYZER_REPO_TAG}
+      GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(triton-perf-analyzer)
+  endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# Python wheel targets (Req 29)
+# Built AFTER the main CMake compilation as an explicit additional step:
+#   cmake --build --preset <preset> --target wheels
+#
+# Individual wheel targets:
+#   tritonserver-wheel  — tritonserver Python SDK wheel (from core/python/)
+#   client-wheel        — tritonclient wheels (from client/)
+#   wheels              — convenience target that builds all wheels
+# ---------------------------------------------------------------------------
+find_package(Python3 QUIET COMPONENTS Interpreter)
+
+if(Python3_FOUND)
+  # Server Python SDK wheel (core/python/tritonserver package)
+  set(_server_py_dir "${CMAKE_CURRENT_SOURCE_DIR}/../core/python")
+  if(EXISTS "${_server_py_dir}/setup.py")
+    add_custom_target(tritonserver-wheel
+      COMMAND ${Python3_EXECUTABLE} -m pip wheel
+        --no-deps
+        --wheel-dir "${CMAKE_BINARY_DIR}/wheels"
+        "${_server_py_dir}"
+      COMMENT "Building tritonserver Python wheel"
+      VERBATIM
+    )
+  endif()
+
+  # Client wheels (tritonclient[grpc] + tritonclient[http])
+  set(_client_py_dir "${CMAKE_CURRENT_SOURCE_DIR}/../client")
+  if(EXISTS "${_client_py_dir}/setup.py" OR EXISTS "${_client_py_dir}/pyproject.toml")
+    add_custom_target(client-wheel
+      COMMAND ${Python3_EXECUTABLE} -m pip wheel
+        --no-deps
+        --wheel-dir "${CMAKE_BINARY_DIR}/wheels"
+        "${_client_py_dir}"
+      COMMENT "Building tritonclient Python wheels"
+      VERBATIM
+    )
+  endif()
+
+  # Convenience umbrella target
+  add_custom_target(wheels
+    COMMENT "Building all Python wheels into ${CMAKE_BINARY_DIR}/wheels/"
+  )
+  if(TARGET tritonserver-wheel)
+    add_dependencies(wheels tritonserver-wheel)
+  endif()
+  if(TARGET client-wheel)
+    add_dependencies(wheels client-wheel)
+  endif()
+else()
+  message(STATUS "Python3 not found — 'wheels' target will not be available")
+endif()

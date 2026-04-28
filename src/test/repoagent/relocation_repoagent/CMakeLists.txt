@@ -61,7 +61,7 @@ set_target_properties(
   POSITION_INDEPENDENT_CODE ON
   OUTPUT_NAME tritonrepoagent_relocation
   LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtritonrepoagent_relocation.ldscript
-  LINK_FLAGS "-Wl,--version-script libtritonrepoagent_relocation.ldscript"
+  LINK_FLAGS "-Wl,--version-script ${CMAKE_CURRENT_BINARY_DIR}/libtritonrepoagent_relocation.ldscript"
 )
 
 #

@@ -24,7 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.31.8)
+cmake_minimum_required(VERSION 3.31.8)
 
 project(tritonserverexe LANGUAGES C CXX)
 
@@ -33,38 +33,20 @@ include(GNUInstallDirs)
 #
 # Dependencies
 #
-# We must include the transitive closure of all repos so that we can
-# override the tag. The backend repo is needed for the tests.
+# Internal Triton repos are brought in via add_subdirectory in the parent
+# CMakeLists.txt (server/CMakeLists.txt). Their targets are already in scope.
 #
-include(FetchContent)
-
-FetchContent_Declare(
-  repo-common
-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/common.git
-  GIT_TAG ${TRITON_COMMON_REPO_TAG}
-)
-FetchContent_Declare(
-  repo-core
-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/core.git
-  GIT_TAG ${TRITON_CORE_REPO_TAG}
-)
-FetchContent_Declare(
-  repo-backend
-  GIT_REPOSITORY ${TRITON_REPO_ORGANIZATION}/backend.git
-  GIT_TAG ${TRITON_BACKEND_REPO_TAG}
-)
 
 if(TRITON_ENABLE_GRPC)
   set(TRITON_COMMON_ENABLE_PROTOBUF ON)
   set(TRITON_COMMON_ENABLE_GRPC ON)
 endif() # TRITON_ENABLE_GRPC
 
-FetchContent_MakeAvailable(repo-common repo-core repo-backend)
-
 # CUDA
 #
 if(${TRITON_ENABLE_GPU})
   find_package(CUDAToolkit REQUIRED)
+  set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
   message(STATUS "Using CUDA ${CUDA_VERSION}")
 endif() # TRITON_ENABLE_GPU
 
@@ -209,14 +191,7 @@ if(${TRITON_ENABLE_GPU})
   )
 endif() # TRITON_ENABLE_GPU
 
-if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
-    ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
-  target_include_directories(
-    main
-    PRIVATE
-      ${LIBEVENT_INCLUDE_DIRS}
-  )
-endif()
+  # Libevent include dirs come via the Conan-generated target's INTERFACE_INCLUDE_DIRECTORIES
 
 
 if(${TRITON_ENABLE_HTTP})
@@ -401,7 +376,9 @@ if(${TRITON_ENABLE_HTTP}
       triton-common-logging   # from repo-common
       triton-core-serverapi   # from repo-core
       triton-core-serverstub  # from repo-core
-      ${LIBEVENT_LIBRARIES}
+      libevent::core
+      libevent::extra
+      libevent::pthreads
       libevhtp::evhtp
       re2::re2
   )
@@ -654,6 +631,7 @@ if (NOT WIN32)
       triton-common-error             # from repo-common
       triton-core-serverapi           # from repo-core
       triton-core-serverstub          # from repo-core
+      rapidjson
     )
 
   if(${TRITON_ENABLE_GPU})
@@ -718,6 +696,7 @@ if (NOT WIN32)
       triton-common-error             # from repo-common
       triton-core-serverapi           # from repo-core
       triton-core-serverstub          # from repo-core
+      rapidjson
     )
 
   if(${TRITON_ENABLE_GPU})
@@ -789,6 +768,7 @@ if (NOT WIN32)
         triton-common-error             # from repo-common
         triton-core-serverapi           # from repo-core
         triton-core-serverstub          # from repo-core
+        rapidjson
         CUDA::cudart
       )
 

@@ -1,0 +1,62 @@
+{
+  "version": 6,
+  "vendor": {
+    "triton": {
+      "component": "TritonPerfAnalyzer",
+      "platform": "manylinux (RHEL/CentOS-compatible) x86_64",
+      "notes": [
+        "PerfAnalyzer is distributed as a standalone binary — manylinux ensures maximum",
+        "compatibility across Linux distributions (GLIBC 2.17+).",
+        "GPU mode (CUDA shared memory, GPU metrics) is enabled for benchmarking GPU models.",
+        "Run cmake from the perf_analyzer/ source directory."
+      ],
+      "conan_install": [
+        "conan install perf_analyzer/",
+        "  --profile:host=server/conan/profiles/linux-gcc13-release-manylinux",
+        "  --profile:build=server/conan/profiles/linux-gcc13-release",
+        "  -o '&:enable_gpu=True'",
+        "  -o '&:enable_grpc=True'",
+        "  -o '&:enable_http=True'",
+        "  --build=missing",
+        "  --output-folder=perf_analyzer/build/triton-perf-analyzer-release-manylinux-x86_64/conan",
+        "",
+        "cmake --preset triton-perf-analyzer-release-manylinux-x86_64",
+        "cmake --build --preset triton-perf-analyzer-release-manylinux-x86_64"
+      ]
+    }
+  },
+  "configurePresets": [
+    {
+      "name": "triton-perf-analyzer-release-manylinux-x86_64",
+      "displayName": "TritonPerfAnalyzer — Release, manylinux, x86_64",
+      "description": "PerfAnalyzer release build for manylinux-compatible Linux on x86_64.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "${sourceDir}/build/${presetName}/conan/generators/conan_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_BUILD_TYPE":                     "Release",
+        "TRITON_ENABLE_GPU":                    "ON",
+        "TRITON_ENABLE_CC_HTTP":                "ON",
+        "TRITON_ENABLE_CC_GRPC":                "ON",
+        "TRITON_ENABLE_PERF_ANALYZER_OPENAI":   "ON",
+        "TRITON_ENABLE_PERF_ANALYZER_TFS":      "ON",
+        "TRITON_ENABLE_PERF_ANALYZER_TS":       "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "triton-perf-analyzer-release-manylinux-x86_64",
+      "configurePreset": "triton-perf-analyzer-release-manylinux-x86_64",
+      "jobs": 8
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "triton-perf-analyzer-release-manylinux-x86_64",
+      "configurePreset": "triton-perf-analyzer-release-manylinux-x86_64",
+      "filter": { "exclude": { "label": "requires-gpu" } }
+    }
+  ]
+}

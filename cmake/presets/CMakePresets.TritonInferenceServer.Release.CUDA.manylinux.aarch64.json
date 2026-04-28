@@ -1,0 +1,68 @@
+{
+  "version": 6,
+  "vendor": {
+    "triton": {
+      "component": "TritonInferenceServer",
+      "platform": "manylinux (RHEL/CentOS-compatible) aarch64 with NVIDIA GPU (CUDA)",
+      "notes": [
+        "manylinux builds target GLIBC 2.17+ compatibility.",
+        "aarch64 CUDA targets: Jetson Orin (SM 8.7) and Grace Hopper (SM 9.0).",
+        "SageMaker and Vertex AI endpoints are disabled."
+      ],
+      "conan_install": [
+        "conan install server/",
+        "  --profile:host=server/conan/profiles/linux-gcc13-release-manylinux-aarch64",
+        "  --profile:build=server/conan/profiles/linux-gcc13-release",
+        "  -o '&:enable_gpu=True'",
+        "  -o '&:enable_grpc=True'",
+        "  -o '&:enable_http=True'",
+        "  -o '&:enable_metrics=True'",
+        "  --build=missing",
+        "  --output-folder=server/build/triton-inference-server-release-cuda-manylinux-aarch64/conan",
+        "",
+        "cmake --preset triton-inference-server-release-cuda-manylinux-aarch64",
+        "cmake --build --preset triton-inference-server-release-cuda-manylinux-aarch64"
+      ]
+    }
+  },
+  "configurePresets": [
+    {
+      "name": "triton-inference-server-release-cuda-manylinux-aarch64",
+      "displayName": "TritonInferenceServer — Release, CUDA, manylinux, aarch64",
+      "description": "GPU-enabled release build for RHEL-compatible Linux on aarch64 (Orin, Grace Hopper).",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "${sourceDir}/build/${presetName}/conan/generators/conan_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_BUILD_TYPE":              "Release",
+        "TRITON_ENABLE_GPU":             "ON",
+        "TRITON_ENABLE_HTTP":            "ON",
+        "TRITON_ENABLE_GRPC":            "ON",
+        "TRITON_ENABLE_METRICS":         "ON",
+        "TRITON_ENABLE_METRICS_GPU":     "ON",
+        "TRITON_ENABLE_METRICS_CPU":     "ON",
+        "TRITON_ENABLE_ENSEMBLE":        "ON",
+        "TRITON_ENABLE_SAGEMAKER":       "OFF",
+        "TRITON_ENABLE_VERTEX_AI":       "OFF",
+        "TRITON_MIN_COMPUTE_CAPABILITY": "8.7",
+        "CMAKE_CUDA_ARCHITECTURES":      "87;90",
+        "CMAKE_CUDA_RUNTIME_LIBRARY":    "Shared"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "triton-inference-server-release-cuda-manylinux-aarch64",
+      "configurePreset": "triton-inference-server-release-cuda-manylinux-aarch64",
+      "jobs": 8
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "triton-inference-server-release-cuda-manylinux-aarch64",
+      "configurePreset": "triton-inference-server-release-cuda-manylinux-aarch64",
+      "filter": { "exclude": { "label": "requires-gpu" } }
+    }
+  ]
+}

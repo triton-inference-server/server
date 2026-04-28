@@ -1,0 +1,20 @@
+# Python runtime dependencies for Triton Inference Server
+#
+# TensorRT-LLM is installed as a pre-built wheel — NOT built from source.
+# The wheel provides both the Python bindings and the required C++ shared
+# libraries (libtensorrt_llm.so, libnvinfer_plugin_tensorrt_llm.so, etc.).
+#
+--extra-index-url https://pypi.nvidia.com
+
+# TensorRT-LLM runtime (wheel replaces the TensorRT-LLM/ source clone)
+tensorrt-llm==1.2.0
+
+# OpenAI-compatible HTTP frontend
+fastapi==0.121.2
+httpx==0.27.2
+openai>=1.107.3
+starlette>=0.49.1
+partial-json-parser
+
+# Utilities
+scipy>=1.11.0
