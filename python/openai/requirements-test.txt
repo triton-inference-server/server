@@ -25,5 +25,5 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Testing
-pytest==8.1.1
+pytest==9.0.3
 pytest-asyncio==0.23.8
