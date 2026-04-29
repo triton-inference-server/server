@@ -1512,6 +1512,8 @@ LABEL com.nvidia.build.ref={}
 """.format(
         argmap["NVIDIA_BUILD_ID"], argmap["NVIDIA_BUILD_ID"], argmap["NVIDIA_BUILD_REF"]
     )
+    if argmap.get("CI_PIPELINE_ID"):
+        df += "ENV CI_PIPELINE_ID {}\n".format(argmap["CI_PIPELINE_ID"])
     return df
 
 
@@ -1645,6 +1647,8 @@ LABEL com.nvidia.build.ref={}
 """.format(
         argmap["NVIDIA_BUILD_ID"], argmap["NVIDIA_BUILD_ID"], argmap["NVIDIA_BUILD_REF"]
     )
+    if argmap.get("CI_PIPELINE_ID"):
+        df += "ENV CI_PIPELINE_ID {}\n".format(argmap["CI_PIPELINE_ID"])
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -1678,6 +1682,7 @@ def create_build_dockerfiles(
     dockerfileargmap = {
         "NVIDIA_BUILD_REF": "" if FLAGS.build_sha is None else FLAGS.build_sha,
         "NVIDIA_BUILD_ID": "<unknown>" if FLAGS.build_id is None else FLAGS.build_id,
+        "CI_PIPELINE_ID": os.environ.get("CI_PIPELINE_ID", ""),
         "TRITON_VERSION": FLAGS.version,
         "TRITON_CONTAINER_VERSION": FLAGS.container_version,
         "BASE_IMAGE": base_image,
