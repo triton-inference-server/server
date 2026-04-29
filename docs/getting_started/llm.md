@@ -282,7 +282,7 @@ The above needs to be done manually with your favorite editor. Once finished, pl
     -v $(pwd)/all_models:/opt/all_models \
     -v $(pwd)/scripts:/opt/scripts \
     -v $(pwd)/Phi-3-mini-4k-instruct:/opt/Phi-3-mini-4k-instruct \
-    nvcr.io/nvidia/tritonserver:26.03-trtllm-python-py3
+    nvcr.io/nvidia/tritonserver:26.04-trtllm-python-py3
 
     # Launch Server
     python3 ../scripts/launch_triton_server.py --model_repo ../all_models/inflight_batcher_llm --world_size 1
@@ -308,7 +308,7 @@ The above needs to be done manually with your favorite editor. Once finished, pl
 
 <!---->
 
-    export RELEASE="26.03"
+    export RELEASE="26.04"
     docker run -it --net=host --gpus '"device=0"'  nvcr.io/nvidia/tritonserver:${RELEASE}-py3-sdk
 
 17. ## Download the Phi-3 tokenizer
