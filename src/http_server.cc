@@ -1,4 +1,4 @@
-// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -478,12 +478,17 @@ ReadDataFromJsonHelper(
     triton::common::TritonJson::Value& tensor_data, int* counter,
     int64_t expected_cnt, int current_depth = 0)
 {
+  if (!base) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "Failed to parse 'data' field: output buffer unavailable");
+  }
   // FIXME should move 'switch' statement outside the recursive function and
   // pass in a read data callback once data type is confirmed.
   // Currently 'switch' is performed on each element even through all elements
   // have the same data type.
 
-  if (current_depth >= HTTP_MAX_JSON_NESTING_DEPTH) {
+  if (current_depth >= HTTP_MAX_JSON_NESTING_DEPTH || current_depth < 0) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         ("JSON nesting depth exceeds maximum allowed "
@@ -501,8 +506,12 @@ ReadDataFromJsonHelper(
           base, dtype, el, counter, expected_cnt, current_depth + 1));
     }
   } else {
+    if (!counter) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL, "Invalid counter provided");
+    }
     // Check if writing to 'serialized' is overrunning the expected byte_size
-    if (*counter >= expected_cnt) {
+    if (*counter < 0 || static_cast<int64_t>(*counter) >= expected_cnt) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
           "Shape does not match true shape of 'data' field");
@@ -603,20 +612,22 @@ ReadDataFromJsonHelper(
         break;
       }
       case TRITONSERVER_TYPE_BYTES: {
-        const char* cstr;
-        size_t len = 0;
+        const char* cstr{nullptr};
+        size_t len{0};
         RETURN_IF_ERR(tensor_data.AsString(&cstr, &len));
-        // Quick sanity check to ensure we don't write beyond `expected_cnt`.
-        int32_t actual_cnt = *counter + len + sizeof(uint32_t);
-        if (actual_cnt < 0) {
+        if (len > INT64_MAX) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
-              "Unable to parse 'data' field: string length is negative");
+              "Tensor size is too large to be processed");
         }
-        if (static_cast<int64_t>(actual_cnt) > expected_cnt) {
+        // Quick sanity check to ensure we don't write beyond `expected_cnt`.
+        int64_t actual_cnt = static_cast<int64_t>(*counter) +
+                             static_cast<int64_t>(len) +
+                             static_cast<int64_t>(sizeof(uint32_t));
+        if (actual_cnt < 0 || actual_cnt > expected_cnt) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
-              "Shape does not match true shape of 'data' field");
+              "shape does not match true shape of 'data' field");
         }
         memcpy(
             base + *counter, reinterpret_cast<char*>(&len), sizeof(uint32_t));
@@ -666,6 +677,11 @@ ReadDataFromJson(
               .c_str());
 
     default:
+      if (!base) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INTERNAL,
+            "Failed to parse 'data' field: output buffer unavailable");
+      }
       RETURN_MSG_IF_ERR(
           ReadDataFromJsonHelper(
               base, dtype, tensor_data, &counter, expected_cnt),
@@ -677,8 +693,7 @@ ReadDataFromJson(
   if (counter != expected_cnt) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
-        "Unable to parse 'data': Shape does not match true shape of 'data' "
-        "field");
+        "Failed to parse 'data' field: shape does not match true shape");
   }
 
   return nullptr;
@@ -693,7 +708,8 @@ WriteDataToJsonCheck(
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
         std::string(
-            "output tensor shape does not match size of output for '" +
+            "Failed to write 'data' field: output tensor shape does not match "
+            "size of output for '" +
             output_name + "'")
             .c_str());
   }
@@ -714,7 +730,8 @@ WriteDataToJson(
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INTERNAL,
             std::string(
-                "output tensor shape does not match size of output for '" +
+                "Failed to write 'data' field: output tensor shape does not "
+                "match size of output for '" +
                 output_name + "'")
                 .c_str());
       }
@@ -1091,7 +1108,12 @@ CompressionTypeUsed(const std::string accept_encoding)
       try {
         type_weight = std::stod(encoding.substr(weight_pos + 3));
       }
+      catch (const std::out_of_range& oor) {
+        type_weight = 0;
+        continue;
+      }
       catch (const std::invalid_argument& ia) {
+        type_weight = 0;
         continue;
       }
     }
@@ -1391,7 +1413,13 @@ HTTPAPIServer::HandleRepositoryIndex(
   if (buffer_len > 0) {
     triton::common::TritonJson::Value ready_json;
     if (index_request.Find("ready", &ready_json)) {
-      err = ready_json.AsBool(&ready);
+      if (!ready_json.IsBool()) {
+        err = TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "Invalid value for 'ready': expected a boolean");
+      } else {
+        err = ready_json.AsBool(&ready);
+      }
     }
   }
 
@@ -2182,7 +2210,10 @@ HTTPAPIServer::HandleSystemSharedMemory(
       }
     }
   } else if (action == "register") {
-    if (region_name.empty()) {
+    if (!shm_manager_->AllowClientSharedMemory()) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
+    } else if (region_name.empty()) {
       err = TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           "'region name' is necessary to register system shared memory region");
@@ -2229,7 +2260,10 @@ HTTPAPIServer::HandleSystemSharedMemory(
       }
     }
   } else if (action == "unregister") {
-    if (region_name.empty()) {
+    if (!shm_manager_->AllowClientSharedMemory()) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
+    } else if (region_name.empty()) {
       err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_CPU);
     } else {
       err = shm_manager_->Unregister(region_name, TRITONSERVER_MEMORY_CPU);
@@ -2271,7 +2305,10 @@ HTTPAPIServer::HandleCudaSharedMemory(
       }
     }
   } else if (action == "register") {
-    if (region_name.empty()) {
+    if (!shm_manager_->AllowClientSharedMemory()) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
+    } else if (region_name.empty()) {
       err = TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           "'region name' is necessary to register cuda shared memory region");
@@ -2333,7 +2370,10 @@ HTTPAPIServer::HandleCudaSharedMemory(
 #endif  // TRITON_ENABLE_GPU
     }
   } else if (action == "unregister") {
-    if (region_name.empty()) {
+    if (!shm_manager_->AllowClientSharedMemory()) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
+    } else if (region_name.empty()) {
       err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_GPU);
     } else {
       err = shm_manager_->Unregister(region_name, TRITONSERVER_MEMORY_GPU);
@@ -3079,8 +3119,8 @@ HTTPAPIServer::EVBufferToJson(
   if (length > max_input_size_) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
-        ("Request JSON size of " + std::to_string(length) +
-         " bytes exceeds the maximum allowed value of " +
+        ("request JSON size of " + std::to_string(length) +
+         " bytes exceeds the maximum allowed input size of " +
          std::to_string(max_input_size_) +
          " bytes. Use --http-max-input-size to increase the limit.")
             .c_str());
@@ -3354,12 +3394,12 @@ HTTPAPIServer::HandleGenerate(
         server_.get(), req, GetResponseCompressionType(req),
         generate_stream_request_schema_.get(),
         generate_stream_response_schema_.get(), streaming, irequest_shared,
-        shm_manager_));
+        shm_manager_, max_input_size_));
   } else {
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_request_schema_.get(), generate_response_schema_.get(),
-        streaming, irequest_shared, shm_manager_));
+        streaming, irequest_shared, shm_manager_, max_input_size_));
   }
   generate_request->trace_ = trace;
 
@@ -3506,13 +3546,16 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
   std::vector<std::string> members;
   RETURN_IF_ERR(generate_request.Members(&members));
 
+  size_t consumed_input_size{0};
+
   for (const auto& m : members) {
     auto it = schema->children_.find(m);
     if (it != schema->children_.end()) {
       switch (it->second->kind_) {
         case MappingSchema::Kind::EXACT_MAPPING: {
           // Read meta data
-          RETURN_IF_ERR(ExactMappingInput(m, generate_request, input_metadata));
+          RETURN_IF_ERR(ExactMappingInput(
+              m, generate_request, input_metadata, consumed_input_size));
           break;
         }
         case MappingSchema::Kind::MAPPING_SCHEMA: {
@@ -3542,7 +3585,8 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
       }
     } else if (schema->allow_unspecified_) {
       // Unspecified key follows EXACT_MAPPING
-      RETURN_IF_ERR(ExactMappingInput(m, generate_request, input_metadata));
+      RETURN_IF_ERR(ExactMappingInput(
+          m, generate_request, input_metadata, consumed_input_size));
     } else {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNSUPPORTED,
@@ -3556,7 +3600,8 @@ TRITONSERVER_Error*
 HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
     const std::string& name,
     triton::common::TritonJson::Value& generate_request,
-    std::map<std::string, triton::common::TritonJson::Value>& input_metadata)
+    std::map<std::string, triton::common::TritonJson::Value>& input_metadata,
+    size_t& consumed_input_byte_size)
 {
   auto it = input_metadata.find(name);
   if (it == input_metadata.end()) {
@@ -3580,14 +3625,58 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
               .c_str());
     }
 
+    size_t byte_size{0};
     size_t element_cnt = tensor_data.IsArray() ? tensor_data.ArraySize() : 1;
 
-    size_t byte_size = 0;
     if (dtype == TRITONSERVER_TYPE_BYTES) {
       RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
     } else {
-      byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
+      size_t element_size = TRITONSERVER_DataTypeByteSize(dtype);
+      if (element_size == 0) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("input '") + name + "' has unsupported datatype " +
+             value)
+                .c_str());
+      }
+
+      // Ensure that we do not have an integer overflow when calculating
+      // byte_size = element_cnt * element_size.
+      if (element_cnt > (SIZE_MAX / element_size)) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("input '") + name +
+             "' has too many elements of datatype " + value)
+                .c_str());
+      }
+
+      byte_size = element_cnt * element_size;
     }
+
+    // For zero-size input, we can skip the rest of the validation and just add
+    // it as an empty input.
+    if (byte_size == 0) {
+      RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(
+          triton_request_.get(), name.c_str(), dtype, nullptr, 0));
+      return nullptr;
+    }
+
+    // Ensure that the resulting array size in bytes does not exceed the maximum
+    // allowed input size.
+    if (byte_size + consumed_input_byte_size > max_input_size_ ||
+        byte_size + consumed_input_byte_size < consumed_input_byte_size) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          (std::string("request size of ") +
+           std::to_string(consumed_input_byte_size) + " bytes with input '" +
+           name + "' of size " + std::to_string(byte_size) +
+           " bytes exceeds the maximum allowed input size of " +
+           std::to_string(max_input_size_) +
+           ". Use --http-max-input-size to increase the limit.")
+              .c_str());
+    }
+
+    consumed_input_byte_size += byte_size;
 
     std::vector<int64_t> shape_vec;
     {
@@ -3600,11 +3689,13 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
              name)
                 .c_str());
       }
+
       for (size_t i = 0; i < value.ArraySize(); ++i) {
         int64_t d = 0;
         RETURN_IF_ERR(value.IndexAsInt(i, &d));
         shape_vec.push_back(d);
       }
+
       // Because generate request don't carry too much shape information, using
       // a two-pass process to pad the request value to match input shape.
       // 1. iterate shape for fixed dimension to distribute 'element_cnt'.
@@ -3622,12 +3713,14 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
           element_cnt /= *rit;
         }
       }
+
       for (auto rit = shape_vec.rbegin(); rit != shape_vec.rend(); ++rit) {
         if (*rit == -1) {
           *rit = element_cnt;
           element_cnt = 1;
         }
       }
+
       if (element_cnt != 1) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
@@ -3642,10 +3735,10 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
     serialized_data_.emplace_back();
     std::vector<char>& serialized = serialized_data_.back();
     serialized.resize(byte_size);
+
     RETURN_IF_ERR(ReadDataFromJson(
         name.c_str(), tensor_data, &serialized[0], dtype,
         dtype == TRITONSERVER_TYPE_BYTES ? byte_size : element_cnt));
-
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(
         triton_request_.get(), name.c_str(), dtype, &shape_vec[0],
         shape_vec.size()));

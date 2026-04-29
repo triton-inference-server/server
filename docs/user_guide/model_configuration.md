@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -87,7 +87,7 @@ The default is false, which means the model will generate exactly one response f
 ### Maximum Batch Size
 
 The *max_batch_size* property indicates the maximum batch size that the model supports for the [types of batching](architecture.md#models-and-schedulers) that can be exploited by Triton.
-If the model's batch dimension is the first dimension, and all inputs and outputs to the model have this batch dimension, then Triton can use its [dynamic batcher](#dynamic-batcher) or [sequence batcher](#sequence-batcher) to automatically use batching with the model.
+If the model's batch dimension is the first dimension, and all inputs and outputs to the model have this batch dimension, then Triton can use its [dynamic batcher](batcher.md#dynamic-batcher) or [sequence batcher](batcher.md#sequence-batcher) to automatically use batching with the model.
 In this case *max_batch_size* should be set to a value greater-or-equal-to 1 that indicates the maximum batch size that Triton should use with the model.
 
 For models that do not support batching, or do not support batching in the specific ways described above, *max_batch_size* must be set to zero.
@@ -194,7 +194,7 @@ The [*reshape* property](#reshape) must be used if there is a mismatch between t
 Similarly, the *reshape* property must be used if there is a mismatch between the output shape produced by the model and the shape that Triton returns in a response to an inference request.
 
 Model inputs can specify `allow_ragged_batch` to indicate that the input is a [ragged input](ragged_batching.md#ragged-batching).
-The field is used with [dynamic batcher](#dynamic-batcher) to allow batching without enforcing the input to have the same shape in all requests.
+The field is used with [dynamic batcher](model_configuration.md#default-max-batch-size-and-dynamic-batcher) to allow batching without enforcing the input to have the same shape in all requests.
 
 ## Auto-Generated Model Configuration
 
@@ -212,7 +212,7 @@ All other model types *must* provide a model configuration file.
 
 When developing a custom backend, you can populate required settings in the configuration and call `TRITONBACKEND_ModelSetConfig` API to update completed configuration with Triton core.
 You can take a look at [Onnxruntime](https://github.com/triton-inference-server/onnxruntime_backend) backends as examples of how to achieve this.
-Currently, only [inputs, outputs](#inputs-and-outputs), [max_batch_size](#maximum-batch-size) and [dynamic batching](#dynamic-batcher) settings can be populated by backend.
+Currently, only [inputs, outputs](#inputs-and-outputs), [max_batch_size](#maximum-batch-size) and [dynamic batching](model_configuration.md#default-max-batch-size-and-dynamic-batcher) settings can be populated by backend.
 For custom backends, your config.pbtxt file must include a `backend` field or your model name must be in the form `<model_name>.<backend_name>`.
 
 You can also see the model configuration generated for a model by Triton using the [model configuration endpoint](../protocol/extension_model_configuration.md).
@@ -312,9 +312,9 @@ Currently, the following backends which utilize these default batch values and t
 2. [TensorRT backend](https://github.com/triton-inference-server/tensorrt_backend)
 
    1. TensorRT models store the maximum batch size explicitly and do not make use of the default-max-batch-size parameter.
-      However, if max_batch_size > 1 and no [scheduler](model_configuration.md#scheduling-and-batching) is provided, the dynamic batch scheduler will be enabled.
+      However, if max_batch_size > 1 and no scheduler is provided, the dynamic batch scheduler will be enabled.
 
-If a value greater than 1 for the maximum batch size is set for the model, the [dynamic_batching](#dynamic-batcher) config will be set if no scheduler is provided in the configuration file.
+If a value greater than 1 for the maximum batch size is set for the model, the [dynamic_batching](batcher.md#dynamic-batcher) config will be set if no scheduler is provided in the configuration file.
 
 
 ## Datatypes

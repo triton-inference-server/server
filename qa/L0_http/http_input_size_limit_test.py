@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@ import sys
 
 sys.path.append("../common")
 
+import base64
 import gzip
 import io
 import json
@@ -41,6 +42,9 @@ import test_util as tu
 # Constants for size calculations
 # Each FP32 value is 4 bytes, so we need to divide target byte sizes by 4 to get element counts
 BYTES_PER_FP32 = 4
+BYTES_PER_INT64 = (
+    8  # For the type size explosion test, we use int64 which is 8 bytes per element
+)
 MB = 2**20  # 1 MB = 1,048,576 bytes
 GB = 2**30  # 1 GB = 1,073,741,824 bytes
 DEFAULT_LIMIT_BYTES = 64 * MB  # 64MB default limit
@@ -58,7 +62,120 @@ OFFSET_ELEMENTS = 32
 
 class InferSizeLimitTest(tu.TestResultCollector):
     def _get_infer_url(self, model_name):
-        return "http://localhost:8000/v2/models/{}/infer".format(model_name)
+        return f"http://localhost:8000/v2/models/{model_name}/infer"
+
+    def test_json_dtype_size_expansion_exceeds_limit_error(self):
+        """
+        Test that when the client sends a JSON input of byte[], that when it
+        expands to dtype[], it exceeds the maximum allowed input size and
+        returns an appropriate error message. The test sends a large base64
+        encoded string as input, which simulates a byte[] input that would
+        expand to a much larger dtype[] input on the server side when
+        `sizeof(dtype) > 1`.
+        The test checks that the error message indicates that the input size
+        exceeds the limit.
+        This is important to prevent clients from sending inputs that could
+        cause excessive memory usage on the server.
+        """
+        model = "onnx_zero_1_float32"
+
+        # Provided data is 64MB of int8, but the model expects FP32,
+        # which would expand to 256MB when interpreted as FP32.
+        bytes_input = np.ones(DEFAULT_LIMIT_BYTES, dtype=np.int8)
+        input_bytes = bytes_input.tobytes()
+        data_str = base64.b64encode(input_bytes).decode("utf-8")
+        headers = {
+            "Content-Type": "application/json",
+            "Inference-Header-Content-Length": f"{len(input_bytes)}",
+        }
+        shape_size = (
+            DEFAULT_LIMIT_ELEMENTS // BYTES_PER_INT64
+        )  # Calculate shape size based on int64 element count to match the byte size
+
+        payload = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "datatype": "INT64",
+                    "shape": [1, shape_size],
+                    "data": data_str,
+                }
+            ]
+        }
+
+        response = requests.post(
+            f"http://localhost:8000/v2/models/{model}/generate",
+            headers=headers,
+            json=payload,
+        )
+
+        self.assertEqual(
+            400,
+            response.status_code,
+            f"Expected error code for type/size mismatch, got: {response.status_code}",
+        )
+        error_msg = response.content.decode()
+        print(
+            f"Error message: {error_msg}", flush=True
+        )  # Print the error message for debugging
+        self.assertIn(
+            "request JSON size of ",
+            error_msg,
+        )
+        self.assertIn(
+            " bytes exceeds the maximum allowed input size of ",
+            error_msg,
+        )
+        self.assertIn(
+            "Use --http-max-input-size to increase the limit.",
+            error_msg,
+        )
+
+        # Test multiple inputs with one that causes size explosion.
+        payload = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "datatype": "INT64",
+                    "shape": [1, shape_size // 2],
+                    "data": data_str[: len(data_str) // 2],
+                },
+                {
+                    "name": "INPUT1",
+                    "datatype": "INT64",
+                    "shape": [1, shape_size // 2],
+                    "data": data_str[len(data_str) // 2 :],
+                },
+            ]
+        }
+
+        response = requests.post(
+            f"http://localhost:8000/v2/models/{model}/generate",
+            headers=headers,
+            json=payload,
+        )
+
+        self.assertEqual(
+            400,
+            response.status_code,
+            f"Expected error code for type/size mismatch, got: {response.status_code}",
+        )
+        error_msg = response.content.decode()
+        print(
+            f"Error message: {error_msg}", flush=True
+        )  # Print the error message for debugging
+        self.assertIn(
+            "request JSON size of ",
+            error_msg,
+        )
+        self.assertIn(
+            " bytes exceeds the maximum allowed input size of ",
+            error_msg,
+        )
+        self.assertIn(
+            "Use --http-max-input-size to increase the limit.",
+            error_msg,
+        )
 
     def test_default_limit_raw_binary(self):
         """Test raw binary inputs with default limit"""
@@ -165,9 +282,16 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message contains size limit info
         error_msg = response.content.decode()
         self.assertIn(
-            "exceeds the maximum allowed value",
+            "request JSON size of ",
             error_msg,
-            "Expected error message about exceeding max input size",
+        )
+        self.assertIn(
+            " bytes exceeds the maximum allowed input size of ",
+            error_msg,
+        )
+        self.assertIn(
+            "Use --http-max-input-size to increase the limit.",
+            error_msg,
         )
 
         # Test case 2: Input just under the 64MB limit (should succeed)
@@ -320,9 +444,16 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message contains size limit info
         error_msg = response.content.decode()
         self.assertIn(
-            "exceeds the maximum allowed value",
+            "request JSON size of ",
             error_msg,
-            "Expected error message about exceeding max input size",
+        )
+        self.assertIn(
+            " bytes exceeds the maximum allowed input size of ",
+            error_msg,
+        )
+        self.assertIn(
+            "Use --http-max-input-size to increase the limit.",
+            error_msg,
         )
 
         # Test case 2: Input just under the 128MB configured limit (should succeed)
@@ -405,15 +536,15 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message
         error_msg = response.content.decode()
         self.assertIn(
-            "Request JSON size",
+            "request JSON size of ",
             error_msg,
         )
         self.assertIn(
-            "exceeds the maximum allowed value",
+            " bytes exceeds the maximum allowed input size of ",
             error_msg,
         )
         self.assertIn(
-            "Use --http-max-input-size to increase the limit",
+            "Use --http-max-input-size to increase the limit.",
             error_msg,
         )
 

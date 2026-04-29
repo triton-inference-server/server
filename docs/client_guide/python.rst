@@ -1,5 +1,5 @@
 ..
-.. Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+.. Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 ..
 .. Redistribution and use in source and binary forms, with or without
 .. modification, are permitted provided that the following conditions
@@ -29,11 +29,10 @@
 Python
 ####
 
-.. include:: python_readme.rst
-
 .. toctree::
    :maxdepth: 1
    :hidden:
 
+   Overview <../tutorials/Triton_Inference_Server_Python_API/README.md>
    Kafka I/O <../tutorials/Triton_Inference_Server_Python_API/examples/kafka-io/README.md>
    Rayserve <../tutorials/Triton_Inference_Server_Python_API/examples/rayserve/README.md>

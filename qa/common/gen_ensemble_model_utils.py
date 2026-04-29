@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -761,7 +761,7 @@ def create_ensemble_modelfile(
 
         try:
             os.makedirs(model_version_dir)
-        except OSError as ex:
+        except OSError:
             pass  # ignore existing dir
 
 
@@ -834,7 +834,7 @@ def create_ensemble_modelconfig(
 
         try:
             os.makedirs(config_dir)
-        except OSError as ex:
+        except OSError:
             pass  # ignore existing dir
 
         with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -867,7 +867,7 @@ def create_identity_ensemble_modelfile(
 
         try:
             os.makedirs(model_version_dir)
-        except OSError as ex:
+        except OSError:
             pass  # ignore existing dir
 
 
@@ -915,7 +915,7 @@ def create_identity_ensemble_modelconfig(
 
         try:
             os.makedirs(config_dir)
-        except OSError as ex:
+        except OSError:
             pass  # ignore existing dir
 
         with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -937,7 +937,7 @@ def create_sequence_ensemble_modelfile(
 
         try:
             os.makedirs(model_version_dir)
-        except OSError as ex:
+        except OSError:
             pass  # ignore existing dir
 
 
@@ -979,7 +979,7 @@ def create_sequence_ensemble_modelconfig(
 
         try:
             os.makedirs(config_dir)
-        except OSError as ex:
+        except OSError:
             pass  # ignore existing dir
 
         with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -1015,7 +1015,7 @@ def create_nop_modelconfig(
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -1059,7 +1059,7 @@ def create_nop_tunnel_modelconfig(models_dir, tensor_shape, tensor_dtype):
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -1084,7 +1084,7 @@ def create_nop_tunnel_modelconfig(models_dir, tensor_shape, tensor_dtype):
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:

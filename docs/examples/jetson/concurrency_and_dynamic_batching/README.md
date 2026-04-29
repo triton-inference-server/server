@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -326,6 +326,6 @@ dynamic_batching {
 }
 ```
 
-To try further options of dynamic batcher see the [documentation](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#dynamic-batcher).
+To try further options of dynamic batcher see the [documentation](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/batcher.md#dynamic-batcher).
 
 You can also try enabling both concurrent model execution and dynamic batching.

@@ -1,5 +1,5 @@
 <!--
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -55,7 +55,7 @@ the backend should not allow the caller thread to return from
 TRITONBACKEND_ModelInstanceExecute until that instance is ready to
 handle another set of requests. If not designed properly the backend
 can be easily over-subscribed. This can also cause under-utilization
-of features like [Dynamic Batching](model_configuration.md#dynamic-batcher)
+of features like [Dynamic Batching](batcher.md#dynamic-batcher)
 as it leads to eager batching.
 
 ### Python model using Python Backend
@@ -90,16 +90,16 @@ model, the client must use the bi-directional streaming RPC. See
 for more details. The [decoupled_test.py](../../qa/L0_decoupled/decoupled_test.py) demonstrates
 how the gRPC streaming can be used to infer decoupled models.
 
-If using [Triton's in-process C API](../customization_guide/inference_protocols.md#in-process-triton-server-api),
+If using [Triton's in-process C API](../customization_guide/inprocess_c_api.md),
 your application should be cognizant that the callback function you registered with
 `TRITONSERVER_InferenceRequestSetResponseCallback` can be invoked any number of times,
 each time with a new response. You can take a look at [grpc_server.cc](https://github.com/triton-inference-server/server/blob/main/src/grpc/grpc_server.cc)
 
 ### Using Decoupled Models in Ensembles
 
-When using decoupled models within an [ensemble pipeline](ensemble_models.md), you may encounter unbounded memory growth if the decoupled model produces responses faster than downstream models can consume them.
+When using decoupled models within an [ensemble pipeline](ensemble_models.md), you may experience unbounded memory growth if a decoupled model produces responses faster than downstream models can consume them.
 
-To prevent unbounded memory growth in this scenario, consider using the `max_inflight_requests` configuration field. This field limits the maximum number of concurrent inflight requests permitted at each ensemble step for each inference request.
+To prevent this, use the `max_inflight_requests` configuration field. This field sets a limit on the maximum number of concurrent requests allowed at each ensemble step. The limit is shared across all active requests for that ensemble model, which helps control memory usage and prevents it from growing without bound.
 
 For more details and examples, see [Managing Memory Usage in Ensemble Models](ensemble_models.md#managing-memory-usage-in-ensemble-models).
 

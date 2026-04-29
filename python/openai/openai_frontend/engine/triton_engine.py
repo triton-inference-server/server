@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,6 +27,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import time
@@ -137,10 +138,8 @@ class TritonLLMEngine(LLMEngine):
         self.lora_separator = lora_separator
         self.default_max_tokens = default_max_tokens
 
-        # NOTE: Creation time and model metadata will be static at startup for
-        # now, and won't account for dynamically loading/unloading models.
-        self.create_time = int(time.time())
         self.model_metadata = self._get_model_metadata()
+        self._metadata_lock = asyncio.Lock()
         self.tool_call_parser = (
             ToolParserManager.get_tool_parser_cls(tool_call_parser)
             if tool_call_parser
@@ -493,53 +492,114 @@ class TritonLLMEngine(LLMEngine):
 
         return tokenizer
 
+    def _build_model_metadata(self, name: str) -> TritonModelMetadata:
+        model = self.server.model(name)
+        backend = model.config()["backend"]
+        if not backend and model.config()["platform"] == "ensemble":
+            backend = "ensemble"
+        print(f"Found model: {name=}, {backend=}")
+
+        lora_configs = _parse_lora_configs(
+            self.server.options.model_repository,
+            name,
+            model.version,
+            backend if self.backend is None else self.backend,
+        )
+
+        echo_tensor_name = None
+        for input in model.config()["input"]:
+            if input["name"] in [
+                "exclude_input_in_output",
+                "sampling_param_exclude_input_from_output",
+            ]:
+                echo_tensor_name = input["name"]
+                break
+
+        return TritonModelMetadata(
+            name=name,
+            backend=backend,
+            model=model,
+            tokenizer=self.tokenizer,
+            lora_configs=lora_configs,
+            echo_tensor_name=echo_tensor_name,
+            create_time=int(time.time()),
+            inference_request_converter=self._determine_request_converter(
+                backend, RequestKind.GENERATION
+            ),
+            embedding_request_converter=self._determine_request_converter(
+                backend, RequestKind.EMBEDDING
+            ),
+        )
+
     def _get_model_metadata(self) -> Dict[str, TritonModelMetadata]:
-        # One tokenizer and creation time shared for all loaded models for now.
+        # One tokenizer is shared for all loaded models; creation time is per model.
         model_metadata = {}
-
-        # Read all triton models and store the necessary metadata for each
-        for name, _ in self.server.models().keys():
-            model = self.server.model(name)
-            backend = model.config()["backend"]
-            # Explicitly handle ensembles to avoid any runtime validation errors
-            if not backend and model.config()["platform"] == "ensemble":
-                backend = "ensemble"
-            print(f"Found model: {name=}, {backend=}")
-
-            lora_configs = _parse_lora_configs(
-                self.server.options.model_repository,
-                name,
-                model.version,
-                backend if self.backend is None else self.backend,
-            )
-
-            echo_tensor_name = None
-            for input in model.config()["input"]:
-                if input["name"] in [
-                    "exclude_input_in_output",
-                    "sampling_param_exclude_input_from_output",
-                ]:
-                    echo_tensor_name = input["name"]
-                    break
-
-            metadata = TritonModelMetadata(
-                name=name,
-                backend=backend,
-                model=model,
-                tokenizer=self.tokenizer,
-                lora_configs=lora_configs,
-                echo_tensor_name=echo_tensor_name,
-                create_time=self.create_time,
-                inference_request_converter=self._determine_request_converter(
-                    backend, RequestKind.GENERATION
-                ),
-                embedding_request_converter=self._determine_request_converter(
-                    backend, RequestKind.EMBEDDING
-                ),
-            )
-            model_metadata[name] = metadata
-
+        for name, _ in self.server.models(exclude_not_ready=True).keys():
+            model_metadata[name] = self._build_model_metadata(name)
         return model_metadata
+
+    async def load_model(self, model_name: str) -> Model:
+        if (
+            self.server.options.model_control_mode
+            != tritonserver.ModelControlMode.EXPLICIT
+        ):
+            raise ClientError(
+                "Model load/unload requires --model-control-mode=explicit"
+            )
+
+        async with self._metadata_lock:
+            if model_name in self.model_metadata:
+                raise ClientError(f"Model '{model_name}' is already loaded")
+
+            # Blocking C API call dispatched to thread pool to avoid blocking
+            # the event loop. The C API blocks until model is fully loaded and
+            # ready, matching standard Triton server behavior.
+            try:
+                metadata = await asyncio.to_thread(self._load_model_sync, model_name)
+            except tritonserver.InvalidArgumentError as e:
+                raise ClientError(f"Failed to load model '{model_name}': {e}")
+            except tritonserver.TritonError as e:
+                raise ServerError(f"Failed to load model '{model_name}': {e}")
+
+            self.model_metadata[model_name] = metadata
+
+        return Model(
+            id=model_name,
+            created=metadata.create_time,
+            object=ObjectType.model,
+            owned_by="Triton Inference Server",
+        )
+
+    def _load_model_sync(self, model_name: str) -> TritonModelMetadata:
+        self.server.load(model_name)
+        return self._build_model_metadata(model_name)
+
+    async def unload_model(self, model_name: str) -> None:
+        if (
+            self.server.options.model_control_mode
+            != tritonserver.ModelControlMode.EXPLICIT
+        ):
+            raise ClientError(
+                "Model load/unload requires --model-control-mode=explicit"
+            )
+
+        async with self._metadata_lock:
+            if model_name not in self.model_metadata:
+                raise ClientError(f"Unknown model: {model_name}")
+
+            # Blocking C API call dispatched to thread pool. The C API handles
+            # in-flight request draining and conflict resolution internally.
+            try:
+                await asyncio.to_thread(self._unload_model_sync, model_name)
+            except tritonserver.InvalidArgumentError as e:
+                raise ClientError(f"Failed to unload model '{model_name}': {e}")
+            except tritonserver.TritonError as e:
+                raise ServerError(f"Failed to unload model '{model_name}': {e}")
+
+            del self.model_metadata[model_name]
+
+    def _unload_model_sync(self, model_name: str) -> None:
+        self.server.unload(model_name)
 
     def _get_streaming_chat_response_chunk(
         self,
@@ -990,6 +1050,11 @@ class TritonLLMEngine(LLMEngine):
         # Currently only support single string as input
         if not isinstance(request.prompt, str):
             raise ClientError("only single string input is supported")
+
+        if "best_of" in request.model_fields_set and metadata.backend == "vllm":
+            raise ClientError(
+                "best_of is no longer supported in vLLM backend, removed from vLLM V1 engine"
+            )
 
         if request.n and request.n > 1:
             raise ClientError(

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,11 +45,9 @@ from typing import List, Tuple
 
 
 def create_ensemble_modelfile(
-    create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape
+    models_dir, model_version, io_cnt, max_batch, dtype, shape
 ):
-    if not tu.validate_for_ensemble_model(
-        "zero", dtype, dtype, dtype, shape, shape, shape
-    ):
+    if not tu.validate_for_ensemble_model("zero", dtype, dtype, dtype):
         return
 
     emu.create_identity_ensemble_modelfile(
@@ -64,11 +62,9 @@ def create_ensemble_modelfile(
 
 
 def create_ensemble_modelconfig(
-    create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape
+    models_dir, model_version, io_cnt, max_batch, dtype, shape
 ):
-    if not tu.validate_for_ensemble_model(
-        "zero", dtype, dtype, dtype, shape, shape, shape
-    ):
+    if not tu.validate_for_ensemble_model("zero", dtype, dtype, dtype):
         return
 
     emu.create_identity_ensemble_modelconfig(
@@ -84,10 +80,8 @@ def create_ensemble_modelconfig(
     )
 
 
-def create_onnx_modelfile(
-    create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape
-):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+def create_onnx_modelfile(models_dir, model_version, io_cnt, max_batch, dtype, shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
         return
 
     onnx_dtype = np_to_onnx_dtype(dtype)
@@ -139,10 +133,8 @@ def create_onnx_modelfile(
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
 
-def create_onnx_modelconfig(
-    create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape
-):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+def create_onnx_modelconfig(models_dir, io_cnt, max_batch, dtype, shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
         return
 
     # Use a different model name for the non-batching variant
@@ -172,7 +164,7 @@ def create_onnx_modelconfig(
 
 
 def create_libtorch_modelfile(
-    create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape
+    models_dir, model_version, io_cnt, max_batch, dtype, shape
 ):
     if not tu.validate_for_libtorch_model(
         dtype, dtype, dtype, shape, shape, shape, max_batch
@@ -279,9 +271,7 @@ def create_libtorch_modelfile(
     traced.save(model_version_dir + "/model.pt")
 
 
-def create_libtorch_modelconfig(
-    create_savedmodel, models_dir, model_version, io_cnt, max_batch, dtype, shape
-):
+def create_libtorch_modelconfig(models_dir, io_cnt, max_batch, dtype, shape):
     if not tu.validate_for_libtorch_model(
         dtype, dtype, dtype, shape, shape, shape, max_batch
     ):
@@ -337,7 +327,7 @@ output [
         cfile.write(config)
 
 
-def create_libtorch_linalg_modelfile(create_savedmodel, models_dir, model_version):
+def create_libtorch_linalg_modelfile(models_dir, model_version):
     model_name = "libtorch_float32_linalg"
 
     # To test the linalg library, this script uses two inverse matrix operations
@@ -363,7 +353,7 @@ def create_libtorch_linalg_modelfile(create_savedmodel, models_dir, model_versio
     traced.save(model_version_dir + "/model.pt")
 
 
-def create_libtorch_linalg_modelconfig(create_savedmodel, models_dir, model_version):
+def create_libtorch_linalg_modelconfig(models_dir):
     # Unpack version policy
     version_policy_str = "{ latest { num_versions: 1 }}"
 
@@ -425,9 +415,7 @@ def create_openvino_modelfile(
             max_batch,
         ]
     )
-    if not tu.validate_for_openvino_model(
-        dtype, dtype, dtype, batch_dim + shape, batch_dim + shape, batch_dim + shape
-    ):
+    if not tu.validate_for_openvino_model(dtype, dtype, dtype, batch_dim + shape):
         return
 
     # Create the model
@@ -452,9 +440,7 @@ def create_openvino_modelfile(
     openvino_save_model(model_version_dir, model)
 
 
-def create_openvino_modelconfig(
-    models_dir, model_version, io_cnt, max_batch, dtype, shape
-):
+def create_openvino_modelconfig(models_dir, io_cnt, max_batch, dtype, shape):
     batch_dim = (
         []
         if max_batch == 0
@@ -462,9 +448,7 @@ def create_openvino_modelconfig(
             max_batch,
         ]
     )
-    if not tu.validate_for_openvino_model(
-        dtype, dtype, dtype, batch_dim + shape, batch_dim + shape, batch_dim + shape
-    ):
+    if not tu.validate_for_openvino_model(dtype, dtype, dtype, batch_dim + shape):
         return
 
     # Unpack version policy
@@ -518,7 +502,6 @@ output [
 
 
 def create_plan_modelfile(
-    create_savedmodel,
     models_dir,
     model_version,
     io_cnt,
@@ -527,7 +510,7 @@ def create_plan_modelfile(
     shape,
     profile_max_size,
 ):
-    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype):
         return
 
     # generate models with different configuration to ensure test coverage
@@ -826,16 +809,14 @@ def create_plan_dynamic_modelfile(
 
 
 def create_plan_modelconfig(
-    create_savedmodel,
     models_dir,
-    model_version,
     io_cnt,
     max_batch,
     dtype,
     shape,
     shape_tensor_input_dtype=None,
 ):
-    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype):
         return
 
     shape_str = tu.shape_to_dims_str(shape)
@@ -948,9 +929,7 @@ def create_shape_tensor_models(
     model_version = 1
 
     create_plan_modelconfig(
-        True,
         models_dir,
-        model_version,
         io_cnt,
         8,
         dtype,
@@ -962,9 +941,7 @@ def create_shape_tensor_models(
     )
     if no_batch:
         create_plan_modelconfig(
-            True,
             models_dir,
-            model_version,
             io_cnt,
             0,
             dtype,
@@ -987,72 +964,47 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
     model_version = 1
 
     if FLAGS.onnx:
-        create_onnx_modelconfig(
-            True, models_dir, model_version, io_cnt, 8, dtype, shape
-        )
-        create_onnx_modelfile(True, models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_onnx_modelconfig(models_dir, io_cnt, 8, dtype, shape)
+        create_onnx_modelfile(models_dir, model_version, io_cnt, 8, dtype, shape)
         if no_batch:
-            create_onnx_modelconfig(
-                True, models_dir, model_version, io_cnt, 0, dtype, shape
-            )
-            create_onnx_modelfile(
-                True, models_dir, model_version, io_cnt, 0, dtype, shape
-            )
+            create_onnx_modelconfig(models_dir, io_cnt, 0, dtype, shape)
+            create_onnx_modelfile(models_dir, model_version, io_cnt, 0, dtype, shape)
 
     if FLAGS.openvino:
-        create_openvino_modelconfig(models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_openvino_modelconfig(models_dir, io_cnt, 8, dtype, shape)
         create_openvino_modelfile(models_dir, model_version, io_cnt, 8, dtype, shape)
         if no_batch:
-            create_openvino_modelconfig(
-                models_dir, model_version, io_cnt, 0, dtype, shape
-            )
+            create_openvino_modelconfig(models_dir, io_cnt, 0, dtype, shape)
             create_openvino_modelfile(
                 models_dir, model_version, io_cnt, 0, dtype, shape
             )
 
     if FLAGS.libtorch:
-        create_libtorch_modelconfig(
-            True, models_dir, model_version, io_cnt, 8, dtype, shape
-        )
-        create_libtorch_modelfile(
-            True, models_dir, model_version, io_cnt, 8, dtype, shape
-        )
+        create_libtorch_modelconfig(models_dir, io_cnt, 8, dtype, shape)
+        create_libtorch_modelfile(models_dir, model_version, io_cnt, 8, dtype, shape)
         if no_batch:
-            create_libtorch_modelconfig(
-                True, models_dir, model_version, io_cnt, 0, dtype, shape
-            )
+            create_libtorch_modelconfig(models_dir, io_cnt, 0, dtype, shape)
             create_libtorch_modelfile(
-                True, models_dir, model_version, io_cnt, 0, dtype, shape
+                models_dir, model_version, io_cnt, 0, dtype, shape
             )
 
     if FLAGS.tensorrt or FLAGS.tensorrt_compat:
-        create_plan_modelconfig(
-            True, models_dir, model_version, io_cnt, 8, dtype, shape
-        )
-        create_plan_modelfile(
-            True, models_dir, model_version, io_cnt, 8, dtype, shape, 32
-        )
+        create_plan_modelconfig(models_dir, io_cnt, 8, dtype, shape)
+        create_plan_modelfile(models_dir, model_version, io_cnt, 8, dtype, shape, 32)
         if no_batch:
-            create_plan_modelconfig(
-                True, models_dir, model_version, io_cnt, 0, dtype, shape
-            )
+            create_plan_modelconfig(models_dir, io_cnt, 0, dtype, shape)
             create_plan_modelfile(
-                True, models_dir, model_version, io_cnt, 0, dtype, shape, 32
+                models_dir, model_version, io_cnt, 0, dtype, shape, 32
             )
 
     if FLAGS.tensorrt_big:
-        create_plan_modelconfig(
-            True, models_dir, model_version, io_cnt, 8, dtype, shape
-        )
+        create_plan_modelconfig(models_dir, io_cnt, 8, dtype, shape)
         create_plan_modelfile(
-            True, models_dir, model_version, io_cnt, 8, dtype, shape, 16 * 1024 * 1024
+            models_dir, model_version, io_cnt, 8, dtype, shape, 16 * 1024 * 1024
         )
         if no_batch:
-            create_plan_modelconfig(
-                True, models_dir, model_version, io_cnt, 0, dtype, shape
-            )
+            create_plan_modelconfig(models_dir, io_cnt, 0, dtype, shape)
             create_plan_modelfile(
-                True,
                 models_dir,
                 model_version,
                 io_cnt,
@@ -1064,23 +1016,17 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
 
     if FLAGS.ensemble:
         emu.create_nop_modelconfig(models_dir, shape, dtype)
-        create_ensemble_modelconfig(
-            True, models_dir, model_version, io_cnt, 8, dtype, shape
-        )
-        create_ensemble_modelfile(
-            True, models_dir, model_version, io_cnt, 8, dtype, shape
-        )
+        create_ensemble_modelconfig(models_dir, model_version, io_cnt, 8, dtype, shape)
+        create_ensemble_modelfile(models_dir, model_version, io_cnt, 8, dtype, shape)
         if no_batch:
             create_ensemble_modelconfig(
-                True, models_dir, model_version, io_cnt, 0, dtype, shape
+                models_dir, model_version, io_cnt, 0, dtype, shape
             )
             create_ensemble_modelfile(
-                True, models_dir, model_version, io_cnt, 0, dtype, shape
+                models_dir, model_version, io_cnt, 0, dtype, shape
             )
 
 
-# FIXME: The function signatures require a `savedmodel` boolean flag
-# on all of them even though Tensorflow has been deprecated since 25.03
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -1186,5 +1132,5 @@ if __name__ == "__main__":
     # Create libtorch linalg model
     if FLAGS.libtorch:
         model_version = 1
-        create_libtorch_linalg_modelconfig(True, FLAGS.models_dir, model_version)
-        create_libtorch_linalg_modelfile(True, FLAGS.models_dir, model_version)
+        create_libtorch_linalg_modelconfig(FLAGS.models_dir)
+        create_libtorch_linalg_modelfile(FLAGS.models_dir, model_version)

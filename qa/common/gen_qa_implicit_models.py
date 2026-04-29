@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -46,7 +46,7 @@ np_dtype_string = np.dtype(object)
 def create_onnx_modelfile_wo_initial_state(
     models_dir, model_version, max_batch, dtype, shape
 ):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -249,7 +249,7 @@ def create_onnx_modelfile_wo_initial_state(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
@@ -258,7 +258,7 @@ def create_onnx_modelfile_wo_initial_state(
 def create_onnx_modelfile_with_initial_state(
     models_dir, model_version, max_batch, dtype, shape
 ):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -363,7 +363,7 @@ def create_onnx_modelfile_with_initial_state(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
@@ -439,7 +439,7 @@ def create_libtorch_modelfile_wo_initial_state(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     traced.save(model_version_dir + "/model.pt")
@@ -499,7 +499,7 @@ def create_libtorch_modelfile_with_initial_state(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     traced.save(model_version_dir + "/model.pt")
@@ -519,9 +519,7 @@ def create_libtorch_modelfile(
         )
 
 
-def create_libtorch_modelconfig(
-    models_dir, model_version, max_batch, dtype, shape, initial_state
-):
+def create_libtorch_modelconfig(models_dir, max_batch, dtype, shape, initial_state):
     if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
@@ -704,16 +702,14 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
 
-def create_onnx_modelconfig(
-    models_dir, model_version, max_batch, dtype, shape, initial_state
-):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+def create_onnx_modelconfig(models_dir, max_batch, dtype, shape, initial_state):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -890,7 +886,7 @@ instance_group [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -998,7 +994,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -1133,7 +1129,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -1141,7 +1137,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
 def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
-    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype):
         return
 
     if dtype != np.float32:
@@ -1150,8 +1146,8 @@ def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
         create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
-def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):
-    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
+def create_plan_modelconfig(models_dir, max_batch, dtype, shape):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -1223,7 +1219,7 @@ instance_group [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -1234,14 +1230,10 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
     model_version = 1
 
     if FLAGS.onnx:
-        create_onnx_modelconfig(
-            models_dir, model_version, 8, dtype, shape, initial_state
-        )
+        create_onnx_modelconfig(models_dir, 8, dtype, shape, initial_state)
         create_onnx_modelfile(models_dir, model_version, 8, dtype, shape, initial_state)
         if no_batch:
-            create_onnx_modelconfig(
-                models_dir, model_version, 0, dtype, shape, initial_state
-            )
+            create_onnx_modelconfig(models_dir, 0, dtype, shape, initial_state)
             create_onnx_modelfile(
                 models_dir, model_version, 0, dtype, shape, initial_state
             )
@@ -1253,10 +1245,10 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
         if dtype == np.int8:
             suffix = [1, 1]
 
-        create_plan_modelconfig(models_dir, model_version, 8, dtype, shape + suffix)
+        create_plan_modelconfig(models_dir, 8, dtype, shape + suffix)
         create_plan_models(models_dir, model_version, 8, dtype, shape + suffix)
         if no_batch:
-            create_plan_modelconfig(models_dir, model_version, 0, dtype, shape + suffix)
+            create_plan_modelconfig(models_dir, 0, dtype, shape + suffix)
             create_plan_models(models_dir, model_version, 0, dtype, shape + suffix)
 
     if FLAGS.libtorch:
@@ -1264,15 +1256,13 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
         if dtype == np.int8:
             suffix = [1, 1]
 
-        create_libtorch_modelconfig(
-            models_dir, model_version, 8, dtype, shape + suffix, initial_state
-        )
+        create_libtorch_modelconfig(models_dir, 8, dtype, shape + suffix, initial_state)
         create_libtorch_modelfile(
             models_dir, model_version, 8, dtype, shape + suffix, initial_state
         )
         if no_batch:
             create_libtorch_modelconfig(
-                models_dir, model_version, 0, dtype, shape + suffix, initial_state
+                models_dir, 0, dtype, shape + suffix, initial_state
             )
             create_libtorch_modelfile(
                 models_dir, model_version, 0, dtype, shape + suffix, initial_state

@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,6 +38,9 @@
 
 | Triton release version	 | NGC Tag	 | Python version	 | Torch version | TensorRT version | TensorRT-LLM version | CUDA version | CUDA Driver version | Size |
 | --- | ---  | --- | --- | --- | --- | --- | --- | --- |
+| 26.03 | nvcr.io/nvidia/tritonserver:26.03-trtllm-python-py3 | Python 3.12.3  | 2.10.0a0+b4e4ee81d3.nv25.12 | 0.14.1.48 | 1.2.0 | 13.1.0.036 | 590.44.01 | 14.18 GB |
+| 26.02 | nvcr.io/nvidia/tritonserver:26.02-trtllm-python-py3 | Python 3.12.3  | 2.9.0a0+145a3a7bda.nv25.10 | 10.13.3.9 | 1.1.0 | 13.0.2.006 | 580.95.05 | 16.17 GB |
+| 26.01 | nvcr.io/nvidia/tritonserver:26.01-trtllm-python-py3 | Python 3.12.3  | 2.9.0a0+145a3a7bda.nv25.10 | 10.13.3.9 | 1.1.0 | 13.0.2.006 | 580.95.05 | 16.17 GB |
 | 25.12 | nvcr.io/nvidia/tritonserver:25.12-trtllm-python-py3 | Python 3.12.3  | 2.9.0a0+145a3a7bda.nv25.10 | 10.13.3.9 | 1.1.0 | 13.0.2.006 | 580.95.05 | 16.04 GB |
 | 25.11 | nvcr.io/nvidia/tritonserver:25.11-trtllm-python-py3 | Python 3.12.3  | 2.9.0a0+145a3a7bda.nv25.10 | 10.13.3.9 | 1.0.3.2510 | 13.0.2.006 | 580.95.05 | 12.25 GB |
 | 25.10 | nvcr.io/nvidia/tritonserver:25.10-trtllm-python-py3 | Python 3.12.3  | 2.8.0a0+5228986c39.nv25.6 | 10.11.0.33 | 1.0.0 | 12.9.1.010 | 575.57.08 | 16.21 GB |
@@ -64,6 +67,9 @@
 
 | Triton release version	 | NGC Tag	 | Python version	 | vLLM version | CUDA version | CUDA Driver version | Size |
 | --- | --- | --- | --- | --- | --- | --- |
+| 26.03 | nvcr.io/nvidia/tritonserver:26.03-vllm-python-py3 | Python 3.12.3  | 0.17.1+fb2e3ab6.nv26.3.46332470.cu132 | 13.2.0.046 | 595.45.04 | 9.22G |
+| 26.02 | nvcr.io/nvidia/tritonserver:26.02-vllm-python-py3 | Python 3.12.3  | 0.15.1+nv26.2 | 13.1.1.006 | 590.48.01 | 8.9G |
+| 26.01 | nvcr.io/nvidia/tritonserver:26.01-vllm-python-py3 | Python 3.12.3  | 0.13.0+faa43dbf.nv26.1.cu131 | 13.1.1.006 | 590.48.01 | 8.79G |
 | 25.12 | nvcr.io/nvidia/tritonserver:25.12-vllm-python-py3 | Python 3.12.3  | 0.11.1+9114fd76.nv25.12.cu131 | 13.1.0.036 | 590.44.01 | 8.54G |
 | 25.11 | nvcr.io/nvidia/tritonserver:25.11-vllm-python-py3 | Python 3.12.3  | 0.11.0+582e4e37.nv25.11.cu130 | 13.0.2.006 | 580.95.05 | 8.72G |
 | 25.10 | nvcr.io/nvidia/tritonserver:25.10-vllm-python-py3 | Python 3.12.3  | 0.10.2+9dd9ca32.nv25.10.cu130 | 13.0.2.006 | 580.95.05 | 8.34G |
@@ -90,6 +96,9 @@
 
 | Triton release version	 | ONNX Runtime	 |
 | --- | --- |
+| 26.03 | 1.24.2 |
+| 26.02 | 1.24.1 |
+| 26.01 | 1.23.2 |
 | 25.12 | 1.23.2 |
 | 25.11 | 1.23.2 |
 | 25.10 | 1.23.1 |

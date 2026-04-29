@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -59,7 +59,7 @@ install_build_deps_yum() {
 }
 
 install_build_deps() {
-  if [[ ${TRITON_RHEL} -eq "1" ]]; then
+  if [[ ${TRITON_RHEL} -eq "1" ]] && grep -qE 'rhel|centos|fedora' /etc/os-release; then
     install_build_deps_yum
   else
     install_build_deps_apt

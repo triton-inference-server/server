@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -106,8 +106,8 @@ def create_plan_modelfile(
     network.mark_output(out0.get_output(0))
     network.mark_output(out1.get_output(0))
 
-    out0.get_output(0).dtype = trt_output0_dtype
-    out1.get_output(0).dtype = trt_output1_dtype
+    out0.set_output_type(0, trt_output0_dtype)
+    out1.set_output_type(0, trt_output1_dtype)
 
     in0.allowed_formats = 1 << int(trt_input_memory_format)
     in1.allowed_formats = 1 << int(trt_input_memory_format)
@@ -179,7 +179,7 @@ def create_plan_modelfile(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -189,7 +189,6 @@ def create_plan_modelfile(
 def create_plan_modelconfig(
     models_dir,
     max_batch,
-    model_version,
     input_shape,
     output0_shape,
     output1_shape,
@@ -204,9 +203,6 @@ def create_plan_modelconfig(
         input_dtype,
         output0_dtype,
         output1_dtype,
-        input_shape,
-        output0_shape,
-        output1_shape,
     ):
         return
 
@@ -328,7 +324,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -352,16 +348,12 @@ def create_plan_model(
         input_dtype,
         output0_dtype,
         output1_dtype,
-        input_shape,
-        output0_shape,
-        output1_shape,
     ):
         return
 
     create_plan_modelconfig(
         models_dir,
         max_batch,
-        model_version,
         input_shape,
         output0_shape,
         output1_shape,

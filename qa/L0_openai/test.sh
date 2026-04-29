@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,13 +28,12 @@
 ### Helpers ###
 
 function download_tensorrt_llm_models {
-    TENSORRTLLM_VERSION="$1"
-    TENSORRTLLM_DIR="$2"
+    TENSORRTLLM_DIR="$1"
     rm -rf ${TENSORRTLLM_DIR} && mkdir ${TENSORRTLLM_DIR}
-    git clone --filter=blob:none --no-checkout https://github.com/NVIDIA/TensorRT-LLM.git ${TENSORRTLLM_DIR}
+    git clone --filter=blob:none --no-checkout https://github.com/triton-inference-server/TensorRT-LLM.git ${TENSORRTLLM_DIR}
     pushd ${TENSORRTLLM_DIR}
     git sparse-checkout set triton_backend/all_models
-    git checkout ${TENSORRTLLM_VERSION}
+    git checkout ${TENSORRTLLM_REPO_TAG}
     popd
 }
 
@@ -51,8 +50,7 @@ function install_deps() {
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
         # TODO: Remove this when the next stable version of TRT-LLM is available
         TENSORRTLLM_DIR="/workspace/TensorRT-LLM"
-        TENSORRTLLM_VERSION="v1.2.0rc2"
-        download_tensorrt_llm_models ${TENSORRTLLM_VERSION} ${TENSORRTLLM_DIR}
+        download_tensorrt_llm_models ${TENSORRTLLM_DIR}
 
         prepare_tensorrtllm meta-llama/Meta-Llama-3.1-8B-Instruct tests/tensorrtllm_models /tmp/engines/llama/3.1-8b-instruct/ ${TENSORRTLLM_DIR}
         prepare_tensorrtllm mistralai/Mistral-Nemo-Instruct-2407 tests/tensorrtllm_mistral_models /tmp/engines/mistral/nemo-instruct-2407/ ${TENSORRTLLM_DIR}

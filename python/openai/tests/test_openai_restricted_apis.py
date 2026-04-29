@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,7 +40,7 @@ def assert_response_success(
     """Assert that a response was successful."""
     assert (
         response.status_code == expected_status
-    ), f"{description} should return {expected_status}, got {response.status_code}"
+    ), f"{description} should return {expected_status}, got {response.status_code} {response.text}"
 
 
 def assert_response_unauthorized(
@@ -49,7 +49,7 @@ def assert_response_unauthorized(
     """Assert that a response was unauthorized."""
     assert (
         response.status_code == expected_status
-    ), f"{description} should be unauthorized with {expected_status}, got {response.status_code}"
+    ), f"{description} should be unauthorized with {expected_status}, got {response.status_code} {response.text}"
 
 
 def make_get_request(
@@ -129,6 +129,7 @@ def verify_inference_endpoints(
 def verify_model_repository_endpoints(
     base_url, model, headers, expected_success, description_prefix
 ):
+    # Verify model repository endpoints
     response = make_get_request(base_url, "/v1/models", headers=headers)
     if expected_success:
         assert_response_success(
@@ -148,6 +149,22 @@ def verify_model_repository_endpoints(
         assert_response_unauthorized(
             response, description=f"{description_prefix} Specific model endpoint"
         )
+
+    # Verify model management endpoints
+    for endpoint in ["unload", "load"]:
+        response = requests.post(
+            f"{base_url}/v1/models/{model}/{endpoint}", headers=headers
+        )
+        if expected_success:
+            assert_response_success(
+                response,
+                description=f"{description_prefix} - Model {endpoint} endpoint",
+            )
+        else:
+            assert_response_unauthorized(
+                response,
+                description=f"{description_prefix} - Model {endpoint} endpoint",
+            )
 
 
 def verify_metrics_endpoint(base_url, headers, expected_success, description_prefix):
@@ -288,6 +305,10 @@ class TestOpenAIServerRestrictedAPIs:
             tokenizer_model,
             "--backend",
             backend,
+            "--model-control-mode",
+            "explicit",
+            "--load-model",
+            "*",
             "--openai-restricted-api",
             "inference,model-repository",
             "admin-key",
@@ -345,6 +366,10 @@ class TestOpenAIServerMultipleRestrictions:
             tokenizer_model,
             "--backend",
             backend,
+            "--model-control-mode",
+            "explicit",
+            "--load-model",
+            "*",
             "--openai-restricted-api",
             "model-repository",
             "model-key",

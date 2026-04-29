@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -158,7 +158,7 @@ rm -f *.log.*
 set -e
 
 CLIENT_LOG=`pwd`/client.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --allow-client-shm=true"
 source ../common/util.sh
 
 run_server
@@ -346,6 +346,14 @@ done
 $SIMPLE_REUSE_INFER_OBJECTS_CLIENT -v -i grpc -u localhost:8001 >> ${CLIENT_LOG}.c++.reuse 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.c++.reuse
+    RET=1
+fi
+
+# Test duplicate output names are rejected
+python $PYTHON_UNIT_TEST GrpcTest >> ${CLIENT_LOG}.duplicate_output 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.duplicate_output
+    echo -e "\n***\n*** Python GRPC Duplicate Output Test Failed\n***"
     RET=1
 fi
 
@@ -569,7 +577,7 @@ done
 # Run python grpc aio unit test
 PYTHON_GRPC_AIO_TEST=python_grpc_aio_test.py
 CLIENT_LOG=`pwd`/python_grpc_aio_test.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --allow-client-shm=true"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

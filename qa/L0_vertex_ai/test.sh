@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,7 +44,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
-rm -rf multi_models single_model
+rm -rf multi_models single_model restricted_single_model
 rm -f *.log
 rm -f *.out
 
@@ -67,6 +67,11 @@ mkdir multi_models && \
     sed -i "s/onnx_int32_int32_int32/subadd/" multi_models/subadd/config.pbtxt
 mkdir single_model && \
     cp -r multi_models/addsub single_model/.
+
+# Set up single-model Python repository used by restricted API regression
+mkdir -p restricted_single_model/identity_fp32/1 && \
+    cp ../python_models/identity_fp32/config.pbtxt restricted_single_model/identity_fp32/ && \
+    cp ../python_models/identity_fp32/model.py restricted_single_model/identity_fp32/1/
 
 # Use Vertex AI's health endpoint to check server status
 # Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
@@ -134,7 +139,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 kill $SERVER_PID
-wait $SERVE_PID
+wait $SERVER_PID
 set +e
 # Expect no message regarding Vertex AI as it is disabled
 grep "failed to start Vertex AI service" $SERVER_LOG
@@ -157,7 +162,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 kill $SERVER_PID
-wait $SERVE_PID
+wait $SERVER_PID
 set +e
 grep "Started Vertex AI HTTPService at" $SERVER_LOG
 if [ $? -ne 0 ]; then
@@ -186,7 +191,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 kill $SERVER_PID
-wait $SERVE_PID
+wait $SERVER_PID
 set +e
 grep "Started Vertex AI HTTPService at" $SERVER_LOG
 if [ $? -ne 0 ]; then
@@ -220,7 +225,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 kill $SERVER_PID
-wait $SERVE_PID
+wait $SERVER_PID
 set +e
 # Expect no message regarding Vertex AI as it is disabled
 grep "failed to start Vertex AI service" $SERVER_LOG
@@ -331,7 +336,7 @@ fi
 set -e
 
 kill $SERVER_PID
-wait $SERVE_PID
+wait $SERVER_PID
 
 #
 # AIP_STORAGE_URI / AIP_HTTP_PORT
@@ -370,7 +375,7 @@ fi
 set -e
 
 kill $SERVER_PID
-wait $SERVE_PID
+wait $SERVER_PID
 
 #
 # default model
@@ -453,7 +458,7 @@ else
 fi
 set -e
 kill $SERVER_PID
-wait $SERVE_PID
+wait $SERVER_PID
 
 # Test default model as well as multi model
 SERVER_ARGS="--vertex-ai-default-model=addsub"
@@ -694,25 +699,247 @@ else
 fi
 set -e
 
-# repository control (expect error)
+# repository control via redirect is blocked unconditionally
 rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/models/subadd/unload" localhost:8080/predict`
-if [ "$code" == "200" ]; then
+if [ "$code" != "403" ]; then
     cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Failed. Expected model unload via redirect to return 403 (got $code)\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+#
+# Restricted API regression for Vertex redirect
+#
+unset_vertex_variables
+export AIP_PREDICT_ROUTE="/predict"
+export AIP_HEALTH_ROUTE="/health"
+
+SERVER_LOG="vertex_restricted_api_testing_server.log"
+SERVER_ARGS="--log-verbose=1 --allow-vertex-ai=true \
+  --model-repository=restricted_single_model \
+  --vertex-ai-default-model=identity_fp32 \
+  --http-restricted-api=metadata,model-config,model-repository,statistics,shared-memory:X-Vertex-Restricted=secret"
+
+run_server_nowait
+vertex_ai_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Baseline infer remains available without restricted header
+set +e
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "Content-Type: application/json" -d'{"inputs":[{"name":"INPUT0","datatype":"FP32","shape":[1,1],"data":[42.0]}],"outputs":[{"name":"OUTPUT0"}]}' localhost:8080/predict`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected /predict inference succeeds without restricted header\n***"
     RET=1
 else
-    grep "explicit model load / unload is not allowed" ./curl.out
+    grep "OUTPUT0" ./curl.out
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected error on model control\n***"
+        cat ./curl.out
+        echo -e "\n***\n*** Failed. Expected inference output is returned\n***"
         RET=1
     fi
 fi
 set -e
 
+# Redirected read-only APIs should be blocked without restricted header
+set +e
+for redirect_endpoint in \
+    "v2" \
+    "v2/models/identity_fp32/config" \
+    "v2/repository/index" \
+    "v2/systemsharedmemory/status" \
+    "v2/cudasharedmemory/status"
+do
+    rm -f ./curl.out
+    code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: ${redirect_endpoint}" localhost:8080/predict`
+    if [ "$code" != "403" ]; then
+        cat ./curl.out
+        echo -e "\n***\n*** Failed. Expected ${redirect_endpoint} is restricted\n***"
+        RET=1
+    fi
+done
+
+# Mutating shared memory operations are blocked through redirect
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/systemsharedmemory/region/test/register" -H "Content-Type: application/json" -d '{"key":"test_shm","byte_size":1024}' localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected shared memory register is blocked via redirect\n***"
+    RET=1
+fi
+
+# Model load redirect is unconditionally blocked through the prediction endpoint
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/models/identity_fp32/load" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model load via redirect is blocked\n***"
+    RET=1
+fi
+
+# Model unload redirect is unconditionally blocked through the prediction endpoint
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/models/identity_fp32/unload" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model unload via redirect is blocked\n***"
+    RET=1
+fi
+
+# Statistics redirect without restricted header should be blocked
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/models/identity_fp32/stats" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model statistics via redirect is restricted\n***"
+    RET=1
+fi
+set -e
+
+# Restricted header should allow read-only handler invocation
+set +e
+for redirect_endpoint in \
+    "v2" \
+    "v2/models/identity_fp32/config" \
+    "v2/repository/index" \
+    "v2/systemsharedmemory/status" \
+    "v2/cudasharedmemory/status"
+do
+    rm -f ./curl.out
+    code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: ${redirect_endpoint}" \
+    -H "X-Vertex-Restricted: secret" localhost:8080/predict`
+    if [ "$code" != "200" ]; then
+        cat ./curl.out
+        echo -e "\n***\n*** Failed. Expected ${redirect_endpoint} passes with restricted header\n***"
+        RET=1
+    fi
+done
+
+# Mutating shared memory operations remain blocked even with valid header
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/systemsharedmemory/region/test/register" -H "X-Vertex-Restricted: secret" -H "Content-Type: application/json" -d '{"key":"test_shm","byte_size":1024}' localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected shared memory register is blocked via redirect even with valid header\n***"
+    RET=1
+fi
+
+# Model load remains blocked even with valid restricted header
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/models/identity_fp32/load" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model load is blocked via redirect even with valid header\n***"
+    RET=1
+fi
+
+# Model unload remains blocked even with valid restricted header
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/repository/models/identity_fp32/unload" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model unload is blocked via redirect even with valid header\n***"
+    RET=1
+fi
+
+# Statistics redirect with restricted header should pass
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/models/identity_fp32/stats" -H "X-Vertex-Restricted: secret" localhost:8080/predict`
+if [ "$code" == "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected model statistics passes with restricted header\n***"
+    RET=1
+fi
+
+# Wrong restricted header should reject the request
+set +e
+for redirect_endpoint in \
+    "v2" \
+    "v2/models/identity_fp32/config" \
+    "v2/repository/index" \
+    "v2/systemsharedmemory/status" \
+    "v2/cudasharedmemory/status" \
+    "v2/systemsharedmemory/region/test/register"
+do
+    rm -f ./curl.out
+    if [ "$redirect_endpoint" != "v2/systemsharedmemory/region/test/register" ]; then
+       code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: ${redirect_endpoint}" \
+       -H "X-Vertex-Restricted: invalid" localhost:8080/predict`
+    else
+        code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: ${redirect_endpoint}" \
+        -H "X-Vertex-Restricted: invalid" -H "Content-Type: application/json" -d '{"key":"test_shm","byte_size":1024}' localhost:8080/predict`
+    fi
+    if [ "$code" != "403" ]; then
+        cat ./curl.out
+        echo -e "\n***\n*** Failed. Expected invalid restricted header value is rejected for ${redirect_endpoint}\n***"
+        RET=1
+    fi
+done
+set -e
+
 kill $SERVER_PID
-wait $SERVE_PID
+wait $SERVER_PID
+
+#
+# HTTP max input size enforcement on Vertex AI endpoint
+#
+unset_vertex_variables
+export AIP_PREDICT_ROUTE="/predict"
+export AIP_HEALTH_ROUTE="/health"
+
+SERVER_LOG="vertex_max_input_size_server.log"
+SERVER_ARGS="--allow-vertex-ai=true \
+  --model-repository=restricted_single_model \
+  --vertex-ai-default-model=identity_fp32 \
+  --http-max-input-size=128"
+run_server_nowait
+vertex_ai_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+# Small payload under 128 bytes should succeed
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "Content-Type: application/json" -d'{"inputs":[{"name":"INPUT0","datatype":"FP32","shape":[1,1],"data":[1.0]}],"outputs":[{"name":"OUTPUT0"}]}' localhost:8080/predict`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected small payload to succeed on Vertex AI endpoint (got $code)\n***"
+    RET=1
+fi
+
+# Large payload over 128 bytes should be rejected
+rm -f ./curl.out
+LARGE_PAYLOAD='{"inputs":[{"name":"INPUT0","datatype":"FP32","shape":[1,16],"data":[1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0]}],"outputs":[{"name":"OUTPUT0"}]}'
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "Content-Type: application/json" -d"$LARGE_PAYLOAD" localhost:8080/predict`
+if [ "$code" == "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected oversized payload to be rejected on Vertex AI endpoint\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
