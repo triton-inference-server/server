@@ -972,6 +972,13 @@ RUN yum install -y \\
             xz-devel \\
             zlib-devel
 """
+    if argmap["NVIDIA_BUILD_ID"] is not None:
+        df += """
+ENV BUILD_NUMBER={}
+""".format(
+            argmap["NVIDIA_BUILD_ID"]
+        )
+
     if os.getenv("CCACHE_REMOTE_ONLY") and os.getenv("CCACHE_REMOTE_STORAGE"):
         df += """
 RUN curl -k -s -L https://github.com/ccache/ccache/archive/refs/tags/v4.10.2.tar.gz -o /tmp/ccache.tar.gz \\
@@ -1049,6 +1056,12 @@ ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
 """
+    if argmap["NVIDIA_BUILD_ID"] is not None:
+        df += """
+ENV BUILD_NUMBER={}
+""".format(
+            argmap["NVIDIA_BUILD_ID"]
+        )
     # Install the windows- or linux-specific buildbase dependencies
     if target_platform() == "windows":
         df += """
