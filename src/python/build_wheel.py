@@ -69,6 +69,62 @@ def sed(pattern, replace, source, dest=None):
         shutil.copyfile(name, source)
 
 
+def _detect_cuda_version():
+    """Detect the CUDA toolkit version visible to the build.
+
+    Prefers the CUDA_VERSION env var (set by official NVIDIA base
+    images); falls back to parsing /usr/local/cuda/version.json which
+    is the canonical location for the installed toolkit. Returns the
+    raw string (e.g. "13.2.1") or None when CUDA is not available.
+    """
+    v = os.environ.get("CUDA_VERSION")
+    if v:
+        return v
+    try:
+        import json as _json
+
+        with open("/usr/local/cuda/version.json") as f:
+            data = _json.load(f)
+        return data.get("cuda", {}).get("version")
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def _compose_version(base_version):
+    """Compose the full wheel version string.
+
+    Appends a PEP 440 local-version segment describing the NVIDIA
+    container release and CUDA toolkit so consumers can tell an
+    nv26.04 wheel from an nv26.05 wheel and a cu132 wheel from a
+    cu128 wheel. All sources are optional; local non-CI builds return
+    the version unchanged.
+    """
+    nv = (
+        os.environ.get("NVIDIA_UPSTREAM_VERSION")
+        or os.environ.get("NVIDIA_TRITON_SERVER_VERSION")
+        or os.environ.get("TRITON_CONTAINER_VERSION")
+    )
+    cuda = _detect_cuda_version()
+    print(
+        f"=== Wheel local-version inputs: "
+        f"NVIDIA_UPSTREAM_VERSION={os.environ.get('NVIDIA_UPSTREAM_VERSION')!r} "
+        f"NVIDIA_TRITON_SERVER_VERSION={os.environ.get('NVIDIA_TRITON_SERVER_VERSION')!r} "
+        f"TRITON_CONTAINER_VERSION={os.environ.get('TRITON_CONTAINER_VERSION')!r} "
+        f"-> nv={nv!r}, cuda={cuda!r}",
+        file=sys.stderr,
+    )
+    local = []
+    if nv:
+        local.append(f"nv{nv}")
+    if cuda:
+        parts = cuda.split(".")
+        if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+            local.append(f"cu{parts[0]}{parts[1]}")
+    if local:
+        return f"{base_version}+{'.'.join(local)}"
+    return base_version
+
+
 def _repair_wheel_with_auditwheel(whl_dir, dest_dir):
     """Upgrade a linux_<arch> wheel to manylinux_2_X_<arch>.
 
@@ -179,9 +235,31 @@ def main():
     os.chdir(FLAGS.whl_dir)
     print("=== Building wheel")
     args = ["python3", "setup.py", "bdist_wheel"]
+    # PEP 427 build tag: lets two wheels of the same version coexist
+    # (e.g. reruns of the same CI pipeline). Sources, first non-empty
+    # and usable wins:
+    #   CI_PIPELINE_ID  - GitLab pipeline-scoped ID (preferred).
+    #   NVIDIA_BUILD_ID - from build.py's --build-id flag.
+    #   BUILD_NUMBER    - generic CI systems.
+    # PEP 427 requires the build tag to start with a digit.
+    build_tag = (
+        os.environ.get("CI_PIPELINE_ID")
+        or os.environ.get("NVIDIA_BUILD_ID")
+        or os.environ.get("BUILD_NUMBER")
+    )
+    print(
+        f"=== Wheel build-tag inputs: "
+        f"CI_PIPELINE_ID={os.environ.get('CI_PIPELINE_ID')!r} "
+        f"NVIDIA_BUILD_ID={os.environ.get('NVIDIA_BUILD_ID')!r} "
+        f"BUILD_NUMBER={os.environ.get('BUILD_NUMBER')!r} "
+        f"-> build-tag={build_tag!r}",
+        file=sys.stderr,
+    )
+    if build_tag and build_tag != "<unknown>" and build_tag[:1].isdigit():
+        args += [f"--build-number={build_tag}"]
 
     wenv = os.environ.copy()
-    wenv["VERSION"] = FLAGS.triton_version
+    wenv["VERSION"] = _compose_version(FLAGS.triton_version)
     wenv["TRITON_PYBIND"] = PYBIND_LIB
     p = subprocess.Popen(args, env=wenv)
     p.wait()
