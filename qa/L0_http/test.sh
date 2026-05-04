@@ -695,7 +695,7 @@ wait $SERVER_PID
 
 # Helper library to parse SSE events
 # https://github.com/mpetazzoni/sseclient
-pip install sseclient-py
+pip install sseclient-py psutil
 
 SERVER_ARGS="--model-repository=`pwd`/../python_models/generate_models --log-verbose=1"
 SERVER_LOG="./inference_server_generate_endpoint_test.log"
