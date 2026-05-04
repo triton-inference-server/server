@@ -149,7 +149,7 @@ class InferenceParametersTest(unittest.IsolatedAsyncioTestCase):
                     callback=partial(self.grpcclient_callback, user_data),
                 )
                 result = user_data.get()
-                self.assertFalse(result is InferenceServerException)
+                self.assertIsNot(result, InferenceServerException)
             else:
                 raise ValueError(f"Unsupported client type: {client_type}")
         else:
@@ -200,7 +200,7 @@ class InferenceParametersTest(unittest.IsolatedAsyncioTestCase):
             model_name="parameter", inputs=inputs, parameters=parameters
         )
         result = user_data.get()
-        self.assertFalse(result is InferenceServerException)
+        self.assertIsNot(result, InferenceServerException)
         self.verify_outputs(result, parameters, expected_headers)
         self.grpcclient.stop_stream()
 
