@@ -72,11 +72,11 @@ class InferSizeLimitTest(tu.TestResultCollector):
         """
         pid_str = os.environ.get("SERVER_PID")
         if not pid_str:
-            self.Fail("SERVER_PID env var is not set")
+            self.fail("SERVER_PID env var is not set")
         try:
             return psutil.Process(int(pid_str))
         except (ValueError, psutil.NoSuchProcess) as e:
-            self.Fail(f"Invalid or stale SERVER_PID={pid_str!r}: {e}")
+            self.fail(f"Invalid or stale SERVER_PID={pid_str!r}: {e}")
 
     def test_json_dtype_size_expansion_exceeds_limit_error(self):
         """
@@ -750,8 +750,8 @@ class InferSizeLimitTest(tu.TestResultCollector):
         self.assertIn("outputs", result, "Response missing outputs field")
 
     def test_no_leak_on_invalid_inference_header_length(self):
-        """Test that sending multiple malformed compressed requests does
-        not cause memory growth on the server.
+        """
+        Test that sending multiple malformed compressed requests does not cause memory growth on the server.
         """
         leak_request_count = 100
         max_rss_growth_bytes = 32 * MB
