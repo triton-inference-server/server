@@ -69,13 +69,15 @@ def sed(pattern, replace, source, dest=None):
         shutil.copyfile(name, source)
 
 
-def _detect_cuda_version():
+def _detect_cuda_version() -> str | None:
     """Detect the CUDA toolkit version visible to the build.
 
     Prefers the CUDA_VERSION env var (set by official NVIDIA base
     images); falls back to parsing /usr/local/cuda/version.json which
-    is the canonical location for the installed toolkit. Returns the
-    raw string (e.g. "13.2.1") or None when CUDA is not available.
+    is the canonical location for the installed toolkit.
+
+    Returns:
+        str or None: The CUDA version as a string (e.g. "13.2.1"), or None if CUDA is not available.
     """
     v = os.environ.get("CUDA_VERSION")
     if v:
