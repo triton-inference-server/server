@@ -3265,10 +3265,9 @@ HTTPAPIServer::DecompressBuffer(
     case DataCompressor::Type::DEFLATE:
     case DataCompressor::Type::GZIP: {
       decompressed_buffer->reset(evbuffer_new());
-      RETURN_IF_ERR(
-          DataCompressor::DecompressData(
-              compression_type, req->buffer_in, decompressed_buffer->get(),
-              max_input_size_));
+      RETURN_IF_ERR(DataCompressor::DecompressData(
+            compression_type, req->buffer_in, decompressed_buffer->get(),
+            max_input_size_));
       break;
     }
     case DataCompressor::Type::UNKNOWN: {
