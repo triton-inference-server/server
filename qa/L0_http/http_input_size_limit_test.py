@@ -33,9 +33,11 @@ import base64
 import gzip
 import io
 import json
+import os
 import unittest
 
 import numpy as np
+import psutil
 import requests
 import test_util as tu
 
@@ -734,6 +736,81 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify we got a valid response
         result = response.json()
         self.assertIn("outputs", result, "Response missing outputs field")
+
+
+class DecompressionLeakRegressionTest(tu.TestResultCollector):
+    """
+    Test that sending multiple malformed compressed requests does not cause memory leaks on the server.
+    """
+
+    LEAK_REQUEST_COUNT = 100
+    MAX_RSS_GROWTH_BYTES = 32 * MB
+    MODEL_NAME = "onnx_zero_1_float32"
+
+    def _get_server_process(self):
+        """
+        Return a psutil.Process for the tritonserver process.
+        """
+        pid_str = os.environ.get("SERVER_PID")
+        if not pid_str:
+            self.skipTest(
+                "SERVER_PID env var is not set"
+            )
+        try:
+            return psutil.Process(int(pid_str))
+        except (ValueError, psutil.NoSuchProcess) as e:
+            self.skipTest(f"Invalid or stale SERVER_PID={pid_str!r}: {e}")
+
+    def _assert_invalid_compressed_request_rejected(
+        self, session, url, body, headers
+    ):
+        resp = session.post(url, data=body, headers=headers)
+        self.assertEqual(
+            400,
+            resp.status_code,
+            f"Expected status code 400, got {resp.status_code}: {resp.content[:200]!r}",
+        )
+
+    def test_no_leak_on_invalid_inference_header_length(self):
+        body = gzip.compress(b" " * MB)
+        headers = {
+            "Content-Type": "application/json",
+            "Content-Encoding": "gzip",
+            "Inference-Header-Content-Length": "9999999",
+        }
+        url = f"http://localhost:8000/v2/models/{self.MODEL_NAME}/infer"
+
+        server = self._get_server_process()
+
+        with requests.Session() as session:
+            # Warm up this exact error path so one-time allocations do not
+            # look like leaks.
+            self._assert_invalid_compressed_request_rejected(
+                session, url, body, headers
+            )
+
+            rss_before = server.memory_info().rss
+            for _ in range(self.LEAK_REQUEST_COUNT):
+                self._assert_invalid_compressed_request_rejected(
+                    session, url, body, headers
+                )
+            rss_after = server.memory_info().rss
+
+        growth = rss_after - rss_before
+        print(
+            f"RSS: before={rss_before / MB:.1f} MiB, "
+            f"after={rss_after / MB:.1f} MiB, "
+            f"growth={growth / MB:.1f} MiB, "
+            f"limit={self.MAX_RSS_GROWTH_BYTES / MB:.0f} MiB",
+            flush=True,
+        )
+        self.assertLess(
+            growth,
+            self.MAX_RSS_GROWTH_BYTES,
+            f"Server RSS grew by {growth / MB:.1f} MiB after "
+            f"{self.LEAK_REQUEST_COUNT} malformed compressed requests "
+            f"(limit {self.MAX_RSS_GROWTH_BYTES / MB:.0f} MiB).",
+        )
 
 
 if __name__ == "__main__":
