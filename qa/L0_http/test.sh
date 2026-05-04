@@ -854,7 +854,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Test that sending multiple malformed compressed requests does not cause memory leaks on the server.
-SERVER_PID=$SERVER_PID python http_input_size_limit_test.py DecompressionLeakRegressionTest.test_no_leak_on_invalid_inference_header_length >> $CLIENT_LOG 2>&1
+SERVER_PID=$SERVER_PID python http_input_size_limit_test.py InferSizeLimitTest.test_no_leak_on_invalid_inference_header_length >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Decompression Leak Regression Failed\n***\n***"
