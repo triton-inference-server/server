@@ -72,11 +72,11 @@ class InferSizeLimitTest(tu.TestResultCollector):
         """
         pid_str = os.environ.get("SERVER_PID")
         if not pid_str:
-            self.fail("SERVER_PID env var is not set")
+            raise AssertionError("SERVER_PID env var is not set")
         try:
             return psutil.Process(int(pid_str))
         except (ValueError, psutil.NoSuchProcess) as e:
-            self.fail(f"Invalid or stale SERVER_PID={pid_str!r}: {e}")
+            raise AssertionError(f"Invalid or stale SERVER_PID={pid_str!r}: {e}")
 
     def test_json_dtype_size_expansion_exceeds_limit_error(self):
         """
