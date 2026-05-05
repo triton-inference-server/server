@@ -545,7 +545,7 @@ class HTTPAPIServer : public HTTPServer {
       evhtp_request_t* req, evbuffer* decompressed_buffer,
       int32_t* content_length);
   TRITONSERVER_Error* DecompressBuffer(
-      evhtp_request_t* req, EvbufferUniquePtr* decompressed_buffer);
+      evhtp_request_t* req, EvbufferUniquePtr& decompressed_buffer);
   TRITONSERVER_Error* CheckTransactionPolicy(
       evhtp_request_t* req, const std::string& model_name,
       int64_t requested_model_version);

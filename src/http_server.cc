@@ -3258,15 +3258,15 @@ HTTPAPIServer::StartTrace(
 
 TRITONSERVER_Error*
 HTTPAPIServer::DecompressBuffer(
-    evhtp_request_t* req, EvbufferUniquePtr* decompressed_buffer)
+    evhtp_request_t* req, EvbufferUniquePtr& decompressed_buffer)
 {
   auto compression_type = GetRequestCompressionType(req);
   switch (compression_type) {
     case DataCompressor::Type::DEFLATE:
     case DataCompressor::Type::GZIP: {
-      decompressed_buffer->reset(evbuffer_new());
+      decompressed_buffer.reset(evbuffer_new());
       RETURN_IF_ERR(DataCompressor::DecompressData(
-          compression_type, req->buffer_in, decompressed_buffer->get(),
+          compression_type, req->buffer_in, decompressed_buffer.get(),
           max_input_size_));
       break;
     }
@@ -3778,7 +3778,7 @@ HTTPAPIServer::HandleInfer(
 
   // Decompress request body if it is compressed in supported type
   EvbufferUniquePtr decompressed_buffer;
-  RETURN_AND_RESPOND_IF_ERR(req, DecompressBuffer(req, &decompressed_buffer));
+  RETURN_AND_RESPOND_IF_ERR(req, DecompressBuffer(req, decompressed_buffer));
 
   // Get content length as a default header_length if no header specified
   int32_t content_length = 0;
