@@ -39,8 +39,6 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
 fi
 
 CLIENT_LOG="./client.log"
-TEST_SCRIPT_PY="parameters_test.py"
-
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
@@ -54,27 +52,27 @@ mkdir -p "${MODELDIR}/ensemble/1"
 # https://jirasw.nvidia.com/browse/DLIS-4673
 
 all_tests=("test_params"
+           "test_params_reserved_rejected"
            "test_headers"
-           "test_header_forward_pattern_case_insensitive"
-           "test_grpc_header_forward_pattern_case_sensitive")
+           "test_grpc_header_forward_pattern_case_sensitive"
+           "test_headers_reserved_rejected")
 
 RET=0
-for i in "${all_tests[@]}"; do
-  # TEST_HEADER is a parameter used by `parameters_test.py` that controls
-  # whether the script will test for inclusion of headers in parameters or not.
+for test in "${all_tests[@]}"; do
   SERVER_ARGS="--model-repository=${MODELDIR} --exit-timeout-secs=120"
-  if [ "$i" == "test_headers" ]; then
-    SERVER_ARGS+=" --grpc-header-forward-pattern my_header.*"
-    SERVER_ARGS+=" --http-header-forward-pattern my_header.*"
-  elif [ "$i" == "test_header_forward_pattern_case_insensitive" ]; then
+  if [ "$test" == "test_headers" ]; then
+    # gRPC lowercases metadata keys; HTTP may lowercase too — match prefix case-insensitively.
     SERVER_ARGS+=" --grpc-header-forward-pattern MY_HEADER.*"
     SERVER_ARGS+=" --http-header-forward-pattern MY_HEADER.*"
   # NOTE: headers sent through the python HTTP client may be automatically
   # lowercased by internal libraries like geventhttpclient, so we only test
   # GRPC client for case-sensitivity here:
   # https://github.com/geventhttpclient/geventhttpclient/blob/d1e14356c3b02099c879cf9b3bdb684a0cbd8bf5/src/geventhttpclient/header.py#L62-L63
-  elif [ "$i" == "test_grpc_header_forward_pattern_case_sensitive" ]; then
+  elif [ "$test" == "test_grpc_header_forward_pattern_case_sensitive" ]; then
     SERVER_ARGS+=" --grpc-header-forward-pattern (?-i)MY_HEADER.*"
+  elif [ "$test" == "test_headers_reserved_rejected" ]; then
+    SERVER_ARGS+=" --grpc-header-forward-pattern .*"
+    SERVER_ARGS+=" --http-header-forward-pattern .*"
   fi
   run_server
   if [ "$SERVER_PID" == "0" ]; then
@@ -84,7 +82,7 @@ for i in "${all_tests[@]}"; do
   fi
 
   set +e
-  TEST_HEADER="$i" python3 $TEST_SCRIPT_PY >$CLIENT_LOG 2>&1
+  python3 -m unittest "parameters_test.InferenceParametersTest.${test}" >$CLIENT_LOG 2>&1
   if [ $? -ne 0 ]; then
       cat $CLIENT_LOG
       echo -e "\n***\n*** Test Failed\n***"

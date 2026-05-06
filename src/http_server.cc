@@ -2888,8 +2888,7 @@ HTTPAPIServer::ParseJsonTritonParams(
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             ("parameter keys starting with 'triton_' are reserved for Triton "
-             "usage "
-             "and should not be specified."));
+             "usage and should not be specified."));
       } else {
         RETURN_IF_ERR(SetTritonParameterFromJsonParameter(
             parameter, params_json, irequest));
@@ -3192,14 +3191,25 @@ struct HeaderSearchPayload {
 int
 ForEachHeader(evhtp_header_t* header, void* arg)
 {
-  HeaderSearchPayload* header_search_payload =
-      reinterpret_cast<HeaderSearchPayload*>(arg);
+  auto* header_search_payload = reinterpret_cast<HeaderSearchPayload*>(arg);
 
   TRITONSERVER_InferenceRequest* request = header_search_payload->request_;
   const re2::RE2& regex = header_search_payload->regex_;
+  std::string header_key{header->key};
 
-  std::string matched_string;
-  if (RE2::PartialMatch(std::string(header->key), regex)) {
+  if (RE2::PartialMatch(header_key, regex)) {
+    if (std::find(
+            kReservedParameterKeys.begin(), kReservedParameterKeys.end(),
+            header_key) != kReservedParameterKeys.end() ||
+        header_key.rfind("triton_", 0) == 0) {
+      header_search_payload->error_ = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          ("Header '" + header_key +
+           "' is reserved for Triton usage and cannot be forwarded.")
+              .c_str());
+      return 1;
+    }
+
     header_search_payload->error_ =
         TRITONSERVER_InferenceRequestSetStringParameter(
             request, header->key, header->val);

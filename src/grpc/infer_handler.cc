@@ -1,4 +1,4 @@
-// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -291,8 +291,8 @@ SetInferenceRequestMetadata(
             TRITONSERVER_ERROR_INVALID_ARG,
             (std::string(
                  "parameter keys starting with 'triton_' are reserved for "
-                 "Triton "
-                 "usage. Only the following keys starting with 'triton_' are "
+                 "Triton usage. Only the following keys starting with "
+                 "'triton_' are "
                  "allowed: ") +
              Join(TRITON_RESERVED_REQUEST_PARAMS, " "))
                 .c_str());
