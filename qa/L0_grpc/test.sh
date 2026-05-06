@@ -152,6 +152,12 @@ sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" ${M
 rm -f ${MODELDIR}/simple_string_dyna_sequence/1/model.onnx
 cp ../custom_models/custom_dyna_sequence_int32/1/libtriton_dyna_sequence.so ${MODELDIR}/simple_string_dyna_sequence/1/
 
+rm -rf ${MODELDIR}/string_identity
+cp -r ../python_models/string_identity ${MODELDIR}/string_identity
+mkdir -p ${MODELDIR}/string_identity/1
+mv ${MODELDIR}/string_identity/model.py ${MODELDIR}/string_identity/1/model.py
+sed -i "s/dims: \[ 1 \]/dims: [ -1 ]/g" ${MODELDIR}/string_identity/config.pbtxt
+
 rm -f *.log
 rm -f *.log.*
 
@@ -349,11 +355,11 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-# Test duplicate output names are rejected
-python $PYTHON_UNIT_TEST GrpcTest >> ${CLIENT_LOG}.duplicate_output 2>&1
+# Test duplicate output and bytes_contents
+python $PYTHON_UNIT_TEST GrpcTest >> "grpc_test--${CLIENT_LOG}" 2>&1
 if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.duplicate_output
-    echo -e "\n***\n*** Python GRPC Duplicate Output Test Failed\n***"
+    cat "grpc_test--${CLIENT_LOG}"
+    echo -e "\n***\n*** Python GRPC Test Failed\n***"
     RET=1
 fi
 
