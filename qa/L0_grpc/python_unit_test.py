@@ -113,9 +113,7 @@ class GrpcTest(unittest.TestCase):
         response = grpc_stub.ModelInfer(request, timeout=120)
 
         self.assertEqual(list(response.outputs[0].shape), [element_count])
-        self.assertEqual(
-            len(response.raw_output_contents[0]), expected_serialized_size
-        )
+        self.assertEqual(len(response.raw_output_contents[0]), expected_serialized_size)
 
         # Verify every element round-tripped correctly through the
         # serialization path.
