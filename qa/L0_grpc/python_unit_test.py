@@ -32,11 +32,12 @@ import unittest
 # For stream infer test
 from functools import partial
 
-import grpc
 import numpy as np
 import tritonclient.grpc as grpcclient
 from tritonclient.grpc import service_pb2, service_pb2_grpc
 from tritonclient.utils import InferenceServerException, deserialize_bytes_tensor
+
+import grpc
 
 
 class UserData:
