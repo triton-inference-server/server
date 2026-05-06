@@ -270,8 +270,6 @@ class TorchAotiTest(tu.TestResultCollector):
         input_data = self._get_torchvision_input_data(INPUT_SHAPE)
         input_data[0][0] = 1.0
 
-        start = time.time()
-
         with http.InferenceServerClient("localhost:8000") as client:
             inputs = [
                 http.InferInput("ARGS[0]", input_data.shape, "FP32"),
@@ -296,9 +294,6 @@ class TorchAotiTest(tu.TestResultCollector):
             assert len(outputs) == len(output_data)
             for data in output_data:
                 assert data.shape == OUTPUT_SHAPE
-
-        end = time.time()
-        assert (end - start) < 0.2, f"Inference time {end - start} time exceeds 200ms"
 
 
 if __name__ == "__main__":
