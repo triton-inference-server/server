@@ -76,6 +76,8 @@ class SagemakerRequestManyChunksTest(unittest.TestCase):
             try:
                 s.sendall(b"0\r\n\r\n")
             except (BrokenPipeError, ConnectionResetError):
+                # Server may close/reset early after detecting chunk-limit violation.
+                # In that case, failing to send the terminating chunk is expected.
                 pass
 
             # Receive response
