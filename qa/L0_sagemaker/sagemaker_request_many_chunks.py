@@ -141,7 +141,7 @@ class SagemakerRequestManyChunksTest(unittest.TestCase):
         # Monitor RSS growth over 100 requests.
         repeat_request_count = 100
         rss_before = server.memory_info().rss
-        # TODO: Why sagemaker server ocassionly grows >10 MiB but http server always smaller than 1 MiB?
+        # TODO: Why sagemaker server occasionally grows >10 MiB but http server always smaller than 1 MiB?
         max_rss_growth_bytes = 20 * MIB
 
         for _ in range(repeat_request_count):

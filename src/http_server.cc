@@ -51,9 +51,7 @@
 namespace triton { namespace server {
 
 // Transfer-Encoding: chunked — count non-empty chunks per request (worker
-// thread); reset in ChunkCountReset, increment in ChunkCountIncrement. Caps
-// evbuffer fan-out / RSS.
-thread_local uint64_t tls_http_chunk_n = 0;
+// thread). Increment in ChunkCountIncrement. Caps evbuffer fan-out / RSS.
 constexpr uint64_t kMaxChunkedChunks =
     1 << 16;  // reject on chunk count > kMaxChunkedChunks (65536)
 
@@ -310,17 +308,6 @@ HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
 }
 
 evhtp_res
-HTTPServer::ChunkCountReset(
-    evhtp_request_t* req, evhtp_headers_t* hdrs, void* arg)
-{
-  (void)req;
-  (void)hdrs;
-  (void)arg;
-  tls_http_chunk_n = 0;
-  return EVHTP_RES_OK;
-}
-
-evhtp_res
 HTTPServer::ChunkCountIncrement(
     evhtp_request_t* req, uint64_t chunk_len, void* arg)
 {
@@ -332,7 +319,7 @@ HTTPServer::ChunkCountIncrement(
   if (chunk_len == 0) {
     return EVHTP_RES_OK;
   }
-  if (++tls_http_chunk_n > kMaxChunkedChunks) {
+  if (++req->chunk_count > kMaxChunkedChunks) {
     AddContentTypeHeader(req, "application/json");
     const std::string msg =
         std::string("Chunked request body exceeds maximum of ") +
