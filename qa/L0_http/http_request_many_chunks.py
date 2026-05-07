@@ -78,6 +78,8 @@ class HTTPRequestManyChunksTest(unittest.TestCase):
             try:
                 s.sendall(b"0\r\n\r\n")
             except (BrokenPipeError, ConnectionResetError):
+                # Server may close/reset early after deciding on an error response.
+                # Ignore send failure here and continue reading any available response bytes.
                 pass
 
             response = b""
