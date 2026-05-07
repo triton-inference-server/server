@@ -695,7 +695,7 @@ wait $SERVER_PID
 
 # Helper library to parse SSE events
 # https://github.com/mpetazzoni/sseclient
-pip install sseclient-py
+pip install sseclient-py psutil
 
 SERVER_ARGS="--model-repository=`pwd`/../python_models/generate_models --log-verbose=1"
 SERVER_LOG="./inference_server_generate_endpoint_test.log"
@@ -850,6 +850,14 @@ python http_input_size_limit_test.py InferSizeLimitTest.test_json_dtype_size_exp
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for type size explosion\n***"
+    RET=1
+fi
+
+# Test that sending multiple malformed compressed requests does not cause memory leaks on the server.
+SERVER_PID=$SERVER_PID python http_input_size_limit_test.py InferSizeLimitTest.test_no_leak_on_invalid_inference_header_length >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Decompression Leak Regression Failed\n***\n***"
     RET=1
 fi
 set -e

@@ -152,6 +152,18 @@ sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" ${M
 rm -f ${MODELDIR}/simple_string_dyna_sequence/1/model.onnx
 cp ../custom_models/custom_dyna_sequence_int32/1/libtriton_dyna_sequence.so ${MODELDIR}/simple_string_dyna_sequence/1/
 
+# Prepare a dedicated model repository for GrpcTest in python_unit_test.py.
+# separate from MODELDIR avoids changing the model count expected by other
+# tests in this script.
+GRPC_TEST_MODELDIR=`pwd`/grpc_test_models
+rm -rf ${GRPC_TEST_MODELDIR}
+mkdir -p ${GRPC_TEST_MODELDIR}
+cp -r ${MODELDIR}/simple ${GRPC_TEST_MODELDIR}/
+cp -r ../python_models/string_identity ${GRPC_TEST_MODELDIR}/string_identity
+mkdir -p ${GRPC_TEST_MODELDIR}/string_identity/1
+mv ${GRPC_TEST_MODELDIR}/string_identity/model.py ${GRPC_TEST_MODELDIR}/string_identity/1/model.py
+sed -i "s/dims: \[ 1 \]/dims: [ -1 ]/g" ${GRPC_TEST_MODELDIR}/string_identity/config.pbtxt
+
 rm -f *.log
 rm -f *.log.*
 
@@ -349,11 +361,26 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-# Test duplicate output names are rejected
-python $PYTHON_UNIT_TEST GrpcTest >> ${CLIENT_LOG}.duplicate_output 2>&1
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Test duplicate output and bytes_contents
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${GRPC_TEST_MODELDIR}"
+SERVER_LOG=./inference_server_grpc_test.log
+GRPC_TEST_CLIENT_LOG=./inference_client_grpc_test.log
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $PYTHON_UNIT_TEST GrpcTest >> $GRPC_TEST_CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.duplicate_output
-    echo -e "\n***\n*** Python GRPC Duplicate Output Test Failed\n***"
+    cat $GRPC_TEST_CLIENT_LOG
+    echo -e "\n***\n*** Python GRPC Test Failed\n***"
     RET=1
 fi
 

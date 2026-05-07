@@ -2888,8 +2888,7 @@ HTTPAPIServer::ParseJsonTritonParams(
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             ("parameter keys starting with 'triton_' are reserved for Triton "
-             "usage "
-             "and should not be specified."));
+             "usage and should not be specified."));
       } else {
         RETURN_IF_ERR(SetTritonParameterFromJsonParameter(
             parameter, params_json, irequest));
@@ -3192,14 +3191,25 @@ struct HeaderSearchPayload {
 int
 ForEachHeader(evhtp_header_t* header, void* arg)
 {
-  HeaderSearchPayload* header_search_payload =
-      reinterpret_cast<HeaderSearchPayload*>(arg);
+  auto* header_search_payload = reinterpret_cast<HeaderSearchPayload*>(arg);
 
   TRITONSERVER_InferenceRequest* request = header_search_payload->request_;
   const re2::RE2& regex = header_search_payload->regex_;
+  std::string header_key{header->key};
 
-  std::string matched_string;
-  if (RE2::PartialMatch(std::string(header->key), regex)) {
+  if (RE2::PartialMatch(header_key, regex)) {
+    if (std::find(
+            kReservedParameterKeys.begin(), kReservedParameterKeys.end(),
+            header_key) != kReservedParameterKeys.end() ||
+        header_key.rfind("triton_", 0) == 0) {
+      header_search_payload->error_ = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          ("Header '" + header_key +
+           "' is reserved for Triton usage and cannot be forwarded.")
+              .c_str());
+      return 1;
+    }
+
     header_search_payload->error_ =
         TRITONSERVER_InferenceRequestSetStringParameter(
             request, header->key, header->val);
@@ -3258,15 +3268,15 @@ HTTPAPIServer::StartTrace(
 
 TRITONSERVER_Error*
 HTTPAPIServer::DecompressBuffer(
-    evhtp_request_t* req, evbuffer** decompressed_buffer)
+    evhtp_request_t* req, EvbufferUniquePtr& decompressed_buffer)
 {
   auto compression_type = GetRequestCompressionType(req);
   switch (compression_type) {
     case DataCompressor::Type::DEFLATE:
     case DataCompressor::Type::GZIP: {
-      *decompressed_buffer = evbuffer_new();
+      decompressed_buffer.reset(evbuffer_new());
       RETURN_IF_ERR(DataCompressor::DecompressData(
-          compression_type, req->buffer_in, *decompressed_buffer,
+          compression_type, req->buffer_in, decompressed_buffer.get(),
           max_input_size_));
       break;
     }
@@ -3777,13 +3787,13 @@ HTTPAPIServer::HandleInfer(
   }
 
   // Decompress request body if it is compressed in supported type
-  evbuffer* decompressed_buffer = nullptr;
-  RETURN_AND_RESPOND_IF_ERR(req, DecompressBuffer(req, &decompressed_buffer));
+  EvbufferUniquePtr decompressed_buffer;
+  RETURN_AND_RESPOND_IF_ERR(req, DecompressBuffer(req, decompressed_buffer));
 
   // Get content length as a default header_length if no header specified
   int32_t content_length = 0;
   RETURN_AND_RESPOND_IF_ERR(
-      req, GetContentLength(req, decompressed_buffer, &content_length));
+      req, GetContentLength(req, decompressed_buffer.get(), &content_length));
 
   // Get the header length
   size_t header_length = 0;
@@ -3835,8 +3845,8 @@ HTTPAPIServer::HandleInfer(
   // Parse EV request and fill Triton request fields from it
   RETURN_AND_CALLBACK_IF_ERR(
       EVRequestToTritonRequest(
-          req, model_name, irequest, decompressed_buffer, infer_request.get(),
-          header_length),
+          req, model_name, irequest, decompressed_buffer.get(),
+          infer_request.get(), header_length),
       error_callback);
 
   // Get request ID for logging in case of error.
@@ -3851,7 +3861,7 @@ HTTPAPIServer::HandleInfer(
   RETURN_AND_CALLBACK_IF_ERR(ForwardHeaders(req, irequest), error_callback);
 
   auto request_release_payload = std::make_unique<RequestReleasePayload>(
-      irequest_shared, decompressed_buffer);
+      irequest_shared, decompressed_buffer.release());
   RETURN_AND_CALLBACK_IF_ERR(
       TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestClass::InferRequestComplete,
