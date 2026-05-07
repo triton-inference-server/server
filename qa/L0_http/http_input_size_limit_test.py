@@ -33,9 +33,11 @@ import base64
 import gzip
 import io
 import json
+import os
 import unittest
 
 import numpy as np
+import psutil
 import requests
 import test_util as tu
 
@@ -63,6 +65,18 @@ OFFSET_ELEMENTS = 32
 class InferSizeLimitTest(tu.TestResultCollector):
     def _get_infer_url(self, model_name):
         return f"http://localhost:8000/v2/models/{model_name}/infer"
+
+    def _get_server_process(self):
+        """
+        Return a psutil.Process for the tritonserver under test.
+        """
+        pid_str = os.environ.get("SERVER_PID")
+        if not pid_str:
+            raise AssertionError("SERVER_PID env var is not set")
+        try:
+            return psutil.Process(int(pid_str))
+        except (ValueError, psutil.NoSuchProcess) as e:
+            raise AssertionError(f"Invalid or stale SERVER_PID={pid_str!r}: {e}")
 
     def test_json_dtype_size_expansion_exceeds_limit_error(self):
         """
@@ -734,6 +748,62 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify we got a valid response
         result = response.json()
         self.assertIn("outputs", result, "Response missing outputs field")
+
+    def test_no_leak_on_invalid_inference_header_length(self):
+        """
+        Test that sending multiple malformed compressed requests does not cause memory growth on the server.
+        """
+        leak_request_count = 100
+        max_rss_growth_bytes = 32 * MB
+        model = "onnx_zero_1_float32"
+
+        body = gzip.compress(b" " * MB)
+        headers = {
+            "Content-Type": "application/json",
+            "Content-Encoding": "gzip",
+            "Inference-Header-Content-Length": "9999999",
+        }
+        url = self._get_infer_url(model)
+
+        server = self._get_server_process()
+
+        with requests.Session() as session:
+            # Warm up the failure path so one-time allocations do not look
+            # like leaks.
+            resp = session.post(url, data=body, headers=headers)
+            self.assertEqual(
+                400,
+                resp.status_code,
+                f"Expected status code 400, got {resp.status_code}: "
+                f"{resp.content[:200]!r}",
+            )
+
+            rss_before = server.memory_info().rss
+            for _ in range(leak_request_count):
+                resp = session.post(url, data=body, headers=headers)
+                self.assertEqual(
+                    400,
+                    resp.status_code,
+                    f"Expected status code 400, got {resp.status_code}: "
+                    f"{resp.content[:200]!r}",
+                )
+            rss_after = server.memory_info().rss
+
+        growth = rss_after - rss_before
+        print(
+            f"RSS: before={rss_before / MB:.1f} MiB, "
+            f"after={rss_after / MB:.1f} MiB, "
+            f"growth={growth / MB:.1f} MiB, "
+            f"limit={max_rss_growth_bytes / MB:.0f} MiB",
+            flush=True,
+        )
+        self.assertLess(
+            growth,
+            max_rss_growth_bytes,
+            f"Server RSS grew by {growth / MB:.1f} MiB after "
+            f"{leak_request_count} malformed compressed requests "
+            f"(limit {max_rss_growth_bytes / MB:.0f} MiB).",
+        )
 
 
 if __name__ == "__main__":
