@@ -78,6 +78,7 @@ class SagemakerRequestManyChunksTest(unittest.TestCase):
             except (BrokenPipeError, ConnectionResetError):
                 # Server may close/reset early after detecting chunk-limit violation.
                 # In that case, failing to send the terminating chunk is expected.
+                pass
 
             # Receive response
             response = b""
