@@ -33,12 +33,11 @@ import base64
 import gzip
 import io
 import json
-import os
 import unittest
 
 import numpy as np
 import requests
-from test_util import MIB, TestResultCollector, get_server_process_from_env
+from test_util import GIB, MIB, TestResultCollector, get_server_process_from_env
 
 # Constants for size calculations
 # Each FP32 value is 4 bytes, so we need to divide target byte sizes by 4 to get element counts
