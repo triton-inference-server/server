@@ -31,9 +31,11 @@
 #include "http_server.h"
 
 #include <event2/buffer.h>
+#include <event2/bufferevent.h>
 #include <re2/re2.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <list>
 #include <regex>
 #include <thread>
@@ -47,6 +49,13 @@
 #include "triton/common/triton_json.h"
 
 namespace triton { namespace server {
+
+// Transfer-Encoding: chunked — count non-empty chunks per request (worker
+// thread); reset in ChunkCountReset, increment in ChunkCountIncrement. Caps
+// evbuffer fan-out / RSS.
+thread_local uint64_t tls_http_chunk_n = 0;
+constexpr uint64_t kMaxChunkedChunks =
+    1 << 16;  // reject on chunk count > kMaxChunkedChunks (65536)
 
 #define RETURN_AND_CALLBACK_IF_ERR(X, CALLBACK) \
   do {                                          \
@@ -289,8 +298,57 @@ HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
     server->conn_cnt_++;
   }
   evhtp_connection_set_hook(
+      conn, evhtp_hook_on_headers,
+      (evhtp_hook)(void*)HTTPServer::ChunkCountReset, arg);
+  evhtp_connection_set_hook(
+      conn, evhtp_hook_on_new_chunk,
+      (evhtp_hook)(void*)HTTPServer::ChunkCountIncrement, arg);
+  evhtp_connection_set_hook(
       conn, evhtp_hook_on_connection_fini,
       (evhtp_hook)(void*)HTTPServer::EndConnection, arg);
+  return EVHTP_RES_OK;
+}
+
+evhtp_res
+HTTPServer::ChunkCountReset(
+    evhtp_request_t* req, evhtp_headers_t* hdrs, void* arg)
+{
+  (void)req;
+  (void)hdrs;
+  (void)arg;
+  tls_http_chunk_n = 0;
+  return EVHTP_RES_OK;
+}
+
+evhtp_res
+HTTPServer::ChunkCountIncrement(
+    evhtp_request_t* req, uint64_t chunk_len, void* arg)
+{
+  (void)arg;
+  if ((req->flags & EVHTP_REQ_FLAG_FINISHED) != 0) {
+    return EVHTP_RES_OK;
+  }
+
+  if (chunk_len == 0) {
+    return EVHTP_RES_OK;
+  }
+  if (++tls_http_chunk_n > kMaxChunkedChunks) {
+    AddContentTypeHeader(req, "application/json");
+    const std::string msg =
+        std::string("Chunked request body exceeds maximum of ") +
+        std::to_string(kMaxChunkedChunks) +
+        " non-empty chunks. Send fewer or larger HTTP chunks.";
+    EVBufferAddErrorJson(req->buffer_out, msg.c_str());
+    // Force connection close after flushing this error response.
+    req->flags &= ~EVHTP_REQ_FLAG_KEEPALIVE;
+    if ((req->conn != nullptr) && (req->conn->bev != nullptr)) {
+      // Stop ingesting request bytes once over limit so memory won't keep
+      // growing while we flush the error response.
+      bufferevent_disable(req->conn->bev, EV_READ);
+    }
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return EVHTP_RES_OK;
+  }
   return EVHTP_RES_OK;
 }
 

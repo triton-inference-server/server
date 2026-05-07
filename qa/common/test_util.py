@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
+import os
 import unittest
 
 import numpy as np
@@ -36,6 +37,45 @@ _last_request_id = 0
 # Numpy does not support the BF16 datatype natively.
 # We use this dummy dtype as a representative for BF16.
 np_dtype_bfloat16 = np.dtype([("bf16", object)])
+
+MIB = 2**20  # 1 MIB = 1,048,576 bytes
+GIB = 2**30  # 1 GIB = 1,073,741,824 bytes
+
+
+def get_server_process_from_env(env_var="SERVER_PID"):
+    """
+    Return a psutil.Process for the tritonserver under test.
+    """
+    import psutil
+
+    pid_str = os.environ.get(env_var)
+    if not pid_str:
+        raise AssertionError(f"{env_var} env var is not set")
+    try:
+        return psutil.Process(int(pid_str))
+    except (ValueError, psutil.NoSuchProcess) as e:
+        raise AssertionError(f"Invalid or stale {env_var}={pid_str!r}: {e}")
+
+
+def wait_for_stable_rss(server, rss_tolerance_bytes=0.1 * MIB, stable_threshold=10):
+    """
+    Wait until the RSS of the server is stable.
+    """
+    import time
+
+    last_rss = None
+    stable_count = 0
+    while True:
+        rss = server.memory_info().rss
+        if last_rss is not None and abs(rss - last_rss) < rss_tolerance_bytes:
+            stable_count += 1
+        else:
+            stable_count = 0
+        last_rss = rss
+        if stable_count >= stable_threshold:
+            break
+        time.sleep(0.1)
+    return
 
 
 def shape_element_count(shape):

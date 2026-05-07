@@ -950,7 +950,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $REQUEST_MANY_CHUNKS_PY -v >> ${CLIENT_LOG} 2>&1
+SERVER_PID=$SERVER_PID python $REQUEST_MANY_CHUNKS_PY -v >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** HTTP Request Many Chunks Test Failed\n***"
     cat $SERVER_LOG
