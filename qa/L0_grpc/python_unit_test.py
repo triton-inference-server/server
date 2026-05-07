@@ -34,7 +34,10 @@ from functools import partial
 
 import numpy as np
 import tritonclient.grpc as grpcclient
-from tritonclient.utils import InferenceServerException
+from tritonclient.grpc import service_pb2, service_pb2_grpc
+from tritonclient.utils import InferenceServerException, deserialize_bytes_tensor
+
+import grpc
 
 
 class UserData:
@@ -75,6 +78,61 @@ class GrpcTest(unittest.TestCase):
         self.assertTrue(
             client.is_server_live(),
             "Server is not healthy after duplicate output request",
+        )
+
+    def test_bytes_contents_many_elements_serialization(self):
+        """
+        Regression test for InferGRPCToInput bytes_contents pre-allocation.
+        Sends a BYTES tensor with many explicit bytes_contents elements over
+        the raw gRPC stub.
+        """
+        # 10,485,760 elements * (4-byte length + 1-byte payload) = 50 MiB
+        # of serialized BYTES data on both the request and response sides.
+        element_count = 10 * 1024 * 1024
+        payload = b"A"
+        expected_serialized_size = element_count * (4 + len(payload))
+
+        request = service_pb2.ModelInferRequest()
+        request.model_name = "string_identity"
+
+        input_tensor = request.inputs.add()
+        input_tensor.name = "INPUT0"
+        input_tensor.datatype = "BYTES"
+        input_tensor.shape.extend([element_count])
+        input_tensor.contents.bytes_contents.extend([payload] * element_count)
+        request.outputs.add().name = "OUTPUT0"
+
+        # The default Python gRPC client send/receive limit is 4 MiB which
+        # is below the request and response sizes used here.
+        channel_options = [
+            ("grpc.max_send_message_length", 256 * 1024 * 1024),
+            ("grpc.max_receive_message_length", 256 * 1024 * 1024),
+        ]
+        grpc_stub = service_pb2_grpc.GRPCInferenceServiceStub(
+            grpc.insecure_channel("localhost:8001", options=channel_options)
+        )
+        response = grpc_stub.ModelInfer(request, timeout=120)
+
+        self.assertEqual(list(response.outputs[0].shape), [element_count])
+        self.assertEqual(len(response.raw_output_contents[0]), expected_serialized_size)
+
+        # Verify every element round-tripped correctly through the
+        # serialization path.
+        output = deserialize_bytes_tensor(response.raw_output_contents[0])
+        self.assertEqual(output.shape, (element_count,))
+        self.assertTrue(
+            np.all(output == payload),
+            "bytes_contents elements did not round-trip correctly",
+        )
+
+        client = grpcclient.InferenceServerClient(url="localhost:8001")
+        self.assertTrue(
+            client.is_server_live(),
+            "Server must remain healthy after many bytes_contents elements",
+        )
+        self.assertTrue(
+            client.is_model_ready("string_identity"),
+            "Model must remain ready after many bytes_contents elements",
         )
 
 
