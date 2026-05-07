@@ -476,6 +476,7 @@ class HTTPAPIServer : public HTTPServer {
   };
 
   struct ReleaseEvbuffer {
+    // Custom deleter for evbuffer
     void operator()(evbuffer* b) const noexcept
     {
       if (b != nullptr) {
