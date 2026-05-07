@@ -296,9 +296,6 @@ HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
     server->conn_cnt_++;
   }
   evhtp_connection_set_hook(
-      conn, evhtp_hook_on_headers,
-      (evhtp_hook)(void*)HTTPServer::ChunkCountReset, arg);
-  evhtp_connection_set_hook(
       conn, evhtp_hook_on_new_chunk,
       (evhtp_hook)(void*)HTTPServer::ChunkCountIncrement, arg);
   evhtp_connection_set_hook(
