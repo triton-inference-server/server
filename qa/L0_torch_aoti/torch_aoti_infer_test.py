@@ -32,7 +32,6 @@ sys.path.append("../common")
 
 import unittest
 
-import numpy as np
 import test_util as tu
 import torch
 import tritonclient.http as http
