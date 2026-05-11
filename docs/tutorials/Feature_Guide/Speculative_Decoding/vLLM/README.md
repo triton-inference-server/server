@@ -330,6 +330,7 @@ Solution:
 
 ## Additional Resources
 
+- [Speculative Decoding Overview](../README.md) - High-level guide and backend comparison
 - [vLLM Backend Documentation](https://github.com/triton-inference-server/vllm_backend)
 - [vLLM Speculative Decoding](https://docs.vllm.ai/)
 - [Speculative Decoding Paper](https://arxiv.org/abs/2211.17192)
