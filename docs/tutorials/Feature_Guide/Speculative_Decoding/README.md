@@ -75,9 +75,9 @@ The speculative decoding process follows these steps:
 Suppose we want to generate the sentence: "The cat sat on the mat."
 
 1. **Draft Model proposes**: "The cat sat on the"
-2. **Target Model verifies**: 
+2. **Target Model verifies**:
    - ✓ "The" - Accept
-   - ✓ "cat" - Accept  
+   - ✓ "cat" - Accept
    - ✓ "sat" - Accept
    - ✓ "on" - Accept
    - ✓ "the" - Accept

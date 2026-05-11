@@ -121,7 +121,7 @@ model_repository/
 ### config.pbtxt
 
 ```
-# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # (License text omitted for brevity)
 
 name: "llama-3.1-70b-speculative"
@@ -300,7 +300,7 @@ Solution: Reduce gpu_memory_utilization or use a smaller draft model
 
 **Issue**: No speedup observed
 ```
-Solution: 
+Solution:
 - Ensure draft model is from the same family as target model
 - Check that num_speculative_tokens > 0
 - Verify both models loaded successfully in logs
