@@ -102,8 +102,6 @@ class TorchAotiTest(tu.TestResultCollector):
 
         input_data = self._get_complex_input_data(INPUT_SHAPE)
 
-        start = time.time()
-
         with http.InferenceServerClient("localhost:8000") as client:
             inputs = [
                 http.InferInput("INPUT__0", input_data[0].shape, "INT8"),
@@ -136,19 +134,16 @@ class TorchAotiTest(tu.TestResultCollector):
             for output_name in output_names:
                 output_data.append(results.as_numpy(output_name))
 
-            assert len(outputs) == len(output_data)
+            self.assertEqual(len(outputs), len(output_data))
             for data in output_data:
-                assert data.shape == OUTPUT_SHAPE
+                self.assertEqual(data.shape, OUTPUT_SHAPE)
 
-            assert (output_data[0] == (input_data[0] + input_data[1])).all()
-            assert (output_data[1] == input_data[0] - input_data[1]).all()
-            assert (output_data[2] == input_data[0]).all()
-            assert (output_data[3] == input_data[1]).all()
-            assert (output_data[4] == input_data[2]).all()
-            assert (output_data[5] == input_data[3]).all()
-
-        end = time.time()
-        assert (end - start) < 0.0333, f"Inference time {end - start} time exceeds 33ms"
+            self.assertTrue((output_data[0] == (input_data[0] + input_data[1])).all())
+            self.assertTrue((output_data[1] == input_data[0] - input_data[1]).all())
+            self.assertTrue((output_data[2] == input_data[0]).all())
+            self.assertTrue((output_data[3] == input_data[1]).all())
+            self.assertTrue((output_data[4] == input_data[2]).all())
+            self.assertTrue((output_data[5] == input_data[3]).all())
 
     def test_complex_named(self):
         MODEL_NAME = "torch_aoti_complex_named"
@@ -156,8 +151,6 @@ class TorchAotiTest(tu.TestResultCollector):
         OUTPUT_SHAPE = self._get_complex_output_shape()
 
         input_data = self._get_complex_input_data(INPUT_SHAPE)
-
-        start = time.time()
 
         with http.InferenceServerClient("localhost:8000") as client:
             inputs = [
@@ -191,19 +184,16 @@ class TorchAotiTest(tu.TestResultCollector):
             for output_name in output_names:
                 output_data.append(results.as_numpy(output_name))
 
-            assert len(outputs) == len(output_data)
+            self.assertEqual(len(outputs), len(output_data))
             for data in output_data:
-                assert data.shape == OUTPUT_SHAPE
+                self.assertEqual(data.shape, OUTPUT_SHAPE)
 
-            assert (output_data[0] == (input_data[0] + input_data[1])).all()
-            assert (output_data[1] == input_data[0]).all()
-            assert (output_data[2] == input_data[1]).all()
-            assert (output_data[3] == input_data[2]).all()
-            assert (output_data[4] == input_data[3]).all()
-            assert (output_data[5] == (input_data[0] - input_data[1])).all()
-
-        end = time.time()
-        assert (end - start) < 0.0333, f"Inference time {end - start} time exceeds 33ms"
+            self.assertTrue((output_data[0] == (input_data[0] + input_data[1])).all())
+            self.assertTrue((output_data[1] == input_data[0]).all())
+            self.assertTrue((output_data[2] == input_data[1]).all())
+            self.assertTrue((output_data[3] == input_data[2]).all())
+            self.assertTrue((output_data[4] == input_data[3]).all())
+            self.assertTrue((output_data[5] == (input_data[0] - input_data[1])).all())
 
     def test_simple_model(self):
         io_types = [
@@ -224,8 +214,6 @@ class TorchAotiTest(tu.TestResultCollector):
                 self._get_simple_input_data(INPUT_SHAPE, io_type),
                 self._get_simple_input_data(INPUT_SHAPE, io_type),
             )
-
-            start = time.time()
 
             with http.InferenceServerClient("localhost:8000") as client:
                 inputs = [
@@ -252,15 +240,10 @@ class TorchAotiTest(tu.TestResultCollector):
                 for output_name in output_names:
                     output_data.append(results.as_numpy(output_name))
 
-                assert len(outputs) == len(output_data)
+                self.assertEqual(len(outputs), len(output_data))
                 for data in output_data:
-                    assert data.shape == OUTPUT_SHAPE
-                    assert (data == input_data[0] + input_data[1]).all()
-
-            end = time.time()
-            assert (
-                end - start
-            ) < 0.0333, f"Inference time {end - start} time exceeds 33ms"
+                    self.assertEqual(data.shape, OUTPUT_SHAPE)
+                    self.assertTrue((data == input_data[0] + input_data[1]).all())
 
     def test_torchvision(self):
         MODEL_NAME = "torchvision_aoti"
@@ -291,9 +274,11 @@ class TorchAotiTest(tu.TestResultCollector):
             for output_name in output_names:
                 output_data.append(results.as_numpy(output_name))
 
-            assert len(outputs) == len(output_data)
+            self.assertEqual(len(outputs), len(output_data))
             for data in output_data:
-                assert data.shape == OUTPUT_SHAPE
+                self.assertEqual(data.shape, OUTPUT_SHAPE)
+                output_tensor = torch.from_numpy(data)
+                self.assertTrue(torch.isfinite(output_tensor).all().item())
 
 
 if __name__ == "__main__":

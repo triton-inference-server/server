@@ -1630,7 +1630,7 @@ def create_torchvision_aoti_modelfile(
     model = model.to(device)
     model = model.eval()
 
-    SHAPE = (max_batch, 3, 244, 244)
+    SHAPE = (max_batch, 3, 224, 224)
 
     # Example input tensor with batch size 1 and 3 color channels (RGB), height and width of 224
     sample_inputs = (torch.zeros(SHAPE, dtype=torch.float32, device=device),)
@@ -3044,6 +3044,7 @@ if __name__ == "__main__":
             create_torch_aoti_complex_modelconfig(FLAGS.models_dir)
 
     if FLAGS.torchvision_aoti:
+        # TODO: Add support for variable batch size and version policy for torchvision AOTI models.
         print(f"{_color_blue}TorchVision AOTI model generation requested{_color_reset}")
         if create_torchvision_aoti_modelfile(FLAGS.models_dir, 1):
             create_torchvision_aoti_modelconfig(FLAGS.models_dir, 1)

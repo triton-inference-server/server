@@ -47,8 +47,8 @@ if [[ "$#" -ge 1 ]]; then
     REPO_VERSION=$1
 fi
 if [[ -z "$REPO_VERSION" ]]; then
-    echo -e "${COLOR_ERROR}Repository version must be specified${COLOR_RESET}" &1>2
-    echo -e "${COLOR_ERROR}\n***\n*** Test Failed\n***${COLOR_RESET}" &1>2
+    echo -e "${COLOR_ERROR}Repository version must be specified${COLOR_RESET}" 1>&2
+    echo -e "${COLOR_ERROR}\n***\n*** Test Failed\n***${COLOR_RESET}" 1>&2
     exit 1
 fi
 if [[ ! -z "$TEST_REPO_ARCH" ]]; then
@@ -132,6 +132,7 @@ fi
 # Cleanup
 echo -e "${COLOR_DARK}Killing server (pid: ${SERVER_PID})${COLOR_RESET}"
 kill -s SIGINT ${SERVER_PID}
+wait ${SERVER_PID} || true
 echo -e "${COLOR_DARK}Removing model repository${COLOR_RESET}"
 for model in "${models[@]}"; do
     rm -rf ${MODELDIR}/${model}
