@@ -1290,7 +1290,7 @@ def create_libtorch_modelfile(
     traced.save(f"{model_version_dir}/model.pt")
 
 
-def generate_sample_inputs(
+def generate_torch_aoti_sample_inputs(
     input_shape,
     input_dtype,
     device,
@@ -1441,7 +1441,7 @@ def create_torch_aoti_modelfile(
     model.to(device)
     model = model.eval()
 
-    sample_inputs = generate_sample_inputs(input_shape, input_dtype, device)
+    sample_inputs = generate_torch_aoti_sample_inputs(input_shape, input_dtype, device)
     package_path = os.path.join(model_version_dir, "model.pt2")
 
     try:
