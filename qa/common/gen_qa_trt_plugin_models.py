@@ -49,9 +49,7 @@ def get_trt_plugin(plugin_name):
     # registry surface). Pick the matching API at runtime.
     registry = trt.get_plugin_registry()
     use_v3 = not hasattr(registry, "plugin_creator_list")
-    plugin_creators = (
-        registry.all_creators if use_v3 else registry.plugin_creator_list
-    )
+    plugin_creators = registry.all_creators if use_v3 else registry.plugin_creator_list
     for plugin_creator in plugin_creators:
         if (plugin_creator.name == "CustomHardmax") and (
             plugin_name == "CustomHardmax"
@@ -123,9 +121,7 @@ def create_plan_modelfile(
     # object returned by get_trt_plugin() is matched to the same version.
     plugin_obj = get_trt_plugin(plugin_name)
     if hasattr(network, "add_plugin_v2"):
-        plugin_layer = network.add_plugin_v2(
-            inputs=[input_layer], plugin=plugin_obj
-        )
+        plugin_layer = network.add_plugin_v2(inputs=[input_layer], plugin=plugin_obj)
     else:
         plugin_layer = network.add_plugin_v3(
             inputs=[input_layer], shape_inputs=[], plugin=plugin_obj
