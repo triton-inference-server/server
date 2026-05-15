@@ -1371,7 +1371,7 @@ def np_to_dtype(np_dtype):
         return torch.int32
 
 
-def create_torch_aoti_modelfile(
+def create_torch_aoti_model_file(
     models_dir,
     model_version,
     input_shape,
@@ -1461,7 +1461,7 @@ def create_torch_aoti_modelfile(
     return True
 
 
-def create_torch_aoti_complex_modelfile(
+def create_torch_aoti_complex_model_file(
     models_dir: str,
 ):
     base_name = "torch_aoti_complex"
@@ -1611,7 +1611,7 @@ def create_torch_aoti_complex_modelfile(
     return True
 
 
-def create_torchvision_aoti_modelfile(
+def create_torchvision_aoti_model_file(
     models_dir: str,
     max_batch: int,
 ):
@@ -1747,7 +1747,7 @@ output [
         print(f"Created {config_dir}/{label_filename}")
 
 
-def create_torch_aoti_modelconfig(
+def create_torch_aoti_model_config(
     models_dir,
     input_shape,
     output_shape,
@@ -1826,7 +1826,7 @@ instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU
         print(f"Created {label_path}")
 
 
-def create_torch_aoti_complex_modelconfig(
+def create_torch_aoti_complex_model_config(
     models_dir,
 ):
     base_name = "torch_aoti_complex"
@@ -1978,7 +1978,7 @@ instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU
             print(f"Created {config_path}")
 
 
-def create_torchvision_aoti_modelconfig(
+def create_torchvision_aoti_model_config(
     models_dir: str,
     max_batch: int,
 ):
@@ -2393,14 +2393,14 @@ def create_models(
                 f"{_color_magenta}PyTorch: AOTI model generation requested{_color_reset}"
             )
             # max-batch 8
-            if create_torch_aoti_modelfile(
+            if create_torch_aoti_model_file(
                 models_dir,
                 model_version,
                 input_shape,
                 input_dtype,
                 output0_dtype,
             ):
-                create_torch_aoti_modelconfig(
+                create_torch_aoti_model_config(
                     models_dir,
                     input_shape,
                     output0_shape,
@@ -3040,11 +3040,11 @@ if __name__ == "__main__":
         print(
             f"{_color_magenta}PyTorch: Complex AOTI model generation requested{_color_reset}"
         )
-        if create_torch_aoti_complex_modelfile(FLAGS.models_dir):
-            create_torch_aoti_complex_modelconfig(FLAGS.models_dir)
+        if create_torch_aoti_complex_model_file(FLAGS.models_dir):
+            create_torch_aoti_complex_model_config(FLAGS.models_dir)
 
     if FLAGS.torchvision_aoti:
         # TODO: Add support for variable batch size and version policy for torchvision AOTI models.
         print(f"{_color_blue}TorchVision AOTI model generation requested{_color_reset}")
-        if create_torchvision_aoti_modelfile(FLAGS.models_dir, 1):
-            create_torchvision_aoti_modelconfig(FLAGS.models_dir, 1)
+        if create_torchvision_aoti_model_file(FLAGS.models_dir, 1):
+            create_torchvision_aoti_model_config(FLAGS.models_dir, 1)
