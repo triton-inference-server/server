@@ -1298,7 +1298,7 @@ def generate_torch_aoti_sample_inputs(
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     input_shape = [abs(ips) for ips in input_shape]
 
-    np_to_dtype = {
+    np_to_torch_dtype = {
         np.int8: torch.int8,
         np.int16: torch.int16,
         np.int32: torch.int32,
@@ -1312,14 +1312,18 @@ def generate_torch_aoti_sample_inputs(
         np.uint64: torch.uint64,
     }
 
-    if input_dtype not in np_to_dtype:
+    if input_dtype not in np_to_torch_dtype:
         print(
             f"{_color_yellow}warning: dtype {input_dtype} is unsupported; falling back to torch.int32{_color_reset}"
         )
         input_dtype = np.int32
 
-    input0 = torch.zeros(input_shape, dtype=np_to_dtype[input_dtype], device=device)
-    input1 = torch.zeros(input_shape, dtype=np_to_dtype[input_dtype], device=device)
+    input0 = torch.zeros(
+        input_shape, dtype=np_to_torch_dtype[input_dtype], device=device
+    )
+    input1 = torch.zeros(
+        input_shape, dtype=np_to_torch_dtype[input_dtype], device=device
+    )
 
     return (input0, input1)
 
