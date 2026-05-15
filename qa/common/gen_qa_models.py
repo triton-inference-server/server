@@ -1298,45 +1298,28 @@ def generate_torch_aoti_sample_inputs(
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     input_shape = [abs(ips) for ips in input_shape]
 
-    if input_dtype == np.int8:
-        input0 = torch.zeros(input_shape, dtype=torch.int8, device=device)
-        input1 = torch.zeros(input_shape, dtype=torch.int8, device=device)
-    elif input_dtype == np.int16:
-        input0 = torch.zeros(input_shape, dtype=torch.int16, device=device)
-        input1 = torch.zeros(input_shape, dtype=torch.int16, device=device)
-    elif input_dtype == np.int32:
-        input0 = torch.zeros(input_shape, dtype=torch.int32, device=device)
-        input1 = torch.zeros(input_shape, dtype=torch.int32, device=device)
-    elif input_dtype == np.int64:
-        input0 = torch.zeros(input_shape, dtype=torch.int64, device=device)
-        input1 = torch.zeros(input_shape, dtype=torch.int64, device=device)
-    elif input_dtype == np.float16:
-        input0 = torch.zeros(input_shape, dtype=torch.float16, device=device)
-        input1 = torch.zeros(input_shape, dtype=torch.float16, device=device)
-    elif input_dtype == np.float32:
-        input0 = torch.zeros(input_shape, dtype=torch.float32, device=device)
-        input1 = torch.zeros(input_shape, dtype=torch.float32, device=device)
-    elif input_dtype == np.float64:
-        input0 = torch.zeros(input_shape, dtype=torch.float64, device=device)
-        input1 = torch.zeros(input_shape, dtype=torch.float64, device=device)
-    elif input_dtype == np.uint8:
-        input0 = torch.zeros(input_shape, dtype=torch.uint8, device=device)
-        input1 = torch.zeros(input_shape, dtype=torch.uint8, device=device)
-    elif input_dtype == np.uint16:
-        input0 = torch.zeros(input_shape, dtype=torch.uint16, device=device)
-        input1 = torch.zeros(input_shape, dtype=torch.uint16, device=device)
-    elif input_dtype == np.uint32:
-        input0 = torch.zeros(input_shape, dtype=torch.uint32, device=device)
-        input1 = torch.zeros(input_shape, dtype=torch.uint32, device=device)
-    elif input_dtype == np.uint64:
-        input0 = torch.zeros(input_shape, dtype=torch.uint64, device=device)
-        input1 = torch.zeros(input_shape, dtype=torch.uint64, device=device)
-    else:
+    np_to_dtype = {
+        np.int8: torch.int8,
+        np.int16: torch.int16,
+        np.int32: torch.int32,
+        np.int64: torch.int64,
+        np.float16: torch.float16,
+        np.float32: torch.float32,
+        np.float64: torch.float64,
+        np.uint8: torch.uint8,
+        np.uint16: torch.uint16,
+        np.uint32: torch.uint32,
+        np.uint64: torch.uint64,
+    }
+
+    if input_dtype not in np_to_dtype:
         print(
             f"{_color_yellow}warning: dtype {input_dtype} is unsupported; falling back to torch.int32{_color_reset}"
         )
-        input0 = torch.zeros(input_shape, dtype=torch.int32, device=device)
-        input1 = torch.zeros(input_shape, dtype=torch.int32, device=device)
+        input_dtype = np.int32
+
+    input0 = torch.zeros(input_shape, dtype=np_to_dtype[input_dtype], device=device)
+    input1 = torch.zeros(input_shape, dtype=np_to_dtype[input_dtype], device=device)
 
     return (input0, input1)
 
