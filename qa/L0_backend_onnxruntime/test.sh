@@ -25,8 +25,22 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
+
 export CUDA_VISIBLE_DEVICES=0
 
+DATADIR=/data/inferenceserver/${REPO_VERSION}
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./inference_server.log"
 CLIENT_LOG="./test.log"
@@ -38,23 +52,8 @@ rm -rf models
 RET=0
 
 # BFLOAT16 test
-# Generate the model
-mkdir -p models/add_bf16/1
-set +e
-
-pip install onnx==1.20.1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to install onnx dependency\n***"
-    exit 1
-fi
-
-python gen_add_bf16_onnx_model.py
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to generate BFLOAT16 ONNX model\n***"
-    exit 1
-fi
-
-set -e
+mkdir -p models
+cp -r ${DATADIR}/qa_model_repository/onnx_bf16_bf16_bf16 models/.
 
 SERVER_ARGS="--model-repository=`pwd`/models"
 run_server
