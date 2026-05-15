@@ -352,43 +352,29 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_format_models.py --models_dir=$TRITON_MD
 chmod -R 777 $TRITON_MDLS_QA_TRT_FORMAT_MODEL
 nvidia-smi --query-gpu=compute_cap | grep -qzE '10\.7|11\.0' && echo -e '${COLOR_WARNING}[WARNING]${COLOR_RESET} Skipping model generation for data dependent shape (NonZero not supported on this GPU)${COLOR_RESET}' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_data_dependent_shape.py --models_dir=$TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
 chmod -R 777 $TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL
-# Make shared library for custom Hardmax plugin.
-if [ -d "/usr/src/tensorrt/samples/python/onnx_custom_plugin" ]; then
-    cd /usr/src/tensorrt/samples/python/onnx_custom_plugin
+# Build the custom Hardmax plugin used by L0_trt_plugin. The plugin source is
+# pulled from the internal NVIDIA TensorRT mirror at the rel-<major.minor>
+# branch matching the runtime TRT version (rel-10.x ships the legacy V2
+# implementation, rel-11.0 ships the IPluginV3 port). If the branch does not
+# exist for this TRT version, the plugin model generation is skipped with a
+# warning -- L0_trt_plugin will report missing artifacts but the rest of the
+# QA model repository is still produced.
+TRT_BRANCH=\$(echo \$TRT_VERSION | cut -d . -f -2)
+TRTSRC=/workspace/TensorRT
+rm -rf \$TRTSRC
+if git clone --depth 1 -b rel-\${TRT_BRANCH} \
+     https://gitlab-ci-token:\${CI_JOB_TOKEN}@gitlab-master.nvidia.com/TensorRT/TensorRT.git \
+     \$TRTSRC; then
+  cd \$TRTSRC/samples/python/onnx_custom_plugin && \
+    rm -rf build && mkdir build && cd build && cmake .. && make -j && \
+    cp libcustomHardmaxPlugin.so $TRITON_MDLS_QA_TRT_PLUGIN_MODEL/.
+  LD_PRELOAD=$TRITON_MDLS_QA_TRT_PLUGIN_MODEL/libcustomHardmaxPlugin.so \
+    python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_plugin_models.py \
+    --models_dir=$TRITON_MDLS_QA_TRT_PLUGIN_MODEL
+  chmod -R 777 $TRITON_MDLS_QA_TRT_PLUGIN_MODEL
 else
-    TRT_BRANCH=\$(echo \$TRT_VERSION | cut -d . -f -2)
-    if ! git clone -b release/\${TRT_BRANCH} --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT; then
-      MAJOR=\$(echo "\$TRT_BRANCH" | cut -d . -f 1)
-      MINOR=\$(echo "\$TRT_BRANCH" | cut -d . -f 2)
-      if [ -n "\$MINOR" ] && [ "\$MINOR" -gt 0 ] 2>/dev/null; then
-        TRT_BRANCH="\${MAJOR}.\$((MINOR - 1))"
-        echo "Fallback: cloning TensorRT release/\${TRT_BRANCH} (previous minor)"
-        git clone -b release/\${TRT_BRANCH} --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
-      elif [ -n "\$MAJOR" ] && [ "\$MAJOR" -gt 0 ] 2>/dev/null; then
-        PREV_MAJOR=\$((MAJOR - 1))
-        echo "Fallback: MINOR is 0, querying remote for latest release/\${PREV_MAJOR}.x branch"
-        TRT_BRANCH=\$(git ls-remote --heads https://github.com/NVIDIA/TensorRT.git "refs/heads/release/\${PREV_MAJOR}.*" \
-          | awk -F'refs/heads/release/' '{print \$2}' \
-          | awk -F. '{print \$2, \$0}' \
-          | sort -k1,1n \
-          | tail -1 \
-          | awk '{print \$2}')
-        if [ -n "\$TRT_BRANCH" ]; then
-          echo "Fallback: cloning TensorRT release/\${TRT_BRANCH}"
-          git clone -b release/\${TRT_BRANCH} --depth 1 https://github.com/NVIDIA/TensorRT.git /workspace/TensorRT
-        else
-          exit 1
-        fi
-      else
-        exit 1
-      fi
-    fi
-    cd /workspace/TensorRT/samples/python/onnx_custom_plugin
+  echo "[WARNING] TensorRT rel-\${TRT_BRANCH} not available on internal mirror; skipping CustomHardmax plugin model generation. L0_trt_plugin coverage will be missing for this TRT version."
 fi
-rm -rf build && mkdir build && \
-cd build && cmake .. && make -j && cp libcustomHardmaxPlugin.so $TRITON_MDLS_QA_TRT_PLUGIN_MODEL/.
-LD_PRELOAD=$TRITON_MDLS_QA_TRT_PLUGIN_MODEL/libcustomHardmaxPlugin.so python3 $TRITON_MDLS_SRC_DIR/gen_qa_trt_plugin_models.py --models_dir=$TRITON_MDLS_QA_TRT_PLUGIN_MODEL
-chmod -R 777 $TRITON_MDLS_QA_TRT_PLUGIN_MODEL
 exit 0
 EOF
 
@@ -569,6 +555,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
             -v $DOCKER_VOLUME:/mnt \
             -t \
             -e TRT_VERBOSE \
+            -e CI_JOB_TOKEN \
             $TENSORRT_IMAGE \
             bash -e $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
 
