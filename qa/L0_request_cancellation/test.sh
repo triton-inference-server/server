@@ -42,7 +42,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
-CANCEL_LOG_LINE="Cancellation notification received for"
+CANCEL_LOG_LINE="Cancellation notification received for "
 
 RET=0
 rm -f *.log
@@ -175,13 +175,27 @@ done
 #
 # C++ gRPC cancellation tests
 #
+# allow_timeout_override disables queue prefetching, keeping requests queued
+# long enough for the "Queued" cancellation tests to cancel them before
+# forwarding to the rate limiter. This saves overall test time.
+cat >> models/custom_identity_int32/config.pbtxt <<'EOF'
+dynamic_batching {
+  default_queue_policy {
+    allow_timeout_override: true
+  }
+}
+EOF
+
 GRPC_CANCELLATION_TEST_CPP=../clients/grpc_cancellation_test
 
-for ENTRY in "TestGrpcAsyncInfer 1" \
+for ENTRY in "TestGrpcAsyncInferCancelExecutingRequest 1" \
+             "TestGrpcAsyncInferCancelQueuedRequest 2" \
              "TestGrpcAsyncInferCancelAfterCompletionIsNoOp 0" \
              "TestGrpcAsyncInferWithoutContextStillCompletes 0" \
-             "TestGrpcAsyncInferMulti 2" \
-             "TestGrpcStreamInfer 1" \
+             "TestGrpcAsyncInferMultiCancelExecutingRequests 2" \
+             "TestGrpcAsyncInferMultiCancelQueuedRequest 2" \
+             "TestGrpcStreamInferCancelExecutingRequest 1" \
+             "TestGrpcStreamInferCancelQueuedRequest 1" \
              "TestGrpcStreamCancelWithoutInfer 1" \
              "TestGrpcStreamCancelThenRestart 1"; do
     read -r TEST_CASE EXPECTED_CANCEL_COUNT <<< "$ENTRY"
@@ -189,10 +203,10 @@ for ENTRY in "TestGrpcAsyncInfer 1" \
     TEST_LOG="./grpc_cancellation_test_cpp.$TEST_CASE.log"
     SERVER_LOG="./grpc_cancellation_test_cpp.$TEST_CASE.server.log"
 
-    # AsyncInferMulti fans out N concurrent requests; bump to 3 CPU
-    # instances so each can execute in parallel. Reverted after the test
-    # so subsequent cases keep the default single-instance config.
-    if [ "$TEST_CASE" == "TestGrpcAsyncInferMulti" ]; then
+    # AsyncInferMulti fans out N concurrent requests; bump to 3 CPU instances
+    # so each can execute in parallel. Every other test uses the default
+    # single-instance config.
+    if [ "$TEST_CASE" == "TestGrpcAsyncInferMultiCancelExecutingRequests" ]; then
         sed -i 's|instance_group .*|instance_group [{ count: 3, kind: KIND_CPU }]|' \
             models/custom_identity_int32/config.pbtxt
     fi
@@ -226,7 +240,7 @@ for ENTRY in "TestGrpcAsyncInfer 1" \
     kill $SERVER_PID
     wait $SERVER_PID
 
-    if [ "$TEST_CASE" == "TestGrpcAsyncInferMulti" ]; then
+    if [ "$TEST_CASE" == "TestGrpcAsyncInferMultiCancelExecutingRequests" ]; then
         sed -i 's|instance_group .*|instance_group [{ kind: KIND_CPU }]|' \
             models/custom_identity_int32/config.pbtxt
     fi
