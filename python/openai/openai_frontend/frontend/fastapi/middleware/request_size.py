@@ -26,7 +26,6 @@
 
 from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
-
 from utils.utils import StatusCode, validate_positive_int
 
 
