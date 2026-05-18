@@ -148,6 +148,4 @@ class FastApiFrontend(OpenAIFrontend):
             RequestSizeLimitMiddleware,
             http_max_input_size=self.http_max_input_size,
         )
-        print(
-            f"[INFO] HTTP request size limit set to {self.http_max_input_size} bytes"
-        )
+        print(f"[INFO] HTTP request size limit set to {self.http_max_input_size} bytes")

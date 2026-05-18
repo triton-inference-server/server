@@ -1,4 +1,4 @@
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -51,7 +51,7 @@ class StatusCode(IntEnum):
     SERVER_ERROR = 500
 
 
-def validate_positive_int(value: object) -> int:    
+def validate_positive_int(value: object) -> int:
     try:
         ivalue = int(value)
     except (TypeError, ValueError):

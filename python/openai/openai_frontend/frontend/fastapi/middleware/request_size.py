@@ -68,19 +68,28 @@ class RequestSizeLimitMiddleware:
                 content_length = int(value)
             except ValueError:
                 await self._send_error(
-                    scope, send, StatusCode.CLIENT_ERROR, "invalid_content_length",
+                    scope,
+                    send,
+                    StatusCode.CLIENT_ERROR,
+                    "invalid_content_length",
                     "Invalid Content-Length header: not an integer.",
                 )
                 return
             if content_length < 0:
                 await self._send_error(
-                    scope, send, StatusCode.CLIENT_ERROR, "invalid_content_length",
+                    scope,
+                    send,
+                    StatusCode.CLIENT_ERROR,
+                    "invalid_content_length",
                     "Invalid Content-Length header: must be non-negative.",
                 )
                 return
             if content_length > self.http_max_input_size:
                 await self._send_error(
-                    scope, send, StatusCode.CONTENT_TOO_LARGE, "content_too_large",
+                    scope,
+                    send,
+                    StatusCode.CONTENT_TOO_LARGE,
+                    "content_too_large",
                     self._content_too_large_message,
                 )
                 return
@@ -97,7 +106,10 @@ class RequestSizeLimitMiddleware:
             total += len(chunk)
             if total > self.http_max_input_size:
                 await self._send_error(
-                    scope, send, StatusCode.CONTENT_TOO_LARGE, "content_too_large",
+                    scope,
+                    send,
+                    StatusCode.CONTENT_TOO_LARGE,
+                    "content_too_large",
                     self._content_too_large_message,
                 )
                 return
@@ -136,6 +148,12 @@ class RequestSizeLimitMiddleware:
     ) -> None:
         response = JSONResponse(
             status_code=status_code,
-            content={"error": {"message": message, "type": "invalid_request_error", "code": code}},
+            content={
+                "error": {
+                    "message": message,
+                    "type": "invalid_request_error",
+                    "code": code,
+                }
+            },
         )
         await response(scope, _disconnect_receive, send)
