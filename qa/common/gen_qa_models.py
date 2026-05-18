@@ -159,8 +159,7 @@ def create_plan_dynamic_rf_modelfile(
     profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
 
     flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
-    if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
-        flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
     datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
     for dt in datatype_set:
@@ -450,8 +449,7 @@ def create_plan_fixed_rf_modelfile(
     profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
 
     flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
-    if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
-        flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
     datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
     for dt in datatype_set:

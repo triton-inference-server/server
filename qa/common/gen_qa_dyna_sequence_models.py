@@ -129,8 +129,7 @@ def create_plan_shape_tensor_modelfile(
 
     flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
     flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
-    if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
-        flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
     if trt_dtype == trt.int8:
         flags |= 1 << int(trt.BuilderFlag.INT8)
@@ -370,8 +369,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
     flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
     flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
-    if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
-        flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
     if trt_dtype == trt.int8:
         flags |= 1 << int(trt.BuilderFlag.INT8)
