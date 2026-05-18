@@ -327,7 +327,7 @@ fi
 
 # Helper library to parse SSE events
 # https://github.com/mpetazzoni/sseclient
-pip install sseclient-py
+pip install sseclient-py psutil
 
 # Inference with generate_stream inference type
 set +e
@@ -608,7 +608,7 @@ if [ "$code" != "200" ]; then
 fi
 
 set +e
-python $REQUEST_MANY_CHUNKS_PY >>$CLIENT_LOG 2>&1
+SERVER_PID=$SERVER_PID python $REQUEST_MANY_CHUNKS_PY >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Sagemaker Request Many Chunks Test Failed\n***"
     cat $SERVER_LOG

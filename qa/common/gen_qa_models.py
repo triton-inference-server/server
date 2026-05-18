@@ -47,6 +47,7 @@ np_dtype_string = np.dtype(object)
 from typing import List, Tuple
 
 _color_blue = "\033[94m"
+_color_cyan = "\033[36m"
 _color_green = "\033[32m"
 _color_magenta = "\033[35m"
 _color_red = "\033[31m"
@@ -159,7 +160,8 @@ def create_plan_dynamic_rf_modelfile(
     profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
 
     flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
-    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+    if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
+        flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
     datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
     for dt in datatype_set:
@@ -449,7 +451,8 @@ def create_plan_fixed_rf_modelfile(
     profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
 
     flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
-    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+    if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
+        flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
     datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
     for dt in datatype_set:
@@ -1289,7 +1292,7 @@ def create_libtorch_modelfile(
     traced.save(f"{model_version_dir}/model.pt")
 
 
-def generate_sample_inputs(
+def generate_torch_aoti_sample_inputs(
     input_shape,
     input_dtype,
     device,
@@ -1297,70 +1300,32 @@ def generate_sample_inputs(
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     input_shape = [abs(ips) for ips in input_shape]
 
-    if input_dtype == np.int8:
-        input0 = torch.randint(-128, 127, input_shape, dtype=torch.int8, device=device)
-        input1 = torch.randint(-128, 127, input_shape, dtype=torch.int8, device=device)
-    elif input_dtype == np.int16:
-        input0 = torch.randint(
-            -32768, 32767, input_shape, dtype=torch.int16, device=device
+    np_to_torch_dtype = {
+        np.int8: torch.int8,
+        np.int16: torch.int16,
+        np.int32: torch.int32,
+        np.int64: torch.int64,
+        np.float16: torch.float16,
+        np.float32: torch.float32,
+        np.float64: torch.float64,
+        np.uint8: torch.uint8,
+        np.uint16: torch.uint16,
+        np.uint32: torch.uint32,
+        np.uint64: torch.uint64,
+    }
+
+    if input_dtype not in np_to_torch_dtype:
+        print(
+            f"{_color_yellow}warning: dtype {input_dtype} is unsupported; falling back to torch.int32{_color_reset}"
         )
-        input1 = torch.randint(
-            -32768, 32767, input_shape, dtype=torch.int16, device=device
-        )
-    elif input_dtype == np.int32:
-        input0 = torch.randint(
-            -2147483648, 2147483647, input_shape, dtype=torch.int32, device=device
-        )
-        input1 = torch.randint(
-            -2147483648, 2147483647, input_shape, dtype=torch.int32, device=device
-        )
-    elif input_dtype == np.int64:
-        input0 = torch.randint(
-            -9223372036854775808,
-            9223372036854775807,
-            input_shape,
-            dtype=torch.int64,
-            device=device,
-        )
-        input1 = torch.randint(
-            -9223372036854775808,
-            9223372036854775807,
-            input_shape,
-            dtype=torch.int64,
-            device=device,
-        )
-    elif input_dtype == np.float16:
-        input0 = torch.randn(*input_shape, dtype=torch.float16, device=device)
-        input1 = torch.randn(*input_shape, dtype=torch.float16, device=device)
-    elif input_dtype == np.float32:
-        input0 = torch.randn(*input_shape, dtype=torch.float32, device=device)
-        input1 = torch.randn(*input_shape, dtype=torch.float32, device=device)
-    elif input_dtype == np.float64:
-        input0 = torch.randn(*input_shape, dtype=torch.float64, device=device)
-        input1 = torch.randn(*input_shape, dtype=torch.float64, device=device)
-    elif input_dtype == np.uint8:
-        input0 = torch.randint(0, 255, input_shape, dtype=torch.uint8, device=device)
-        input1 = torch.randint(0, 255, input_shape, dtype=torch.uint8, device=device)
-    elif input_dtype == np.uint16:
-        input0 = torch.randint(0, 65535, input_shape, dtype=torch.uint16, device=device)
-        input1 = torch.randint(0, 65535, input_shape, dtype=torch.uint16, device=device)
-    elif input_dtype == np.uint32:
-        input0 = torch.randint(
-            0, 4294967295, input_shape, dtype=torch.uint32, device=device
-        )
-        input1 = torch.randint(
-            0, 4294967295, input_shape, dtype=torch.uint32, device=device
-        )
-    elif input_dtype == np.uint64:
-        input0 = torch.randint(
-            0, 18446744073709551615, input_shape, dtype=torch.uint64, device=device
-        )
-        input1 = torch.randint(
-            0, 18446744073709551615, input_shape, dtype=torch.uint64, device=device
-        )
-    else:
-        input0 = torch.randn(*input_shape, device=device)
-        input1 = torch.randn(*input_shape, device=device)
+        input_dtype = np.int32
+
+    input0 = torch.zeros(
+        input_shape, dtype=np_to_torch_dtype[input_dtype], device=device
+    )
+    input1 = torch.zeros(
+        input_shape, dtype=np_to_torch_dtype[input_dtype], device=device
+    )
 
     return (input0, input1)
 
@@ -1395,7 +1360,7 @@ def np_to_dtype(np_dtype):
         return torch.int32
 
 
-def create_torch_aoti_modelfile(
+def create_torch_aoti_model_file(
     models_dir,
     model_version,
     input_shape,
@@ -1418,7 +1383,7 @@ def create_torch_aoti_modelfile(
         )
         return False
 
-    model_version_dir = f"{models_dir}/{model_name}/{model_version}"
+    model_version_dir = os.path.join(models_dir, model_name, str(model_version))
 
     print(f"{_color_green}Creating model {model_name}{_color_reset}")
 
@@ -1465,13 +1430,14 @@ def create_torch_aoti_modelfile(
     model.to(device)
     model = model.eval()
 
-    sample_input = generate_sample_inputs(input_shape, input_dtype, device)
+    sample_inputs = generate_torch_aoti_sample_inputs(input_shape, input_dtype, device)
+    package_path = os.path.join(model_version_dir, "model.pt2")
 
     try:
-        ep = torch.export.export(model, sample_input)
+        exported_model = torch.export.export(model, sample_inputs)
         torch._inductor.aoti_compile_and_package(
-            ep,
-            package_path=f"{model_version_dir}/model.pt2",
+            exported_model,
+            package_path=package_path,
         )
     except Exception as e:
         print(
@@ -1484,13 +1450,162 @@ def create_torch_aoti_modelfile(
     return True
 
 
-def create_torchvision_aoti_modelfile(
+def create_torch_aoti_complex_model_file(
+    models_dir: str,
+):
+    base_name = "torch_aoti_complex"
+    model_names = [
+        f"{base_name}_named",
+        f"{base_name}_index",
+    ]
+    model_version_dirs = [
+        os.path.join(models_dir, model_names[0], "1"),
+        os.path.join(models_dir, model_names[1], "1"),
+    ]
+
+    for model_version_dir in model_version_dirs:
+        try:
+            os.makedirs(model_version_dir)
+        except OSError:
+            pass  # ignore existing dir
+
+    print(f"{_color_green}Creating model {base_name}{_color_reset}")
+
+    class TorchAotiComplex(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+
+        def forward(
+            self,
+            hdata: torch.Tensor,
+            vdata: torch.Tensor,
+            options: dict[str, torch.Tensor],
+        ) -> dict[
+            str,
+            torch.Tensor | tuple[torch.Tensor, torch.Tensor] | dict[str, torch.Tensor],
+        ]:
+            out = {
+                "AAA": hdata + vdata,
+                "ZZZ": hdata - vdata,
+                "BBB": (
+                    hdata,
+                    vdata,
+                ),
+                "CCC": options,
+            }
+
+            return out
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = TorchAotiComplex()
+    model.to(device)
+    model = model.eval()
+
+    SHAPE = (1, 16)
+
+    sample_args = (
+        torch.zeros(SHAPE, dtype=torch.int8, device=device),
+        torch.zeros(SHAPE, dtype=torch.int8, device=device),
+        {
+            "option1": torch.zeros(SHAPE, dtype=torch.int8, device=device),
+            "option2": torch.zeros(SHAPE, dtype=torch.int8, device=device),
+        },
+    )
+
+    # Export and package the model
+    print(f"{_color_green}Exporting and packaging the model...{_color_reset}")
+
+    model_file_name = "model.pt2"
+    package_paths = [
+        os.path.join(model_version_dirs[0], model_file_name),
+        os.path.join(model_version_dirs[1], model_file_name),
+    ]
+
+    try:
+        exported_model = torch.export.export(model, sample_args)
+        torch._inductor.aoti_compile_and_package(
+            exported_model,
+            package_path=package_paths[0],
+        )
+    except Exception as e:
+        print(
+            f"{_color_red}error: Failed to create model {base_name}{_color_reset}",
+            file=sys.stderr,
+        )
+        print(f"\n{_color_red}{e}{_color_reset}\n", file=sys.stderr)
+        return False
+
+    try:
+        # Now load and run the packaged model
+        print(f"{_color_cyan}Loading and running the packaged model...{_color_reset}")
+
+        compiled_model = torch._inductor.aoti_load_package(package_paths[0])
+
+        print(f"{_color_cyan}Compiled model call spec:{_color_reset}")
+
+        for elem in compiled_model.loader.get_call_spec():
+            print(elem)
+
+        print(f"{_color_cyan}Running the compiled model...{_color_reset}")
+
+        with torch.inference_mode():
+            hdata = torch.randint(
+                low=0,
+                high=127,
+                size=SHAPE,
+                dtype=torch.int8,
+                device=device,
+            )
+            vdata = torch.randint(
+                low=0,
+                high=127,
+                size=SHAPE,
+                dtype=torch.int8,
+                device=device,
+            )
+            options = {
+                "option1": torch.randint(
+                    low=0,
+                    high=127,
+                    size=SHAPE,
+                    dtype=torch.int8,
+                    device=device,
+                ),
+                "option2": torch.randint(
+                    low=0,
+                    high=127,
+                    size=SHAPE,
+                    dtype=torch.int8,
+                    device=device,
+                ),
+            }
+
+            _ = compiled_model(hdata, vdata, options)
+
+            print(
+                f'{_color_green}Model "{base_name}" successfully executed.{_color_reset}'
+            )
+    except Exception as e:
+        print(
+            f"{_color_red}error: Failed to validate model {base_name}{_color_reset}",
+            file=sys.stderr,
+        )
+        print(f"\n{_color_red}{e}{_color_reset}\n", file=sys.stderr)
+        return False
+
+    # Copy the compiled model package to the alternate model folder.
+    # Both the named and ordinal addressing versions of the model (from Triton's point-of-view) use the same compiled model.
+    shutil.copy(package_paths[0], package_paths[1])
+
+    return True
+
+
+def create_torchvision_aoti_model_file(
     models_dir: str,
     max_batch: int,
-    model_version: int,
 ):
     model_name = "torchvision_aoti"
-    model_version_dir = f"{models_dir}/{model_name}/{model_version}"
+    model_version_dir = os.path.join(models_dir, model_name, "1")
 
     try:
         os.makedirs(model_version_dir)
@@ -1504,16 +1619,16 @@ def create_torchvision_aoti_modelfile(
     model = model.to(device)
     model = model.eval()
 
+    SHAPE = (max_batch, 3, 224, 224)
+
     # Example input tensor with batch size 1 and 3 color channels (RGB), height and width of 224
-    input_tensor = torch.randn(max_batch, 3, 224, 224, device=device)
+    sample_inputs = (torch.zeros(SHAPE, dtype=torch.float32, device=device),)
+
+    package_path = os.path.join(model_version_dir, "model.pt2")
 
     try:
-        ep = torch.export.export(model, (input_tensor,))
-
-        torch._inductor.aoti_compile_and_package(
-            ep,
-            package_path=f"{model_version_dir}/model.pt2",
-        )
+        ep = torch.export.export(model, sample_inputs)
+        torch._inductor.aoti_compile_and_package(ep, package_path=package_path)
     except Exception as e:
         print(
             f"{_color_red}error: Failed to create model {model_name}{_color_reset}",
@@ -1609,9 +1724,11 @@ output [
     except OSError:
         pass  # ignore existing dir
 
-    with open(f"{config_dir}/config.pbtxt", "w") as file:
+    config_path = os.path.join(config_dir, "config.pbtxt")
+
+    with open(config_path, "w") as file:
         file.write(config)
-        print(f"Created {config_dir}/config.pbtxt")
+        print(f"Created {config_path}")
 
     with open(f"{config_dir}/{label_filename}", "w") as file:
         for l in range(output0_label_cnt):
@@ -1619,7 +1736,7 @@ output [
         print(f"Created {config_dir}/{label_filename}")
 
 
-def create_torch_aoti_modelconfig(
+def create_torch_aoti_model_config(
     models_dir,
     input_shape,
     output_shape,
@@ -1650,7 +1767,7 @@ def create_torch_aoti_modelconfig(
     print(f"{_color_green}Creating config for {model_name}{_color_reset}")
 
     label_filename = "output_labels.txt"
-    config_dir = f"{models_dir}/{model_name}"
+    config_dir = os.path.join(models_dir, model_name)
     config = f"""
 backend: "pytorch"
 name: "{model_name}"
@@ -1658,19 +1775,19 @@ platform: "torch_aoti"
 version_policy: {version_policy_str}
 input [
   {{
-    name: "INPUT0"
+    name: "ARGS[0]"
     data_type: {np_to_model_dtype(input_dtype)}
     dims: [ {tu.shape_to_dims_str(input_shape)} ]
   }},
   {{
-    name: "INPUT1"
+    name: "ARGS[1]"
     data_type: {np_to_model_dtype(input_dtype)}
     dims: [ {tu.shape_to_dims_str(input_shape)} ]
   }}
 ]
 output [
   {{
-    name: "OUTPUT__0"
+    name: "RESULT"
     data_type: {np_to_model_dtype(output_dtype)}
     dims: [ {tu.shape_to_dims_str(output_shape)} ]
     label_filename: "{label_filename}"
@@ -1684,17 +1801,173 @@ instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU
     except OSError:
         pass  # ignore existing dir
 
-    with open(f"{config_dir}/config.pbtxt", "w") as file:
-        file.write(config)
-        print(f"Created {config_dir}/config.pbtxt")
+    config_path = os.path.join(config_dir, "config.pbtxt")
 
-    with open(f"{config_dir}/{label_filename}", "w") as file:
+    with open(config_path, "w") as file:
+        file.write(config)
+        print(f"Created {config_path}")
+
+    label_path = os.path.join(config_dir, label_filename)
+
+    with open(label_path, "w") as file:
         for l in range(output_label_cnt):
             file.write(f"label{l}\n")
-        print(f"Created {config_dir}/{label_filename}")
+        print(f"Created {label_path}")
 
 
-def create_torchvision_aoti_modelconfig(
+def create_torch_aoti_complex_model_config(
+    models_dir,
+):
+    base_name = "torch_aoti_complex"
+    model_names = [
+        f"{base_name}_named",
+        f"{base_name}_index",
+    ]
+
+    print(f"{_color_green}Creating config for {base_name}{_color_reset}")
+
+    config_dirs = [
+        os.path.join(models_dir, model_names[0]),
+        os.path.join(models_dir, model_names[1]),
+    ]
+    configs = [
+        f"""
+backend: "pytorch"
+platform: "torch_aoti"
+name: "{model_names[0]}"
+input: [
+  {{
+    name: "ARGS[0]"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "ARGS[1]"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "ARGS[2][option1]"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "ARGS[2][option2]"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }}
+]
+output: [
+  {{
+    name: "RESULT[AAA]"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "RESULT[BBB][0]"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "RESULT[BBB][1]"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "RESULT[CCC][option1]"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "RESULT[CCC][option2]"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "RESULT[ZZZ]"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }}
+]
+instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"} }}]
+""",
+        f"""
+backend: "pytorch"
+name: "{model_names[1]}"
+platform: "torch_aoti"
+input: [
+  {{
+    name: "INPUT__0"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "INPUT__1"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "INPUT__2"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "INPUT__3"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }}
+]
+output: [
+  {{
+    name: "OUTPUT__0"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "OUTPUT__1"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "OUTPUT__2"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "OUTPUT__3"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "OUTPUT__4"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }},
+  {{
+    name: "OUTPUT__5"
+    data_type: TYPE_INT8
+    dims: [1, 16]
+  }}
+]
+instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"} }}]
+""",
+    ]
+
+    for i in range(2):
+        config_dir = config_dirs[i]
+        try:
+            os.makedirs(config_dir)
+        except OSError:
+            pass  # ignore existing dir
+
+        config_path = os.path.join(config_dir, "config.pbtxt")
+
+        with open(config_path, "w") as file:
+            file.write(configs[i])
+            print(f"Created {config_path}")
+
+
+def create_torchvision_aoti_model_config(
     models_dir: str,
     max_batch: int,
 ):
@@ -1703,7 +1976,7 @@ def create_torchvision_aoti_modelconfig(
 
     print(f"{_color_green}Creating config for {model_name}{_color_reset}")
 
-    config_dir = f"{models_dir}/{model_name}"
+    config_dir = os.path.join(models_dir, model_name)
     config = f"""
 backend: "pytorch"
 name: "{model_name}"
@@ -1711,14 +1984,13 @@ platform: "torch_aoti"
 max_batch_size: {max_batch}
 input  [
   {{
-    name: "INPUT__0"
+    name: "ARGS[0]"
     data_type: TYPE_FP32
-    format: FORMAT_NCHW
     dims: [ 3, 224, 224 ]
   }}]
 output [
   {{
-    name: "OUTPUT__0"
+    name: "RESULT"
     data_type: TYPE_FP32
     dims: [ 1000 ]
     label_filename: "{label_filename}"
@@ -1732,15 +2004,19 @@ instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU
     except OSError:
         pass  # ignore existing dir
 
-    with open(f"{config_dir}/config.pbtxt", "w") as file:
+    config_path = os.path.join(config_dir, "config.pbtxt")
+
+    with open(config_path, "w") as file:
         file.write(config)
-        print(f"Created {config_dir}/config.pbtxt")
+        print(f"Created {config_path}")
 
     source_path = os.environ.get("TRITON_GENSRCDIR", default="gen_srcdir")
     source_filename = os.path.join(source_path, RESNET50_LABEL_FILE)
 
-    shutil.copyfile(source_filename, f"{config_dir}/{label_filename}")
-    print(f"Created {config_dir}/{label_filename}")
+    target_path = os.path.join(config_dir, label_filename)
+
+    shutil.copyfile(source_filename, target_path)
+    print(f"Created {target_path}")
 
 
 def create_openvino_modelfile(
@@ -2106,14 +2382,14 @@ def create_models(
                 f"{_color_magenta}PyTorch: AOTI model generation requested{_color_reset}"
             )
             # max-batch 8
-            if create_torch_aoti_modelfile(
+            if create_torch_aoti_model_file(
                 models_dir,
                 model_version,
                 input_shape,
                 input_dtype,
                 output0_dtype,
             ):
-                create_torch_aoti_modelconfig(
+                create_torch_aoti_model_config(
                     models_dir,
                     input_shape,
                     output0_shape,
@@ -2352,6 +2628,8 @@ if __name__ == "__main__":
     if FLAGS.onnx:
         import onnx
     if FLAGS.libtorch or FLAGS.torch_aoti:
+        import shutil
+
         import torch
         from torch import nn
     if FLAGS.torchvision_aoti:
@@ -2747,7 +3025,15 @@ if __name__ == "__main__":
             for model_shape in [(-1,), (-1, -1), (-1, -1, -1)]:
                 emu.create_nop_modelconfig(FLAGS.models_dir, model_shape, model_dtype)
 
+    if FLAGS.torch_aoti:
+        print(
+            f"{_color_magenta}PyTorch: Complex AOTI model generation requested{_color_reset}"
+        )
+        if create_torch_aoti_complex_model_file(FLAGS.models_dir):
+            create_torch_aoti_complex_model_config(FLAGS.models_dir)
+
     if FLAGS.torchvision_aoti:
+        # TODO: Add support for variable batch size and version policy for torchvision AOTI models.
         print(f"{_color_blue}TorchVision AOTI model generation requested{_color_reset}")
-        if create_torchvision_aoti_modelfile(FLAGS.models_dir, 1, 1):
-            create_torchvision_aoti_modelconfig(FLAGS.models_dir, 1)
+        if create_torchvision_aoti_model_file(FLAGS.models_dir, 1):
+            create_torchvision_aoti_model_config(FLAGS.models_dir, 1)
