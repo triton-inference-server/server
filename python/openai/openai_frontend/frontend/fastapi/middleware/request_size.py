@@ -111,7 +111,7 @@ class RequestSizeLimitMiddleware:
             "body": body_chunks[0] if len(body_chunks) == 1 else b"".join(body_chunks),
             "more_body": False,
         }
-        body_chunks = None
+        del body_chunks
 
         async def replay_receive() -> Message:
             nonlocal body_message
