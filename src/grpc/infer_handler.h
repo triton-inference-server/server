@@ -1601,11 +1601,22 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
     for (const auto& pair : metadata) {
       auto& key = pair.first;
       auto& value = pair.second;
-      std::string param_key = std::string(key.begin(), key.end());
-      if (RE2::PartialMatch(param_key, header_forward_regex_)) {
-        std::string param_value = std::string(value.begin(), value.end());
+      std::string header_key = std::string(key.begin(), key.end());
+      if (RE2::PartialMatch(header_key, header_forward_regex_)) {
+        if (std::find(
+                kReservedParameterKeys.begin(), kReservedParameterKeys.end(),
+                header_key) != kReservedParameterKeys.end() ||
+            header_key.rfind("triton_", 0) == 0) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              ("Header '" + header_key +
+               "' is reserved for Triton usage and cannot be forwarded.")
+                  .c_str());
+        }
+
+        std::string header_value = std::string(value.begin(), value.end());
         err = TRITONSERVER_InferenceRequestSetStringParameter(
-            irequest, param_key.c_str(), param_value.c_str());
+            irequest, header_key.c_str(), header_value.c_str());
         if (err != nullptr) {
           break;
         }

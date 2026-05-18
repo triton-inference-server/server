@@ -107,6 +107,10 @@ class HTTPServer {
 
   static void StopCallback(evutil_socket_t sock, short events, void* arg);
 
+  // Transfer-Encoding: chunked — increment count per non-empty chunk (capped).
+  static evhtp_res ChunkCountIncrement(
+      evhtp_request_t* req, uint64_t chunk_len, void* arg);
+
   static evhtp_res NewConnection(evhtp_connection_t* conn, void* arg);
   static evhtp_res EndConnection(evhtp_connection_t* conn, void* arg);
 
@@ -525,6 +529,17 @@ class HTTPAPIServer : public HTTPServer {
     bool end_{false};
   };
 
+  struct ReleaseEvbuffer {
+    // Custom deleter for evbuffer
+    void operator()(evbuffer* b) const noexcept
+    {
+      if (b != nullptr) {
+        evbuffer_free(b);
+      }
+    }
+  };
+  using EvbufferUniquePtr = std::unique_ptr<evbuffer, ReleaseEvbuffer>;
+
   // Simple structure that carries the userp payload needed for
   // request release callback.
   struct RequestReleasePayload final {
@@ -586,7 +601,7 @@ class HTTPAPIServer : public HTTPServer {
       evhtp_request_t* req, evbuffer* decompressed_buffer,
       int32_t* content_length);
   TRITONSERVER_Error* DecompressBuffer(
-      evhtp_request_t* req, evbuffer** decompressed_buffer);
+      evhtp_request_t* req, EvbufferUniquePtr& decompressed_buffer);
   TRITONSERVER_Error* CheckTransactionPolicy(
       evhtp_request_t* req, const std::string& model_name,
       int64_t requested_model_version);

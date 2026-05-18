@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2025-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -175,7 +175,15 @@ class TestAsyncClientToolCalling:
         assert parsed_arguments.get("unit") == "fahrenheit"
 
     @pytest.mark.asyncio
-    async def test_tool_call_and_choice(self, client: openai.AsyncOpenAI, model: str):
+    async def test_tool_call_and_choice(
+        self, client: openai.AsyncOpenAI, model: str, backend: str
+    ):
+        # FIXME: [TRI-992] Maybe an issue on TRT-LLM but unverified.
+        if backend == "vllm" and model == "mistral-nemo-instruct-2407":
+            pytest.skip(
+                reason="Mistral model tool calling is not triggered with tool_choice=auto (default)."
+            )
+
         chat_completion = await client.chat.completions.create(
             messages=MESSAGES_ASKING_FOR_TOOLS,
             temperature=0,

@@ -672,7 +672,7 @@ fi
 
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=http_test.py
-EXPECTED_NUM_TESTS=14
+EXPECTED_NUM_TESTS=16
 set +e
 python $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -695,7 +695,7 @@ wait $SERVER_PID
 
 # Helper library to parse SSE events
 # https://github.com/mpetazzoni/sseclient
-pip install sseclient-py
+pip install sseclient-py psutil
 
 SERVER_ARGS="--model-repository=`pwd`/../python_models/generate_models --log-verbose=1"
 SERVER_LOG="./inference_server_generate_endpoint_test.log"
@@ -852,6 +852,14 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Default Input Size Limit Test Failed for type size explosion\n***"
     RET=1
 fi
+
+# Test that sending multiple malformed compressed requests does not cause memory leaks on the server.
+SERVER_PID=$SERVER_PID python http_input_size_limit_test.py InferSizeLimitTest.test_no_leak_on_invalid_inference_header_length >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Decompression Leak Regression Failed\n***\n***"
+    RET=1
+fi
 set -e
 
 kill $SERVER_PID
@@ -942,7 +950,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $REQUEST_MANY_CHUNKS_PY -v >> ${CLIENT_LOG} 2>&1
+SERVER_PID=$SERVER_PID python $REQUEST_MANY_CHUNKS_PY -v >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** HTTP Request Many Chunks Test Failed\n***"
     cat $SERVER_LOG

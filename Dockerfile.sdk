@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:26.03-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:26.04-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_REPO_ORGANIZATION=http://github.com/triton-inference-server
@@ -169,16 +169,20 @@ RUN apt-get update && \
             python3-wheel \
             vim \
             wget && \
-    pip3 install "grpcio<1.68" "grpcio-tools<1.68"
+    pip3 install "grpcio<1.68" "grpcio-tools<1.68" && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*;
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
 COPY NVIDIA_Deep_Learning_Container_License.pdf .
 COPY --from=sdk_build /workspace/client/ client/
 COPY --from=sdk_build /workspace/install/ install/
-RUN cd install && \
-    export VERSION=`cat /workspace/TRITON_VERSION` && \
-    tar zcf /workspace/v$VERSION.clients.tar.gz *
+WORKDIR /workspace/install
+RUN export VERSION=`cat /workspace/TRITON_VERSION` && \
+    tar zcf /workspace/v"$VERSION".clients.tar.gz ./*
+
+WORKDIR /workspace
 
 # For CI testing need to copy over L0_sdk test and L0_client_build_variants test.
 RUN mkdir qa
@@ -195,20 +199,31 @@ COPY qa/images/mug.jpg images/mug.jpg
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
-RUN pip3 install --upgrade "numpy<2" pillow attrdict && \
-    find install/python/ -maxdepth 1 -type f -name \
-         "tritonclient-*-py3-none-any.whl" | xargs printf -- '%s[all]' | \
-    xargs pip3 install --upgrade
+RUN pip3 install --upgrade "numpy<2" pillow attrdict
+
+RUN --mount=type=secret,id=triton_ci_pip_extra_values,env=TRITON_CI_PYPI_EXTRA_VALUES \
+    if [ -n "${TRITON_CI_PYPI_EXTRA_VALUES}" ]; then \
+        find install/python/ -maxdepth 1 -type f -name \
+            "tritonclient-*any*.whl" -exec pip3 install --upgrade ${TRITON_CI_PYPI_EXTRA_VALUES} {}[all] \; ; \
+    else \
+        find install/python/ -maxdepth 1 -type f -name \
+            "tritonclient-*any*.whl" -exec pip3 install --upgrade {}[all] \; ; \
+    fi
 
 # Install GenAI-Perf
-RUN pip3 install genai-perf
+RUN --mount=type=secret,id=triton_ci_pip_extra_values,env=TRITON_CI_PYPI_EXTRA_VALUES \
+    if [ -n "${TRITON_CI_PYPI_EXTRA_VALUES}" ]; then \
+       pip3 install --upgrade ${TRITON_CI_PYPI_EXTRA_VALUES} genai-perf ; \
+    else \
+        pip3 install --upgrade genai-perf ; \
+    fi
 
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         [ "$(uname -m)" != "x86_64" ] && arch="sbsa" || arch="x86_64" && \
         curl -o /tmp/cuda-keyring.deb \
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/$arch/cuda-keyring_1.1-1_all.deb \
-        && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
+        "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/${arch}/cuda-keyring_1.1-1_all.deb" \
+        && apt -y install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
         apt update && \
         apt install --yes --no-install-recommends \
                datacenter-gpu-manager-4-core=1:${DCGM_VERSION} \

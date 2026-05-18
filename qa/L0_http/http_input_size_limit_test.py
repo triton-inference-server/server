@@ -37,7 +37,7 @@ import unittest
 
 import numpy as np
 import requests
-import test_util as tu
+from test_util import GIB, MIB, TestResultCollector, get_server_process_from_env
 
 # Constants for size calculations
 # Each FP32 value is 4 bytes, so we need to divide target byte sizes by 4 to get element counts
@@ -45,10 +45,8 @@ BYTES_PER_FP32 = 4
 BYTES_PER_INT64 = (
     8  # For the type size explosion test, we use int64 which is 8 bytes per element
 )
-MB = 2**20  # 1 MB = 1,048,576 bytes
-GB = 2**30  # 1 GB = 1,073,741,824 bytes
-DEFAULT_LIMIT_BYTES = 64 * MB  # 64MB default limit
-INCREASED_LIMIT_BYTES = 128 * MB  # 128MB increased limit
+DEFAULT_LIMIT_BYTES = 64 * MIB  # 64MB default limit
+INCREASED_LIMIT_BYTES = 128 * MIB  # 128MB increased limit
 
 # Calculate element counts for size limits
 DEFAULT_LIMIT_ELEMENTS = DEFAULT_LIMIT_BYTES // BYTES_PER_FP32  # 16,777,216 elements
@@ -60,7 +58,7 @@ INCREASED_LIMIT_ELEMENTS = (
 OFFSET_ELEMENTS = 32
 
 
-class InferSizeLimitTest(tu.TestResultCollector):
+class InferSizeLimitTest(TestResultCollector):
     def _get_infer_url(self, model_name):
         return f"http://localhost:8000/v2/models/{model_name}/infer"
 
@@ -119,7 +117,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             f"Error message: {error_msg}", flush=True
         )  # Print the error message for debugging
         self.assertIn(
-            "Request JSON size of ",
+            "request JSON size of ",
             error_msg,
         )
         self.assertIn(
@@ -187,7 +185,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             DEFAULT_LIMIT_ELEMENTS + OFFSET_ELEMENTS, dtype=np.float32
         )
         input_bytes = large_input.tobytes()
-        assert len(input_bytes) > 64 * MB  # Verify we're actually over the 64MB limit
+        assert len(input_bytes) > 64 * MIB  # Verify we're actually over the 64MB limit
 
         headers = {"Inference-Header-Content-Length": "0"}
         response = requests.post(
@@ -217,7 +215,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             DEFAULT_LIMIT_ELEMENTS - OFFSET_ELEMENTS, dtype=np.float32
         )
         input_bytes = small_input.tobytes()
-        assert len(input_bytes) < 64 * MB  # Verify we're actually under the 64MB limit
+        assert len(input_bytes) < 64 * MIB  # Verify we're actually under the 64MB limit
 
         response = requests.post(
             self._get_infer_url(model), data=input_bytes, headers=headers
@@ -262,7 +260,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             ]
         }
         assert (
-            shape_size * BYTES_PER_FP32 > 64 * MB
+            shape_size * BYTES_PER_FP32 > 64 * MIB
         )  # Verify we're actually over the 64MB limit
 
         headers = {"Content-Type": "application/json"}
@@ -282,7 +280,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message contains size limit info
         error_msg = response.content.decode()
         self.assertIn(
-            "Request JSON size of ",
+            "request JSON size of ",
             error_msg,
         )
         self.assertIn(
@@ -347,7 +345,9 @@ class InferSizeLimitTest(tu.TestResultCollector):
             INCREASED_LIMIT_ELEMENTS + OFFSET_ELEMENTS, dtype=np.float32
         )
         input_bytes = large_input.tobytes()
-        assert len(input_bytes) > 128 * MB  # Verify we're actually over the 128MB limit
+        assert (
+            len(input_bytes) > 128 * MIB
+        )  # Verify we're actually over the 128MB limit
 
         headers = {"Inference-Header-Content-Length": "0"}
         response = requests.post(
@@ -378,7 +378,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         )
         input_bytes = small_input.tobytes()
         assert (
-            len(input_bytes) < 128 * MB
+            len(input_bytes) < 128 * MIB
         )  # Verify we're actually under the 128MB limit
 
         response = requests.post(
@@ -424,7 +424,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
             ]
         }
         assert (
-            shape_size * BYTES_PER_FP32 > 128 * MB
+            shape_size * BYTES_PER_FP32 > 128 * MIB
         )  # Verify we're actually over the 128MB limit
 
         headers = {"Content-Type": "application/json"}
@@ -505,7 +505,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
 
         # Create a string that is larger (large payload about 2GB) than the default limit of 64MB
         # (2^31 + 64) elements * 1 bytes = 2GB + 64 bytes = 2,147,483,712 bytes
-        large_string_size = 2 * GB + 64
+        large_string_size = 2 * GIB + 64
         large_string = "A" * large_string_size
 
         payload = {
@@ -536,7 +536,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify error message
         error_msg = response.content.decode()
         self.assertIn(
-            "Request JSON size of ",
+            "request JSON size of ",
             error_msg,
         )
         self.assertIn(
@@ -588,7 +588,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         }
 
         # Test case 1: Payload that decompresses to 64MB + 1MB (over limit) should fail
-        large_target_size = DEFAULT_LIMIT_BYTES + MB
+        large_target_size = DEFAULT_LIMIT_BYTES + MIB
         (
             large_compressed_data,
             large_uncompressed_size,
@@ -628,7 +628,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         )
 
         # Test case 2: Payload that decompresses to 64MB - 1MB (under limit) should succeed
-        small_target_size = DEFAULT_LIMIT_BYTES - MB
+        small_target_size = DEFAULT_LIMIT_BYTES - MIB
         (
             small_compressed_data,
             small_uncompressed_size,
@@ -670,7 +670,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         }
 
         # Test case 1: Input that decompresses to 128MB + 1MB (over limit) should fail
-        large_target_size = INCREASED_LIMIT_BYTES + MB
+        large_target_size = INCREASED_LIMIT_BYTES + MIB
         (
             large_compressed_data,
             large_uncompressed_size,
@@ -702,7 +702,7 @@ class InferSizeLimitTest(tu.TestResultCollector):
         )
 
         # Test case 2: Input that decompresses to 128MB - 1MB (under limit) should succeed
-        small_target_size = INCREASED_LIMIT_BYTES - MB
+        small_target_size = INCREASED_LIMIT_BYTES - MIB
         (
             small_compressed_data,
             small_uncompressed_size,
@@ -734,6 +734,62 @@ class InferSizeLimitTest(tu.TestResultCollector):
         # Verify we got a valid response
         result = response.json()
         self.assertIn("outputs", result, "Response missing outputs field")
+
+    def test_no_leak_on_invalid_inference_header_length(self):
+        """
+        Test that sending multiple malformed compressed requests does not cause memory growth on the server.
+        """
+        leak_request_count = 100
+        max_rss_growth_bytes = 32 * MIB
+        model = "onnx_zero_1_float32"
+
+        body = gzip.compress(b" " * MIB)
+        headers = {
+            "Content-Type": "application/json",
+            "Content-Encoding": "gzip",
+            "Inference-Header-Content-Length": "9999999",
+        }
+        url = self._get_infer_url(model)
+
+        server = get_server_process_from_env()
+
+        with requests.Session() as session:
+            # Warm up the failure path so one-time allocations do not look
+            # like leaks.
+            resp = session.post(url, data=body, headers=headers)
+            self.assertEqual(
+                400,
+                resp.status_code,
+                f"Expected status code 400, got {resp.status_code}: "
+                f"{resp.content[:200]!r}",
+            )
+
+            rss_before = server.memory_info().rss
+            for _ in range(leak_request_count):
+                resp = session.post(url, data=body, headers=headers)
+                self.assertEqual(
+                    400,
+                    resp.status_code,
+                    f"Expected status code 400, got {resp.status_code}: "
+                    f"{resp.content[:200]!r}",
+                )
+            rss_after = server.memory_info().rss
+
+        growth = rss_after - rss_before
+        print(
+            f"RSS: before={rss_before / MIB:.1f} MIB, "
+            f"after={rss_after / MIB:.1f} MIB, "
+            f"growth={growth / MIB:.1f} MIB, "
+            f"limit={max_rss_growth_bytes / MIB:.0f} MIB",
+            flush=True,
+        )
+        self.assertLess(
+            growth,
+            max_rss_growth_bytes,
+            f"Server RSS grew by {growth / MIB:.1f} MIB after "
+            f"{leak_request_count} malformed compressed requests "
+            f"(limit {max_rss_growth_bytes / MIB:.0f} MIB).",
+        )
 
 
 if __name__ == "__main__":

@@ -31,9 +31,11 @@
 #include "http_server.h"
 
 #include <event2/buffer.h>
+#include <event2/bufferevent.h>
 #include <re2/re2.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <list>
 #include <regex>
 #include <thread>
@@ -47,6 +49,11 @@
 #include "triton/common/triton_json.h"
 
 namespace triton { namespace server {
+
+// Transfer-Encoding: chunked — count non-empty chunks per request (worker
+// thread). Increment in ChunkCountIncrement. Caps evbuffer fan-out / RSS.
+constexpr uint64_t kMaxChunkedChunks =
+    1 << 16;  // reject on chunk count > kMaxChunkedChunks (65536)
 
 #define RETURN_AND_CALLBACK_IF_ERR(X, CALLBACK) \
   do {                                          \
@@ -289,8 +296,43 @@ HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
     server->conn_cnt_++;
   }
   evhtp_connection_set_hook(
+      conn, evhtp_hook_on_new_chunk,
+      (evhtp_hook)(void*)HTTPServer::ChunkCountIncrement, arg);
+  evhtp_connection_set_hook(
       conn, evhtp_hook_on_connection_fini,
       (evhtp_hook)(void*)HTTPServer::EndConnection, arg);
+  return EVHTP_RES_OK;
+}
+
+evhtp_res
+HTTPServer::ChunkCountIncrement(
+    evhtp_request_t* req, uint64_t chunk_len, void* arg)
+{
+  (void)arg;
+  if ((req->flags & EVHTP_REQ_FLAG_FINISHED) != 0) {
+    return EVHTP_RES_OK;
+  }
+
+  if (chunk_len == 0) {
+    return EVHTP_RES_OK;
+  }
+  if (++req->chunk_count > kMaxChunkedChunks) {
+    AddContentTypeHeader(req, "application/json");
+    const std::string msg =
+        std::string("Chunked request body exceeds maximum of ") +
+        std::to_string(kMaxChunkedChunks) +
+        " non-empty chunks. Send fewer or larger HTTP chunks.";
+    EVBufferAddErrorJson(req->buffer_out, msg.c_str());
+    // Force connection close after flushing this error response.
+    req->flags &= ~EVHTP_REQ_FLAG_KEEPALIVE;
+    if ((req->conn != nullptr) && (req->conn->bev != nullptr)) {
+      // Stop ingesting request bytes once over limit so memory won't keep
+      // growing while we flush the error response.
+      bufferevent_disable(req->conn->bev, EV_READ);
+    }
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return EVHTP_RES_OK;
+  }
   return EVHTP_RES_OK;
 }
 
@@ -1420,7 +1462,13 @@ HTTPAPIServer::HandleRepositoryIndex(
   if (buffer_len > 0) {
     triton::common::TritonJson::Value ready_json;
     if (index_request.Find("ready", &ready_json)) {
-      err = ready_json.AsBool(&ready);
+      if (!ready_json.IsBool()) {
+        err = TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "Invalid value for 'ready': expected a boolean");
+      } else {
+        err = ready_json.AsBool(&ready);
+      }
     }
   }
 
@@ -2999,8 +3047,7 @@ HTTPAPIServer::ParseJsonTritonParams(
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             ("parameter keys starting with 'triton_' are reserved for Triton "
-             "usage "
-             "and should not be specified."));
+             "usage and should not be specified."));
       } else {
         RETURN_IF_ERR(SetTritonParameterFromJsonParameter(
             parameter, params_json, irequest));
@@ -3303,14 +3350,25 @@ struct HeaderSearchPayload {
 int
 ForEachHeader(evhtp_header_t* header, void* arg)
 {
-  HeaderSearchPayload* header_search_payload =
-      reinterpret_cast<HeaderSearchPayload*>(arg);
+  auto* header_search_payload = reinterpret_cast<HeaderSearchPayload*>(arg);
 
   TRITONSERVER_InferenceRequest* request = header_search_payload->request_;
   const re2::RE2& regex = header_search_payload->regex_;
+  std::string header_key{header->key};
 
-  std::string matched_string;
-  if (RE2::PartialMatch(std::string(header->key), regex)) {
+  if (RE2::PartialMatch(header_key, regex)) {
+    if (std::find(
+            kReservedParameterKeys.begin(), kReservedParameterKeys.end(),
+            header_key) != kReservedParameterKeys.end() ||
+        header_key.rfind("triton_", 0) == 0) {
+      header_search_payload->error_ = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          ("Header '" + header_key +
+           "' is reserved for Triton usage and cannot be forwarded.")
+              .c_str());
+      return 1;
+    }
+
     header_search_payload->error_ =
         TRITONSERVER_InferenceRequestSetStringParameter(
             request, header->key, header->val);
@@ -3369,15 +3427,15 @@ HTTPAPIServer::StartTrace(
 
 TRITONSERVER_Error*
 HTTPAPIServer::DecompressBuffer(
-    evhtp_request_t* req, evbuffer** decompressed_buffer)
+    evhtp_request_t* req, EvbufferUniquePtr& decompressed_buffer)
 {
   auto compression_type = GetRequestCompressionType(req);
   switch (compression_type) {
     case DataCompressor::Type::DEFLATE:
     case DataCompressor::Type::GZIP: {
-      *decompressed_buffer = evbuffer_new();
+      decompressed_buffer.reset(evbuffer_new());
       RETURN_IF_ERR(DataCompressor::DecompressData(
-          compression_type, req->buffer_in, *decompressed_buffer,
+          compression_type, req->buffer_in, decompressed_buffer.get(),
           max_input_size_));
       break;
     }
@@ -3888,13 +3946,13 @@ HTTPAPIServer::HandleInfer(
   }
 
   // Decompress request body if it is compressed in supported type
-  evbuffer* decompressed_buffer = nullptr;
-  RETURN_AND_RESPOND_IF_ERR(req, DecompressBuffer(req, &decompressed_buffer));
+  EvbufferUniquePtr decompressed_buffer;
+  RETURN_AND_RESPOND_IF_ERR(req, DecompressBuffer(req, decompressed_buffer));
 
   // Get content length as a default header_length if no header specified
   int32_t content_length = 0;
   RETURN_AND_RESPOND_IF_ERR(
-      req, GetContentLength(req, decompressed_buffer, &content_length));
+      req, GetContentLength(req, decompressed_buffer.get(), &content_length));
 
   // Get the header length
   size_t header_length = 0;
@@ -3946,8 +4004,8 @@ HTTPAPIServer::HandleInfer(
   // Parse EV request and fill Triton request fields from it
   RETURN_AND_CALLBACK_IF_ERR(
       EVRequestToTritonRequest(
-          req, model_name, irequest, decompressed_buffer, infer_request.get(),
-          header_length),
+          req, model_name, irequest, decompressed_buffer.get(),
+          infer_request.get(), header_length),
       error_callback);
 
   // Get request ID for logging in case of error.
@@ -3962,7 +4020,7 @@ HTTPAPIServer::HandleInfer(
   RETURN_AND_CALLBACK_IF_ERR(ForwardHeaders(req, irequest), error_callback);
 
   auto request_release_payload = std::make_unique<RequestReleasePayload>(
-      irequest_shared, decompressed_buffer);
+      irequest_shared, decompressed_buffer.release());
   RETURN_AND_CALLBACK_IF_ERR(
       TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestClass::InferRequestComplete,
