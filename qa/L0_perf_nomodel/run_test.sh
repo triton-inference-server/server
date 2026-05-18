@@ -52,7 +52,7 @@ MODEL_REPO="${PWD}/models"
 PERF_CLIENT=perf_analyzer
 SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
-pip3 install perf-analyzer==2.60.0
+pip3 install perf-analyzer
 
 # DATADIR is already set in environment variable for aarch64
 if [ "$ARCH" != "aarch64" ]; then
@@ -110,12 +110,6 @@ for BACKEND in $BACKENDS; do
         continue
     fi
 
-    # Skip high concurrency tests for custom backend to avoid resource exhaustion on CPU
-    # For more info: TRI-345 (Linear)
-    #if [ "$BACKEND" == "custom" ] && [ $CONCURRENCY -gt 8 ]; then
-    #    continue
-    #fi
-
     # plan and openvino models do not support 16MB I/O tests
     if ([ $BACKEND == "plan" ] || [ $BACKEND == "openvino" ]) && [ $TENSOR_SIZE != 1 ]; then
         continue
@@ -125,7 +119,7 @@ for BACKEND in $BACKENDS; do
     INPUT_NAME="INPUT0" && [ $BACKEND == "libtorch" ] && INPUT_NAME="INPUT__0"
 
     MAX_LATENCY=300
-    MAX_BATCH=${STATIC_BATCH} && [ $DYNAMIC_BATCH > $STATIC_BATCH ] && MAX_BATCH=${DYNAMIC_BATCH}
+    MAX_BATCH=${STATIC_BATCH} && (( DYNAMIC_BATCH > STATIC_BATCH )) && MAX_BATCH=${DYNAMIC_BATCH}
 
     # TODO Add openvino identity model that supports batching/dynamic batching
     # The current openvino identity model does also not support batching
@@ -141,13 +135,13 @@ for BACKEND in $BACKENDS; do
     OUTPUT_SHARED_MEMORY_SIZE=""
     if [[ "$SHARED_MEMORY" != "none" ]]; then
         OUTPUT_SHARED_MEMORY_SIZE=$((TENSOR_ELEMENT_BYTES*TENSOR_SIZE))
-        if [ $MAX_BATCH > 1 ]; then
+        if (( MAX_BATCH > 1 )); then
             OUTPUT_SHARED_MEMORY_SIZE=$((OUTPUT_SHARED_MEMORY_SIZE*MAX_BATCH))
         fi
         OUTPUT_SHARED_MEMORY_SIZE="--output-shared-memory-size $OUTPUT_SHARED_MEMORY_SIZE"
     fi
 
-    if [ $DYNAMIC_BATCH > 1 ]; then
+    if (( DYNAMIC_BATCH > 1 )); then
         NAME=${BACKEND}_sbatch${STATIC_BATCH}_dbatch${DYNAMIC_BATCH}_instance${INSTANCE_CNT}
     else
         NAME=${BACKEND}_sbatch${STATIC_BATCH}_instance${INSTANCE_CNT}
@@ -185,7 +179,7 @@ for BACKEND in $BACKENDS; do
         (cd models/$MODEL_NAME && \
                 sed -i "s/dims:.*\[.*\]/dims: \[ ${SHAPE} \]/g" config.pbtxt)
     fi
-    if [ $DYNAMIC_BATCH > 1 ] && [ $BACKEND != "openvino" ]; then
+    if (( DYNAMIC_BATCH > 1 )) && [ $BACKEND != "openvino" ]; then
         (cd models/$MODEL_NAME && \
                 echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
     fi
@@ -221,6 +215,10 @@ for BACKEND in $BACKENDS; do
         echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
         RET=1
     fi
+    if [ ! -s ${RESULTDIR}/${NAME}.csv ]; then
+        echo -e "\n***\n*** FAILED Perf Analyzer measurement: missing ${RESULTDIR}/${NAME}.csv\n***"
+        RET=1
+    fi
     echo "Time after perf analyzer trials: $(date)"
     set +o pipefail
     set -e
@@ -245,7 +243,7 @@ for BACKEND in $BACKENDS; do
         wait $SERVER_PID
     fi
 
-    if [ -f $REPORTER ]; then
+    if [ -f $REPORTER ] && [ -s ${RESULTDIR}/${NAME}.csv ]; then
         set +e
 
         URL_FLAG=

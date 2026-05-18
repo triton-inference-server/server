@@ -62,6 +62,11 @@ PERF_CLIENT_STABILIZE_WINDOW=10000
 # measurement windows to be considered value.
 PERF_CLIENT_STABILIZE_THRESHOLD=15.0
 
+# A value of 999 bypasses perf_analyzer's stability gate. This is only used
+# for large-I/O throughput cases where PA can otherwise collect measurements
+# until --max-trials and exit without writing a CSV.
+PERF_CLIENT_LARGE_IO_STABILIZE_THRESHOLD=${PERF_CLIENT_LARGE_IO_STABILIZE_THRESHOLD:-999}
+
 RUNTEST=./run_test.sh
 
 # The model used for data collection has a single input and a single
@@ -186,6 +191,19 @@ for idx in "${!TEST_NAMES[@]}"; do
     TEST_TENSOR_SIZE=${TEST_TENSOR_SIZES[$idx]}
     TEST_INSTANCE_COUNT=${TEST_INSTANCE_COUNTS[$idx]}
     TEST_CONCURRENCY=${TEST_CONCURRENCY[$idx]}
+    TEST_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD}
+
+    # The 16MB no-shmem HTTP/gRPC throughput cases are client/transport bound
+    # at high concurrency. In that mode perf_analyzer can run until
+    # --max-trials without finding a stable p95/throughput window and then
+    # return without producing the CSV that reporter.py needs. These are data
+    # collection benchmarks, so keep the load shape and relax stability only
+    # for that large-payload throughput path.
+    if (( TEST_TENSOR_SIZE == TENSOR_SIZE_16MB && TEST_CONCURRENCY > 1 )) && \
+       [[ "${TEST_SHARED_MEMORY}" == "none" ]] && \
+       [[ "${TEST_PROTOCOL}" != "triton_c_api" ]]; then
+        TEST_STABILIZE_THRESHOLD=${PERF_CLIENT_LARGE_IO_STABILIZE_THRESHOLD}
+    fi
 
     # FIXME: If PA C API adds SHMEM support, remove this.
     if [[ "${TEST_SHARED_MEMORY}" != "none" ]] && \
@@ -198,7 +216,7 @@ for idx in "${!TEST_NAMES[@]}"; do
                 RESULTDIR=${REPO_VERSION}/${TEST_DIR} \
                 PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE} \
                 PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW} \
-                PERF_CLIENT_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD} \
+                PERF_CLIENT_STABILIZE_THRESHOLD=${TEST_STABILIZE_THRESHOLD} \
                 PERF_CLIENT_PROTOCOL=${TEST_PROTOCOL} \
                 TENSOR_SIZE=${TEST_TENSOR_SIZE} \
                 BACKENDS=${TEST_BACKENDS} \
