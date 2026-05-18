@@ -28,6 +28,7 @@
 import os
 import unittest
 
+import ml_dtypes
 import numpy as np
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
@@ -38,43 +39,51 @@ class BFloat16Test(unittest.TestCase):
         self.protocol = os.environ.get("CLIENT_TYPE", "http")
         if self.protocol == "http":
             self.client_ = httpclient.InferenceServerClient("localhost:8000")
+            self.client_module_ = httpclient
         else:
             self.client_ = grpcclient.InferenceServerClient("localhost:8001")
-        self.model_name_ = "add_bf16"
-        self.shape_ = [1]
+            self.client_module_ = grpcclient
+        self.model_name_ = "onnx_bf16_bf16_bf16"
+        # Model dims are [-1, 16]: dynamic batch dim plus inner dim of 16.
+        self.inner_dim_ = 16
 
     def _infer_bf16(self, input0_data, input1_data):
-        """Helper to run BF16 inference and return the output numpy array."""
-        if self.protocol == "http":
-            input0 = httpclient.InferInput("INPUT0", self.shape_, "BF16")
-            input1 = httpclient.InferInput("INPUT1", self.shape_, "BF16")
-        else:
-            input0 = grpcclient.InferInput("INPUT0", self.shape_, "BF16")
-            input1 = grpcclient.InferInput("INPUT1", self.shape_, "BF16")
+        """Helper to run BF16 inference and return the output numpy arrays."""
+        input0 = self.client_module_.InferInput(
+            "INPUT0", list(input0_data.shape), "BF16"
+        )
+        input1 = self.client_module_.InferInput(
+            "INPUT1", list(input1_data.shape), "BF16"
+        )
         input0.set_data_from_numpy(input0_data)
         input1.set_data_from_numpy(input1_data)
 
         results = self.client_.infer(self.model_name_, [input0, input1])
-        return results.as_numpy("OUTPUT")
+        return results.as_numpy("OUTPUT0"), results.as_numpy("OUTPUT1")
 
-    def test_bf16_add_variants(self):
-        """Run BF16 add across multiple cases: zeros, negatives, large, small, cancellation, and identical."""
-        for input0_val, input1_val, expected_val in [
-            (0.0, 0.0, 0.0),  # zeros
-            (-1.5, 3.5, 2.0),  # negatives / mixed
-            (100.0, 200.0, 300.0),  # large
-            (1e-2, 1e-2, 2e-2),  # small (near underflow)
-            (1.0, -1.0, 0.0),  # cancellation
-            (2.0, 2.0, 4.0),  # identical inputs
-        ]:
-            output = self._infer_bf16(
-                np.full(self.shape_, input0_val, dtype=np.float32),
-                np.full(self.shape_, input1_val, dtype=np.float32),
-            )
-            self.assertEqual(output.dtype, np.float32)
-            # TODO: BF16 to FP32 conversion loses precision. Remove rtol and atol in TRI-801.
-            # BF16 has ~3 decimal digits; use relaxed tol for computed values
-            np.testing.assert_allclose(output, expected_val, rtol=1e-2, atol=1e-3)
+    def test_bf16_add_sub_variants(self):
+        """Run BF16 add/sub across multiple cases batched in a single request:
+        zeros, negatives, large, small, cancellation, and identical."""
+        cases = [
+            (0.0, 0.0),
+            (-1.5, 3.5),
+            (100.0, 200.0),
+            (1e-2, 1e-2),
+            (1.0, -1.0),
+            (2.0, 2.0),
+        ]
+        batch_size = len(cases)
+        input0_data = np.empty((batch_size, self.inner_dim_), dtype=ml_dtypes.bfloat16)
+        input1_data = np.empty((batch_size, self.inner_dim_), dtype=ml_dtypes.bfloat16)
+        for i, (v0, v1) in enumerate(cases):
+            input0_data[i, :] = v0
+            input1_data[i, :] = v1
+
+        output0, output1 = self._infer_bf16(input0_data, input1_data)
+        self.assertEqual(output0.dtype, ml_dtypes.bfloat16)
+        self.assertEqual(output1.dtype, ml_dtypes.bfloat16)
+        np.testing.assert_array_equal(output0, input0_data + input1_data)
+        np.testing.assert_array_equal(output1, input0_data - input1_data)
 
 
 if __name__ == "__main__":

@@ -30,13 +30,14 @@ import json
 import os
 import unittest
 
+import ml_dtypes
 import numpy as np
 
 _last_request_id = 0
 
 # Numpy does not support the BF16 datatype natively.
-# We use this dummy dtype as a representative for BF16.
-np_dtype_bfloat16 = np.dtype([("bf16", object)])
+# We use ml_dtypes.bfloat16 for BF16.
+np_dtype_bfloat16 = ml_dtypes.bfloat16
 
 MIB = 2**20  # 1 MIB = 1,048,576 bytes
 GIB = 2**30  # 1 GIB = 1,073,741,824 bytes
