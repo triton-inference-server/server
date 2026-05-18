@@ -584,7 +584,8 @@ def create_plan_dynamic_rf_modelfile(
 
     flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
     flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
-    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+    if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
+        flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
     datatype_set = set([trt_dtype])
     for dt in datatype_set:
         if dt == trt.int8:
@@ -707,7 +708,8 @@ def create_plan_shape_tensor_modelfile(
 
     flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
     flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
-    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+    if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
+        flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
     datatype_set = set([trt_dtype])
     for dt in datatype_set:
         if dt == trt.int8:
