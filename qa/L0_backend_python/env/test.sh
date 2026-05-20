@@ -246,6 +246,63 @@ set -e
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 aws s3 rb "${BUCKET_URL}"
 
+# EXECUTION_ENV_PATH path-traversal regression test. For each
+# traversal vector, load a Python-backend model with archive is malicious
+# and assert: (a) Triton refuses to start, (b) no file was written outside
+# the extraction directory, (c) the server log contains the libarchive
+# rejection. See zipslip_test.py for the archive layout.
+ZIPSLIP_REPO="`pwd`/zipslip_models"
+ZIPSLIP_EXECUTION_ENV_PATH='$$TRITON_MODEL_DIRECTORY/malicious_env.tar.gz'
+
+ZIPSLIP_CASES=(
+    "relative:Path contains '..'"
+    "absolute:Path is absolute"
+)
+
+for case in "${ZIPSLIP_CASES[@]}"; do
+    mode="${case%%:*}"
+    expected_msg="${case#*:}"
+    model="zipslip_${mode}"
+    marker="/tmp/zipslip_${mode}_marker_$$"
+    SERVER_LOG="./zipslip_${mode}_server.log"
+
+    rm -f "${marker}" "${SERVER_LOG}" "${ZIPSLIP_REPO}"
+    mkdir -p "${ZIPSLIP_REPO}/${model}/1"
+
+    cp ../../python_models/identity_fp32/config.pbtxt "${ZIPSLIP_REPO}/${model}/config.pbtxt"
+    cp ../../python_models/identity_fp32/model.py     "${ZIPSLIP_REPO}/${model}/1/model.py"
+    (cd "${ZIPSLIP_REPO}/${model}" && \
+        sed -i "s/^name:.*/name: \"${model}\"/" config.pbtxt && \
+        echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$ZIPSLIP_EXECUTION_ENV_PATH\"}}" >> config.pbtxt)
+    python3 ./zipslip_test.py \
+        --mode   "${mode}" \
+        --output "${ZIPSLIP_REPO}/${model}/malicious_env.tar.gz" \
+        --marker "${marker}"
+
+    SERVER_ARGS="--model-repository=${ZIPSLIP_REPO} --log-verbose=1"
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        kill_server
+        echo -e "\n***\n*** Zip Slip (mode=${mode}): tritonserver started despite malicious EXECUTION_ENV_PATH archive.\n***"
+        RET=1
+    fi
+
+    set +e
+    if [ -e "${marker}" ]; then
+        ls -la "${marker}"
+        echo -e "\n***\n*** Zip Slip (mode=${mode}): marker file written outside extraction directory.\n***"
+        RET=1
+    fi
+    if ! grep -q "${expected_msg}" "${SERVER_LOG}"; then
+        cat "${SERVER_LOG}"
+        echo -e "\n***\n*** Zip Slip (mode=${mode}): expected '${expected_msg}' not found in server log.\n***"
+        RET=1
+    fi
+    set -e
+
+    rm -f "${marker}"
+done
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Env Manager Test PASSED.\n***"
 else
