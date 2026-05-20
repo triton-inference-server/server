@@ -62,10 +62,11 @@ PERF_CLIENT_STABILIZE_WINDOW=10000
 # measurement windows to be considered value.
 PERF_CLIENT_STABILIZE_THRESHOLD=15.0
 
-# A value of 999 bypasses perf_analyzer's stability gate. This is only used
-# for large-I/O throughput cases where PA can otherwise collect measurements
-# until --max-trials and exit without writing a CSV.
+# A value of 999 bypasses perf_analyzer's stability gate. For large-I/O
+# throughput cases, count_windows mode lets PA wait for a fixed number of
+# completed responses instead of relying on fixed 10s time windows.
 PERF_CLIENT_LARGE_IO_STABILIZE_THRESHOLD=${PERF_CLIENT_LARGE_IO_STABILIZE_THRESHOLD:-999}
+PERF_CLIENT_LARGE_IO_MEASUREMENT_REQUEST_COUNT=${PERF_CLIENT_LARGE_IO_MEASUREMENT_REQUEST_COUNT:-10}
 
 RUNTEST=./run_test.sh
 
@@ -192,17 +193,17 @@ for idx in "${!TEST_NAMES[@]}"; do
     TEST_INSTANCE_COUNT=${TEST_INSTANCE_COUNTS[$idx]}
     TEST_CONCURRENCY=${TEST_CONCURRENCY[$idx]}
     TEST_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD}
+    TEST_PERF_CLIENT_EXTRA_ARGS=${PERF_CLIENT_EXTRA_ARGS}
 
-    # The 16MB no-shmem HTTP/gRPC throughput cases are client/transport bound
-    # at high concurrency. In that mode perf_analyzer can run until
-    # --max-trials without finding a stable p95/throughput window and then
-    # return without producing the CSV that reporter.py needs. These are data
-    # collection benchmarks, so keep the load shape and relax stability only
-    # for that large-payload throughput path.
+    # The 16MB no-shmem throughput cases are client/transport bound at high
+    # concurrency. With time_windows mode, perf_analyzer can exit without
+    # producing the CSV that reporter.py needs. These are data collection
+    # benchmarks, so keep the load shape but use count_windows mode only for
+    # that large-payload throughput path.
     if (( TEST_TENSOR_SIZE == TENSOR_SIZE_16MB && TEST_CONCURRENCY > 1 )) && \
-       [[ "${TEST_SHARED_MEMORY}" == "none" ]] && \
-       [[ "${TEST_PROTOCOL}" != "triton_c_api" ]]; then
+       [[ "${TEST_SHARED_MEMORY}" == "none" ]]; then
         TEST_STABILIZE_THRESHOLD=${PERF_CLIENT_LARGE_IO_STABILIZE_THRESHOLD}
+        TEST_PERF_CLIENT_EXTRA_ARGS+=" --measurement-mode=count_windows --measurement-request-count=${PERF_CLIENT_LARGE_IO_MEASUREMENT_REQUEST_COUNT}"
     fi
 
     # FIXME: If PA C API adds SHMEM support, remove this.
@@ -217,6 +218,7 @@ for idx in "${!TEST_NAMES[@]}"; do
                 PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE} \
                 PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW} \
                 PERF_CLIENT_STABILIZE_THRESHOLD=${TEST_STABILIZE_THRESHOLD} \
+                PERF_CLIENT_EXTRA_ARGS="${TEST_PERF_CLIENT_EXTRA_ARGS}" \
                 PERF_CLIENT_PROTOCOL=${TEST_PROTOCOL} \
                 TENSOR_SIZE=${TEST_TENSOR_SIZE} \
                 BACKENDS=${TEST_BACKENDS} \
