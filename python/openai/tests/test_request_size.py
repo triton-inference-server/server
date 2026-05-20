@@ -43,8 +43,6 @@ from frontend.fastapi.middleware.request_size import RequestSizeLimitMiddleware
 from tests.utils import setup_fastapi_app, setup_server
 from utils.utils import HTTP_DEFAULT_MAX_INPUT_SIZE
 
-_LIMIT = HTTP_DEFAULT_MAX_INPUT_SIZE  # 64 MiB
-_OVERFLOW = 16  # bytes
 _MODEL = "mock_llm"
 
 # All POST endpoints.
@@ -81,27 +79,29 @@ def _assert_content_too_large(response) -> None:
     error = body["error"]
     assert error["type"] == "invalid_request_error"
     assert error["code"] == "content_too_large"
-    assert str(_LIMIT) in error["message"]
+    assert str(HTTP_DEFAULT_MAX_INPUT_SIZE) in error["message"]
     assert "--http-max-input-size" in error["message"]
 
 
 class TestRequestSizeLimitMiddleware:
     @pytest.mark.parametrize("endpoint", _ENDPOINTS)
     def test_body_at_limit_is_not_rejected(self, client, endpoint):
-        response = client.post(endpoint, content=b"x" * _LIMIT)
+        response = client.post(endpoint, content=b"x" * HTTP_DEFAULT_MAX_INPUT_SIZE)
         assert response.status_code != 413
 
     @pytest.mark.parametrize("endpoint", _ENDPOINTS)
     def test_body_over_limit_is_rejected(self, client, endpoint):
-        response = client.post(endpoint, content=b"x" * (_LIMIT + _OVERFLOW))
+        response = client.post(
+            endpoint, content=b"x" * (HTTP_DEFAULT_MAX_INPUT_SIZE + 1)
+        )
         _assert_content_too_large(response)
 
     @pytest.mark.parametrize("endpoint", _ENDPOINTS)
     def test_chunked_body_over_limit_is_rejected(self, client, endpoint):
         # httpx switches to chunked transfer when content is an Iterable[bytes].
         def chunks():
-            yield b"x" * _LIMIT
-            yield b"x" * _OVERFLOW
+            yield b"x" * HTTP_DEFAULT_MAX_INPUT_SIZE
+            yield b"x"
 
         response = client.post(endpoint, content=chunks())
         _assert_content_too_large(response)
@@ -129,7 +129,9 @@ class TestContentLengthValidation:
             elif message["type"] == "http.response.body":
                 captured["body"] += message.get("body", b"")
 
-        middleware = RequestSizeLimitMiddleware(app=app, http_max_input_size=_LIMIT)
+        middleware = RequestSizeLimitMiddleware(
+            app=app, http_max_input_size=HTTP_DEFAULT_MAX_INPUT_SIZE
+        )
         scope = {
             "type": "http",
             "method": "POST",

@@ -48,11 +48,6 @@ class RequestSizeLimitMiddleware:
     def __init__(self, app: ASGIApp, http_max_input_size: int) -> None:
         self.app = app
         self.http_max_input_size = validate_positive_int(http_max_input_size)
-        self._content_too_large_message = (
-            "Request content size exceeds the maximum allowed input size of "
-            f"{self.http_max_input_size} bytes. "
-            "Use --http-max-input-size to increase the limit."
-        )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -89,7 +84,7 @@ class RequestSizeLimitMiddleware:
                     send,
                     StatusCode.CONTENT_TOO_LARGE,
                     "content_too_large",
-                    self._content_too_large_message,
+                    self._content_too_large_message(content_length),
                 )
                 return
             break
@@ -109,17 +104,17 @@ class RequestSizeLimitMiddleware:
                     send,
                     StatusCode.CONTENT_TOO_LARGE,
                     "content_too_large",
-                    self._content_too_large_message,
+                    self._content_too_large_message(total),
                 )
                 return
             body_chunks.append(chunk)
             if not message.get("more_body", False):
                 break
 
-        # Assemble body (single-chunk fast path avoids a copy) and replay to app.
+        # Assemble the buffered body and replay it to the app.
         body_message: Message = {
             "type": "http.request",
-            "body": body_chunks[0] if len(body_chunks) == 1 else b"".join(body_chunks),
+            "body": b"".join(body_chunks),
             "more_body": False,
         }
         del body_chunks
@@ -136,6 +131,13 @@ class RequestSizeLimitMiddleware:
             return await receive()
 
         await self.app(scope, replay_receive, send)
+
+    def _content_too_large_message(self, actual_bytes: int) -> str:
+        return (
+            f"Request size of {actual_bytes} bytes exceeds the maximum allowed "
+            f"input size of {self.http_max_input_size} bytes. "
+            f"Use --http-max-input-size to increase the limit."
+        )
 
     async def _send_error(
         self,
