@@ -1027,9 +1027,18 @@ SagemakerAPIServer::SageMakerMMELoadModel(
    */
 
   std::string repo_parent_path, subdir, customer_subdir;
-  RE2::FullMatch(
+  bool matched = RE2::FullMatch(
       url_abspath, model_path_regex_, &repo_parent_path, &subdir,
       &customer_subdir);
+  if (!matched) {
+    HTTP_RESPOND_IF_ERR(
+        req, TRITONSERVER_ErrorNew(
+                 TRITONSERVER_ERROR_INVALID_ARG,
+                 ("Invalid \"url\" '" + url_string +
+                  "': expected a path of the form "
+                  "/opt/ml/models/<hash>/model[/<subdir>]")
+                     .c_str()));
+  }
 
   std::string config_path = url_abspath + "/config.pbtxt";
   struct stat buffer;
