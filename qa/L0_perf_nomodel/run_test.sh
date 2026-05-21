@@ -207,7 +207,11 @@ for BACKEND in $BACKENDS; do
     echo "Time before perf analyzer trials: $(date)"
     set +e
     set -o pipefail
-    PA_MAX_TRIALS=${PA_MAX_TRIALS:-"50"}
+    # 50 was too low for count_windows mode at high concurrency with large
+    # I/O: PA can exhaust trials in a few seconds and exit 0 without writing
+    # a CSV. 200 keeps the upper bound generous; with --stability-percentage
+    # set very high (999) PA still stabilizes after ~3 windows in practice.
+    PA_MAX_TRIALS=${PA_MAX_TRIALS:-"200"}
     $PERF_CLIENT -v \
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \

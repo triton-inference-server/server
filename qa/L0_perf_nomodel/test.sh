@@ -65,8 +65,15 @@ PERF_CLIENT_STABILIZE_THRESHOLD=15.0
 # A value of 999 bypasses perf_analyzer's stability gate. For large-I/O
 # throughput cases, count_windows mode lets PA wait for a fixed number of
 # completed responses instead of relying on fixed 10s time windows.
+#
+# The request-count base is per-concurrency; the actual value passed to PA is
+# scaled up at runtime by concurrency so the window is always long enough to
+# contain multiple full concurrency cycles. A window shorter than a single
+# request's tail latency causes PA 2.60.0 to give up after two windows and
+# exit 0 without writing a CSV (observed on the 16MB no-shmem throughput
+# cases at concurrency 16).
 PERF_CLIENT_LARGE_IO_STABILIZE_THRESHOLD=${PERF_CLIENT_LARGE_IO_STABILIZE_THRESHOLD:-999}
-PERF_CLIENT_LARGE_IO_MEASUREMENT_REQUEST_COUNT=${PERF_CLIENT_LARGE_IO_MEASUREMENT_REQUEST_COUNT:-10}
+PERF_CLIENT_LARGE_IO_MEASUREMENT_REQUEST_COUNT=${PERF_CLIENT_LARGE_IO_MEASUREMENT_REQUEST_COUNT:-50}
 
 RUNTEST=./run_test.sh
 
@@ -221,7 +228,17 @@ for idx in "${!TEST_NAMES[@]}"; do
     fi
     if (( USE_COUNT_WINDOWS == 1 )); then
         TEST_STABILIZE_THRESHOLD=${PERF_CLIENT_LARGE_IO_STABILIZE_THRESHOLD}
-        TEST_PERF_CLIENT_EXTRA_ARGS+=" --measurement-mode=count_windows --measurement-request-count=${PERF_CLIENT_LARGE_IO_MEASUREMENT_REQUEST_COUNT}"
+        # Scale request-count by concurrency so each window contains at least
+        # a few full concurrency cycles (count >= 3 * conc keeps the window
+        # longer than the per-request tail latency at conc=16 + 16MB I/O).
+        TEST_REQUEST_COUNT=${PERF_CLIENT_LARGE_IO_MEASUREMENT_REQUEST_COUNT}
+        if (( TEST_CONCURRENCY > 1 )); then
+            scaled=$(( TEST_CONCURRENCY * 10 ))
+            if (( scaled > TEST_REQUEST_COUNT )); then
+                TEST_REQUEST_COUNT=${scaled}
+            fi
+        fi
+        TEST_PERF_CLIENT_EXTRA_ARGS+=" --measurement-mode=count_windows --measurement-request-count=${TEST_REQUEST_COUNT}"
     fi
 
     # FIXME: If PA C API adds SHMEM support, remove this.
