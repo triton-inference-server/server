@@ -641,8 +641,6 @@ spans are properly ended.
 
 ### Limitations
 
-- OpenTelemetry trace mode is not supported on Windows systems.
-
 - Triton supports only
 [OTLP/HTTP Exporter](https://opentelemetry.io/docs/specs/otlp/#otlphttp)
 and allows specification of only url for this exporter through

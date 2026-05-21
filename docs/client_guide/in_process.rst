@@ -1,5 +1,5 @@
 ..
-.. Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+.. Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 ..
 .. Redistribution and use in source and binary forms, with or without
 .. modification, are permitted provided that the following conditions
@@ -35,11 +35,10 @@ allows Triton to be linked directly into a C/C++/java/python application. This A
 is called the "Triton Server API" or just "Server API" for short. The
 API is implemented in the Triton shared library which is built from
 source contained in the `core
-repository <https://github.com/triton-inference-server/core>`__. On Linux
-this library is libtritonserver.so and on Windows it is
-tritonserver.dll. In the Triton Docker image the shared library is
-found in /opt/tritonserver/lib. The header file that defines and
-documents the Server API is
+repository <https://github.com/triton-inference-server/core>`__. On Linux this
+library is libtritonserver.so. In the Triton Docker image the shared library is
+found in /opt/tritonserver/lib. The header file that defines and documents the
+Server API is
 `tritonserver.h <https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h>`__.
 `Java bindings for In-Process Triton Server API <../customization_guide/inprocess_java_api.html#java-bindings-for-in-process-triton-server-api>`__
 are built on top of `tritonserver.h` and can be used for Java applications that
