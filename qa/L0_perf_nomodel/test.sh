@@ -195,13 +195,31 @@ for idx in "${!TEST_NAMES[@]}"; do
     TEST_STABILIZE_THRESHOLD=${PERF_CLIENT_STABILIZE_THRESHOLD}
     TEST_PERF_CLIENT_EXTRA_ARGS=${PERF_CLIENT_EXTRA_ARGS}
 
-    # The 16MB no-shmem throughput cases are client/transport bound at high
-    # concurrency. With time_windows mode, perf_analyzer can exit without
-    # producing the CSV that reporter.py needs. These are data collection
-    # benchmarks, so keep the load shape but use count_windows mode only for
-    # that large-payload throughput path.
-    if (( TEST_TENSOR_SIZE == TENSOR_SIZE_16MB && TEST_CONCURRENCY > 1 )) && \
+    # Switch perf_analyzer to count_windows mode for the cases that have been
+    # observed to either OOM-kill tritonserver or cause perf_analyzer to exit
+    # silently without producing a CSV under time_windows mode:
+    #
+    #   * 16MB no-shmem cases at ANY concurrency -- conc=1 latency runs were
+    #     OOM-killing the server mid-window, and conc>1 throughput runs were
+    #     exiting after only printing "Request concurrency: N".
+    #   * triton_c_api max-throughput cases at conc>1 -- perf_analyzer exits
+    #     with code 0 after printing the measurement header, never writing a
+    #     CSV. count_windows + a small request count keeps the run short
+    #     enough to avoid the failure path.
+    #
+    # count_windows replaces the fixed 10s wall-clock window with a fixed
+    # number of completed responses, which both shortens the run and removes
+    # the timing sensitivity that the new perf_analyzer release exposes.
+    USE_COUNT_WINDOWS=0
+    if (( TEST_TENSOR_SIZE == TENSOR_SIZE_16MB )) && \
        [[ "${TEST_SHARED_MEMORY}" == "none" ]]; then
+        USE_COUNT_WINDOWS=1
+    fi
+    if (( TEST_CONCURRENCY > 1 )) && \
+       [[ "${TEST_PROTOCOL}" == "triton_c_api" ]]; then
+        USE_COUNT_WINDOWS=1
+    fi
+    if (( USE_COUNT_WINDOWS == 1 )); then
         TEST_STABILIZE_THRESHOLD=${PERF_CLIENT_LARGE_IO_STABILIZE_THRESHOLD}
         TEST_PERF_CLIENT_EXTRA_ARGS+=" --measurement-mode=count_windows --measurement-request-count=${PERF_CLIENT_LARGE_IO_MEASUREMENT_REQUEST_COUNT}"
     fi
