@@ -2440,7 +2440,7 @@ HTTPAPIServer::GetContentLength(
         evhtp_kv_find(req->headers_in, kContentLengthHeader);
     if (content_length_c_str != nullptr) {
       try {
-        lcontent_length = std::atoi(content_length_c_str);
+        lcontent_length = std::stoi(content_length_c_str);
       }
       catch (const std::invalid_argument& ia) {
         err = TRITONSERVER_ErrorNew(
@@ -2484,7 +2484,7 @@ HTTPAPIServer::GetInferenceHeaderLength(
   if (header_length_c_str != NULL) {
     int parsed_value;
     try {
-      parsed_value = std::atoi(header_length_c_str);
+      parsed_value = std::stoi(header_length_c_str);
     }
     catch (const std::invalid_argument& ia) {
       return TRITONSERVER_ErrorNew(

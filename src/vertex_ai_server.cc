@@ -79,7 +79,7 @@ VertexAiAPIServer::GetInferenceHeaderLength(
       int32_t parsed_value;
       try {
         parsed_value =
-            std::atoi(content_type_c_str + binary_mime_type_.length());
+            std::stoi(content_type_c_str + binary_mime_type_.length());
       }
       catch (const std::invalid_argument& ia) {
         return TRITONSERVER_ErrorNew(
