@@ -221,8 +221,17 @@ for BACKEND in $BACKENDS; do
     fi
     # Surface the failure here rather than letting reporter.py crash later
     # with a cryptic "can't open ... csv" message.
+    #
+    # Two failure modes get masked otherwise:
+    #   1. The PA Python wrapper at /usr/local/bin/perf_analyzer swallows the
+    #      child binary's non-zero exit code and returns 0 even when the C++
+    #      binary crashed (e.g. uncaught std::bad_alloc from the no-shmem
+    #      data path under sustained large-payload load), so `$?` cannot be
+    #      trusted by itself.
+    #   2. A successful PA run that produced no rows still writes no CSV.
     if [ ! -s ${RESULTDIR}/${NAME}.csv ]; then
         echo -e "\n***\n*** FAILED Perf Analyzer measurement: missing ${RESULTDIR}/${NAME}.csv\n***"
+        echo -e "*** Detected perf_analyzer C++ crash (see ${RESULTDIR}/${NAME}.log).\n***"
         RET=1
     fi
     echo "Time after perf analyzer trials: $(date)"

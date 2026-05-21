@@ -207,12 +207,12 @@ for idx in "${!TEST_NAMES[@]}"; do
     # right place to get a meaningful 16MB throughput measurement anyway.
     #
     # TODO(perf_analyzer): remove this skip once the upstream fix lands.
-    if (( TEST_TENSOR_SIZE == TENSOR_SIZE_16MB && TEST_CONCURRENCY > 1 )) && \
-       [[ "${TEST_SHARED_MEMORY}" == "none" ]] && \
-       { [[ "${TEST_PROTOCOL}" == "grpc" ]] || [[ "${TEST_PROTOCOL}" == "triton_c_api" ]]; }; then
-        echo "WARNING: Skipping '${TEST_NAME}' due to perf_analyzer 2.60.0 hang on count_windows/time_windows with 16MB no-shmem + concurrency 16 over ${TEST_PROTOCOL}."
-        continue
-    fi
+    #if (( TEST_TENSOR_SIZE == TENSOR_SIZE_16MB && TEST_CONCURRENCY > 1 )) && \
+    #   [[ "${TEST_SHARED_MEMORY}" == "none" ]] && \
+    #   { [[ "${TEST_PROTOCOL}" == "grpc" ]] || [[ "${TEST_PROTOCOL}" == "triton_c_api" ]]; }; then
+    #    echo "WARNING: Skipping '${TEST_NAME}' due to perf_analyzer 2.60.0 hang on count_windows/time_windows with 16MB no-shmem + concurrency 16 over ${TEST_PROTOCOL}."
+    #    continue
+    #fi
 
     # FIXME: If PA C API adds SHMEM support, remove this.
     if [[ "${TEST_SHARED_MEMORY}" != "none" ]] && \
