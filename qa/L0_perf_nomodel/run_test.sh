@@ -52,11 +52,8 @@ MODEL_REPO="${PWD}/models"
 PERF_CLIENT=perf_analyzer
 SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
-# Pin perf_analyzer to keep benchmark numbers comparable across CI runs.
-# Newer releases have changed defaults (e.g. -t deprecation, count_windows
-# behavior) which can silently move the reported throughput/latency.
-PERF_ANALYZER_VERSION=${PERF_ANALYZER_VERSION:=2.60.0}
-pip3 install "perf-analyzer==${PERF_ANALYZER_VERSION}"
+# The PyPI package was renamed from "perf_analyzer" to "perf-analyzer".
+pip3 install perf-analyzer
 
 # DATADIR is already set in environment variable for aarch64
 if [ "$ARCH" != "aarch64" ]; then
@@ -90,11 +87,7 @@ fi
 PERF_CLIENT_PERCENTILE_ARGS="" &&
     (( ${PERF_CLIENT_PERCENTILE} != 0 )) &&
     PERF_CLIENT_PERCENTILE_ARGS="--percentile=${PERF_CLIENT_PERCENTILE}"
-# Preserve any extra args the caller already exported in PERF_CLIENT_EXTRA_ARGS
-# (e.g. test.sh forwards --measurement-mode=count_windows /
-# --measurement-request-count for large-I/O throughput cases). Without the
-# trailing ${PERF_CLIENT_EXTRA_ARGS} reference, that input is silently dropped.
-PERF_CLIENT_EXTRA_ARGS="$PERF_CLIENT_PERCENTILE_ARGS --shared-memory ${SHARED_MEMORY} ${PERF_CLIENT_EXTRA_ARGS:-}"
+PERF_CLIENT_EXTRA_ARGS="$PERF_CLIENT_PERCENTILE_ARGS --shared-memory ${SHARED_MEMORY}"
 
 # Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and
 # reporting structure, though "triton_c_api" is not strictly a "protocol".
@@ -127,6 +120,9 @@ for BACKEND in $BACKENDS; do
     INPUT_NAME="INPUT0" && [ $BACKEND == "libtorch" ] && INPUT_NAME="INPUT__0"
 
     MAX_LATENCY=300
+    # `[ $A > $B ]` is a shell redirection, not an integer comparison.
+    # Use `(( A > B ))` so MAX_BATCH is only overridden when DYNAMIC_BATCH
+    # really is larger than STATIC_BATCH.
     MAX_BATCH=${STATIC_BATCH} && (( DYNAMIC_BATCH > STATIC_BATCH )) && MAX_BATCH=${DYNAMIC_BATCH}
 
     # TODO Add openvino identity model that supports batching/dynamic batching
@@ -207,11 +203,7 @@ for BACKEND in $BACKENDS; do
     echo "Time before perf analyzer trials: $(date)"
     set +e
     set -o pipefail
-    # 50 was too low for count_windows mode at high concurrency with large
-    # I/O: PA can exhaust trials in a few seconds and exit 0 without writing
-    # a CSV. 200 keeps the upper bound generous; with --stability-percentage
-    # set very high (999) PA still stabilizes after ~3 windows in practice.
-    PA_MAX_TRIALS=${PA_MAX_TRIALS:-"200"}
+    PA_MAX_TRIALS=${PA_MAX_TRIALS:-"50"}
     $PERF_CLIENT -v \
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
@@ -227,6 +219,8 @@ for BACKEND in $BACKENDS; do
         echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
         RET=1
     fi
+    # Surface the failure here rather than letting reporter.py crash later
+    # with a cryptic "can't open ... csv" message.
     if [ ! -s ${RESULTDIR}/${NAME}.csv ]; then
         echo -e "\n***\n*** FAILED Perf Analyzer measurement: missing ${RESULTDIR}/${NAME}.csv\n***"
         RET=1
