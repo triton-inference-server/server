@@ -235,19 +235,23 @@ for BACKEND in $BACKENDS; do
     set +o pipefail
     set -e
 
-    echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${RESULTDIR}/${NAME}.tjson
-    echo -e "\"s_benchmark_name\":\"nomodel\"," >> ${RESULTDIR}/${NAME}.tjson
-    echo -e "\"s_server\":\"triton\"," >> ${RESULTDIR}/${NAME}.tjson
+    # Write the .tjson manifest atomically (truncate first, append the rest).
+    # Using `>>` for every line means re-running the test against an existing
+    # result dir would concatenate JSON documents and break reporter.py with
+    # "json.decoder.JSONDecodeError: Extra data".
+    echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\","  > ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"s_benchmark_name\":\"nomodel\","          >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"s_server\":\"triton\","                   >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"s_protocol\":\"${PERF_CLIENT_PROTOCOL}\"," >> ${RESULTDIR}/${NAME}.tjson
-    echo -e "\"s_framework\":\"${BACKEND}\"," >> ${RESULTDIR}/${NAME}.tjson
-    echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${RESULTDIR}/${NAME}.tjson
-    echo -e "\"l_concurrency\":${CONCURRENCY}," >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"s_framework\":\"${BACKEND}\","            >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"s_model\":\"${MODEL_NAME}\","             >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"l_concurrency\":${CONCURRENCY},"          >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"l_dynamic_batch_size\":${DYNAMIC_BATCH}," >> ${RESULTDIR}/${NAME}.tjson
-    echo -e "\"l_batch_size\":${STATIC_BATCH}," >> ${RESULTDIR}/${NAME}.tjson
-    echo -e "\"l_size\":${TENSOR_SIZE}," >> ${RESULTDIR}/${NAME}.tjson
-    echo -e "\"s_shared_memory\":\"${SHARED_MEMORY}\"," >> ${RESULTDIR}/${NAME}.tjson
-    echo -e "\"l_instance_count\":${INSTANCE_CNT}," >> ${RESULTDIR}/${NAME}.tjson
-    echo -e "\"s_architecture\":\"${ARCH}\"}]" >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"l_batch_size\":${STATIC_BATCH},"          >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"l_size\":${TENSOR_SIZE},"                 >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"s_shared_memory\":\"${SHARED_MEMORY}\","  >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"l_instance_count\":${INSTANCE_CNT},"      >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"s_architecture\":\"${ARCH}\"}]"           >> ${RESULTDIR}/${NAME}.tjson
 
     # SERVER_PID may not be set if using "triton_c_api" for example
     if [[ -n "${SERVER_PID}" ]]; then

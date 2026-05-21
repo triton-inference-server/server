@@ -39,6 +39,13 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
 fi
 
 rm -f *.log  *.csv *.tjson *.json
+# Also wipe the per-version result directory. run_test.sh writes the .tjson
+# manifest with `>>` (append), so any leftover .tjson from a previous run in
+# the same workspace will accumulate duplicate JSON documents and cause
+# reporter.py to fail with "json.decoder.JSONDecodeError: Extra data".
+if [ -n "${REPO_VERSION}" ] && [ -d "${REPO_VERSION}" ]; then
+    rm -rf "${REPO_VERSION}"
+fi
 
 # Descriptive name for the current results
 UNDERTEST_NAME=${NVIDIA_TRITON_SERVER_VERSION}
