@@ -64,8 +64,8 @@ given Triton will return an error.
 
 > [!NOTE]
 >
-> Shared memory is not supported on Windows. On Jetson, only system shared
-> memory is supported (CUDA shared memory is not).
+> On Jetson, only system shared memory is supported (CUDA shared memory is
+> not).
 
 ## HTTP/REST
 

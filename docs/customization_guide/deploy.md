@@ -279,18 +279,6 @@ Directory where cache shared libraries are found.
 > must be access controlled. Adding untrusted files
 > can lead to arbitrarty code execution.
 
-##### `backend-config=<backend>,additional-dependency-dirs=<string>`
-
-This is an optional Windows feature that enables Triton to search custom
-dependency directories when loading a specific backend. The user can input
-these directories as a string of semicolon-separated paths (including a
-trailing semicolon). These directories are programmatically prepended to
-the process's PATH and are removed when the backend is loaded successfully.
-Windows will search PATH last in its search sequence, so be cautious that
-no untrusted files of same name exist in a location of higher search priority
-(e.g., System32). It is still recommended to add backend-specific dependencies
-to their corresponding backend folder when possible.
-
 # GRPC server options
 Triton Inference Server's gRPC inference handlers internally use states to manage inference requests and response queues. Each state consists of one inference request and one response queue. The response queue within a state can hold multiple response objects. These states remain allocated for reuse to optimize performance by minimizing dynamic allocations.
 
