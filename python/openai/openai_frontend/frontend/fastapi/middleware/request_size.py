@@ -84,7 +84,9 @@ class RequestSizeLimitMiddleware:
                     send,
                     StatusCode.CONTENT_TOO_LARGE,
                     "content_too_large",
-                    self._content_too_large_message(content_length),
+                    self._oversized_request_message(
+                        content_length, self.http_max_input_size
+                    ),
                 )
                 return
             break
@@ -104,7 +106,9 @@ class RequestSizeLimitMiddleware:
                     send,
                     StatusCode.CONTENT_TOO_LARGE,
                     "content_too_large",
-                    self._content_too_large_message(total),
+                    self._oversized_request_message(
+                        total, self.http_max_input_size
+                    ),
                 )
                 return
             body_chunks.append(chunk)
@@ -132,10 +136,11 @@ class RequestSizeLimitMiddleware:
 
         await self.app(scope, replay_receive, send)
 
-    def _content_too_large_message(self, actual_bytes: int) -> str:
+    @staticmethod
+    def _oversized_request_message(actual_bytes: int, max_bytes: int) -> str:
         return (
             f"Request size of {actual_bytes} bytes exceeds the maximum allowed "
-            f"input size of {self.http_max_input_size} bytes. "
+            f"input size of {max_bytes} bytes. "
             f"Use --http-max-input-size to increase the limit."
         )
 

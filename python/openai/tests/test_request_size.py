@@ -72,15 +72,16 @@ def client():
         server.stop()
 
 
-def _assert_content_too_large(response) -> None:
+def _assert_content_too_large(response, actual_bytes: int) -> None:
     assert response.status_code == 413
     body = response.json()
     assert set(body) == {"error"}
     error = body["error"]
     assert error["type"] == "invalid_request_error"
     assert error["code"] == "content_too_large"
-    assert str(HTTP_DEFAULT_MAX_INPUT_SIZE) in error["message"]
-    assert "--http-max-input-size" in error["message"]
+    assert error["message"] == RequestSizeLimitMiddleware._oversized_request_message(
+        actual_bytes, HTTP_DEFAULT_MAX_INPUT_SIZE
+    )
 
 
 class TestRequestSizeLimitMiddleware:
@@ -91,20 +92,21 @@ class TestRequestSizeLimitMiddleware:
 
     @pytest.mark.parametrize("endpoint", _ENDPOINTS)
     def test_body_over_limit_is_rejected(self, client, endpoint):
-        response = client.post(
-            endpoint, content=b"x" * (HTTP_DEFAULT_MAX_INPUT_SIZE + 1)
-        )
-        _assert_content_too_large(response)
+        over = HTTP_DEFAULT_MAX_INPUT_SIZE + 1
+        response = client.post(endpoint, content=b"x" * over)
+        _assert_content_too_large(response, over)
 
     @pytest.mark.parametrize("endpoint", _ENDPOINTS)
     def test_chunked_body_over_limit_is_rejected(self, client, endpoint):
+        over = HTTP_DEFAULT_MAX_INPUT_SIZE + 1
+
         # httpx switches to chunked transfer when content is an Iterable[bytes].
         def chunks():
             yield b"x" * HTTP_DEFAULT_MAX_INPUT_SIZE
             yield b"x"
 
         response = client.post(endpoint, content=chunks())
-        _assert_content_too_large(response)
+        _assert_content_too_large(response, over)
 
     def test_get_without_body_is_unaffected(self, client):
         response = client.get(_ENDPOINTS[0])
