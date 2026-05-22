@@ -106,9 +106,7 @@ class RequestSizeLimitMiddleware:
                     send,
                     StatusCode.CONTENT_TOO_LARGE,
                     "content_too_large",
-                    self._oversized_request_message(
-                        total, self.http_max_input_size
-                    ),
+                    self._oversized_request_message(total, self.http_max_input_size),
                 )
                 return
             body_chunks.append(chunk)

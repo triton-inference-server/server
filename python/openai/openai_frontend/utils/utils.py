@@ -26,7 +26,7 @@
 
 from enum import IntEnum
 
-# Default maximum allowed HTTP request input size in bytes (64 MiB).
+# Default value for the --http-max-input-size CLI flag (64 MiB).
 # Same as HTTP_DEFAULT_MAX_INPUT_SIZE in src/common.h.
 HTTP_DEFAULT_MAX_INPUT_SIZE: int = 1 << 26
 
