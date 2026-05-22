@@ -194,23 +194,37 @@ for idx in "${!TEST_NAMES[@]}"; do
     TEST_INSTANCE_COUNT=${TEST_INSTANCE_COUNTS[$idx]}
     TEST_CONCURRENCY=${TEST_CONCURRENCY[$idx]}
 
-    # perf_analyzer 2.60.0 hangs in this exact shape: 16MB no-shmem payload,
-    # concurrency 16, and a fast transport (gRPC or Triton C API). It prints
-    # only "Pass [1]" and then runs silently for many minutes before exiting
-    # with status 0 and writing no CSV. The same combination also reproduces
-    # on the upstream main branch with time_windows mode, so it is a PA
-    # defect rather than a workaround we can apply in shell.
+    # perf_analyzer has two compounding bugs that make this exact
+    # shape (16MB payload, concurrency 16, --shared-memory=none) impossible
+    # to measure today:
     #
-    # The HTTP variant of the same shape passes (slower per-request rate
-    # gives PA enough head-room to close windows), and the shared-memory
-    # variants of the 16MB tests (TEST_SHARED_MEMORY=system|cuda) are the
-    # right place to get a meaningful 16MB throughput measurement anyway.
+    #   1. RSS leak in the no-shmem data path: PA retains roughly one
+    #      input-tensor's worth of memory per completed request. At 16MB and
+    #      concurrency 16 this grows by ~2.5 GB/sec and eventually triggers
+    #      `terminate called after throwing an instance of 'std::bad_alloc'`.
+    #      Reproduced deterministically with `ulimit -v 20G` (PA crashes in
+    #      ~30 sec) and observed up to 2 TB RSS on a DGX H100 without ulimit.
     #
-    # TODO(perf_analyzer): remove this skip once the upstream fix lands.
+    #   2. The Python wrapper around the PA binary
+    #      (/usr/local/bin/perf_analyzer) returns exit status 0 regardless
+    #      of how the C++ binary died, so the script cannot detect the
+    #      crash via $? alone. Only the missing CSV reveals the crash;
+    #      run_test.sh checks for that.
+    #
+    # The HTTP variant of the same shape sometimes finishes 3 measurement
+    # windows before the leak catches up, but it is not reliable. The
+    # shared-memory variants of the 16MB tests
+    # (TEST_SHARED_MEMORY=system|cuda) keep PA's RSS flat at ~500MB and
+    # run at ~20-30k infer/sec instead of the ~100 infer/sec that no-shmem
+    # achieves, so they are the right place to capture the meaningful 16MB
+    # throughput measurement.
+    #
+    # TODO(perf_analyzer): remove this skip once the upstream RSS leak and
+    # the Python-wrapper exit-code laundering are fixed.
     #if (( TEST_TENSOR_SIZE == TENSOR_SIZE_16MB && TEST_CONCURRENCY > 1 )) && \
     #   [[ "${TEST_SHARED_MEMORY}" == "none" ]] && \
     #   { [[ "${TEST_PROTOCOL}" == "grpc" ]] || [[ "${TEST_PROTOCOL}" == "triton_c_api" ]]; }; then
-    #    echo "WARNING: Skipping '${TEST_NAME}' due to perf_analyzer 2.60.0 hang on count_windows/time_windows with 16MB no-shmem + concurrency 16 over ${TEST_PROTOCOL}."
+    #    echo "WARNING: Skipping '${TEST_NAME}' -- perf_analyzer 2.60.0 leaks ~16MB/request in --shared-memory=none mode and crashes with std::bad_alloc."
     #    continue
     #fi
 
