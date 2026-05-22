@@ -163,6 +163,9 @@ function generate_model_repository() {
         # Types that need to use SubAdd instead of AddSub
         swap_types="float32 int32 int16 int8"
         for onnx_model in $onnx_models; do
+          # Skip BF16 models: Not yet supported by Python backend
+          [[ "$onnx_model" == *bf16* ]] && continue
+
           if [ "$BACKEND" == "python_dlpack" ]; then
             python_model=`echo $onnx_model | sed 's/onnx/python_dlpack/g' | sed 's,'"$DATADIR/qa_model_repository/"',,g'`
           else
@@ -256,10 +259,14 @@ function generate_model_repository() {
       if [ "$FW" == "onnx" ] && [ "$TEST_VALGRIND" -eq 1 ]; then
         # Reduce the instance count to make loading onnx models faster
         for MC in `ls models/${FW}*/config.pbtxt`; do
+            # Skip BF16 models: ORT CPU has no bf16 kernels
+            [[ "$MC" == *bf16* ]] && continue
             echo "instance_group [ { kind: ${KIND} count: 1 }]" >> $MC
         done
       elif [ "$FW" != "plan" ] && [ "$FW" != "python" ] && [ "$FW" != "python_dlpack" ] && [ "$FW" != "openvino" ];then
         for MC in `ls models/${FW}*/config.pbtxt`; do
+            # Skip BF16 models: ORT CPU has no bf16 kernels
+            [[ "$MC" == *bf16* ]] && continue
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
         done
       elif [ "$FW" == "python" ] || [ "$FW" == "python_dlpack" ] || [ "$FW" == "openvino" ]; then
