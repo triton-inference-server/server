@@ -218,6 +218,7 @@ designed for modularity and flexibility
 ### Additional Documentation
 
 - [FAQ](docs/user_guide/faq.md)
+- [Troubleshooting Guide](docs/user_guide/troubleshooting.md)
 - [User Guide](docs/README.md#user-guide)
 - [Customization Guide](docs/README.md#customization-guide)
 - [Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html)
