@@ -86,6 +86,44 @@ and more.  Need enterprise support?  NVIDIA global support is available for Trit
 Inference Server with the
 [NVIDIA AI Enterprise software suite](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/).
 
+## Client Quickstart
+
+Triton ships client libraries for Python and C++, plus a full SDK container with performance measurement tools.
+
+### Python client
+
+```bash
+pip install tritonclient[http]
+```
+
+```python
+import tritonclient.http as client
+
+client = client.InferenceServerClient(url="localhost:8000")
+result = client.infer(model_name="my_model", inputs=[...])
+```
+
+### C++ client
+
+```bash
+# From the SDK container
+docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:26.04-py3-sdk
+# Inside the container:
+#   g++ -std=c++17 my_client.cpp -o my_client \
+#     -I/opt/tritonserver/include \
+#     -L/opt/tritonserver/lib -lclient
+```
+
+### Performance benchmarking
+
+```bash
+# From the SDK container
+docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:26.04-py3-sdk
+
+# Run perf_analyzer
+/perf_analyzer -m densenet_onnx -u localhost:8000
+```
+
 ## Serve a Model in 3 Easy Steps
 
 ```bash
