@@ -98,7 +98,7 @@ SagemakerAPIServer::GetInferenceHeaderLength(
       int32_t parsed_value;
       try {
         parsed_value =
-            std::atoi(content_type_c_str + binary_mime_type_.length());
+            std::stoi(content_type_c_str + binary_mime_type_.length());
       }
       catch (const std::invalid_argument& ia) {
         return TRITONSERVER_ErrorNew(
@@ -508,7 +508,7 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
           evhtp_kv_find(req->headers_in, kContentLengthHeader);
       if (content_length_c_str != nullptr) {
         try {
-          content_length = std::atoi(content_length_c_str);
+          content_length = std::stoi(content_length_c_str);
         }
         catch (const std::invalid_argument& ia) {
           err = TRITONSERVER_ErrorNew(
@@ -1027,9 +1027,18 @@ SagemakerAPIServer::SageMakerMMELoadModel(
    */
 
   std::string repo_parent_path, subdir, customer_subdir;
-  RE2::FullMatch(
+  bool matched = RE2::FullMatch(
       url_abspath, model_path_regex_, &repo_parent_path, &subdir,
       &customer_subdir);
+  if (!matched) {
+    HTTP_RESPOND_IF_ERR(
+        req, TRITONSERVER_ErrorNew(
+                 TRITONSERVER_ERROR_INVALID_ARG,
+                 ("Invalid \"url\" '" + url_string +
+                  "': expected a path of the form "
+                  "/opt/ml/models/<hash>/model[/<subdir>]")
+                     .c_str()));
+  }
 
   std::string config_path = url_abspath + "/config.pbtxt";
   struct stat buffer;
