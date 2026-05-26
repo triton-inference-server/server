@@ -1264,10 +1264,10 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
     df += f"""
 WORKDIR /opt
-COPY --chown=1000:1000 build/install tritonserver
+COPY build/install tritonserver
 
 WORKDIR /opt/tritonserver
-COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
+COPY NVIDIA_Deep_Learning_Container_License.pdf .
 RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
     "tritonserver-*.whl" | xargs -I {{}} pip install --upgrade {{}}[{FLAGS.triton_wheels_dependencies_group}] && \\
     find /opt/tritonserver/python -maxdepth 1 -type f -name \\
@@ -1282,7 +1282,7 @@ RUN pip3 install -r python/openai/requirements.txt
             df += """
 LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
 LABEL com.amazonaws.sagemaker.capabilities.multi-models=true
-COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
+COPY docker/sagemaker/serve /usr/bin/.
 """
     # This is required since libcublasLt.so is not present during the build
     # stage of the PyTorch backend
@@ -1345,8 +1345,9 @@ ENV TF_AUTOTUNE_THRESHOLD       2
 ENV TRITON_SERVER_GPU_ENABLED    {gpu_enabled}
 
 # Create a user that can be used to run triton as
-# non-root. Make sure that this user to given ID 1000. All server
-# artifacts copied below are assign to this user.
+# non-root. Make sure that this user is given ID 1000. Server
+# artifacts copied below remain owned by root; the triton-server
+# user reads and executes them via standard group/other permissions.
 ENV TRITON_SERVER_USER=triton-server
 RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
       && userdel ubuntu > /dev/null 2>&1 || true \\
@@ -1644,10 +1645,10 @@ RUN setx path "%path%;C:\\opt\\tritonserver\\bin"
     df += """
 WORKDIR /opt
 RUN rmdir /S/Q tritonserver || exit 0
-COPY --chown=1000:1000 build/install tritonserver
+COPY build/install tritonserver
 
 WORKDIR /opt/tritonserver
-COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
+COPY NVIDIA_Deep_Learning_Container_License.pdf .
 
 """
     df += """
@@ -2323,8 +2324,8 @@ def cibase_build(
 
 
 def finalize_build(cmake_script, install_dir, ci_dir):
-    cmake_script.cmd(f"chmod -R a+rw {install_dir}")
-    cmake_script.cmd(f"chmod -R a+rw {ci_dir}")
+    cmake_script.cmd(f"chmod -R u+rwX,go+rX,go-w {install_dir}")
+    cmake_script.cmd(f"chmod -R u+rwX,go+rX,go-w {ci_dir}")
 
 
 def enable_all():
