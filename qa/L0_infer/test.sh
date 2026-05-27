@@ -218,6 +218,10 @@ function generate_model_repository() {
       else
         cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
           models/.
+        # Remove ONNX BF16 models for CPU only containers
+        if [ "$BACKEND" == "onnx" ] && [ "$TARGET" == "cpu" ]; then
+          rm -rf models/onnx_*bf16*
+        fi
       fi
     done
 
@@ -256,24 +260,24 @@ function generate_model_repository() {
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in $BACKENDS; do
-      if [ "$FW" == "onnx" ] && [ "$TEST_VALGRIND" -eq 1 ]; then
-        # Reduce the instance count to make loading onnx models faster
-        for MC in `ls models/${FW}*/config.pbtxt`; do
-            # Skip BF16 models: ORT CPU has no bf16 kernels
-            [[ "$MC" == *bf16* ]] && continue
-            echo "instance_group [ { kind: ${KIND} count: 1 }]" >> $MC
-        done
-      elif [ "$FW" != "plan" ] && [ "$FW" != "python" ] && [ "$FW" != "python_dlpack" ] && [ "$FW" != "openvino" ];then
-        for MC in `ls models/${FW}*/config.pbtxt`; do
-            # Skip BF16 models: ORT CPU has no bf16 kernels
-            [[ "$MC" == *bf16* ]] && continue
-            echo "instance_group [ { kind: ${KIND} }]" >> $MC
-        done
-      elif [ "$FW" == "python" ] || [ "$FW" == "python_dlpack" ] || [ "$FW" == "openvino" ]; then
-        for MC in `ls models/${FW}*/config.pbtxt`; do
-            echo "instance_group [ { kind: KIND_CPU }]" >> $MC
-        done
-      fi
+      [ "$FW" == "plan" ] && continue
+      for MC in `ls models/${FW}*/config.pbtxt`; do
+        # BF16 models: ORT CPU has no BF16 kernels, force GPU
+        if [ "$FW" == "onnx" ] && [ "$MC" == *bf16* ]; then
+          MC_KIND="KIND_GPU"
+        else
+          MC_KIND=${KIND}
+        fi
+
+        if [ "$FW" == "onnx" ] && [ "$TEST_VALGRIND" -eq 1 ]; then
+          # Reduce the instance count to make loading onnx models faster
+          echo "instance_group [ { kind: ${MC_KIND} count: 1 }]" >> $MC
+        elif [ "$FW" == "python" ] || [ "$FW" == "python_dlpack" ] || [ "$FW" == "openvino" ]; then
+          echo "instance_group [ { kind: KIND_CPU }]" >> $MC
+        else
+          echo "instance_group [ { kind: ${KIND} }]" >> $MC
+        fi
+      done
     done
 
     # Modify custom_zero_1_float32 and custom_nobatch_zero_1_float32 for relevant ensembles
