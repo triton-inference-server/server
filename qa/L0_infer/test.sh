@@ -218,7 +218,7 @@ function generate_model_repository() {
       else
         cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
           models/.
-        # Remove ONNX BF16 models for CPU only containers
+        # Remove ONNX BF16 models from CPU models
         if [ "$BACKEND" == "onnx" ] && [ "$TARGET" == "cpu" ]; then
           rm -rf models/onnx_*bf16*
         fi

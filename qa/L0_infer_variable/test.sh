@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -63,6 +63,11 @@ for TARGET in cpu gpu; do
     rm -fr models && \
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository models && \
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_variable_model_repository/* models/.
+
+    # Remove ONNX BF16 models from CPU models
+    if [ "$TARGET" == "cpu" ]; then
+        rm -rf models/onnx_*bf16*
+    fi
 
     create_nop_version_dir `pwd`/models
 
