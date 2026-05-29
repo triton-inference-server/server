@@ -34,6 +34,7 @@ from functools import partial
 import tritonserver
 from engine.triton_engine import TritonLLMEngine
 from frontend.fastapi_frontend import FastApiFrontend
+from utils.utils import HTTP_DEFAULT_MAX_INPUT_SIZE, validate_positive_int
 
 
 def signal_handler(
@@ -197,6 +198,14 @@ def parse_args():
         action="append",
         help="Restrict access to specific OpenAI API endpoints. Format: '<API_1>,<API_2>,... <restricted-key> <restricted-value>' (e.g., 'inference,model-repository admin-key admin-value'). If not specified, all endpoints are allowed.",
     )
+    openai_group.add_argument(
+        "--http-max-input-size",
+        type=validate_positive_int,
+        default=HTTP_DEFAULT_MAX_INPUT_SIZE,
+        help=f"Maximum allowed HTTP request input size in bytes for the OpenAI "
+        f"frontend (default: {HTTP_DEFAULT_MAX_INPUT_SIZE}, i.e. 64 MiB). "
+        "Requests exceeding this limit will be rejected.",
+    )
 
     # KServe Predict v2 Frontend
     kserve_group = parser.add_argument_group("Triton KServe Frontend")
@@ -269,6 +278,7 @@ def main():
             port=args.openai_port,
             log_level=args.uvicorn_log_level,
             restricted_apis=args.openai_restricted_api,
+            http_max_input_size=args.http_max_input_size,
         )
     except ValueError as e:
         print(

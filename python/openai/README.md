@@ -949,3 +949,28 @@ curl -H "api-key: my-secret-key" \
 # Multiple APIs in single argument with shared authentication
 --openai-restricted-api "inference,model-repository shared-key shared-secret"
 ```
+
+## HTTP Request Body Size Limit
+
+The frontend enforces a maximum request body size prior to JSON parsing. Requests that exceed this limit are rejected with an error response.
+
+Use `--http-max-input-size` to configure the limit (default: `67108864` bytes / 64 MiB):
+
+```bash
+python3 openai_frontend/main.py \
+  --model-repository /path/to/models \
+  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
+  --http-max-input-size 67108864
+```
+
+The limit applies to all endpoints. Example error response:
+
+```json
+{
+  "error": {
+    "message": "Request content size exceeds the maximum allowed input size of 67108864 bytes. Use --http-max-input-size to increase the limit.",
+    "type": "invalid_request_error",
+    "code": "content_too_large"
+  }
+}
+```

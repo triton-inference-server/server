@@ -1,4 +1,4 @@
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,6 +26,10 @@
 
 from enum import IntEnum
 
+# Default value for the --http-max-input-size CLI flag (64 MiB).
+# Same as HTTP_DEFAULT_MAX_INPUT_SIZE in src/common.h.
+HTTP_DEFAULT_MAX_INPUT_SIZE: int = 1 << 26
+
 
 class ServerError(Exception):
     """Exception raised for server errors."""
@@ -44,4 +48,15 @@ class StatusCode(IntEnum):
     CLIENT_ERROR = 400
     AUTHORIZATION_ERROR = 401
     NOT_FOUND = 404
+    CONTENT_TOO_LARGE = 413
     SERVER_ERROR = 500
+
+
+def validate_positive_int(value: object) -> int:
+    try:
+        ivalue = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"value is not an integer, got {value!r}")
+    if ivalue <= 0:
+        raise ValueError(f"value must be greater than 0, got {value!r}")
+    return ivalue
