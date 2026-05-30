@@ -54,6 +54,14 @@ from .utils import extract_intermediate_diff
 
 ALPHANUMERIC = ascii_letters + digits
 
+# Characters whose presence in ``delta_text`` could change the JSON
+# structure that the streaming parser sees. When none of these appear in a
+# delta, the only effect of a full ``partial_json_parser`` re-parse would
+# be to extend the currently-open string value by the same bytes. The
+# incremental fast path uses this set to decide when the re-parse can be
+# safely skipped.
+_JSON_STRUCTURAL_CHARS = frozenset("\"'\\{}[],:")
+
 
 def generate_mistral_random_id():
     # Mistral Tool Call Ids must be alphanumeric with a maximum length of 9.
@@ -76,6 +84,11 @@ class MistralToolParser(ToolCallParser):
         ] = []  # map what has been streamed for each tool so far to a list
         self.bot_token = "[TOOL_CALLS]"
         self.tool_call_regex = re.compile(r"\[{.*}\]", re.DOTALL)
+        # Name of the argument whose string value is currently being streamed.
+        # Set by the slow path after a successful parse; used by the
+        # incremental fast path to extend that value in place without
+        # re-parsing the full accumulated buffer.
+        self._streaming_value_key: Union[str, None] = None
 
     def parse_tool_calls(
         self, full_text: str, role: str, backend: str
@@ -156,6 +169,47 @@ class MistralToolParser(ToolCallParser):
             # if it's the only token, return None, so we don't send a chat
             # completion any don't send a control token
             return None
+
+        # Incremental fast path: when the slow path has already established
+        # state and we are mid-stream extending a string-valued argument,
+        # appending a delta that contains no JSON-structural characters can
+        # only extend that same string. Skip the full ``partial_json_parser``
+        # re-parse of the entire accumulated buffer (which is O(N) per call
+        # and O(N^2) over the stream) and apply the delta in place.
+        if (
+            self._streaming_value_key is not None
+            and self.current_tool_name_sent
+            and 0 <= self.current_tool_id < len(self.prev_tool_call_arr)
+            and delta_text
+            and _JSON_STRUCTURAL_CHARS.isdisjoint(delta_text)
+        ):
+            try:
+                arguments = self.prev_tool_call_arr[self.current_tool_id].get(
+                    "arguments"
+                )
+                if (
+                    isinstance(arguments, dict)
+                    and isinstance(arguments.get(self._streaming_value_key), str)
+                    and 0 <= self.current_tool_id < len(self.streamed_args_for_tool)
+                ):
+                    arguments[self._streaming_value_key] += delta_text
+                    self.streamed_args_for_tool[
+                        self.current_tool_id
+                    ] += delta_text
+                    return ChatCompletionStreamResponseDelta(
+                        tool_calls=[
+                            ChatCompletionMessageToolCallChunk(
+                                index=self.current_tool_id,
+                                function=Function2(
+                                    arguments=delta_text
+                                ).model_dump(exclude_none=True),
+                            )
+                        ]
+                    )
+            except (AttributeError, IndexError, KeyError, TypeError):
+                # Any inconsistency falls through to the slow path which
+                # re-establishes the parser state from current_text.
+                self._streaming_value_key = None
 
         flags = Allow.ALL if self.current_tool_name_sent else Allow.ALL & ~Allow.STR
 
@@ -312,6 +366,17 @@ class MistralToolParser(ToolCallParser):
             # stream the name - otherwise keep waiting
             # finish by setting old and returning None as base case
             self.prev_tool_call_arr = tool_call_arr
+            # Record the last argument key whose value is currently a string;
+            # subsequent chunks that contain only non-structural characters
+            # can extend that value via the incremental fast path.
+            self._streaming_value_key = None
+            cur_arguments_for_fast_path = (
+                current_tool_call.get("arguments") if current_tool_call else None
+            )
+            if isinstance(cur_arguments_for_fast_path, dict):
+                for key, value in cur_arguments_for_fast_path.items():
+                    if isinstance(value, str):
+                        self._streaming_value_key = key
             return delta
 
         except Exception:

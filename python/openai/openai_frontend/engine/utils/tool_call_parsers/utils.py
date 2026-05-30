@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2025-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,6 +33,15 @@ from typing import Any
 
 import partial_json_parser
 from partial_json_parser.core.options import Allow
+
+# Default value for the --tool-call-parser-max-input-chars CLI flag
+# (per-request character limit for the streaming tool-call parser).
+# 64 KiB covers virtually all legitimate tool-call payloads (typical
+# 100 B - 16 KB, occasional 32 - 64 KB for code-interpreter / structured
+# argument use cases) while bounding the worst-case parser work on
+# adversarial inputs. Used as defense-in-depth on top of the incremental
+# fast path in the streaming tool-call parsers.
+DEFAULT_MAX_TOOL_PARSER_INPUT_CHARS: int = 64 * 1024
 
 
 # partial_json_parser doesn't support extra data and

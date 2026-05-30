@@ -35,7 +35,7 @@ import tritonserver
 from engine.triton_engine import TritonLLMEngine
 from frontend.fastapi_frontend import FastApiFrontend
 from utils.utils import HTTP_DEFAULT_MAX_INPUT_SIZE, validate_positive_int
-
+from engine.utils.tool_call_parsers.utils import DEFAULT_MAX_TOOL_PARSER_INPUT_CHARS
 
 def signal_handler(
     server, openai_frontend, kserve_http_frontend, kserve_grpc_frontend, signal, frame
@@ -133,6 +133,16 @@ def parse_args():
         type=str,
         default=None,
         help="Specify the parser for handling tool calling related response text. Options include: 'llama3' and 'mistral'.",
+    )
+    triton_group.add_argument(
+        "--tool-call-parser-max-input-chars",
+        type=int,
+        default=DEFAULT_MAX_TOOL_PARSER_INPUT_CHARS,
+        help="Maximum number of characters the streaming tool-call parser will "
+        "accept per request, applied as defense-in-depth on top of the "
+        "parser's incremental fast path. When exceeded, the stream is "
+        "terminated with finish_reason=length. Set to 0 or a negative value "
+        f"to disable. Default: {DEFAULT_MAX_TOOL_PARSER_INPUT_CHARS}.",
     )
     # Allows the user to try a different chat template to craft better prompts and receive more targeted tool-calling responses from the model.
     # Some Mistral models have a separate chat template file, in addition to the tokenizer_config.json,
@@ -268,6 +278,7 @@ def main():
         tool_call_parser=args.tool_call_parser,
         chat_template=args.chat_template,
         default_max_tokens=args.default_max_tokens,
+        max_tool_parser_input_chars=args.tool_call_parser_max_input_chars,
     )
 
     # Attach TritonLLMEngine as the backbone for inference and model management

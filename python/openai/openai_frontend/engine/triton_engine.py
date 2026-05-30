@@ -30,9 +30,10 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import (
     Any,
     AsyncIterable,
@@ -52,6 +53,7 @@ from engine.engine import LLMEngine
 from engine.utils.chat import load_chat_template, parse_chat_messages
 from engine.utils.tokenizer import get_tokenizer
 from engine.utils.tool_call_parsers import ToolCallParser, ToolParserManager
+from engine.utils.tool_call_parsers.utils import DEFAULT_MAX_TOOL_PARSER_INPUT_CHARS
 from engine.utils.triton import (
     RequestKind,
     TritonLoraConfig,
@@ -96,6 +98,41 @@ from schemas.openai import (
 )
 from utils.utils import ClientError, ServerError
 
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _ToolCallParserBudget:
+    """Tracks accumulated input chars fed to the streaming tool-call parser
+    for a single request and reports when the configured limit is reached.
+
+    A ``max_chars`` of ``0`` or negative disables the check.
+    """
+
+    max_chars: int
+    consumed_chars: int = 0
+    triggered_reason: Optional[str] = field(default=None, init=False)
+
+    def would_exceed(self, additional_chars: int) -> bool:
+        """Returns True if consuming ``additional_chars`` would exceed the limit.
+
+        Side effect: when this returns True, ``triggered_reason`` is set to a
+        human-readable message describing the limit that fired.
+        """
+        if self.max_chars <= 0:
+            return False
+        if self.consumed_chars + additional_chars > self.max_chars:
+            self.triggered_reason = (
+                f"streaming tool-call parser input would exceed "
+                f"{self.max_chars} characters"
+            )
+            return True
+        return False
+
+    def consume(self, additional_chars: int) -> None:
+        """Adds ``additional_chars`` to the consumed total."""
+        self.consumed_chars += additional_chars
+
 
 # TODO: Improve type hints
 @dataclass
@@ -129,6 +166,7 @@ class TritonLLMEngine(LLMEngine):
         lora_separator: Optional[str] = None,
         tool_call_parser: Optional[str] = None,
         chat_template: Optional[str] = None,
+        max_tool_parser_input_chars: Optional[int] = None,
     ):
         # Assume an already configured and started server
         self.server = server
@@ -137,6 +175,11 @@ class TritonLLMEngine(LLMEngine):
         self.backend = backend
         self.lora_separator = lora_separator
         self.default_max_tokens = default_max_tokens
+        self.max_tool_parser_input_chars = (
+            DEFAULT_MAX_TOOL_PARSER_INPUT_CHARS
+            if max_tool_parser_input_chars is None
+            else max_tool_parser_input_chars
+        )
 
         self.model_metadata = self._get_model_metadata()
         self._metadata_lock = asyncio.Lock()
@@ -660,6 +703,12 @@ class TritonLLMEngine(LLMEngine):
         previous_text = ""
         include_usage = request.stream_options and request.stream_options.include_usage
         usage_accumulator = _StreamingUsageAccumulator(backend)
+        # Per-request input budget for the streaming tool-call parser.
+        parser_budget = (
+            _ToolCallParserBudget(max_chars=self.max_tool_parser_input_chars)
+            if tool_choice_auto
+            else None
+        )
 
         chunk = self._get_first_streaming_chat_response(
             request_id, created, model, role
@@ -675,6 +724,7 @@ class TritonLLMEngine(LLMEngine):
                 response_delta,
                 finish_reason,
                 current_text,
+                should_stop_streaming,
             ) = self._get_streaming_response_delta(
                 previous_text=previous_text,
                 delta_text=delta_text,
@@ -683,6 +733,8 @@ class TritonLLMEngine(LLMEngine):
                 tool_call_parser=tool_call_parser,
                 backend=backend,
                 is_final_response=response.final,
+                parser_budget=parser_budget,
+                request_id=request_id,
             )
             previous_text = current_text
 
@@ -717,6 +769,22 @@ class TritonLLMEngine(LLMEngine):
             )
             yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
 
+            if should_stop_streaming:
+                break
+
+        # Close the inference response iterator. On normal completion this is
+        # a no-op; on early termination (e.g. tool-call parser budget hit) it
+        # cancels the in-flight backend inference so the response queue stops
+        # growing.
+        aclose = getattr(responses, "aclose", None)
+        if aclose is not None:
+            try:
+                await aclose()
+            except Exception:
+                logger.debug(
+                    "Failed to close inference response iterator", exc_info=True
+                )
+
         # Send the final usage chunk if requested via stream_options.
         if include_usage:
             usage_payload = usage_accumulator.get_final_usage()
@@ -743,10 +811,13 @@ class TritonLLMEngine(LLMEngine):
         tool_call_parser: ToolCallParser,
         backend: str,
         is_final_response: bool,
+        parser_budget: Optional[_ToolCallParserBudget] = None,
+        request_id: Optional[str] = None,
     ) -> Tuple[
         Optional[ChatCompletionStreamResponseDelta],
         Optional[ChatCompletionFinishReason],
         str,
+        bool,
     ]:
         response_delta: Optional[ChatCompletionStreamResponseDelta]
         current_text = ""
@@ -762,7 +833,17 @@ class TritonLLMEngine(LLMEngine):
                 ]
             )
         elif tool_choice_auto:
+            if parser_budget is not None and parser_budget.would_exceed(
+                len(delta_text)
+            ):
+                return self._build_truncated_response(
+                    budget=parser_budget,
+                    current_text=previous_text,
+                    request_id=request_id,
+                )
             current_text = previous_text + delta_text
+            if parser_budget is not None:
+                parser_budget.consume(len(delta_text))
             response_delta = tool_call_parser.parse_tool_calls_streaming(
                 current_text=current_text, delta_text=delta_text, backend=backend
             )
@@ -836,7 +917,38 @@ class TritonLLMEngine(LLMEngine):
         else:
             finish_reason = None
 
-        return response_delta, finish_reason, current_text
+        return response_delta, finish_reason, current_text, False
+
+    def _build_truncated_response(
+        self,
+        budget: _ToolCallParserBudget,
+        current_text: str,
+        request_id: Optional[str],
+    ) -> Tuple[
+        ChatCompletionStreamResponseDelta,
+        ChatCompletionFinishReason,
+        str,
+        bool,
+    ]:
+        """Builds the final stream chunk when the parser input budget is reached.
+
+        Uses ``length`` as the OpenAI-standard finish reason for an early
+        cutoff caused by a length-class server-side limit.
+        """
+        reason = budget.triggered_reason or "tool-call parser input budget reached"
+        logger.warning(
+            "Truncating streaming chat completion: %s "
+            "(request_id=%s, consumed_chars=%d)",
+            reason,
+            request_id,
+            budget.consumed_chars,
+        )
+        return (
+            ChatCompletionStreamResponseDelta(content=""),
+            ChatCompletionFinishReason.length,
+            current_text,
+            True,
+        )
 
     def _validate_chat_request(
         self,
