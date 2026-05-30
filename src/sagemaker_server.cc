@@ -199,6 +199,9 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
         if (action == "/invoke") {
           LOG_VERBOSE(1) << "SageMaker request: INVOKE MODEL";
 
+          RETURN_AND_RESPOND_IF_RESTRICTED(
+              req, RestrictedCategory::INFERENCE);
+
           {
             std::lock_guard<std::mutex> lock(models_list_mutex_);
             if (sagemaker_models_list_.find(multi_model_name.c_str()) ==
