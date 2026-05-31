@@ -617,8 +617,6 @@ class TestStreamingToolParseLimit:
     def client(self, tokenizer_model: str):
         model_repository = str(Path(__file__).parent / "tool_parser_models")
         server = setup_server(model_repository)
-        # backend=None lets the engine pick the TRT-LLM request format the mock
-        # model expects (text_input, stream, ...).
         app = setup_fastapi_app(
             tokenizer=tokenizer_model,
             server=server,

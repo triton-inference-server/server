@@ -153,6 +153,12 @@ class TritonLLMEngine(LLMEngine):
         )
         self.chat_template = load_chat_template(chat_template)
 
+        if self.tool_call_parser is not None:
+            print(
+                f"[INFO] Streaming tool-call parse buffer limit set to "
+                f"{self.max_tool_call_parse_bytes} bytes"
+            )
+
     def ready(self) -> bool:
         return self.server.ready()
 
@@ -686,12 +692,11 @@ class TritonLLMEngine(LLMEngine):
                 and len(previous_text) + len(delta_text)
                 > self.max_tool_call_parse_bytes
             ):
-                logger.warning(
-                    "Streaming tool-call parse buffer exceeded %d bytes "
-                    "(request %s); truncating response and cancelling backend "
-                    "inference.",
-                    self.max_tool_call_parse_bytes,
-                    request_id,
+                print(
+                    f"[WARNING] Streaming tool-call parse buffer exceeded "
+                    f"{self.max_tool_call_parse_bytes} bytes (request "
+                    f"{request_id}); truncating response and cancelling "
+                    f"backend inference."
                 )
                 tool_parse_truncated = True
                 break
