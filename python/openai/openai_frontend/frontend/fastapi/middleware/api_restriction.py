@@ -102,6 +102,15 @@ class RestrictedFeatures:
         """
         return self._restrictions.copy()
 
+    def RedactedRestrictionDict(self) -> dict[str, tuple[str, str]]:
+        """
+        Get a copy of the restrictions dictionary safe for logging.
+
+        Returns:
+            dict: Copy of the restrictions mapping API names to (header_key, redacted_value)
+        """
+        return {api: (key, "***") for api, (key, _) in self._restrictions.items()}
+
     def Insert(self, api: str, restriction: tuple[str, str]):
         """
         Add a restriction for a specific API.
