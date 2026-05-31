@@ -42,7 +42,11 @@ def _decode_prompt(request):
 
 def _response(text):
     return pb_utils.InferenceResponse(
-        [pb_utils.Tensor("text_output", np.array([[text]], dtype=object))]
+        [
+            pb_utils.Tensor("text_output", np.array([[text]], dtype=object)),
+            pb_utils.Tensor("num_input_tokens", np.array([[1]], dtype=np.int32)),
+            pb_utils.Tensor("num_output_tokens", np.array([[1]], dtype=np.int32)),
+        ]
     )
 
 
