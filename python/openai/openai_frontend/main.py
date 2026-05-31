@@ -35,6 +35,7 @@ import tritonserver
 from engine.triton_engine import TritonLLMEngine
 from frontend.fastapi_frontend import FastApiFrontend
 from utils.utils import HTTP_DEFAULT_MAX_INPUT_SIZE, validate_positive_int
+from engine.utils.tool_call_parsers.utils import DEFAULT_MAX_TOOL_CALL_PARSE_BYTES
 
 
 def signal_handler(
@@ -150,6 +151,15 @@ def parse_args():
         type=int,
         default=16,
         help="The default maximum number of tokens to generate if not specified in the request. The default is 16.",
+    )
+    triton_group.add_argument(
+        "--max-tool-call-parse-bytes",
+        type=int,
+        default=DEFAULT_MAX_TOOL_CALL_PARSE_BYTES,
+        help="Maximum accumulated output (in bytes) that the streaming tool-call parser will process per request. "
+        "Once this limit is reached, the stream is truncated with finish_reason='length' and backend inference is cancelled. "
+        "This prevents unbounded memory growth caused by excessively large tool-call arguments. "
+        f"Default: {DEFAULT_MAX_TOOL_CALL_PARSE_BYTES}."
     )
     triton_group.add_argument(
         "--model-control-mode",
@@ -268,6 +278,7 @@ def main():
         tool_call_parser=args.tool_call_parser,
         chat_template=args.chat_template,
         default_max_tokens=args.default_max_tokens,
+        max_tool_call_parse_bytes=args.max_tool_call_parse_bytes,
     )
 
     # Attach TritonLLMEngine as the backbone for inference and model management
