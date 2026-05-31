@@ -749,7 +749,7 @@ class TritonLLMEngine(LLMEngine):
 
         # On truncation, cancel the backend to stop it from populating the response queue.
         # Otherwise, abandoned streams may continue to consume memory.
-        # The final chunk is sent with finish_reason="length" to explicitly 
+        # The final chunk is sent with finish_reason="length" to explicitly
         # indicate to the client that a cutoff has occurred.
         if tool_parse_truncated:
             try:

@@ -677,4 +677,3 @@ class TestStreamingToolParseLimit:
         # Plain streaming does not enter the tool parser, so the cap never fires.
         assert "length" not in finish_reasons
         assert len(text) > self.LIMIT_BYTES
-

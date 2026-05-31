@@ -33,9 +33,9 @@ from functools import partial
 
 import tritonserver
 from engine.triton_engine import TritonLLMEngine
+from engine.utils.tool_call_parsers.utils import DEFAULT_MAX_TOOL_CALL_PARSE_BYTES
 from frontend.fastapi_frontend import FastApiFrontend
 from utils.utils import HTTP_DEFAULT_MAX_INPUT_SIZE, validate_positive_int
-from engine.utils.tool_call_parsers.utils import DEFAULT_MAX_TOOL_CALL_PARSE_BYTES
 
 
 def signal_handler(
@@ -159,7 +159,7 @@ def parse_args():
         help="Maximum accumulated output (in bytes) that the streaming tool-call parser will process per request. "
         "Once this limit is reached, the stream is truncated with finish_reason='length' and backend inference is cancelled. "
         "This prevents unbounded memory growth caused by excessively large tool-call arguments. "
-        f"Default: {DEFAULT_MAX_TOOL_CALL_PARSE_BYTES}."
+        f"Default: {DEFAULT_MAX_TOOL_CALL_PARSE_BYTES}.",
     )
     triton_group.add_argument(
         "--model-control-mode",
