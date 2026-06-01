@@ -266,7 +266,7 @@ for case in "${ZIPSLIP_CASES[@]}"; do
     marker="/tmp/zipslip_${mode}_marker_$$"
     SERVER_LOG="./zipslip_${mode}_server.log"
 
-    rm -f "${marker}" "${SERVER_LOG}" "${ZIPSLIP_REPO}"
+    rm -rf "${marker}" "${SERVER_LOG}" "${ZIPSLIP_REPO}"
     mkdir -p "${ZIPSLIP_REPO}/${model}/1"
 
     cp ../../python_models/identity_fp32/config.pbtxt "${ZIPSLIP_REPO}/${model}/config.pbtxt"
