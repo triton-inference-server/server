@@ -31,6 +31,7 @@ sys.path.append("../common")
 
 import unittest
 
+import numpy as np
 import test_util as tu
 import torch
 import tritonclient.http as http
@@ -291,6 +292,69 @@ class TorchAotiTest(tu.TestResultCollector):
                 self.assertEqual(data.shape, OUTPUT_SHAPE)
                 output_tensor = torch.from_numpy(data)
                 self.assertTrue(torch.isfinite(output_tensor).all().item())
+
+
+class TorchAotiSequenceTest(tu.TestResultCollector):
+    # The AOTI sequence model (see gen_qa_implicit_models.py) is a running
+    # accumulator that resets on the sequence start:
+    #   new_state = INPUT0 + INPUT_STATE * (1 - START)
+    #   OUTPUT0   = new_state * READY
+    # Triton's sequence scheduler synthesizes the START / READY control tensors
+    # and manages the implicit state, so the client only sends INPUT__0.
+    MODEL_NAME = "torch_aoti_sequence_float32"
+
+    def _infer_step(self, client, seq_id, value, start, end):
+        data = np.full((1, 1), value, dtype=np.float32)
+        inputs = [http.InferInput("INPUT__0", data.shape, "FP32")]
+        inputs[0].set_data_from_numpy(data, binary_data=True)
+        outputs = [http.InferRequestedOutput("OUTPUT__0", binary_data=True)]
+        result = client.infer(
+            self.MODEL_NAME,
+            inputs,
+            outputs=outputs,
+            sequence_id=seq_id,
+            sequence_start=start,
+            sequence_end=end,
+        )
+        return result.as_numpy("OUTPUT__0")
+
+    def test_single_sequence(self):
+        steps = [2.0, 3.0, 4.0, 5.0]
+        expected = np.cumsum(steps)
+        with http.InferenceServerClient("localhost:8000") as client:
+            for i, value in enumerate(steps):
+                out = self._infer_step(
+                    client,
+                    seq_id=100,
+                    value=value,
+                    start=(i == 0),
+                    end=(i == len(steps) - 1),
+                )
+                self.assertEqual(out.shape, (1, 1))
+                self.assertAlmostEqual(
+                    float(out[0, 0]), float(expected[i]), places=3
+                )
+
+    def test_interleaved_sequences(self):
+        # Two concurrent sequences must keep independent state.
+        seqs = {
+            201: {"steps": [1.0, 1.0, 1.0, 1.0], "sum": 0.0},
+            202: {"steps": [10.0, 20.0, 30.0, 40.0], "sum": 0.0},
+        }
+        with http.InferenceServerClient("localhost:8000") as client:
+            num_steps = len(next(iter(seqs.values()))["steps"])
+            for i in range(num_steps):
+                for seq_id, st in seqs.items():
+                    value = st["steps"][i]
+                    st["sum"] += value
+                    out = self._infer_step(
+                        client,
+                        seq_id=seq_id,
+                        value=value,
+                        start=(i == 0),
+                        end=(i == num_steps - 1),
+                    )
+                    self.assertAlmostEqual(float(out[0, 0]), st["sum"], places=3)
 
 
 if __name__ == "__main__":

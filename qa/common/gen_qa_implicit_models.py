@@ -28,6 +28,7 @@
 
 import argparse
 import os
+import sys
 from typing import List, Tuple
 
 import gen_ensemble_model_utils as emu
@@ -1227,6 +1228,149 @@ instance_group [
         cfile.write(config)
 
 
+def create_torch_aoti_modelfile(models_dir, model_version, max_batch, dtype, shape):
+    # AOT Inductor (PT2) sequence model. The forward arguments map positionally
+    # to the model's ordinal inputs/outputs:
+    #   INPUT__0 = INPUT0 (data), INPUT__1 = INPUT_STATE (implicit state),
+    #   INPUT__2 = START (control),  INPUT__3 = READY (control)
+    #   OUTPUT__0 = out (data),      OUTPUT__1 = new_state (implicit state)
+    # The config addresses the control/state tensors using the descriptive
+    # "<name>__<index>" convention (START__2, READY__3, INPUT_STATE__1,
+    # OUTPUT_STATE__1), which the pt2 backend resolves onto these ordinals.
+    if dtype not in (np.float32, np.int32):
+        return
+
+    torch_dtype = np_to_torch_dtype(dtype)
+    model_name = tu.get_sequence_model_name("torch_aoti", dtype)
+    shape = [abs(ips) for ips in shape]
+
+    class SequenceNet(nn.Module):
+        def __init__(self):
+            super(SequenceNet, self).__init__()
+
+        def forward(self, INPUT0, INPUT_STATE, START, READY):
+            # On sequence START, reset the running state to INPUT0; otherwise
+            # accumulate onto the carried state. READY gates the emitted output
+            # (active batch slots have READY == 1).
+            keep = (1 - START).to(INPUT_STATE.dtype)
+            new_state = INPUT0 + INPUT_STATE * keep
+            out = new_state * READY.to(new_state.dtype)
+            return out, new_state
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = SequenceNet().to(device).eval()
+
+    # Export with a dynamic first (batch) dimension so the AOTI artifact accepts
+    # any batch size in [1, max_batch].
+    export_batch = 2 if max_batch > 0 else 1
+    data_shape = [export_batch] + list(shape)
+    ctrl_shape = [export_batch, 1]
+    sample_inputs = (
+        torch.zeros(data_shape, dtype=torch_dtype, device=device),
+        torch.zeros(data_shape, dtype=torch_dtype, device=device),
+        torch.zeros(ctrl_shape, dtype=torch_dtype, device=device),
+        torch.zeros(ctrl_shape, dtype=torch_dtype, device=device),
+    )
+
+    dynamic_shapes = None
+    if max_batch > 0:
+        batch = torch.export.Dim("batch", min=1, max=max_batch)
+        dynamic_shapes = ({0: batch}, {0: batch}, {0: batch}, {0: batch})
+
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    try:
+        os.makedirs(model_version_dir)
+    except OSError:
+        pass  # ignore existing dir
+
+    try:
+        exported_model = torch.export.export(
+            model, sample_inputs, dynamic_shapes=dynamic_shapes
+        )
+        torch._inductor.aoti_compile_and_package(
+            exported_model, package_path=model_version_dir + "/model.pt2"
+        )
+    except Exception as e:
+        print(
+            f"error: Failed to create AOTI sequence model {model_name}: {e}",
+            file=sys.stderr,
+        )
+
+
+def create_torch_aoti_modelconfig(models_dir, max_batch, dtype, shape):
+    if dtype not in (np.float32, np.int32):
+        return
+
+    model_name = tu.get_sequence_model_name("torch_aoti", dtype)
+    config_dir = models_dir + "/" + model_name
+    control_type = "int32" if dtype == np.int32 else "fp32"
+
+    config = f"""
+name: "{model_name}"
+backend: "pytorch"
+platform: "torch_aoti"
+max_batch_size: {max_batch}
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {{
+      name: "START__2"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_START
+          {control_type}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
+      name: "READY__3"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_READY
+          {control_type}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }}
+  ]
+  state [
+    {{
+      input_name: "INPUT_STATE__1"
+      output_name: "OUTPUT_STATE__1"
+      data_type: {np_to_model_dtype(dtype)}
+      dims: [ {tu.shape_to_dims_str(shape)} ]
+    }}
+  ]
+}}
+input [
+  {{
+    name: "INPUT__0"
+    data_type: {np_to_model_dtype(dtype)}
+    dims: [ {tu.shape_to_dims_str(shape)} ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT__0"
+    data_type: {np_to_model_dtype(dtype)}
+    dims: [ {tu.shape_to_dims_str(shape)} ]
+  }}
+]
+instance_group [
+  {{
+    kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"}
+  }}
+]
+"""
+
+    try:
+        os.makedirs(config_dir)
+    except OSError:
+        pass  # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+
 def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
     model_version = 1
 
@@ -1269,6 +1413,11 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
                 models_dir, model_version, 0, dtype, shape + suffix, initial_state
             )
 
+    if FLAGS.torch_aoti:
+        # AOTI sequence models are generated with first-dim batching enabled.
+        create_torch_aoti_modelconfig(models_dir, 8, dtype, shape)
+        create_torch_aoti_modelfile(models_dir, model_version, 8, dtype, shape)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -1310,6 +1459,12 @@ if __name__ == "__main__":
         help="Generate Pytorch LibTorch models",
     )
     parser.add_argument(
+        "--torch-aoti",
+        required=False,
+        action="store_true",
+        help="Generate PyTorch AOT Inductor (PT2) sequence models",
+    )
+    parser.add_argument(
         "--openvino",
         required=False,
         action="store_true",
@@ -1337,7 +1492,7 @@ if __name__ == "__main__":
     if FLAGS.tensorrt:
         import tensorrt as trt
 
-    if FLAGS.libtorch:
+    if FLAGS.libtorch or FLAGS.torch_aoti:
         import torch
         from torch import nn
 

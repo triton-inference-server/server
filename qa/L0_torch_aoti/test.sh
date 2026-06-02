@@ -96,6 +96,17 @@ for model in "${models[@]}"; do
     echo -e "${COLOR_DARK}ls ${MODELDIR}/${model}${COLOR_RESET}"
     ls -lha ${MODELDIR}/${model}
 done
+
+# Sequence-batching AOTI models live in the implicit-state sequence repository.
+sequence_models=(
+    "torch_aoti_sequence_float32"
+)
+for model in "${sequence_models[@]}"; do
+    cp -r ${DATADIR}/qa_sequence_implicit_model_repository/${model} ${MODELDIR}/${model}
+    echo -e "${COLOR_DARK}ls ${MODELDIR}/${model}${COLOR_RESET}"
+    ls -lha ${MODELDIR}/${model}
+done
+
 echo -e "${COLOR_DARK}ls ${MODELDIR}${COLOR_RESET}"
 ls -lha ${MODELDIR}
 
@@ -134,7 +145,7 @@ echo -e "${COLOR_DARK}Killing server (pid: ${SERVER_PID})${COLOR_RESET}"
 kill -s SIGINT ${SERVER_PID}
 wait ${SERVER_PID} || true
 echo -e "${COLOR_DARK}Removing model repository${COLOR_RESET}"
-for model in "${models[@]}"; do
+for model in "${models[@]}" "${sequence_models[@]}"; do
     rm -rf ${MODELDIR}/${model}
 done
 
