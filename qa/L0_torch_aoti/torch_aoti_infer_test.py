@@ -203,46 +203,59 @@ class TorchAotiTest(tu.TestResultCollector):
             torch.float16,
             torch.float32,
         ]
+        # The simple AOTI add/sub model is compiled with a dynamic batch
+        # dimension and configured with max_batch_size: 8. Exercise a range of
+        # batch sizes (including 1) so we validate that batched inputs are
+        # assembled and batched outputs are scattered back per-row correctly.
+        batch_sizes = [1, 4, 8]
         for io_type in io_types:
             MODEL_NAME = self._get_simple_model_name(io_type)
-            INPUT_SHAPE = (16,)
-            OUTPUT_SHAPE = (16,)
             TRITON_IO_TYPE = self._dtype_to_triton_dtype(io_type)
 
-            input_data = (
-                self._get_simple_input_data(INPUT_SHAPE, io_type),
-                self._get_simple_input_data(INPUT_SHAPE, io_type),
-            )
+            for batch_size in batch_sizes:
+                INPUT_SHAPE = (batch_size, 16)
+                OUTPUT_SHAPE = (batch_size, 16)
 
-            with http.InferenceServerClient("localhost:8000") as client:
-                inputs = [
-                    http.InferInput("ARGS[0]", input_data[0].shape, TRITON_IO_TYPE),
-                    http.InferInput("ARGS[1]", input_data[1].shape, TRITON_IO_TYPE),
-                ]
+                input_data = (
+                    self._get_simple_input_data(INPUT_SHAPE, io_type),
+                    self._get_simple_input_data(INPUT_SHAPE, io_type),
+                )
 
-                inputs[0].set_data_from_numpy(input_data[0], binary_data=True)
-                inputs[1].set_data_from_numpy(input_data[1], binary_data=True)
+                with http.InferenceServerClient("localhost:8000") as client:
+                    inputs = [
+                        http.InferInput(
+                            "ARGS[0]", input_data[0].shape, TRITON_IO_TYPE
+                        ),
+                        http.InferInput(
+                            "ARGS[1]", input_data[1].shape, TRITON_IO_TYPE
+                        ),
+                    ]
 
-                output_names = [
-                    "RESULT",
-                ]
+                    inputs[0].set_data_from_numpy(input_data[0], binary_data=True)
+                    inputs[1].set_data_from_numpy(input_data[1], binary_data=True)
 
-                outputs = []
-                for output_name in output_names:
-                    outputs.append(
-                        http.InferRequestedOutput(output_name, binary_data=True)
-                    )
+                    output_names = [
+                        "RESULT",
+                    ]
 
-                output_data = []
-                results = client.infer(MODEL_NAME, inputs, outputs=outputs)
+                    outputs = []
+                    for output_name in output_names:
+                        outputs.append(
+                            http.InferRequestedOutput(output_name, binary_data=True)
+                        )
 
-                for output_name in output_names:
-                    output_data.append(results.as_numpy(output_name))
+                    output_data = []
+                    results = client.infer(MODEL_NAME, inputs, outputs=outputs)
 
-                self.assertEqual(len(outputs), len(output_data))
-                for data in output_data:
-                    self.assertEqual(data.shape, OUTPUT_SHAPE)
-                    self.assertTrue((data == input_data[0] + input_data[1]).all())
+                    for output_name in output_names:
+                        output_data.append(results.as_numpy(output_name))
+
+                    self.assertEqual(len(outputs), len(output_data))
+                    for data in output_data:
+                        self.assertEqual(data.shape, OUTPUT_SHAPE)
+                        self.assertTrue(
+                            (data == input_data[0] + input_data[1]).all()
+                        )
 
     def test_torchvision(self):
         MODEL_NAME = "torchvision_aoti"

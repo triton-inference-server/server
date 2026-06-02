@@ -1362,6 +1362,7 @@ def np_to_dtype(np_dtype):
 
 def create_torch_aoti_model_file(
     models_dir,
+    max_batch,
     model_version,
     input_shape,
     input_dtype,
@@ -1430,11 +1431,32 @@ def create_torch_aoti_model_file(
     model.to(device)
     model = model.eval()
 
-    sample_inputs = generate_torch_aoti_sample_inputs(input_shape, input_dtype, device)
+    # When batching is enabled, the AOTI artifact must be compiled with a
+    # dynamic first (batch) dimension. Otherwise the compiled model specializes
+    # to a static shape and rejects any batch size other than the one used at
+    # export time. We export with a representative batch > 1 and declare dim 0
+    # of each input as dynamic over [1, max_batch].
+    if max_batch > 0:
+        export_input_shape = [2] + list(input_shape)
+    else:
+        export_input_shape = list(input_shape)
+
+    sample_inputs = generate_torch_aoti_sample_inputs(
+        export_input_shape, input_dtype, device
+    )
+
+    dynamic_shapes = None
+    if max_batch > 0:
+        batch_dim = torch.export.Dim("batch", min=1, max=max_batch)
+        # One spec per positional argument of AddSubNet.forward(INPUT0, INPUT1).
+        dynamic_shapes = ({0: batch_dim}, {0: batch_dim})
+
     package_path = os.path.join(model_version_dir, "model.pt2")
 
     try:
-        exported_model = torch.export.export(model, sample_inputs)
+        exported_model = torch.export.export(
+            model, sample_inputs, dynamic_shapes=dynamic_shapes
+        )
         torch._inductor.aoti_compile_and_package(
             exported_model,
             package_path=package_path,
@@ -1738,6 +1760,7 @@ output [
 
 def create_torch_aoti_model_config(
     models_dir,
+    max_batch,
     input_shape,
     output_shape,
     input_dtype,
@@ -1756,7 +1779,6 @@ def create_torch_aoti_model_config(
         else:
             version_policy_str = "{ all { }}"
 
-    # Use a different model name for the non-batching variant
     model_name = tu.get_model_name(
         "torch_aoti",
         input_dtype,
@@ -1772,6 +1794,7 @@ def create_torch_aoti_model_config(
 backend: "pytorch"
 name: "{model_name}"
 platform: "torch_aoti"
+max_batch_size: {max_batch}
 version_policy: {version_policy_str}
 input [
   {{
@@ -2384,6 +2407,7 @@ def create_models(
             # max-batch 8
             if create_torch_aoti_model_file(
                 models_dir,
+                8,
                 model_version,
                 input_shape,
                 input_dtype,
@@ -2391,6 +2415,7 @@ def create_models(
             ):
                 create_torch_aoti_model_config(
                     models_dir,
+                    8,
                     input_shape,
                     output0_shape,
                     input_dtype,
