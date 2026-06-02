@@ -2230,12 +2230,6 @@ if __name__ == "__main__":
         help="Do not use Docker --pull argument when building container.",
     )
     parser.add_argument(
-        "--container-memory",
-        default=None,
-        required=False,
-        help="Value for Docker --memory argument.",
-    )
-    parser.add_argument(
         "--target-platform",
         required=False,
         default=None,
