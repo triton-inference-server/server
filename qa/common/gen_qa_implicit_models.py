@@ -28,7 +28,6 @@
 
 import argparse
 import os
-import sys
 from typing import List, Tuple
 
 import gen_ensemble_model_utils as emu
@@ -1283,18 +1282,12 @@ def create_torch_aoti_modelfile(models_dir, model_version, max_batch, dtype, sha
     except OSError:
         pass  # ignore existing dir
 
-    try:
-        exported_model = torch.export.export(
-            model, sample_inputs, dynamic_shapes=dynamic_shapes
-        )
-        torch._inductor.aoti_compile_and_package(
-            exported_model, package_path=model_version_dir + "/model.pt2"
-        )
-    except Exception as e:
-        print(
-            f"error: Failed to create AOTI sequence model {model_name}: {e}",
-            file=sys.stderr,
-        )
+    exported_model = torch.export.export(
+        model, sample_inputs, dynamic_shapes=dynamic_shapes
+    )
+    torch._inductor.aoti_compile_and_package(
+        exported_model, package_path=model_version_dir + "/model.pt2"
+    )
 
 
 def create_torch_aoti_modelconfig(models_dir, max_batch, dtype, shape):
