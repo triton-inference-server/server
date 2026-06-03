@@ -88,6 +88,10 @@ struct Options {
   // The number of gRPC inference handler threads. Useful for
   // throughput tuning of models that are request handling bounded.
   int infer_thread_count_{2};
+  // The number of gRPC inference completion queues. Default is 1
+  // (single shared CQ, legacy behavior). Set to 0 for one CQ per
+  // handler thread, or N>1 for N sharded CQs.
+  int infer_cq_count_{1};
   // The maximum number of inference request/response objects that
   // remain allocated for reuse. As long as the number of in-flight
   // requests doesn't exceed this value there will be no
@@ -154,7 +158,7 @@ class Server {
   std::unique_ptr<::grpc::Server> server_;
 
   std::unique_ptr<::grpc::ServerCompletionQueue> common_cq_;
-  std::unique_ptr<::grpc::ServerCompletionQueue> model_infer_cq_;
+  std::vector<std::unique_ptr<::grpc::ServerCompletionQueue>> model_infer_cqs_;
   std::unique_ptr<::grpc::ServerCompletionQueue> model_stream_infer_cq_;
 
   std::unique_ptr<HandlerBase> common_handler_;
