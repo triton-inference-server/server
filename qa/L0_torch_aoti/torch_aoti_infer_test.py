@@ -224,12 +224,8 @@ class TorchAotiTest(tu.TestResultCollector):
 
                 with http.InferenceServerClient("localhost:8000") as client:
                     inputs = [
-                        http.InferInput(
-                            "ARGS[0]", input_data[0].shape, TRITON_IO_TYPE
-                        ),
-                        http.InferInput(
-                            "ARGS[1]", input_data[1].shape, TRITON_IO_TYPE
-                        ),
+                        http.InferInput("ARGS[0]", input_data[0].shape, TRITON_IO_TYPE),
+                        http.InferInput("ARGS[1]", input_data[1].shape, TRITON_IO_TYPE),
                     ]
 
                     inputs[0].set_data_from_numpy(input_data[0], binary_data=True)
@@ -254,9 +250,7 @@ class TorchAotiTest(tu.TestResultCollector):
                     self.assertEqual(len(outputs), len(output_data))
                     for data in output_data:
                         self.assertEqual(data.shape, OUTPUT_SHAPE)
-                        self.assertTrue(
-                            (data == input_data[0] + input_data[1]).all()
-                        )
+                        self.assertTrue((data == input_data[0] + input_data[1]).all())
 
     def test_torchvision(self):
         MODEL_NAME = "torchvision_aoti"
@@ -331,9 +325,7 @@ class TorchAotiSequenceTest(tu.TestResultCollector):
                     end=(i == len(steps) - 1),
                 )
                 self.assertEqual(out.shape, (1, 1))
-                self.assertAlmostEqual(
-                    float(out[0, 0]), float(expected[i]), places=3
-                )
+                self.assertAlmostEqual(float(out[0, 0]), float(expected[i]), places=3)
 
     def test_interleaved_sequences(self):
         # Two concurrent sequences must keep independent state.
