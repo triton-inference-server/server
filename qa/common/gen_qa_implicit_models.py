@@ -1230,12 +1230,14 @@ instance_group [
 def create_torch_aoti_modelfile(models_dir, model_version, max_batch, dtype, shape):
     # AOT Inductor (PT2) sequence model. The forward arguments map positionally
     # to the model's ordinal inputs/outputs:
-    #   INPUT__0 = INPUT0 (data), INPUT__1 = INPUT_STATE (implicit state),
-    #   INPUT__2 = START (control),  INPUT__3 = READY (control)
-    #   OUTPUT__0 = out (data),      OUTPUT__1 = new_state (implicit state)
+    #   INPUT__0 = INPUT0 (data),  INPUT__1 = INPUT_STATE (implicit state),
+    #   INPUT__2 = START (control), INPUT__3 = READY (control),
+    #   INPUT__4 = CORRID (control)
+    #   OUTPUT__0 = out (data),     OUTPUT__1 = new_state (implicit state)
     # The config addresses the control/state tensors using the descriptive
-    # "<name>__<index>" convention (START__2, READY__3, INPUT_STATE__1,
-    # OUTPUT_STATE__1), which the pt2 backend resolves onto these ordinals.
+    # "<name>__<index>" convention (START__2, READY__3, CORRID__4,
+    # INPUT_STATE__1, OUTPUT_STATE__1), which the pt2 backend resolves onto these
+    # ordinals.
     if dtype not in (np.float32, np.int32):
         return
 
@@ -1247,20 +1249,22 @@ def create_torch_aoti_modelfile(models_dir, model_version, max_batch, dtype, sha
         def __init__(self):
             super(SequenceNet, self).__init__()
 
-        def forward(self, INPUT0, INPUT_STATE, START, READY):
+        def forward(self, INPUT0, INPUT_STATE, START, READY, CORRID):
             # On sequence START, reset the running state to INPUT0; otherwise
-            # accumulate onto the carried state. READY gates the emitted output
-            # (active batch slots have READY == 1).
+            # accumulate onto the carried state. The emitted output adds the
+            # correlation id so tests can confirm CORRID delivery, and READY
+            # gates it (active batch slots have READY == 1).
             keep = (1 - START).to(INPUT_STATE.dtype)
             new_state = INPUT0 + INPUT_STATE * keep
-            out = new_state * READY.to(new_state.dtype)
+            out = (new_state + CORRID.to(new_state.dtype)) * READY.to(new_state.dtype)
             return out, new_state
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = SequenceNet().to(device).eval()
 
     # Export with a dynamic first (batch) dimension so the AOTI artifact accepts
-    # any batch size in [1, max_batch].
+    # any batch size in [1, max_batch]. The correlation id is delivered as an
+    # INT32 tensor (see config), independent of the model's data type.
     export_batch = 2 if max_batch > 0 else 1
     data_shape = [export_batch] + list(shape)
     ctrl_shape = [export_batch, 1]
@@ -1269,12 +1273,19 @@ def create_torch_aoti_modelfile(models_dir, model_version, max_batch, dtype, sha
         torch.zeros(data_shape, dtype=torch_dtype, device=device),
         torch.zeros(ctrl_shape, dtype=torch_dtype, device=device),
         torch.zeros(ctrl_shape, dtype=torch_dtype, device=device),
+        torch.zeros(ctrl_shape, dtype=torch.int32, device=device),
     )
 
     dynamic_shapes = None
     if max_batch > 0:
         batch = torch.export.Dim("batch", min=1, max=max_batch)
-        dynamic_shapes = ({0: batch}, {0: batch}, {0: batch}, {0: batch})
+        dynamic_shapes = (
+            {0: batch},
+            {0: batch},
+            {0: batch},
+            {0: batch},
+            {0: batch},
+        )
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
     try:
@@ -1321,6 +1332,15 @@ sequence_batching {{
         {{
           kind: CONTROL_SEQUENCE_READY
           {control_type}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
+      name: "CORRID__4"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_CORRID
+          data_type: TYPE_INT32
         }}
       ]
     }}

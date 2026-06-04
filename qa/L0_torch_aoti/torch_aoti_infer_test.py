@@ -290,11 +290,13 @@ class TorchAotiTest(tu.TestResultCollector):
 
 class TorchAotiSequenceTest(tu.TestResultCollector):
     # The AOTI sequence model (see gen_qa_implicit_models.py) is a running
-    # accumulator that resets on the sequence start:
+    # accumulator that resets on the sequence start and adds the correlation id
+    # to each emitted output:
     #   new_state = INPUT0 + INPUT_STATE * (1 - START)
-    #   OUTPUT0   = new_state * READY
-    # Triton's sequence scheduler synthesizes the START / READY control tensors
-    # and manages the implicit state, so the client only sends INPUT__0.
+    #   OUTPUT0   = (new_state + CORRID) * READY
+    # Triton's sequence scheduler synthesizes the START / READY / CORRID control
+    # tensors and manages the implicit state, so the client only sends INPUT__0
+    # (the correlation id is supplied via sequence_id).
     MODEL_NAME = "torch_aoti_sequence_float32"
 
     def _infer_step(self, client, seq_id, value, start, end):
@@ -313,13 +315,15 @@ class TorchAotiSequenceTest(tu.TestResultCollector):
         return result.as_numpy("OUTPUT__0")
 
     def test_single_sequence(self):
+        seq_id = 100
         steps = [2.0, 3.0, 4.0, 5.0]
-        expected = np.cumsum(steps)
+        # Output is the running sum plus the correlation id.
+        expected = np.cumsum(steps) + seq_id
         with http.InferenceServerClient("localhost:8000") as client:
             for i, value in enumerate(steps):
                 out = self._infer_step(
                     client,
-                    seq_id=100,
+                    seq_id=seq_id,
                     value=value,
                     start=(i == 0),
                     end=(i == len(steps) - 1),
@@ -328,7 +332,8 @@ class TorchAotiSequenceTest(tu.TestResultCollector):
                 self.assertAlmostEqual(float(out[0, 0]), float(expected[i]), places=3)
 
     def test_interleaved_sequences(self):
-        # Two concurrent sequences must keep independent state.
+        # Two concurrent sequences must keep independent state. Each output is
+        # the per-sequence running sum plus that sequence's correlation id.
         seqs = {
             201: {"steps": [1.0, 1.0, 1.0, 1.0], "sum": 0.0},
             202: {"steps": [10.0, 20.0, 30.0, 40.0], "sum": 0.0},
@@ -346,7 +351,9 @@ class TorchAotiSequenceTest(tu.TestResultCollector):
                         start=(i == 0),
                         end=(i == num_steps - 1),
                     )
-                    self.assertAlmostEqual(float(out[0, 0]), st["sum"], places=3)
+                    self.assertAlmostEqual(
+                        float(out[0, 0]), st["sum"] + seq_id, places=3
+                    )
 
 
 if __name__ == "__main__":
