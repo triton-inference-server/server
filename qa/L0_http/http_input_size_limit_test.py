@@ -503,9 +503,10 @@ class InferSizeLimitTest(TestResultCollector):
         """Test JSON request with large string input"""
         model = "simple_identity"
 
-        # Create a string that is larger (large payload about 2GB) than the default limit of 64MB
-        # (2^31 + 64) elements * 1 bytes = 2GB + 64 bytes = 2,147,483,712 bytes
-        large_string_size = 2 * GIB + 64
+        # Create a string larger than the default 64MB limit but well below INT32
+        # Content-Length max (~2GB) so the server validates JSON size, not header
+        # parsing.
+        large_string_size = DEFAULT_LIMIT_BYTES + OFFSET_ELEMENTS
         large_string = "A" * large_string_size
 
         payload = {
