@@ -1229,15 +1229,11 @@ instance_group [
 
 def create_torch_aoti_modelfile(models_dir, model_version, max_batch, dtype, shape):
     # AOT Inductor (PT2) sequence model. The forward arguments map positionally
-    # to the model's ordinal inputs/outputs:
+    # to the model's ordinal inputs/outputs, which the config addresses directly:
     #   INPUT__0 = INPUT0 (data),  INPUT__1 = INPUT_STATE (implicit state),
     #   INPUT__2 = START (control), INPUT__3 = READY (control),
     #   INPUT__4 = CORRID (control)
     #   OUTPUT__0 = out (data),     OUTPUT__1 = new_state (implicit state)
-    # The config addresses the control/state tensors using the descriptive
-    # "<name>__<index>" convention (START__2, READY__3, CORRID__4,
-    # INPUT_STATE__1, OUTPUT_STATE__1), which the pt2 backend resolves onto these
-    # ordinals.
     if dtype not in (np.float32, np.int32):
         return
 
@@ -1318,7 +1314,7 @@ sequence_batching {{
   max_sequence_idle_microseconds: 5000000
   control_input [
     {{
-      name: "START__2"
+      name: "INPUT__2"
       control [
         {{
           kind: CONTROL_SEQUENCE_START
@@ -1327,7 +1323,7 @@ sequence_batching {{
       ]
     }},
     {{
-      name: "READY__3"
+      name: "INPUT__3"
       control [
         {{
           kind: CONTROL_SEQUENCE_READY
@@ -1336,7 +1332,7 @@ sequence_batching {{
       ]
     }},
     {{
-      name: "CORRID__4"
+      name: "INPUT__4"
       control [
         {{
           kind: CONTROL_SEQUENCE_CORRID
@@ -1347,8 +1343,8 @@ sequence_batching {{
   ]
   state [
     {{
-      input_name: "INPUT_STATE__1"
-      output_name: "OUTPUT_STATE__1"
+      input_name: "INPUT__1"
+      output_name: "OUTPUT__1"
       data_type: {np_to_model_dtype(dtype)}
       dims: [ {tu.shape_to_dims_str(shape)} ]
     }}
