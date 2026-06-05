@@ -39,8 +39,6 @@ from openai.types.chat import (
     ChatCompletionToolParam,
 )
 
-# The test helpers are importable because tests/utils.py (loaded via conftest)
-# adds openai_frontend to sys.path.
 from tests.utils import setup_fastapi_app, setup_server
 
 # resources for testing the tool callings
@@ -602,11 +600,12 @@ class TestAsyncClientToolCalling:
 
 
 class TestStreamingToolParseLimit:
-    """Test streaming tool-call parse-size limit.
-    Uses tool_parser_models/tool_stream_py model,
-    that streams a Mistral-format tool call in small fragments: a prompt
-    containing "big-tool-args" yields an argument large enough to exceed the
-    configured limit, any other prompt stays within it.
+    """
+    Test the streaming tool-call parse-size limit. Utilizes the 
+    tool_parser_models/tool_stream_py model, which streams a Mistral-format
+    tool call in small fragments. A prompt containing "big-tool-args" produces
+    an argument large enough to exceed the configured limit, and any other prompt
+    results in an argument that remains within the limit.
     """
 
     MODEL = "tool_stream_py"
