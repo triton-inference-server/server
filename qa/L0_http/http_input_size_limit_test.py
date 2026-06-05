@@ -499,8 +499,8 @@ class InferSizeLimitTest(TestResultCollector):
             f"Expected shape {[1, shape_size]}, got {result['outputs'][0]['shape']}",
         )
 
-    def _build_json_string_body_of_size(self, target_size):
-        """Build a JSON inference request body that is exactly target_size bytes."""
+    def _build_payload_of_json_size(self, target_size):
+        """Build an inference request payload whose JSON serialization is exactly target_size bytes."""
         payload = {
             "inputs": [
                 {
@@ -513,21 +513,17 @@ class InferSizeLimitTest(TestResultCollector):
         }
         overhead = len(json.dumps(payload))
         pad = target_size - overhead
-        assert pad >= 0, "target_size smaller than payload overhead"
+        self.assertGreaterEqual(pad, 0, "target_size smaller than payload overhead")
         payload["inputs"][0]["data"] = ["A" * pad]
-        body = json.dumps(payload)
-        assert len(body) == target_size, (len(body), target_size)
-        return body
+        self.assertEqual(len(json.dumps(payload)), target_size)
+        return payload
 
     def test_large_string_in_json(self):
         """Verify the server's JSON size limit at the byte boundary."""
         model = "simple_identity"
-        headers = {"Content-Type": "application/json"}
 
-        body_over = self._build_json_string_body_of_size(DEFAULT_LIMIT_BYTES + 1)
-        response = requests.post(
-            self._get_infer_url(model), data=body_over, headers=headers
-        )
+        payload_over = self._build_payload_of_json_size(DEFAULT_LIMIT_BYTES + 1)
+        response = requests.post(self._get_infer_url(model), json=payload_over)
         self.assertEqual(
             400,
             response.status_code,
@@ -540,10 +536,8 @@ class InferSizeLimitTest(TestResultCollector):
         self.assertIn(" bytes exceeds the maximum allowed input size of ", error_msg)
         self.assertIn("Use --http-max-input-size to increase the limit.", error_msg)
 
-        body_at = self._build_json_string_body_of_size(DEFAULT_LIMIT_BYTES)
-        response = requests.post(
-            self._get_infer_url(model), data=body_at, headers=headers
-        )
+        payload_at = self._build_payload_of_json_size(DEFAULT_LIMIT_BYTES)
+        response = requests.post(self._get_infer_url(model), json=payload_at)
         self.assertEqual(
             200,
             response.status_code,
