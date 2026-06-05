@@ -38,7 +38,6 @@ from openai.types.chat import (
     ChatCompletionNamedToolChoiceParam,
     ChatCompletionToolParam,
 )
-
 from tests.utils import setup_fastapi_app, setup_server
 
 # resources for testing the tool callings
