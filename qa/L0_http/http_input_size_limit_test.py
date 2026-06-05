@@ -499,7 +499,7 @@ class InferSizeLimitTest(TestResultCollector):
             f"Expected shape {[1, shape_size]}, got {result['outputs'][0]['shape']}",
         )
 
-    def _build_string_body_of_size(self, target_size):
+    def _build_json_string_body_of_size(self, target_size):
         """Build a JSON inference request body that is exactly target_size bytes."""
         payload = {
             "inputs": [
@@ -520,18 +520,11 @@ class InferSizeLimitTest(TestResultCollector):
         return body
 
     def test_large_string_in_json(self):
-        """Verify the server's JSON size limit at the byte boundary.
-
-        Uses a body well below the INT32 Content-Length max (~2GB) so the
-        server's JSON-size check fires deterministically rather than failing
-        in Content-Length header parsing.
-        """
+        """Verify the server's JSON size limit at the byte boundary."""
         model = "simple_identity"
         headers = {"Content-Type": "application/json"}
 
-        # 1 byte over the 64 MiB default limit must be rejected with the
-        # size-limit error.
-        body_over = self._build_string_body_of_size(DEFAULT_LIMIT_BYTES + 1)
+        body_over = self._build_json_string_body_of_size(DEFAULT_LIMIT_BYTES + 1)
         response = requests.post(
             self._get_infer_url(model), data=body_over, headers=headers
         )
@@ -547,8 +540,7 @@ class InferSizeLimitTest(TestResultCollector):
         self.assertIn(" bytes exceeds the maximum allowed input size of ", error_msg)
         self.assertIn("Use --http-max-input-size to increase the limit.", error_msg)
 
-        # Exactly at the limit must pass the size check.
-        body_at = self._build_string_body_of_size(DEFAULT_LIMIT_BYTES)
+        body_at = self._build_json_string_body_of_size(DEFAULT_LIMIT_BYTES)
         response = requests.post(
             self._get_infer_url(model), data=body_at, headers=headers
         )
