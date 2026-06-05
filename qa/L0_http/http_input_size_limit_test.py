@@ -499,54 +499,65 @@ class InferSizeLimitTest(TestResultCollector):
             f"Expected shape {[1, shape_size]}, got {result['outputs'][0]['shape']}",
         )
 
-    def test_large_string_in_json(self):
-        """Test JSON request with large string input"""
-        model = "simple_identity"
-
-        # Create a string larger than the default 64MB limit but well below INT32
-        # Content-Length max (~2GB) so the server validates JSON size, not header
-        # parsing.
-        large_string_size = DEFAULT_LIMIT_BYTES + OFFSET_ELEMENTS
-        large_string = "A" * large_string_size
-
+    def _build_string_body_of_size(self, target_size):
+        """Build a JSON inference request body that is exactly target_size bytes."""
         payload = {
             "inputs": [
                 {
                     "name": "INPUT0",
                     "datatype": "BYTES",
                     "shape": [1, 1],
-                    "data": [large_string],
+                    "data": [""],
                 }
             ]
         }
+        overhead = len(json.dumps(payload))
+        pad = target_size - overhead
+        assert pad >= 0, "target_size smaller than payload overhead"
+        payload["inputs"][0]["data"] = ["A" * pad]
+        body = json.dumps(payload)
+        assert len(body) == target_size, (len(body), target_size)
+        return body
 
+    def test_large_string_in_json(self):
+        """Verify the server's JSON size limit at the byte boundary.
+
+        Uses a body well below the INT32 Content-Length max (~2GB) so the
+        server's JSON-size check fires deterministically rather than failing
+        in Content-Length header parsing.
+        """
+        model = "simple_identity"
         headers = {"Content-Type": "application/json"}
-        response = requests.post(
-            self._get_infer_url(model), headers=headers, json=payload
-        )
 
-        # Should fail with 400 bad request
+        # 1 byte over the 64 MiB default limit must be rejected with the
+        # size-limit error.
+        body_over = self._build_string_body_of_size(DEFAULT_LIMIT_BYTES + 1)
+        response = requests.post(
+            self._get_infer_url(model), data=body_over, headers=headers
+        )
         self.assertEqual(
             400,
             response.status_code,
-            "Expected error code for oversized JSON request, got: {}".format(
-                response.status_code
+            "Expected 400 for body of DEFAULT_LIMIT_BYTES + 1, got: {} ({!r})".format(
+                response.status_code, response.content[:200]
             ),
         )
-
-        # Verify error message
         error_msg = response.content.decode()
-        self.assertIn(
-            "request JSON size of ",
-            error_msg,
+        self.assertIn("request JSON size of ", error_msg)
+        self.assertIn(" bytes exceeds the maximum allowed input size of ", error_msg)
+        self.assertIn("Use --http-max-input-size to increase the limit.", error_msg)
+
+        # Exactly at the limit must pass the size check.
+        body_at = self._build_string_body_of_size(DEFAULT_LIMIT_BYTES)
+        response = requests.post(
+            self._get_infer_url(model), data=body_at, headers=headers
         )
-        self.assertIn(
-            " bytes exceeds the maximum allowed input size of ",
-            error_msg,
-        )
-        self.assertIn(
-            "Use --http-max-input-size to increase the limit.",
-            error_msg,
+        self.assertEqual(
+            200,
+            response.status_code,
+            "Expected 200 for body of exactly DEFAULT_LIMIT_BYTES, got: {} ({!r})".format(
+                response.status_code, response.content[:200]
+            ),
         )
 
     def _create_compressed_payload(self, target_size):
