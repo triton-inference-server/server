@@ -601,7 +601,7 @@ class TestAsyncClientToolCalling:
 
 class TestStreamingToolParseLimit:
     """
-    Test the streaming tool-call parse-size limit. Utilizes the 
+    Test the streaming tool-call parse-size limit. Utilizes the
     tool_parser_models/tool_stream_py model, which streams a Mistral-format
     tool call in small fragments. A prompt containing "big-tool-args" produces
     an argument large enough to exceed the configured limit, and any other prompt
