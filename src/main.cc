@@ -1,4 +1,4 @@
-// Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -138,8 +138,8 @@ StartHttpService(
       server, trace_manager, shm_manager, g_triton_params.http_port_,
       g_triton_params.reuse_http_port_, g_triton_params.http_address_,
       g_triton_params.http_forward_header_pattern_,
-      g_triton_params.http_thread_cnt_, g_triton_params.http_max_input_size_,
-      g_triton_params.http_restricted_apis_, service);
+      g_triton_params.http_thread_cnt_, g_triton_params.http_restricted_apis_,
+      service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -180,22 +180,10 @@ StartSagemakerService(
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
-  size_t max_input_size = triton::server::HTTP_DEFAULT_MAX_INPUT_SIZE;
-  triton::server::RestrictedFeatures restricted_apis{};
-#ifdef TRITON_ENABLE_HTTP
-  // Reuse HTTP server settings for SageMaker endpoint behavior. In
-  // particular, --http-restricted-api and --http-max-input-size also apply
-  // to SageMaker requests. Without TRITON_ENABLE_HTTP, SageMaker falls back to
-  // default input size and unrestricted APIs (no command-line configuration for
-  // restricted APIs).
-  max_input_size = g_triton_params.http_max_input_size_;
-  restricted_apis = g_triton_params.http_restricted_apis_;
-#endif  // TRITON_ENABLE_HTTP
-
   TRITONSERVER_Error* err = triton::server::SagemakerAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.sagemaker_port_,
       g_triton_params.sagemaker_address_, g_triton_params.sagemaker_thread_cnt_,
-      max_input_size, restricted_apis, service);
+      service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -216,23 +204,10 @@ StartVertexAiService(
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
-  size_t max_input_size = triton::server::HTTP_DEFAULT_MAX_INPUT_SIZE;
-  triton::server::RestrictedFeatures restricted_apis{};
-#ifdef TRITON_ENABLE_HTTP
-  // Reuse HTTP server settings for Vertex AI endpoint behavior. In
-  // particular, --http-restricted-api and --http-max-input-size also apply
-  // to Vertex AI requests. Without TRITON_ENABLE_HTTP, Vertex AI falls back to
-  // default input size and unrestricted APIs (no command-line configuration for
-  // restricted APIs).
-  max_input_size = g_triton_params.http_max_input_size_;
-  restricted_apis = g_triton_params.http_restricted_apis_;
-#endif  // TRITON_ENABLE_HTTP
-
   TRITONSERVER_Error* err = triton::server::VertexAiAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.vertex_ai_port_,
       g_triton_params.vertex_ai_address_, g_triton_params.vertex_ai_thread_cnt_,
-      max_input_size, restricted_apis, g_triton_params.vertex_ai_default_model_,
-      service);
+      g_triton_params.vertex_ai_default_model_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -341,17 +316,6 @@ StopEndpoints(uint32_t* exit_timeout_secs)
   }
 #endif  // TRITON_ENABLE_HTTP
 
-#ifdef TRITON_ENABLE_GRPC
-  // Allow for graceful shutdown of GRPC service
-  if (g_grpc_service) {
-    TRITONSERVER_Error* err = g_grpc_service->GracefulStop(exit_timeout_secs);
-    if (err != nullptr) {
-      LOG_TRITONSERVER_ERROR(err, "failed to gracefully stop GRPC service");
-      ret = false;
-    }
-  }
-#endif  // TRITON_ENABLE_GRPC
-
   return ret;
 }
 
@@ -360,9 +324,11 @@ StopEndpoints()
 {
   bool ret = true;
 
+  // TODO: Add support for 'exit_timeout_secs' to the endpoints below and move
+  // them to the 'StopEndpoints(uint32_t* exit_timeout_secs)' function above.
+
 #ifdef TRITON_ENABLE_GRPC
   if (g_grpc_service) {
-    // Forceful shutdown of GRPC service
     TRITONSERVER_Error* err = g_grpc_service->Stop();
     if (err != nullptr) {
       LOG_TRITONSERVER_ERROR(err, "failed to stop GRPC service");
@@ -507,8 +473,7 @@ main(int argc, char** argv)
   triton::server::TraceManager* trace_manager;
 
   // Manager for shared memory blocks.
-  auto shm_manager = std::make_shared<triton::server::SharedMemoryManager>(
-      g_triton_params.allow_client_shm_);
+  auto shm_manager = std::make_shared<triton::server::SharedMemoryManager>();
 
   // Create the server...
   TRITONSERVER_Server* server_ptr = nullptr;
@@ -556,7 +521,7 @@ main(int argc, char** argv)
     triton::server::signal_exit_cv_.wait_for(lock, wait_timeout);
   }
 
-  // Stop the HTTP and gRPC endpoints, and update exit timeout.
+  // Stop the HTTP[, gRPC, and metrics] endpoints, and update exit timeout.
   uint32_t exit_timeout_secs = g_triton_params.exit_timeout_secs_;
   StopEndpoints(&exit_timeout_secs);
   TRITONSERVER_ServerSetExitTimeout(server_ptr, exit_timeout_secs);

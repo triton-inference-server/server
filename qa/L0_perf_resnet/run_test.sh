@@ -53,10 +53,8 @@ rm -fr models && mkdir -p models && \
             sed -i "s/^max_batch_size:.*/max_batch_size: ${MAX_BATCH}/" config.pbtxt && \
             echo "instance_group [ { count: ${INSTANCE_CNT} }]")
 
-pip3 install perf_analyzer
-
 MEASUREMENT_WINDOW=5000
-PERF_CLIENT=perf_analyzer
+PERF_CLIENT=../clients/perf_client
 # Onnx and onnx-trt models are very slow on Jetson.
 if [ "$ARCH" == "aarch64" ]; then
     if [ "$MODEL_FRAMEWORK" == "onnx" ] || [ "$MODEL_FRAMEWORK" == "onnx_trt" ]; then

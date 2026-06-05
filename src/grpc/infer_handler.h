@@ -1,4 +1,4 @@
-// Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -32,7 +32,6 @@
 #include <condition_variable>
 #include <queue>
 #include <regex>
-#include <shared_mutex>
 #include <thread>
 
 #include "../tracer.h"
@@ -731,7 +730,7 @@ class InferHandlerState {
       ctx_->AsyncNotifyWhenDone(notify_state_.get());
     }
 
-    void SetReceivedNotification(bool value) { received_notification_ = value; }
+    void SetReceivedNotification(bool value) { received_notification_ = true; }
 
     bool ReceivedNotification() { return received_notification_; }
 
@@ -861,8 +860,7 @@ class InferHandlerState {
           std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
           if (state->step_ != Steps::CANCELLED &&
               state->step_ != Steps::COMPLETE) {
-            LOG_VERBOSE(1) << "Issuing cancellation for " << state->unique_id_
-                           << " step " << state->step_;
+            LOG_VERBOSE(1) << "Issuing cancellation for " << state->unique_id_;
             if (state->inference_request_.get() == nullptr) {
               // The context might be holding some states that have
               // not been issued to Triton core. Need to skip calling
@@ -897,7 +895,8 @@ class InferHandlerState {
     // Returns whether or not to continue cycling through the gRPC
     // completion queue or not.
     bool HandleCancellation(
-        InferHandlerStateType* state, bool rpc_ok, const std::string& name)
+        InferHandlerStateType* state, bool rpc_ok, const std::string& name,
+        bool is_notification)
     {
       // Check to avoid early exit in case of triton_grpc_error
       if (!IsCancelled()) {
@@ -908,6 +907,12 @@ class InferHandlerState {
             << state->context_->unique_id_ << ", " << state->unique_id_
             << " step " << state->step_;
         return true;
+      }
+      if (is_notification) {
+        LOG_VERBOSE(1) << "Cancellation notification received for " << name
+                       << ", rpc_ok=" << rpc_ok << ", context "
+                       << state->context_->unique_id_ << ", "
+                       << state->unique_id_ << " step " << state->step_;
       }
 
       if (state->step_ != Steps::CANCELLATION_ISSUED) {
@@ -928,6 +933,18 @@ class InferHandlerState {
           // be taken up along with all the other states in the
           // next iteration from the completion queue which
           // would release the state.
+          return true;
+        } else if (is_notification && state->step_ == Steps::CANCELLED) {
+          // A corner case where InferResponseComplete is called between the
+          // cancellation reception but before the cancellation notification
+          // thread enters Process function.
+          // Should let the InferResponseComplete callback trigger the state
+          // release.
+          LOG_VERBOSE(1) << "Waiting for the state enqueued by callback to "
+                            "complete cancellation for "
+                         << name << ", rpc_ok=" << rpc_ok << ", context "
+                         << state->context_->unique_id_ << ", "
+                         << state->unique_id_ << " step " << state->step_;
           return true;
         } else {
           // The cancellation request has been handled so the state can be
@@ -1123,12 +1140,8 @@ class InferHandlerState {
     delay_response_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_RESPONSE");
     delay_complete_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_COMPLETE");
     delay_process_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_PROCESS");
-    delay_process_entry_ms_ =
-        ParseDebugVariable("TRITONSERVER_DELAY_GRPC_PROCESS_ENTRY");
     delay_notification_process_entry_ms_ =
         ParseDebugVariable("TRITONSERVER_DELAY_GRPC_NOTIFICATION");
-    delay_response_complete_exec_ms_ =
-        ParseDebugVariable("TRITONSERVER_DELAY_RESPONSE_COMPLETE_EXEC");
     delay_enqueue_ms_ = ParseDebugVariable("TRITONSERVER_DELAY_GRPC_ENQUEUE");
     delay_response_completion_ms_ =
         ParseDebugVariable("TRITONSERVER_DELAY_RESPONSE_COMPLETION");
@@ -1256,9 +1269,7 @@ class InferHandlerState {
   int delay_response_ms_;
   int delay_complete_ms_;
   int delay_process_ms_;
-  int delay_process_entry_ms_;
   int delay_notification_process_entry_ms_;
-  int delay_response_complete_exec_ms_;
   int delay_enqueue_ms_;
   int delay_response_completion_ms_;
 
@@ -1291,8 +1302,7 @@ class InferHandler : public HandlerBase {
       ServiceType* service, ::grpc::ServerCompletionQueue* cq,
       size_t max_state_bucket_count, size_t max_response_queue_size,
       std::pair<std::string, std::string> restricted_kv,
-      const std::string& header_forward_pattern, std::shared_mutex* conn_mtx,
-      std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn);
+      const std::string& header_forward_pattern);
   virtual ~InferHandler();
 
   // Descriptive name of of the handler.
@@ -1305,9 +1315,6 @@ class InferHandler : public HandlerBase {
   void Stop() override;
 
  protected:
-  void IncrementConnectionCount() { conn_cnt_->fetch_add(1); }
-  void DecrementConnectionCount() { conn_cnt_->fetch_sub(1); }
-
   using State =
       InferHandlerState<ServerResponderType, RequestType, ResponseType>;
   using StateContext = typename State::Context;
@@ -1317,8 +1324,6 @@ class InferHandler : public HandlerBase {
       const std::shared_ptr<StateContext>& context,
       Steps start_step = Steps::START)
   {
-    IncrementConnectionCount();
-
     State* state = nullptr;
 
     if (max_state_bucket_count_ > 0) {
@@ -1359,13 +1364,11 @@ class InferHandler : public HandlerBase {
       if (state_bucket_.size() < max_state_bucket_count_) {
         state->Release();
         state_bucket_.push_back(state);
-        DecrementConnectionCount();
         return;
       }
     }
 
     delete state;
-    DecrementConnectionCount();
   }
 
   // Simple structure that carries the payload needed for
@@ -1375,9 +1378,6 @@ class InferHandler : public HandlerBase {
     std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
         shm_regions_info_;
     std::shared_ptr<SharedMemoryManager> shm_manager_;
-    // For triton_grpc_error mode
-    const bool triton_grpc_error_;
-    std::atomic<bool> grpc_stream_closed_{false};
 
     ResponseReleasePayload(
         State* state,
@@ -1386,9 +1386,7 @@ class InferHandler : public HandlerBase {
             shm_regions_info,
         const std::shared_ptr<SharedMemoryManager>& shm_manager)
         : state_(state), shm_regions_info_(std::move(shm_regions_info)),
-          shm_manager_(shm_manager),
-          triton_grpc_error_(
-              state->context_->gRPCErrorTracker_->triton_grpc_error_)
+          shm_manager_(shm_manager)
     {
     }
 
@@ -1445,10 +1443,6 @@ class InferHandler : public HandlerBase {
   std::pair<std::string, std::string> restricted_kv_;
   std::string header_forward_pattern_;
   re2::RE2 header_forward_regex_;
-
-  std::shared_mutex* conn_mtx_;
-  std::atomic<uint32_t>* conn_cnt_;
-  bool* accepting_new_conn_;
 };
 
 template <
@@ -1461,15 +1455,13 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
         ServiceType* service, ::grpc::ServerCompletionQueue* cq,
         size_t max_state_bucket_count, size_t max_response_queue_size,
         std::pair<std::string, std::string> restricted_kv,
-        const std::string& header_forward_pattern, std::shared_mutex* conn_mtx,
-        std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn)
+        const std::string& header_forward_pattern)
     : name_(name), tritonserver_(tritonserver), service_(service), cq_(cq),
       max_state_bucket_count_(max_state_bucket_count),
       max_response_queue_size_(max_response_queue_size),
       restricted_kv_(restricted_kv),
       header_forward_pattern_(header_forward_pattern),
-      header_forward_regex_(header_forward_pattern_), conn_mtx_(conn_mtx),
-      conn_cnt_(conn_cnt), accepting_new_conn_(accepting_new_conn)
+      header_forward_regex_(header_forward_pattern_)
 {
 }
 
@@ -1511,6 +1503,7 @@ InferHandler<
       if (state->step_ == Steps::WAITING_NOTIFICATION) {
         State* state_wrapper = state;
         state = state_wrapper->state_ptr_;
+        state->context_->SetReceivedNotification(true);
         is_notification = true;
         LOG_VERBOSE(1) << "Received notification for " << Name() << ", "
                        << state->unique_id_;
@@ -1529,16 +1522,7 @@ InferHandler<
           std::this_thread::sleep_for(std::chrono::milliseconds(
               state->delay_notification_process_entry_ms_));
         }
-      } else {
-        if (state->delay_process_entry_ms_ != 0) {
-          // Will delay the entry to Process by the specified time.
-          LOG_INFO << "Delaying the entry to Process thread by "
-                   << state->delay_process_entry_ms_ << " ms...";
-          std::this_thread::sleep_for(
-              std::chrono::milliseconds(state->delay_process_entry_ms_));
-        }
       }
-
       LOG_VERBOSE(2) << "Grpc::CQ::Next() "
                      << state->context_->DebugString(state);
       if (!Process(state, ok, is_notification)) {
@@ -1546,8 +1530,6 @@ InferHandler<
         state->context_->EraseState(state);
         StateRelease(state);
       } else {
-        // In non-streaming infer mode which has multiple request handlers,
-        // there is no guarantee state->context_ is valid beyond this line.
         LOG_VERBOSE(2) << "Returning from " << Name() << ", "
                        << state->unique_id_ << ", " << state->step_;
       }
@@ -1601,22 +1583,11 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
     for (const auto& pair : metadata) {
       auto& key = pair.first;
       auto& value = pair.second;
-      std::string header_key = std::string(key.begin(), key.end());
-      if (RE2::PartialMatch(header_key, header_forward_regex_)) {
-        if (std::find(
-                kReservedParameterKeys.begin(), kReservedParameterKeys.end(),
-                header_key) != kReservedParameterKeys.end() ||
-            header_key.rfind("triton_", 0) == 0) {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INVALID_ARG,
-              ("Header '" + header_key +
-               "' is reserved for Triton usage and cannot be forwarded.")
-                  .c_str());
-        }
-
-        std::string header_value = std::string(value.begin(), value.end());
+      std::string param_key = std::string(key.begin(), key.end());
+      if (RE2::PartialMatch(param_key, header_forward_regex_)) {
+        std::string param_value = std::string(value.begin(), value.end());
         err = TRITONSERVER_InferenceRequestSetStringParameter(
-            irequest, header_key.c_str(), header_value.c_str());
+            irequest, param_key.c_str(), param_value.c_str());
         if (err != nullptr) {
           break;
         }
@@ -1645,12 +1616,10 @@ class ModelInferHandler
       ::grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count,
       size_t max_response_queue_size, grpc_compression_level compression_level,
       std::pair<std::string, std::string> restricted_kv,
-      const std::string& forward_header_pattern, std::shared_mutex* conn_mtx,
-      std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn)
+      const std::string& forward_header_pattern)
       : InferHandler(
             name, tritonserver, service, cq, max_state_bucket_count,
-            max_response_queue_size, restricted_kv, forward_header_pattern,
-            conn_mtx, conn_cnt, accepting_new_conn),
+            max_response_queue_size, restricted_kv, forward_header_pattern),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         compression_level_(compression_level)
   {

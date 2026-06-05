@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -51,7 +51,7 @@ install_build_deps_apt() {
     && . /etc/os-release \
     && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
     && apt-get update -q=2 \
-    && apt-get install -y --no-install-recommends cmake=4.0.3* cmake-data=4.0.3*
+    && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3*
 }
 
 install_build_deps_yum() {
@@ -59,7 +59,7 @@ install_build_deps_yum() {
 }
 
 install_build_deps() {
-  if [[ ${TRITON_RHEL} -eq "1" ]] && grep -qE 'rhel|centos|fedora' /etc/os-release; then
+  if [[ ${TRITON_RHEL} -eq "1" ]]; then
     install_build_deps_yum
   else
     install_build_deps_apt
@@ -85,22 +85,7 @@ create_conda_env_with_specified_path() {
 create_python_backend_stub() {
   rm -rf python_backend
   git clone ${TRITON_REPO_ORGANIZATION}/python_backend -b $PYTHON_BACKEND_REPO_TAG
-  CUDA_PATH=$(readlink -f /usr/local/cuda)
-  export CMAKE_POLICY_VERSION_MINIMUM=3.5
-  (cd python_backend/ \
-      && mkdir builddir \
-      && cd builddir \
-      && export CMAKE_POLICY_VERSION_MINIMUM=3.5 \
-      && cmake \
-        -DCMAKE_CUDA_COMPILER=$CUDA_PATH/bin/nvcc \
-        -DCMAKE_INCLUDE_PATH:STRING=/usr/include \
-        -DCUDAToolkit_ROOT=$CUDA_PATH \
-        -DPYBIND11_PYTHON_VERSION=$PY_VERSION \
-        -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG \
-        -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG \
-        -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG \
-        -DTRITON_ENABLE_GPU=ON \
-        -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
-        -S ../ \
-      && cmake --build . --target triton-python-backend-stub -j18)
+  (cd python_backend/ && mkdir builddir && cd builddir && \
+  cmake -DTRITON_ENABLE_GPU=ON -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG -DPYBIND11_PYTHON_VERSION=$PY_VERSION ../ && \
+  make -j18 triton-python-backend-stub)
 }

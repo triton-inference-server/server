@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -226,10 +226,6 @@ for more information.
 > [!Note]
 > Restricting access can be used to limit exposure to model
 > control APIs to trusted users.
-> When Vertex AI endpoint support is enabled, this setting also
-> applies to redirected Vertex AI requests.
-> If Triton is built without `TRITON_ENABLE_HTTP`, Vertex AI uses
-> default unrestricted API settings.
 
 ##### `--allow-sagemaker <boolean> default False`
 
@@ -278,6 +274,18 @@ Directory where cache shared libraries are found.
 > Access to add or remove files from the cache directory
 > must be access controlled. Adding untrusted files
 > can lead to arbitrarty code execution.
+
+##### `backend-config=<backend>,additional-dependency-dirs=<string>`
+
+This is an optional Windows feature that enables Triton to search custom
+dependency directories when loading a specific backend. The user can input
+these directories as a string of semicolon-separated paths (including a
+trailing semicolon). These directories are programmatically prepended to
+the process's PATH and are removed when the backend is loaded successfully.
+Windows will search PATH last in its search sequence, so be cautious that
+no untrusted files of same name exist in a location of higher search priority
+(e.g., System32). It is still recommended to add backend-specific dependencies
+to their corresponding backend folder when possible.
 
 # GRPC server options
 Triton Inference Server's gRPC inference handlers internally use states to manage inference requests and response queues. Each state consists of one inference request and one response queue. The response queue within a state can hold multiple response objects. These states remain allocated for reuse to optimize performance by minimizing dynamic allocations.

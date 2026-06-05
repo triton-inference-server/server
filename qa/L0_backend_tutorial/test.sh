@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -48,7 +48,7 @@ apt update -q=2 \
     && . /etc/os-release \
     && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
     && apt-get update -q=2 \
-    && apt-get install -y --no-install-recommends cmake=4.0.3* cmake-data=4.0.3* \
+    && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3* \
             rapidjson-dev
 cmake --version
 
@@ -62,7 +62,6 @@ git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
 (cd backend/examples/backends/minimal &&
  mkdir build &&
  cd build &&
- export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
        -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
        -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
@@ -141,7 +140,6 @@ rm -fr /opt/tritonserver/backends/minimal
 (cd backend/examples/backends/recommended &&
  mkdir build &&
  cd build &&
- export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
        -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
        -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \

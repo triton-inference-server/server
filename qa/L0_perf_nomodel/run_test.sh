@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,18 +49,13 @@ ARCH=${ARCH:="x86_64"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 MODEL_REPO="${PWD}/models"
-PERF_CLIENT=perf_analyzer
+PERF_CLIENT=../clients/perf_client
 SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
-pip3 install perf_analyzer
 
 # DATADIR is already set in environment variable for aarch64
 if [ "$ARCH" != "aarch64" ]; then
     DATADIR="/data/inferenceserver/${REPO_VERSION}"
-fi
-
-if [ "$SHARED_MEMORY" != "none" ]; then
-    SERVER_ARGS="${SERVER_ARGS} --allow-client-shm=true"
 fi
 
 # Select the single GPU that will be available to the inference server

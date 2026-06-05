@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,23 +26,34 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import sys
 
-from setuptools import Distribution, find_packages, setup
+from setuptools import find_packages, setup
+
+if "--plat-name" in sys.argv:
+    PLATFORM_FLAG = sys.argv[sys.argv.index("--plat-name") + 1]
+else:
+    PLATFORM_FLAG = "any"
 
 if "VERSION" not in os.environ:
     raise Exception("envvar VERSION must be specified")
 
 VERSION = os.environ["VERSION"]
 
+try:
+    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
-# The wheel ships an arch-specific pybind11 extension bundled via
-# package_data. Without has_ext_modules()=True setuptools marks the
-# wheel pure-Python (py3-none-any), which auditwheel rejects.
-# See TRI-983.
-class BinaryDistribution(Distribution):
-    def has_ext_modules(self):
-        return True
+    class bdist_wheel(_bdist_wheel):
+        def finalize_options(self):
+            _bdist_wheel.finalize_options(self)
+            self.root_is_pure = False
 
+        def get_tag(self):
+            pyver, abi, plat = "py3", "none", PLATFORM_FLAG
+            return pyver, abi, plat
+
+except ImportError:
+    bdist_wheel = None
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 
@@ -60,7 +71,7 @@ platform_package_data = [
     "_c/triton_bindings.pyi",
 ]
 
-gpu_extras = ["cupy-cuda13x"]
+gpu_extras = ["cupy-cuda12x"]
 test_extras = ["pytest"]
 all_extras = gpu_extras + test_extras
 
@@ -94,7 +105,7 @@ setup(
         "": platform_package_data,
     },
     zip_safe=False,
-    distclass=BinaryDistribution,
+    cmdclass={"bdist_wheel": bdist_wheel},
     data_files=data_files,
     install_requires=["tritonserver", "pydantic==2.10.6"],
     extras_require={"GPU": gpu_extras, "test": test_extras, "all": all_extras},

@@ -1,4 +1,4 @@
-# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,7 +28,6 @@ from typing import List
 
 from fastapi import APIRouter, HTTPException, Request
 from schemas.openai import ListModelsResponse, Model, ObjectType
-from utils.utils import StatusCode
 
 router = APIRouter()
 
@@ -36,28 +35,24 @@ OWNED_BY = "Triton Inference Server"
 
 
 @router.get("/v1/models", response_model=ListModelsResponse, tags=["Models"])
-async def list_models(request: Request) -> ListModelsResponse:
+def list_models(request: Request) -> ListModelsResponse:
     """
     Lists the currently available models, and provides basic information about each one such as the owner and availability.
     """
     if not request.app.engine:
-        raise HTTPException(
-            status_code=StatusCode.SERVER_ERROR, detail="No attached inference engine"
-        )
+        raise HTTPException(status_code=500, detail="No attached inference engine")
 
     models: List[Model] = request.app.engine.models()
     return ListModelsResponse(object=ObjectType.list, data=models)
 
 
 @router.get("/v1/models/{model_name}", response_model=Model, tags=["Models"])
-async def retrieve_model(request: Request, model_name: str) -> Model:
+def retrieve_model(request: Request, model_name: str) -> Model:
     """
     Retrieves a model instance, providing basic information about the model such as the owner and permissioning.
     """
     if not request.app.engine:
-        raise HTTPException(
-            status_code=StatusCode.SERVER_ERROR, detail="No attached inference engine"
-        )
+        raise HTTPException(status_code=500, detail="No attached inference engine")
 
     # TODO: Return model directly from engine instead of searching models
     models: List[Model] = request.app.engine.models()
@@ -65,6 +60,4 @@ async def retrieve_model(request: Request, model_name: str) -> Model:
         if model.id == model_name:
             return model
 
-    raise HTTPException(
-        status_code=StatusCode.NOT_FOUND, detail=f"Unknown model: {model_name}"
-    )
+    raise HTTPException(status_code=404, detail=f"Unknown model: {model_name}")

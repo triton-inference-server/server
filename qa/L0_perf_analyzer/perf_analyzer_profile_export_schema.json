@@ -1,0 +1,95 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/triton-inference-server/client/blob/main/src/c%2B%2B/perf_analyzer/examples/schema.json",
+    "title": "Perf Analyzer output data",
+    "description": "A json file describing the output from a Perf Analyzer run.",
+    "type": "object",
+    "required": [
+        "experiments",
+        "version"
+    ],
+    "properties": {
+        "experiments": {
+            "description": "The array of all experiments run by Perf Analyzer.",
+            "type": "array",
+            "required": [
+                "experiment",
+                "requests",
+                "window_boundaries"
+            ],
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "experiment": {
+                        "description": "A single experiment run by Perf Analyzer.",
+                        "type": "object",
+                        "required": [
+                            "mode",
+                            "value"
+                        ],
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "properties": {
+                            "mode": {
+                                "description": "Operating mode of Perf Analyzer: For example, 'concurrency' or 'request rate'.",
+                                "type": "string"
+                            },
+                            "value": {
+                                "description": "Concurrency or request rate for the current experiment.",
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "requests": {
+                        "description": "The array of requests sent by Perf Analyzer for this experiment.",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/properties/experiments/items/properties/$defs/request"
+                        }
+                    },
+                    "$defs": {
+                        "request": {
+                            "description": "Info for a single request.",
+                            "type": "object",
+                            "required": [
+                                "timestamp",
+                                "response_timestamps"
+                            ],
+                            "properties": {
+                                "timestamp": {
+                                    "description": "Time stamp of the request.",
+                                    "type": "integer"
+                                },
+                                "sequence_id": {
+                                    "description": "The sequence_id of the request.",
+                                    "type": "integer"
+                                },
+                                "response_timestamps": {
+                                    "description": "All associated responses to this request.",
+                                    "type": "array",
+                                    "items": {
+                                        "type": "integer"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "window_boundaries": {
+                        "description": "An array of time stamps describing window boundaries.",
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "uniqueItems": true
+                    }
+                }
+            }
+        },
+        "version": {
+            "description": "The version of Perf Analyzer that generated the report.",
+            "type": "string"
+        }
+    }
+}

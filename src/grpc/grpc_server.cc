@@ -1,4 +1,4 @@
-// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -61,6 +61,8 @@
 #ifdef TRITON_ENABLE_TRACING
 #include "../tracer.h"
 #endif  // TRITON_ENABLE_TRACING
+
+#define REGISTER_GRPC_INFER_THREAD_COUNT 2
 
 namespace triton { namespace server { namespace grpc {
 
@@ -1733,15 +1735,9 @@ CommonHandler::RegisterSystemSharedMemoryRegister()
           inference::SystemSharedMemoryRegisterRequest& request,
           inference::SystemSharedMemoryRegisterResponse* response,
           ::grpc::Status* status) {
-        TRITONSERVER_Error* err = nullptr;
-        if (!shm_manager_->AllowClientSharedMemory()) {
-          err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
-        } else {
-          err = shm_manager_->RegisterSystemSharedMemory(
-              request.name(), request.key(), request.offset(),
-              request.byte_size());
-        }
+        TRITONSERVER_Error* err = shm_manager_->RegisterSystemSharedMemory(
+            request.name(), request.key(), request.offset(),
+            request.byte_size());
 
         GrpcStatusUtil::Create(status, err);
         TRITONSERVER_ErrorDelete(err);
@@ -1779,10 +1775,7 @@ CommonHandler::RegisterSystemSharedMemoryUnregister()
           inference::SystemSharedMemoryUnregisterResponse* response,
           ::grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
-        if (!shm_manager_->AllowClientSharedMemory()) {
-          err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
-        } else if (request.name().empty()) {
+        if (request.name().empty()) {
           err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_CPU);
         } else {
           err =
@@ -1893,16 +1886,11 @@ CommonHandler::RegisterCudaSharedMemoryRegister()
           ::grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
 #ifdef TRITON_ENABLE_GPU
-        if (!shm_manager_->AllowClientSharedMemory()) {
-          err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
-        } else {
-          err = shm_manager_->RegisterCUDASharedMemory(
-              request.name(),
-              reinterpret_cast<const cudaIpcMemHandle_t*>(
-                  request.raw_handle().c_str()),
-              request.byte_size(), request.device_id());
-        }
+        err = shm_manager_->RegisterCUDASharedMemory(
+            request.name(),
+            reinterpret_cast<const cudaIpcMemHandle_t*>(
+                request.raw_handle().c_str()),
+            request.byte_size(), request.device_id());
 #else
         err = TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
@@ -1948,10 +1936,7 @@ CommonHandler::RegisterCudaSharedMemoryUnregister()
           inference::CudaSharedMemoryUnregisterResponse* response,
           ::grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
-        if (!shm_manager_->AllowClientSharedMemory()) {
-          err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
-        } else if (request.name().empty()) {
+        if (request.name().empty()) {
           err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_GPU);
         } else {
           err =
@@ -2405,14 +2390,13 @@ Server::Server(
   // Handler for model inference requests.
   std::pair<std::string, std::string> restricted_kv =
       options.restricted_protocols_.Get(RestrictedCategory::INFERENCE);
-  for (int i = 0; i < options.infer_thread_count_; ++i) {
+  for (int i = 0; i < REGISTER_GRPC_INFER_THREAD_COUNT; ++i) {
     model_infer_handlers_.emplace_back(new ModelInferHandler(
         "ModelInferHandler", tritonserver_, trace_manager_, shm_manager_,
         &service_, model_infer_cq_.get(),
         options.infer_allocation_pool_size_ /* max_state_bucket_count */,
         options.max_response_pool_size_, options.infer_compression_level_,
-        restricted_kv, options.forward_header_pattern_, &conn_mtx_, &conn_cnt_,
-        &accepting_new_conn_));
+        restricted_kv, options.forward_header_pattern_));
   }
 
   // Handler for streaming inference requests. Keeps one handler for streaming
@@ -2422,8 +2406,7 @@ Server::Server(
       &service_, model_stream_infer_cq_.get(),
       options.infer_allocation_pool_size_ /* max_state_bucket_count */,
       options.max_response_pool_size_, options.infer_compression_level_,
-      restricted_kv, options.forward_header_pattern_, &conn_mtx_, &conn_cnt_,
-      &accepting_new_conn_));
+      restricted_kv, options.forward_header_pattern_));
 }
 
 Server::~Server()
@@ -2486,8 +2469,6 @@ Server::GetOptions(Options& options, UnorderedMapType& options_map)
   options.infer_compression_level_ =
       static_cast<grpc_compression_level>(infer_compression_level_key);
 
-  RETURN_IF_ERR(GetValue(
-      options_map, "infer_thread_count", &options.infer_thread_count_));
   RETURN_IF_ERR(GetValue(
       options_map, "infer_allocation_pool_size",
       &options.infer_allocation_pool_size_));
@@ -2581,31 +2562,6 @@ Server::Start()
 }
 
 TRITONSERVER_Error*
-Server::GracefulStop(
-    uint32_t* exit_timeout_secs, const std::string& service_name)
-{
-  if (!running_) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is not running.");
-  }
-
-  graceful_shutdown_thread_ = std::thread([this]() {
-    // Stop accepting new RPC requests. Existing requests are allowed to
-    // complete
-    server_->Shutdown();
-  });
-
-  // Required to disable additional requests on existing streaming connections
-  DisableNewConnections();
-
-  if (exit_timeout_secs != nullptr) {
-    WaitForConnectionsToClose(exit_timeout_secs, service_name);
-  }
-
-  return nullptr;  // success
-}
-
-TRITONSERVER_Error*
 Server::Stop()
 {
   if (!running_) {
@@ -2613,14 +2569,9 @@ Server::Stop()
         TRITONSERVER_ERROR_UNAVAILABLE, "GRPC server is not running.");
   }
 
-  // Forcefully cancel remaining RPC connections
-  server_->Shutdown(std::chrono::system_clock::now());
+  // Always shutdown the completion queue after the server.
+  server_->Shutdown();
 
-  if (graceful_shutdown_thread_.joinable()) {
-    graceful_shutdown_thread_.join();
-  }
-
-  // Shutdown completion queues
   common_cq_->Shutdown();
   model_infer_cq_->Shutdown();
   model_stream_infer_cq_->Shutdown();
@@ -2637,31 +2588,6 @@ Server::Stop()
 
   running_ = false;
   return nullptr;  // success
-}
-
-TRITONSERVER_Error*
-Server::DisableNewConnections()
-{
-  std::unique_lock<std::shared_mutex> lock(conn_mtx_);
-
-  accepting_new_conn_ = false;
-
-  return nullptr;  // success
-}
-
-TRITONSERVER_Error*
-Server::WaitForConnectionsToClose(
-    uint32_t* exit_timeout_secs, const std::string& service_name)
-{
-  while (*exit_timeout_secs > 0 && conn_cnt_ > 0) {
-    LOG_INFO << "Timeout " << *exit_timeout_secs << ": Found " << conn_cnt_
-             << " " << service_name
-             << " service connections and inference handlers";
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    (*exit_timeout_secs)--;
-  }
-
-  return nullptr;  // complete
 }
 
 }}}  // namespace triton::server::grpc

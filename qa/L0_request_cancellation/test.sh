@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,10 +42,8 @@ export CUDA_VISIBLE_DEVICES=0
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
-CANCEL_LOG_LINE="Cancellation notification received for "
 
 RET=0
-rm -f *.log
 
 #
 # Unit tests
@@ -68,7 +66,7 @@ if [ $? -ne 0 ]; then
 fi
 
 #
-# Python gRPC cancellation tests
+# gRPC cancellation tests
 #
 rm -rf models && mkdir models
 mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
@@ -86,9 +84,7 @@ for TEST_CASE in "test_grpc_async_infer" \
                     "test_aio_grpc_stream_infer" \
                     "test_grpc_async_infer_cancellation_at_step_start" \
                     "test_grpc_async_infer_response_complete_during_cancellation" \
-                    "test_grpc_async_infer_cancellation_before_finish_0" \
-                    "test_grpc_async_infer_cancellation_before_finish_1" \
-                    "test_grpc_async_infer_cancellation_before_response_complete_and_process_after_final_response"; do
+                    "test_grpc_async_infer_cancellation_during_response_complete"; do
     TEST_LOG="./grpc_cancellation_test.$TEST_CASE.log"
     SERVER_LOG="grpc_cancellation_test.$TEST_CASE.server.log"
     if [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_at_step_start" ]; then
@@ -96,18 +92,12 @@ for TEST_CASE in "test_grpc_async_infer" \
     elif [ "$TEST_CASE" == "test_grpc_async_infer_response_complete_during_cancellation" ]; then
         export TRITONSERVER_DELAY_GRPC_NOTIFICATION=5000
         export TRITONSERVER_DELAY_GRPC_ENQUEUE=5000
-    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_finish_0" ]; then
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_during_response_complete" ]; then
         export TRITONSERVER_DELAY_GRPC_NOTIFICATION=5000
         export TRITONSERVER_DELAY_RESPONSE_COMPLETION=5000
-    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_finish_1" ]; then
-        export TRITONSERVER_DELAY_GRPC_PROCESS_ENTRY=1000
-        export TRITONSERVER_DELAY_RESPONSE_COMPLETION=5000
-    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_response_complete_and_process_after_final_response" ]; then
-        export TRITONSERVER_DELAY_GRPC_NOTIFICATION=5000
-        export TRITONSERVER_DELAY_RESPONSE_COMPLETE_EXEC=5000
     fi
 
-    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -123,7 +113,7 @@ for TEST_CASE in "test_grpc_async_infer" \
         RET=1
     fi
 
-    count=$(grep -o "$CANCEL_LOG_LINE" $SERVER_LOG | wc -l)
+    count=$(grep -o "Cancellation notification received for" $SERVER_LOG | wc -l)
     if [ $count == 0 ]; then
         echo -e "\n***\n*** Cancellation not received by server on $TEST_CASE\n***"
         cat $SERVER_LOG
@@ -132,23 +122,6 @@ for TEST_CASE in "test_grpc_async_infer" \
         echo -e "\n***\n*** Unexpected cancellation received by server on $TEST_CASE. Expected 1 but received $count.\n***"
         cat $SERVER_LOG
         RET=1
-    fi
-
-    # Tests "test_grpc_async_infer" and "test_aio_grpc_async_infer" ends
-    # prematurely before state is released.
-    if [[ "$TEST_CASE" != "test_grpc_async_infer" && "$TEST_CASE" != "test_aio_grpc_async_infer" ]]; then
-        count=$(grep -o "StateRelease" $SERVER_LOG | wc -l)
-        state_released=${state_released:=1}
-        if [ $count == 0 ]; then
-            echo -e "\n***\n*** State not released by server on $TEST_CASE\n***"
-            cat $SERVER_LOG
-            RET=1
-        elif [ $count -ne $state_released ]; then
-            echo -e "\n***\n*** Unexpected states released by server on $TEST_CASE. Expected $state_released but released $count.\n***"
-            cat $SERVER_LOG
-            RET=1
-        fi
-        unset state_released
     fi
     set -e
 
@@ -160,89 +133,9 @@ for TEST_CASE in "test_grpc_async_infer" \
     elif [ "$TEST_CASE" == "test_grpc_async_infer_response_complete_during_cancellation" ]; then
         unset TRITONSERVER_DELAY_GRPC_NOTIFICATION
         unset TRITONSERVER_DELAY_GRPC_ENQUEUE
-    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_finish_0" ]; then
+    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_during_response_complete" ]; then
         unset TRITONSERVER_DELAY_GRPC_NOTIFICATION
         unset TRITONSERVER_DELAY_RESPONSE_COMPLETION
-    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_finish_1" ]; then
-        unset TRITONSERVER_DELAY_GRPC_PROCESS_ENTRY
-        unset TRITONSERVER_DELAY_RESPONSE_COMPLETION
-    elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_response_complete_and_process_after_final_response" ]; then
-        unset TRITONSERVER_DELAY_GRPC_NOTIFICATION
-        unset TRITONSERVER_DELAY_RESPONSE_COMPLETE_EXEC
-    fi
-done
-
-#
-# C++ gRPC cancellation tests
-#
-# allow_timeout_override disables queue prefetching, keeping requests queued
-# long enough for the "Queued" cancellation tests to cancel them before
-# forwarding to the rate limiter. This saves overall test time.
-cat >> models/custom_identity_int32/config.pbtxt <<'EOF'
-dynamic_batching {
-  default_queue_policy {
-    allow_timeout_override: true
-  }
-}
-EOF
-
-GRPC_CANCELLATION_TEST_CPP=../clients/grpc_cancellation_test
-
-for ENTRY in "TestGrpcAsyncInferCancelExecutingRequest 1" \
-             "TestGrpcAsyncInferCancelQueuedRequest 2" \
-             "TestGrpcAsyncInferCancelAfterCompletionIsNoOp 0" \
-             "TestGrpcAsyncInferWithoutContextStillCompletes 0" \
-             "TestGrpcAsyncInferMultiCancelExecutingRequests 2" \
-             "TestGrpcAsyncInferMultiCancelQueuedRequest 2" \
-             "TestGrpcStreamInferCancelExecutingRequest 1" \
-             "TestGrpcStreamInferCancelQueuedRequest 1" \
-             "TestGrpcStreamCancelWithoutInfer 1" \
-             "TestGrpcStreamCancelThenRestart 1"; do
-    read -r TEST_CASE EXPECTED_CANCEL_COUNT <<< "$ENTRY"
-
-    TEST_LOG="./grpc_cancellation_test_cpp.$TEST_CASE.log"
-    SERVER_LOG="./grpc_cancellation_test_cpp.$TEST_CASE.server.log"
-
-    # AsyncInferMulti fans out N concurrent requests; bump to 3 CPU instances
-    # so each can execute in parallel. Every other test uses the default
-    # single-instance config.
-    if [ "$TEST_CASE" == "TestGrpcAsyncInferMultiCancelExecutingRequests" ]; then
-        sed -i 's|instance_group .*|instance_group [{ count: 3, kind: KIND_CPU }]|' \
-            models/custom_identity_int32/config.pbtxt
-    fi
-
-    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
-
-    set +e
-    LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH \
-        $GRPC_CANCELLATION_TEST_CPP \
-            --gtest_filter="GrpcCancellationTest.$TEST_CASE" > $TEST_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** C++ gRPC Cancellation Tests Failed on $TEST_CASE\n***"
-        cat $TEST_LOG
-        RET=1
-    fi
-
-    cancel_count=$(grep -c "$CANCEL_LOG_LINE" $SERVER_LOG || true)
-    if [ $cancel_count -ne $EXPECTED_CANCEL_COUNT ]; then
-        echo -e "\n***\n*** Unexpected cancellation count on $TEST_CASE. Expected $EXPECTED_CANCEL_COUNT but received $cancel_count.\n***"
-        cat $SERVER_LOG
-        RET=1
-    fi
-    set -e
-
-    kill $SERVER_PID
-    wait $SERVER_PID
-
-    if [ "$TEST_CASE" == "TestGrpcAsyncInferMultiCancelExecutingRequests" ]; then
-        sed -i 's|instance_group .*|instance_group [{ kind: KIND_CPU }]|' \
-            models/custom_identity_int32/config.pbtxt
     fi
 done
 

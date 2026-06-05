@@ -1,4 +1,4 @@
-// Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -298,7 +298,6 @@ enum TritonOptionId {
   OPTION_HTTP_ADDRESS,
   OPTION_HTTP_THREAD_COUNT,
   OPTION_HTTP_RESTRICTED_API,
-  OPTION_HTTP_MAX_INPUT_SIZE,
 #endif  // TRITON_ENABLE_HTTP
 #if defined(TRITON_ENABLE_GRPC)
   OPTION_ALLOW_GRPC,
@@ -306,7 +305,6 @@ enum TritonOptionId {
   OPTION_REUSE_GRPC_PORT,
   OPTION_GRPC_ADDRESS,
   OPTION_GRPC_HEADER_FORWARD_PATTERN,
-  OPTION_GRPC_INFER_THREAD_COUNT,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
   OPTION_GRPC_MAX_RESPONSE_POOL_SIZE,
   OPTION_GRPC_USE_SSL,
@@ -377,8 +375,7 @@ enum TritonOptionId {
   OPTION_HOST_POLICY,
   OPTION_MODEL_LOAD_GPU_LIMIT,
   OPTION_MODEL_NAMESPACING,
-  OPTION_ENABLE_PEER_ACCESS,
-  OPTION_ALLOW_CLIENT_SHM
+  OPTION_ENABLE_PEER_ACCESS
 };
 
 void
@@ -425,11 +422,11 @@ TritonParser::SetupOptions()
        "Specify the mode for model management. Options are \"none\", \"poll\" "
        "and \"explicit\". The default is \"none\". "
        "For \"none\", the server will load all models in the model "
-       "repository(s) at startup and will not make any changes to the loaded "
+       "repository(s) at startup and will not make any changes to the load "
        "models after that. For \"poll\", the server will poll the model "
        "repository(s) to detect changes and will load/unload models based on "
        "those changes. The poll rate is controlled by 'repository-poll-secs'. "
-       "For \"explicit\", model load and unload are initiated by using the "
+       "For \"explicit\", model load and unload is initiated by using the "
        "model control APIs, and only models specified with --load-model will "
        "be loaded at startup."});
   model_repo_options_.push_back(
@@ -500,15 +497,10 @@ TritonParser::SetupOptions()
       {OPTION_HTTP_THREAD_COUNT, "http-thread-count", Option::ArgInt,
        "Number of threads handling HTTP requests."});
   http_options_.push_back(
-      {OPTION_HTTP_MAX_INPUT_SIZE, "http-max-input-size", Option::ArgInt,
-       ("Maximum allowed HTTP request input size in bytes. For compressed "
-        "requests, this also limits the decompressed size. Default is " +
-        std::to_string(HTTP_DEFAULT_MAX_INPUT_SIZE) + " bytes (64MB).")});
-  http_options_.push_back(
       {OPTION_HTTP_RESTRICTED_API, "http-restricted-api",
        "<string>:<string>=<string>",
        "Specify restricted HTTP api setting. The format of this "
-       "flag is --http-restricted-api=<apis>:<key>=<value>. Where "
+       "flag is --http-restricted-api=<apis>,<key>=<value>. Where "
        "<api> is a comma-separated list of apis to be restricted. "
        "<key> will be additional header key to be checked when a HTTP request "
        "is received, and <value> is the value expected to be matched."
@@ -538,10 +530,6 @@ TritonParser::SetupOptions()
        Option::ArgStr,
        "The regular expression pattern that will be used for forwarding GRPC "
        "headers as inference request parameters."});
-  grpc_options_.push_back(
-      {OPTION_GRPC_INFER_THREAD_COUNT, "grpc-infer-thread-count",
-       Option::ArgInt,
-       "The number of gRPC inference handler threads. Default is 2."});
   grpc_options_.push_back(
       {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
        "grpc-infer-allocation-pool-size", Option::ArgInt,
@@ -632,7 +620,7 @@ TritonParser::SetupOptions()
       {OPTION_GRPC_RESTRICTED_PROTOCOL, "grpc-restricted-protocol",
        "<string>:<string>=<string>",
        "Specify restricted GRPC protocol setting. The format of this "
-       "flag is --grpc-restricted-protocol=<protocols>:<key>=<value>. Where "
+       "flag is --grpc-restricted-protocol=<protocols>,<key>=<value>. Where "
        "<protocol> is a comma-separated list of protocols to be restricted. "
        "<key> will be additional header key to be checked when a GRPC request "
        "is received, and <value> is the value expected to be matched."
@@ -849,13 +837,6 @@ TritonParser::SetupOptions()
        "limit, the load will be rejected. If not specified, the limit will "
        "not be set."});
 
-  shared_memory_options_.push_back(
-      {OPTION_ALLOW_CLIENT_SHM, "allow-client-shm", Option::ArgBool,
-       "Allow clients to register/unregister and use shared memory regions "
-       "(both CPU system shared memory and GPU CUDA IPC shared memory) for "
-       "inference inputs and outputs. Internal shared memory used by backends "
-       "such as the Python backend is unaffected. Default is false."});
-
   backend_options_.push_back(
       {OPTION_BACKEND_DIR, "backend-directory", Option::ArgStr,
        "The global directory searched for backend shared libraries. Default is "
@@ -938,7 +919,6 @@ TritonParser::SetupOptionGroups()
   option_groups_.emplace_back("Rate Limiter", rate_limiter_options_);
   option_groups_.emplace_back(
       "Memory/Device Management", memory_device_options_);
-  option_groups_.emplace_back("Shared Memory", shared_memory_options_);
   option_groups_.emplace_back("DEPRECATED", deprecated_options_);
 }
 
@@ -1408,15 +1388,6 @@ TritonParser::Parse(int argc, char** argv)
         case OPTION_HTTP_THREAD_COUNT:
           lparams.http_thread_cnt_ = ParseOption<int>(optarg);
           break;
-        case OPTION_HTTP_MAX_INPUT_SIZE: {
-          int64_t temp_input_size = ParseOption<int64_t>(optarg);
-          if (temp_input_size <= 0) {
-            throw ParseException(
-                "Error: --http-max-input-size must be greater than 0.");
-          }
-          lparams.http_max_input_size_ = temp_input_size;
-          break;
-        }
         case OPTION_HTTP_RESTRICTED_API:
           ParseRestrictedFeatureOption(
               optarg, long_options[option_index].name, "", "api",
@@ -1469,15 +1440,6 @@ TritonParser::Parse(int argc, char** argv)
           break;
         case OPTION_GRPC_ADDRESS:
           lgrpc_options.socket_.address_ = optarg;
-          break;
-        case OPTION_GRPC_INFER_THREAD_COUNT:
-          lgrpc_options.infer_thread_count_ = ParseOption<int>(optarg);
-          if (lgrpc_options.infer_thread_count_ < 2 ||
-              lgrpc_options.infer_thread_count_ > 128) {
-            throw ParseException(
-                "invalid argument for --grpc_infer_thread_count. Must be in "
-                "the range 2 to 128.");
-          }
           break;
         case OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE:
           lgrpc_options.infer_allocation_pool_size_ = ParseOption<int>(optarg);
@@ -1789,9 +1751,6 @@ TritonParser::Parse(int argc, char** argv)
           break;
         case OPTION_ENABLE_PEER_ACCESS:
           lparams.enable_peer_access_ = ParseOption<bool>(optarg);
-          break;
-        case OPTION_ALLOW_CLIENT_SHM:
-          lparams.allow_client_shm_ = ParseOption<bool>(optarg);
           break;
       }
     }

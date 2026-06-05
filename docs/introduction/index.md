@@ -1,5 +1,5 @@
 <!--
-# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 
 Triton Inference Server is an open source inference serving software that streamlines
 AI inferencing. Triton Inference Server enables teams to deploy any AI model from multiple deep
-learning and machine learning frameworks, including TensorRT,
+learning and machine learning frameworks, including TensorRT, TensorFlow,
 PyTorch, ONNX, OpenVINO, Python, RAPIDS FIL, and more. Triton supports inference
 across cloud, data center, edge and embedded devices on NVIDIA GPUs, x86 and ARM
 CPU, or AWS Inferentia. Triton Inference Server delivers optimized performance
@@ -60,7 +60,7 @@ available for inferencing. Inference requests arrive at the server via
 either [HTTP/REST or GRPC](../customization_guide/inference_protocols.md) or by the [C
 API](../customization_guide/inprocess_c_api.md) and are then routed to the appropriate per-model
 scheduler. Triton implements [multiple scheduling and batching
-algorithms](../user_guide/architecture.md#models-and-schedulers) that can be configured on a
+algorithms](#models-and-schedulers) that can be configured on a
 model-by-model basis. Each model's scheduler optionally performs
 batching of inference requests and then passes the requests to the
 [backend](https://github.com/triton-inference-server/backend/blob/main/README.md)

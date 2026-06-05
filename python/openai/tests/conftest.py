@@ -1,4 +1,4 @@
-# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,25 +32,14 @@ from fastapi.testclient import TestClient
 from tests.utils import OpenAIServer, setup_fastapi_app, setup_server
 
 
-def pytest_configure(config):
-    """Register custom markers."""
-    config.addinivalue_line(
-        "markers", "openai: mark test to run with OpenAI server (subprocess)"
-    )
-    config.addinivalue_line("markers", "asyncio: mark test as an asyncio test")
-
-
 ### TEST ENVIRONMENT SETUP ###
-def infer_test_environment(tool_call_parser):
+def infer_test_environment():
     # Infer the test environment for simplicity in local dev/testing.
     try:
         import vllm as _
 
         backend = "vllm"
-        if tool_call_parser == "mistral":
-            model = "mistral-nemo-instruct-2407"
-        else:
-            model = "llama-3.1-8b-instruct"
+        model = "llama-3.1-8b-instruct"
         return backend, model
     except ImportError:
         print("No vllm installation found.")
@@ -67,88 +56,41 @@ def infer_test_environment(tool_call_parser):
     raise Exception("Unknown test environment")
 
 
-def infer_test_model_repository(backend, tool_call_parser):
-    if tool_call_parser == "mistral":
-        model_repository = str(Path(__file__).parent / f"{backend}_mistral_models")
-    else:
-        model_repository = str(Path(__file__).parent / f"{backend}_models")
+def infer_test_model_repository(backend):
+    model_repository = str(Path(__file__).parent / f"{backend}_models")
     return model_repository
 
 
-### FIXTURES - Refactored from global variables ###
+# TODO: Refactor away from global variables
+TEST_MODEL = os.environ.get("TEST_MODEL")
+TEST_BACKEND = os.environ.get("TEST_BACKEND")
+TEST_MODEL_REPOSITORY = os.environ.get("TEST_MODEL_REPOSITORY")
 
+TEST_TOKENIZER = os.environ.get(
+    "TEST_TOKENIZER", "meta-llama/Meta-Llama-3.1-8B-Instruct"
+)
+TEST_PROMPT = "What is machine learning?"
+TEST_MESSAGES = [{"role": "user", "content": TEST_PROMPT}]
 
-@pytest.fixture(scope="session")
-def tool_call_parser():
-    return os.environ.get("TEST_TOOL_CALL_PARSER", "llama3")
+if not TEST_BACKEND or not TEST_MODEL:
+    TEST_BACKEND, TEST_MODEL = infer_test_environment()
 
-
-@pytest.fixture(scope="session")
-def backend(tool_call_parser):
-    env_backend = os.environ.get("TEST_BACKEND")
-    env_model = os.environ.get("TEST_MODEL")
-
-    if not env_backend or not env_model:
-        inferred_backend, _ = infer_test_environment(tool_call_parser)
-        return inferred_backend
-    return env_backend
-
-
-@pytest.fixture(scope="session")
-def model(tool_call_parser):
-    env_model = os.environ.get("TEST_MODEL")
-
-    if not env_model:
-        _, inferred_model = infer_test_environment(tool_call_parser)
-        return inferred_model
-    return env_model
-
-
-@pytest.fixture(scope="session")
-def model_repository(backend, tool_call_parser):
-    env_repo = os.environ.get("TEST_MODEL_REPOSITORY")
-
-    if env_repo:
-        return env_repo
-    return infer_test_model_repository(backend, tool_call_parser)
-
-
-@pytest.fixture(scope="session")
-def tokenizer_model():
-    return os.environ.get("TEST_TOKENIZER", "meta-llama/Meta-Llama-3.1-8B-Instruct")
-
-
-@pytest.fixture(scope="session")
-def prompt():
-    return "What is machine learning?"
-
-
-@pytest.fixture(scope="session")
-def messages(prompt):
-    return [{"role": "user", "content": prompt}]
-
-
-@pytest.fixture(scope="session")
-def input(prompt):
-    return prompt
+if not TEST_MODEL_REPOSITORY:
+    TEST_MODEL_REPOSITORY = infer_test_model_repository(TEST_BACKEND)
 
 
 # NOTE: OpenAI client requires actual server running, and won't work
 # with the FastAPI TestClient. Run the server at module scope to run
 # only once for all the tests below.
 @pytest.fixture(scope="module")
-def server(
-    model_repository: str, tokenizer_model: str, backend: str, tool_call_parser: str
-):
+def server():
     args = [
         "--model-repository",
-        model_repository,
+        TEST_MODEL_REPOSITORY,
         "--tokenizer",
-        tokenizer_model,
+        TEST_TOKENIZER,
         "--backend",
-        backend,
-        "--tool-call-parser",
-        tool_call_parser,
+        TEST_BACKEND,
     ]
     # TODO: Incorporate kserve frontend binding smoke tests to catch any
     # breakage with default values or slight cli arg variations
@@ -164,36 +106,42 @@ def server(
 # with arbitrary clients - you must use the TestClient returned to interact with
 # the "server" when "starting the server" via TestClient.
 @pytest.fixture(scope="class")
-def fastapi_client_class_scope(
-    model_repository: str, tokenizer_model: str, backend: str
-):
-    server = setup_server(model_repository=model_repository)
-    app = setup_fastapi_app(tokenizer=tokenizer_model, server=server, backend=backend)
+def fastapi_client_class_scope():
+    server = setup_server(model_repository=TEST_MODEL_REPOSITORY)
+    app = setup_fastapi_app(
+        tokenizer=TEST_TOKENIZER, server=server, backend=TEST_BACKEND
+    )
     with TestClient(app) as test_client:
         yield test_client
 
     server.stop()
 
 
-# FIXME: In TRTLLM tests, the in-process Triton server for the FastAPI app
-# does not automatically release GPU memory, even after calling stop().
-# The memory is only released when the entire pytest process exits.
-#
-# As a result, when the OpenAI server starts another Triton server as a subprocess,
-# there may not be enough GPU memory available to launch a new model instance.
-#
-# This is a workaround to ensure that tests using the OpenAI server run first.
-# Once the OpenAI server subprocess is terminated, tests using the FastAPI app can safely run.
-def pytest_collection_modifyitems(session, config, items):
-    def get_priority(item):
-        cls = item.cls
-        if cls:
-            if getattr(cls, "pytestmark", None):
-                for mark in cls.pytestmark:
-                    if mark.name == "openai":
-                        return 0
-                    elif mark.name == "fastapi":
-                        return 1
-        return 2  # unmarked tests last
+@pytest.fixture(scope="module")
+def model_repository():
+    return TEST_MODEL_REPOSITORY
 
-    items.sort(key=get_priority)
+
+@pytest.fixture(scope="module")
+def model():
+    return TEST_MODEL
+
+
+@pytest.fixture(scope="module")
+def backend():
+    return TEST_BACKEND
+
+
+@pytest.fixture(scope="module")
+def tokenizer_model():
+    return TEST_TOKENIZER
+
+
+@pytest.fixture(scope="module")
+def prompt():
+    return TEST_PROMPT
+
+
+@pytest.fixture(scope="module")
+def messages():
+    return TEST_MESSAGES

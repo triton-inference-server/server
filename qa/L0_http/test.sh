@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,7 +40,6 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-source ../common/util.sh
 RET=0
 
 CLIENT_PLUGIN_TEST="./http_client_plugin_test.py"
@@ -129,7 +128,8 @@ rm -f *.log.*
 set -e
 
 CLIENT_LOG=`pwd`/client.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --allow-client-shm=true"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+source ../common/util.sh
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -163,13 +163,13 @@ for i in \
     BASE=$(basename -- $i)
     SUFFIX="${BASE%.*}"
     if [ $SUFFIX == "image_client" ]; then
-        python $i -m densenet_onnx -s INCEPTION -a -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.async.${SUFFIX}" 2>&1
+        python $i -m inception_onnx -s INCEPTION -a -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.async.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.async.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.async.${SUFFIX}
             RET=1
         fi
-        python $i -m densenet_onnx -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+        python $i -m inception_onnx -s INCEPTION -c 1 -b 1 $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.${SUFFIX}
@@ -255,7 +255,7 @@ echo -n 'username:' > pswd
 echo "password" | openssl passwd -stdin -apr1 >> pswd
 nginx -c `pwd`/$NGINX_CONF
 
-python $BASIC_AUTH_TEST >> ${CLIENT_LOG}.python.plugin.auth 2>&1
+python $BASIC_AUTH_TEST
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.python.plugin.auth
     RET=1
@@ -380,15 +380,9 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
-    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
-    cat ./curl.out
-    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
-    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
-    cat ./curl.out
-    echo ""
     RET=1
 fi
 
@@ -403,15 +397,9 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
-    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
-    cat ./curl.out
-    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
-    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
-    cat ./curl.out
-    echo ""
     RET=1
 fi
 
@@ -426,15 +414,9 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
-    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
-    cat ./curl.out
-    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
-    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
-    cat ./curl.out
-    echo ""
     RET=1
 fi
 
@@ -449,15 +431,9 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "0" ]; then
-    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] found in output when not expected"
-    cat ./curl.out
-    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "0" ]; then
-    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] found in output when not expected"
-    cat ./curl.out
-    echo ""
     RET=1
 fi
 
@@ -473,15 +449,9 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
-    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
-    cat ./curl.out
-    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
-    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
-    cat ./curl.out
-    echo ""
     RET=1
 fi
 
@@ -495,10 +465,7 @@ if [ "$code" == "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "\{\"error\":\"Failed to parse 'data' field: shape does not match true shape\"\}" ./curl.out` != "1" ]; then
-    echo -e "\{\"error\":\"Failed to parse 'data' field: shape does not match true shape\"\} not found in output when expected"
-    cat ./curl.out
-    echo ""
+if [ `grep -c "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\}" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -512,9 +479,6 @@ if [ "$code" == "200" ]; then
     RET=1
 fi
 if [ `grep -c "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\}" ./curl.out` != "1" ]; then
-    echo -e "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\} not found in output when expected"
-    cat ./curl.out
-    echo ""
     RET=1
 fi
 
@@ -529,15 +493,9 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 if [ `grep -c "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\]" ./curl.out` != "1" ]; then
-    echo -e "\[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32\] not found in output when expected"
-    cat ./curl.out
-    echo ""
     RET=1
 fi
 if [ `grep -c "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\]" ./curl.out` != "1" ]; then
-    echo -e "\[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\] not found in output when expected"
-    cat ./curl.out
-    echo ""
     RET=1
 fi
 
@@ -612,7 +570,7 @@ done
 # Run python http aio unit test
 PYTHON_HTTP_AIO_TEST=python_http_aio_test.py
 CLIENT_LOG=`pwd`/python_http_aio_test.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --allow-client-shm=true"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -654,13 +612,7 @@ cp -r ${MODELDIR}/onnx_zero_1_float32 ${MODELDIR}/onnx_zero_1_float32_queue && \
         echo "    }" >> config.pbtxt && \
         echo "}" >> config.pbtxt)
 
-cp -r ./models/simple_identity ${MODELDIR}
-cp -r ./models/simple_identity ${MODELDIR}/simple_identity_int64 && \
-    (cd $MODELDIR/simple_identity_int64 && \
-        sed -i "s/TYPE_STRING/TYPE_INT64/" config.pbtxt && \
-        sed -i "s/simple_identity/simple_identity_int64/" config.pbtxt)
-
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --model-control-mode=explicit --load-model=*"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_http_test.log"
 CLIENT_LOG="./http_test.log"
 run_server
@@ -672,7 +624,7 @@ fi
 
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=http_test.py
-EXPECTED_NUM_TESTS=16
+EXPECTED_NUM_TESTS=10
 set +e
 python $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -695,9 +647,9 @@ wait $SERVER_PID
 
 # Helper library to parse SSE events
 # https://github.com/mpetazzoni/sseclient
-pip install sseclient-py psutil
+pip install sseclient-py
 
-SERVER_ARGS="--model-repository=`pwd`/../python_models/generate_models --log-verbose=1"
+SERVER_ARGS="--model-repository=`pwd`/../python_models/generate_models"
 SERVER_LOG="./inference_server_generate_endpoint_test.log"
 CLIENT_LOG="./generate_endpoint_test.log"
 run_server
@@ -710,9 +662,9 @@ fi
 ## Python Unit Tests
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=generate_endpoint_test.py
-EXPECTED_NUM_TESTS=18
+EXPECTED_NUM_TESTS=17
 set +e
-python $PYTHON_TEST > $CLIENT_LOG 2>&1
+python $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
@@ -795,172 +747,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-### Test HTTP input size limits ###
-
-# Setup models needed for the test
-MODELDIR=http_input_size_limit_test_models
-mkdir -p $MODELDIR
-rm -rf ${MODELDIR}/*
-cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float32 ${MODELDIR}/.
-cp -r ./models/simple_identity ${MODELDIR}/.
-
-# First run with default size limit - large inputs should fail
-SERVER_ARGS="--model-repository=${MODELDIR}"
-SERVER_LOG="./inference_server_default_limit.log"
-CLIENT_LOG="./http_input_size_limit_default.log"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-# Run test to verify that large inputs fail with default limit
-python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_raw_binary >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Default Input Size Limit Test Failed for raw binary input\n***"
-    RET=1
-fi
-
-python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_json >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Default Input Size Limit Test Failed for JSON input\n***"
-    RET=1
-fi
-
-python http_input_size_limit_test.py InferSizeLimitTest.test_large_string_in_json >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Default Input Size Limit Test Failed for large string in JSON\n***"
-    RET=1
-fi
-
-python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_compressed >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Default Input Size Limit Test Failed for compressed input\n***"
-    RET=1
-fi
-
-# Run test to verify that large inputs fail with default limit
-python http_input_size_limit_test.py InferSizeLimitTest.test_json_dtype_size_expansion_exceeds_limit_error >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Default Input Size Limit Test Failed for type size explosion\n***"
-    RET=1
-fi
-
-# Test that sending multiple malformed compressed requests does not cause memory leaks on the server.
-SERVER_PID=$SERVER_PID python http_input_size_limit_test.py InferSizeLimitTest.test_no_leak_on_invalid_inference_header_length >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Decompression Leak Regression Failed\n***\n***"
-    RET=1
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-# Now run with increased size limit (128MB) - large inputs should succeed
-SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=$((2**27))"
-SERVER_LOG="./inference_server_increased_limit.log"
-CLIENT_LOG="./http_input_size_limit_increased.log"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER with increased HTTP input size limit\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-rm -f $CLIENT_LOG
-set +e
-python http_input_size_limit_test.py InferSizeLimitTest.test_large_input_raw_binary >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Input Size Limit Test Failed for raw binary input with increased limits\n***"
-    RET=1
-fi
-
-python http_input_size_limit_test.py InferSizeLimitTest.test_large_input_json >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Input Size Limit Test Failed for JSON input with increased limits\n***"
-    RET=1
-fi
-
-python http_input_size_limit_test.py InferSizeLimitTest.test_large_input_compressed >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Input Size Limit Test Failed for compressed input with increased limits\n***"
-    RET=1
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-# Test with zero max input size - should fail to start
-SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=0"
-SERVER_LOG="./inference_server_zero_limit.log"
-CLIENT_LOG="./http_input_size_limit_zero.log"
-run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "\n***\n*** Server should not start with zero max input size\n***"
-    kill $SERVER_PID
-    wait $SERVER_PID
-    RET=1
-elif [ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_LOG}` != "1" ]; then
-    echo -e "\n***\n*** Failed. Expected '--http-max-input-size must be greater than 0' to be found in log\n***"
-    cat $SERVER_LOG
-    RET=1
-fi
-
-# Test with negative max input size - should fail to start
-SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=-1024"
-SERVER_LOG="./inference_server_negative_limit.log"
-CLIENT_LOG="./http_input_size_limit_negative.log"
-run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "\n***\n*** Server should not start with negative max input size\n***"
-    kill $SERVER_PID
-    wait $SERVER_PID
-    RET=1
-elif [ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_LOG}` != "1" ]; then
-    echo -e "\n***\n*** Failed. Expected '--http-max-input-size must be greater than 0' to be found in log\n***"
-    cat $SERVER_LOG
-    RET=1
-fi
-
-### Test HTTP Requests Containing Many Chunks ###
-MODELDIR="`pwd`/models"
-REQUEST_MANY_CHUNKS_PY="http_request_many_chunks.py"
-CLIENT_LOG="./client.http_request_many_chunks.log"
-SERVER_ARGS="--model-repository=${MODELDIR} --allow-client-shm=true --log-verbose=1 --model-control-mode=explicit --load-model=simple"
-SERVER_LOG="./inference_server_request_many_chunks.log"
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-SERVER_PID=$SERVER_PID python $REQUEST_MANY_CHUNKS_PY -v >> ${CLIENT_LOG} 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** HTTP Request Many Chunks Test Failed\n***"
-    cat $SERVER_LOG
-    cat $CLIENT_LOG
-    RET=1
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
+###
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

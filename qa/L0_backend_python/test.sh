@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -65,6 +65,9 @@ export PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="12"}
 export PYTHON_BACKEND_REPO_TAG=$PYTHON_BACKEND_REPO_TAG
 
 BASE_SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+# Set the default byte size to 5MBs to avoid going out of shared memory. The
+# environment that this job runs on has only 1GB of shared-memory available.
+SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
 
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
@@ -174,9 +177,6 @@ fi
 
 pip3 install pytest requests virtualenv
 
-# Set the default byte size to 5MBs to avoid going out of shared memory. The
-# environment that this job runs on has only 1GB of shared-memory available.
-SERVER_ARGS="$BASE_SERVER_ARGS --allow-client-shm=true --backend-config=python,shm-default-byte-size=5242880"
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -205,7 +205,6 @@ and shared memory pages after starting triton equals to $current_num_pages \n***
     RET=1
 fi
 
-SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
 prev_num_pages=`get_shm_pages`
 # Triton non-graceful exit
 run_server
@@ -408,65 +407,6 @@ and shared memory pages after starting triton equals to $current_num_pages \n***
     exit 1
 fi
 
-
-# Test model with non-existent model file
-# The model.py file is intentionally not created to trigger the failure.
-rm -fr ./models
-mkdir -p models/non_existent_model/1
-cp ../python_models/identity_fp32/config.pbtxt ./models/non_existent_model/config.pbtxt
-(cd models/non_existent_model && \
-          sed -i "s/^name:.*/name: \"non_existent_model\"/" config.pbtxt)
-
-ERROR_MESSAGE_1="Failed to preinitialize Python stub: Python model file not found in '`pwd`/models/non_existent_model/1/model.py'"
-ERROR_MESSAGE_2="failed to load 'non_existent_model'"
-
-for test_mode in "default" "auto_config_disabled"; do
-    if [ "$test_mode" == "default" ]; then
-        SERVER_LOG_SUFFIX=""
-        SERVER_ARGS=$BASE_SERVER_ARGS
-    else
-        SERVER_LOG_SUFFIX="_auto_config_disabled"
-        SERVER_ARGS="$BASE_SERVER_ARGS --disable-auto-complete-config"
-    fi
-
-    SERVER_LOG="./non_existent_model_server${SERVER_LOG_SUFFIX}.log"
-    CLIENT_LOG="./non_existent_model_client${SERVER_LOG_SUFFIX}.log"
-
-    prev_num_pages=`get_shm_pages`
-    run_server
-    if [ "$SERVER_PID" != "0" ]; then
-        echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
-        RET=1
-        kill_server
-    else
-        if grep -q "$ERROR_MESSAGE_1" $SERVER_LOG; then
-            echo -e "Found \"$ERROR_MESSAGE_1\"" >> $CLIENT_LOG
-        else
-            echo -e "Not found \"$ERROR_MESSAGE_1\" in $SERVER_LOG" >> $CLIENT_LOG
-            cat $SERVER_LOG >> $CLIENT_LOG
-            RET=1
-        fi
-
-        if grep -q "$ERROR_MESSAGE_2" $SERVER_LOG; then
-            echo -e "Found \"$ERROR_MESSAGE_2\"" >> $CLIENT_LOG
-        else
-            echo -e "Not found \"$ERROR_MESSAGE_2\" in $SERVER_LOG" >> $CLIENT_LOG
-            cat $SERVER_LOG >> $CLIENT_LOG
-            RET=1
-        fi
-    fi
-
-    current_num_pages=`get_shm_pages`
-    if [ $current_num_pages -ne $prev_num_pages ]; then
-        cat $SERVER_LOG
-        ls /dev/shm
-        echo -e "\n***\n*** Test Failed. Shared memory pages were not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-        exit 1
-    fi
-done
-
 # Disable env test for Jetson since cloud storage repos are not supported
 # Disable ensemble, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
@@ -523,7 +463,7 @@ SUBTESTS="lifecycle argument_validation logging custom_metrics parameters"
 # [DLIS-6123] Disable examples test for Windows since it requires updates to the example clients
 if [[ ${TEST_WINDOWS} == 0 ]]; then
     # TODO: Reimplement restart on decoupled data pipeline and enable restart.
-    SUBTESTS+=" model_control examples request_rescheduling model_readiness"
+    SUBTESTS+=" model_control examples request_rescheduling"
 fi
 for TEST in ${SUBTESTS}; do
     # Run each subtest in a separate virtual environment to avoid conflicts

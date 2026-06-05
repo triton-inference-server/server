@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,13 +28,11 @@
 
 import argparse
 import signal
-import sys
 from functools import partial
 
 import tritonserver
 from engine.triton_engine import TritonLLMEngine
 from frontend.fastapi_frontend import FastApiFrontend
-from utils.utils import HTTP_DEFAULT_MAX_INPUT_SIZE, validate_positive_int
 
 
 def signal_handler(
@@ -111,12 +109,6 @@ def parse_args():
         help="Manual override of Triton backend request format (inputs/output names) to use for inference",
     )
     triton_group.add_argument(
-        "--lora-separator",
-        type=str,
-        default=None,
-        help="LoRA name selection may be appended to the model name following this separator if the separator is provided",
-    )
-    triton_group.add_argument(
         "--tritonserver-log-verbose-level",
         type=int,
         default=0,
@@ -127,54 +119,6 @@ def parse_args():
         type=str,
         default="0.0.0.0",
         help="Address/host of frontends (default: '0.0.0.0')",
-    )
-    triton_group.add_argument(
-        "--tool-call-parser",
-        type=str,
-        default=None,
-        help="Specify the parser for handling tool calling related response text. Options include: 'llama3' and 'mistral'.",
-    )
-    # Allows the user to try a different chat template to craft better prompts and receive more targeted tool-calling responses from the model.
-    # Some Mistral models have a separate chat template file, in addition to the tokenizer_config.json,
-    # such as mistralai/Mistral-Small-3.1-24B-Instruct-2503.
-    # This can serve as a workaround for those models.
-    triton_group.add_argument(
-        "--chat-template",
-        type=str,
-        default=None,
-        help="The path to the custom Jinja chat template file. This is useful if you'd like to use a different chat template than the one provided by the model.",
-    )
-
-    triton_group.add_argument(
-        "--default-max-tokens",
-        type=int,
-        default=16,
-        help="The default maximum number of tokens to generate if not specified in the request. The default is 16.",
-    )
-    triton_group.add_argument(
-        "--model-control-mode",
-        type=str,
-        default="none",
-        choices=["none", "explicit"],
-        help="Specify the mode for model management. Options are 'none', and 'explicit'. "
-        "The default is 'none'. For 'none', the server will load all models in the model "
-        "repository at startup and will not make any changes to the loaded "
-        "models after that. For 'explicit', model load and unload are initiated by using the "
-        "model control APIs, and only models specified with --load-model will "
-        "be loaded at startup.",
-    )
-    triton_group.add_argument(
-        "--load-model",
-        type=str,
-        action="append",
-        default=None,
-        help="Name of the model to be loaded on server startup. It may be specified "
-        "multiple times to add multiple models. To load ALL models at startup, "
-        "specify '*' as the model name with --load-model=* as the ONLY "
-        "--load-model argument, this does not imply any pattern matching. "
-        "Specifying --load-model=* in conjunction with another --load-model "
-        "argument will result in error. Note that this option will only take "
-        "effect if --model-control-mode is set to 'explicit'.",
     )
 
     # OpenAI-Compatible Frontend (FastAPI)
@@ -188,23 +132,6 @@ def parse_args():
         default="info",
         choices=["debug", "info", "warning", "error", "critical", "trace"],
         help="log level for uvicorn",
-    )
-    openai_group.add_argument(
-        "--openai-restricted-api",
-        type=str,
-        default=None,
-        nargs=3,
-        metavar=("APIs", "Restricted Key", "Restricted Value"),
-        action="append",
-        help="Restrict access to specific OpenAI API endpoints. Format: '<API_1>,<API_2>,... <restricted-key> <restricted-value>' (e.g., 'inference,model-repository admin-key admin-value'). If not specified, all endpoints are allowed.",
-    )
-    openai_group.add_argument(
-        "--http-max-input-size",
-        type=validate_positive_int,
-        default=HTTP_DEFAULT_MAX_INPUT_SIZE,
-        help=f"Maximum allowed HTTP request input size in bytes for the OpenAI "
-        f"frontend (default: {HTTP_DEFAULT_MAX_INPUT_SIZE}, i.e. 64 MiB). "
-        "Requests exceeding this limit will be rejected.",
     )
 
     # KServe Predict v2 Frontend
@@ -234,25 +161,8 @@ def main():
     args = parse_args()
 
     # Initialize a Triton Inference Server pointing at LLM models
-    model_control_mode = (
-        tritonserver.ModelControlMode.EXPLICIT
-        if args.model_control_mode == "explicit"
-        else tritonserver.ModelControlMode.NONE
-    )
-
-    load_models = args.load_model or []
-    if load_models and model_control_mode != tritonserver.ModelControlMode.EXPLICIT:
-        print(
-            "Error: Use of '--load-model' requires setting "
-            "'--model-control-mode=explicit' as well.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
     server: tritonserver.Server = tritonserver.Server(
         model_repository=args.model_repository,
-        model_control_mode=model_control_mode,
-        startup_models=load_models,
         log_verbose=args.tritonserver_log_verbose_level,
         log_info=True,
         log_warn=True,
@@ -261,31 +171,16 @@ def main():
 
     # Wrap Triton Inference Server in an interface-conforming "LLMEngine"
     engine: TritonLLMEngine = TritonLLMEngine(
-        server=server,
-        tokenizer=args.tokenizer,
-        backend=args.backend,
-        lora_separator=args.lora_separator,
-        tool_call_parser=args.tool_call_parser,
-        chat_template=args.chat_template,
-        default_max_tokens=args.default_max_tokens,
+        server=server, tokenizer=args.tokenizer, backend=args.backend
     )
 
     # Attach TritonLLMEngine as the backbone for inference and model management
-    try:
-        openai_frontend: FastApiFrontend = FastApiFrontend(
-            engine=engine,
-            host=args.host,
-            port=args.openai_port,
-            log_level=args.uvicorn_log_level,
-            restricted_apis=args.openai_restricted_api,
-            http_max_input_size=args.http_max_input_size,
-        )
-    except ValueError as e:
-        print(
-            f"[ERROR] Failed to initialize FastAPI frontend: {e}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    openai_frontend: FastApiFrontend = FastApiFrontend(
+        engine=engine,
+        host=args.host,
+        port=args.openai_port,
+        log_level=args.uvicorn_log_level,
+    )
 
     # Optionally expose Triton KServe HTTP/GRPC Frontends
     kserve_http, kserve_grpc = None, None

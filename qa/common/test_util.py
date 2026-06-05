@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,56 +27,15 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
-import os
 import unittest
 
-import ml_dtypes
 import numpy as np
 
 _last_request_id = 0
 
 # Numpy does not support the BF16 datatype natively.
-# We use ml_dtypes.bfloat16 for BF16.
-np_dtype_bfloat16 = ml_dtypes.bfloat16
-
-MIB = 2**20  # 1 MIB = 1,048,576 bytes
-GIB = 2**30  # 1 GIB = 1,073,741,824 bytes
-
-
-def get_server_process_from_env(env_var="SERVER_PID"):
-    """
-    Return a psutil.Process for the tritonserver under test.
-    """
-    import psutil
-
-    pid_str = os.environ.get(env_var)
-    if not pid_str:
-        raise AssertionError(f"{env_var} env var is not set")
-    try:
-        return psutil.Process(int(pid_str))
-    except (ValueError, psutil.NoSuchProcess) as e:
-        raise AssertionError(f"Invalid or stale {env_var}={pid_str!r}: {e}")
-
-
-def wait_for_stable_rss(server, rss_tolerance_bytes=0.1 * MIB, stable_threshold=10):
-    """
-    Wait until the RSS of the server is stable.
-    """
-    import time
-
-    last_rss = None
-    stable_count = 0
-    while True:
-        rss = server.memory_info().rss
-        if last_rss is not None and abs(rss - last_rss) < rss_tolerance_bytes:
-            stable_count += 1
-        else:
-            stable_count = 0
-        last_rss = rss
-        if stable_count >= stable_threshold:
-            break
-        time.sleep(0.1)
-    return
+# We use this dummy dtype as a representative for BF16.
+np_dtype_bfloat16 = np.dtype([("bf16", object)])
 
 
 def shape_element_count(shape):
@@ -116,13 +75,7 @@ def shape_to_dims_str(shape):
 
 
 def validate_for_trt_model(
-    input_dtype,
-    output0_dtype,
-    output1_dtype,
-    # Unused arguments for consistency with validate_for_libtorch_model
-    input_shape=None,
-    output0_shape=None,
-    output1_shape=None,
+    input_dtype, output0_dtype, output1_dtype, input_shape, output0_shape, output1_shape
 ):
     """Return True if input and output dtypes are supported by a TRT model."""
     supported_datatypes = [
@@ -160,6 +113,9 @@ def validate_for_ensemble_model(
     input_dtype,
     output0_dtype,
     output1_dtype,
+    input_shape,
+    output0_shape,
+    output1_shape,
 ):
     """Return True if input and output dtypes are supported by the ensemble type."""
 
@@ -192,13 +148,7 @@ def validate_for_ensemble_model(
 
 
 def validate_for_onnx_model(
-    input_dtype,
-    output0_dtype,
-    output1_dtype,
-    # Unused arguments for consistency with validate_for_libtorch_model
-    input_shape=None,
-    output0_shape=None,
-    output1_shape=None,
+    input_dtype, output0_dtype, output1_dtype, input_shape, output0_shape, output1_shape
 ):
     """Return True if input and output dtypes are supported by a Onnx model."""
 
@@ -277,10 +227,7 @@ def validate_for_libtorch_model(
 
 
 def validate_for_openvino_model(
-    input_dtype,
-    output0_dtype,
-    output1_dtype,
-    input_shape,
+    input_dtype, output0_dtype, output1_dtype, input_shape, output0_shape, output1_shape
 ):
     """Return True if input and output dtypes are supported by an OpenVino model."""
 
@@ -319,15 +266,12 @@ def get_dtype_name(dtype):
 
 
 def get_model_name(pf, input_dtype, output0_dtype, output1_dtype):
-    if output1_dtype is None:
-        return f"{pf}_{get_dtype_name(input_dtype)}_{get_dtype_name(output0_dtype)}"
-    else:
-        return "{}_{}_{}_{}".format(
-            pf,
-            get_dtype_name(input_dtype),
-            get_dtype_name(output0_dtype),
-            get_dtype_name(output1_dtype),
-        )
+    return "{}_{}_{}_{}".format(
+        pf,
+        get_dtype_name(input_dtype),
+        get_dtype_name(output0_dtype),
+        get_dtype_name(output1_dtype),
+    )
 
 
 def get_sequence_model_name(pf, dtype):
@@ -365,37 +309,17 @@ def check_gpus_compute_capability(min_capability):
     Returns:
         bool
     """
+    import pycuda.driver as cuda
 
-    import importlib.util
+    cuda.init()
 
-    if importlib.util.find_spec("cuda") is not None:
-        from cuda.core import Device
+    for device_index in range(cuda.Device.count()):
+        device = cuda.Device(device_index)
+        compute_capability = device.compute_capability()
+        compute_capability_value = compute_capability[0] + compute_capability[1] / 10.0
 
-        devices = Device.get_all_devices()
-        for device in devices:
-            cc = device.compute_capability
-            compute_capability_value = cc.major + cc.minor / 10.0
-            if compute_capability_value < min_capability:
-                return False
-
-    elif importlib.util.find_spec("pycuda") is not None:
-        import pycuda.driver as cuda
-
-        cuda.init()
-
-        for device_index in range(cuda.Device.count()):
-            device = cuda.Device(device_index)
-            compute_capability = device.compute_capability()
-            compute_capability_value = (
-                compute_capability[0] + compute_capability[1] / 10.0
-            )
-
-            if compute_capability_value < min_capability:
-                return False
-    else:
-        raise RuntimeError(
-            "No packages found to determine the compute capability. Please check the environment."
-        )
+        if compute_capability_value < min_capability:
+            return False
 
     return True
 

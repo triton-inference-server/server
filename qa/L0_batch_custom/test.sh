@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -54,8 +54,6 @@ TEST_RESULT_FILE='test_results.txt'
 TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
 TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="main"}
 TRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG:="main"}
-TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
-
 
 source ../common/util.sh
 RET=0
@@ -68,7 +66,7 @@ apt update -q=2 \
     && . /etc/os-release \
     && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
     && apt-get update -q=2 \
-    && apt-get install -y --no-install-recommends cmake=4.0.3* cmake-data=4.0.3* rapidjson-dev
+    && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3* rapidjson-dev
 cmake --version
 
 # Set up repository
@@ -88,23 +86,17 @@ git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
 (cd backend/examples/batching_strategies/volume_batching &&
  mkdir build &&
  cd build &&
- export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
-       -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
-       -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
-       -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
-       -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} .. &&
+      -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
+      -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG .. &&
  make -j4 install)
 
  (cd backend/examples/batching_strategies/single_batching &&
  mkdir build &&
  cd build &&
- export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
        -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
-       -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
-       -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
-       -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} .. &&
+       -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG .. &&
  make -j4 install)
 
 cp -r backend/examples/batching_strategies/volume_batching/build/libtriton_volumebatching.so models
@@ -172,10 +164,8 @@ sed -i "s/${OLD_STRING}/${NEW_STRING}/g" ${FILE_PATH}
 (cd backend/examples/batching_strategies/volume_batching &&
  cd build &&
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
-       -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
-       -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
-       -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
-       -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} .. &&
+      -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
+      -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG .. &&
  make -j4 install)
 
 cp -r backend/examples/batching_strategies/volume_batching/build/libtriton_volumebatching.so models/${MODEL_NAME}/libtriton_volumebatching.so

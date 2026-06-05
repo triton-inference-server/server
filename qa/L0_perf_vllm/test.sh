@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,13 +41,13 @@ SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR}
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:=0}
 EXPORT_FILE=profile-export-vllm-model.json
 
-pip3 install tritonclient[perf_analyzer]
-
+pip3 install tritonclient
 rm -rf $MODEL_REPO $EXPORT_FILE *.tjson *.json *.csv
 
 mkdir -p $MODEL_REPO/$MODEL_NAME/1
 echo '{
     "model":"gpt2",
+    "disable_log_requests": "true",
     "gpu_memory_utilization": 0.5
 }' >$MODEL_REPO/$MODEL_NAME/1/model.json
 

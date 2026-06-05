@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,7 +38,7 @@ apt update -q=2 \
     && . /etc/os-release \
     && echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | tee /etc/apt/sources.list.d/kitware.list >/dev/null \
     && apt-get update -q=2 \
-    && apt-get install -y --no-install-recommends cmake=4.0.3* cmake-data=4.0.3*
+    && apt-get install -y --no-install-recommends cmake=3.28.3* cmake-data=3.28.3*
 cmake --version
 
 
@@ -50,15 +50,8 @@ mkdir -p /workspace/build
 # Build without GPU support
 #
 TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:="http://github.com/triton-inference-server"}
-TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="main"}
-TRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG:="main"}
-TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
-
-export CMAKE_POLICY_VERSION_MINIMUM=3.5
-
 (cd /workspace/build && \
         rm -fr cc-clients java-clients python-clients && \
-        export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
               -DTRITON_ENABLE_CC_HTTP=ON \
               -DTRITON_ENABLE_CC_GRPC=ON \
@@ -88,7 +81,6 @@ fi
 #
 (cd /workspace/build && \
         rm -fr cc-clients python-clients && \
-        export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
               -DTRITON_ENABLE_CC_HTTP=OFF \
               -DTRITON_ENABLE_CC_GRPC=ON \
@@ -116,7 +108,6 @@ fi
 #
 (cd /workspace/build && \
         rm -fr cc-clients python-clients && \
-        export CMAKE_POLICY_VERSION_MINIMUM=3.5 && \
         cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
               -DTRITON_ENABLE_CC_HTTP=ON \
               -DTRITON_ENABLE_CC_GRPC=OFF \
@@ -135,6 +126,84 @@ if [ $? -eq 0 ]; then
     echo -e "\n***\n*** No-GRPC Passed\n***"
 else
     echo -e "\n***\n*** No-GRPC FAILED\n***"
+    exit 1
+fi
+
+# TODO: TPRD-342 These tests should be PA CI test
+# cases not Triton test cases
+rm -fr /workspace/build
+mkdir -p /workspace/build
+#
+# Build without C API in Perf Analyzer
+#
+(cd /workspace/build && \
+        cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
+              -DTRITON_ENABLE_CC_HTTP=ON \
+              -DTRITON_ENABLE_CC_GRPC=ON \
+              -DTRITON_ENABLE_PERF_ANALYZER_C_API=OFF \
+              -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
+              -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
+              -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
+              /workspace/perf_analyzer && \
+        make -j16 perf-analyzer)
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** No-CAPI Passed\n***"
+else
+    echo -e "\n***\n*** No-CAPI FAILED\n***"
+    exit 1
+fi
+
+#
+# Build without TensorFlow Serving in Perf Analyzer
+#
+(cd /workspace/build && \
+        rm -fr cc_clients perf_analyzer && \
+        cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
+              -DTRITON_ENABLE_CC_HTTP=ON \
+              -DTRITON_ENABLE_CC_GRPC=ON \
+              -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
+              -DTRITON_ENABLE_PERF_ANALYZER_TFS=OFF \
+              -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
+              -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
+              /workspace/perf_analyzer && \
+        make -j16 perf-analyzer)
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** No-TF-Serving Passed\n***"
+else
+    echo -e "\n***\n*** No-TF-Serving FAILED\n***"
+    exit 1
+fi
+
+#
+# Build without TorchServe in Perf Analyzer
+#
+(cd /workspace/build && \
+        rm -fr cc_clients perf_analyzer && \
+        cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
+              -DTRITON_ENABLE_CC_HTTP=ON \
+              -DTRITON_ENABLE_CC_GRPC=ON \
+              -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
+              -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
+              -DTRITON_ENABLE_PERF_ANALYZER_TS=OFF \
+              -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
+              /workspace/perf_analyzer && \
+        make -j16 perf-analyzer)
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** No-TorchServe Passed\n***"
+else
+    echo -e "\n***\n*** No-TorchServe FAILED\n***"
     exit 1
 fi
 

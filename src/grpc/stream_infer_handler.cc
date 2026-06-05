@@ -1,4 +1,4 @@
-// Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -133,9 +133,6 @@ bool
 ModelStreamInferHandler::Process(
     InferHandler::State* state, bool rpc_ok, bool is_notification)
 {
-  if (is_notification) {
-    state->context_->SetReceivedNotification(true);
-  }
   // Because gRPC doesn't allow concurrent writes on the
   // the stream we only have a single handler thread that
   // reads from the completion queue. Hence, cancellation
@@ -147,16 +144,8 @@ ModelStreamInferHandler::Process(
   if (state->context_->ReceivedNotification()) {
     std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
     if (state->IsGrpcContextCancelled()) {
-      if (is_notification) {
-        // This is the cancellation notification
-        LOG_VERBOSE(1) << "Cancellation notification received for " << Name()
-                       << ", rpc_ok=" << rpc_ok << ", context "
-                       << state->context_->unique_id_ << " step "
-                       << state->context_->step_ << ", state "
-                       << state->unique_id_ << " step " << state->step_;
-      }
-
-      bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
+      bool resume = state->context_->HandleCancellation(
+          state, rpc_ok, Name(), is_notification);
       return resume;
     } else {
       if (state->context_->HandleCompletion()) {
@@ -232,20 +221,9 @@ ModelStreamInferHandler::Process(
       return !finished;
     }
 
-    std::shared_lock<std::shared_mutex> lk1(*conn_mtx_);
-
-    if (!*accepting_new_conn_) {
-      err = TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_UNAVAILABLE,
-          "GRPC server is shutting down and has stopped accepting new "
-          "requests.");
-    }
-
     int64_t requested_model_version;
-    if (err == nullptr) {
-      err = GetModelVersionFromString(
-          request.model_version(), &requested_model_version);
-    }
+    err = GetModelVersionFromString(
+        request.model_version(), &requested_model_version);
 
     // Record the transaction policy of the model into the current state
     // object.
@@ -405,9 +383,9 @@ ModelStreamInferHandler::Process(
         state->context_->WriteResponseIfReady(state);
       } else {
         InferHandler::State* writing_state = nullptr;
-        std::lock_guard<std::recursive_mutex> lk2(state->context_->mu_);
+        std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);
         {
-          std::lock_guard<std::recursive_mutex> lk3(state->step_mtx_);
+          std::lock_guard<std::recursive_mutex> lk2(state->step_mtx_);
           state->response_queue_->MarkNextResponseComplete();
           state->context_->ready_to_write_states_.push(state);
           if (!state->context_->ongoing_write_) {
@@ -536,9 +514,9 @@ ModelStreamInferHandler::Process(
 
       {
         InferHandler::State* writing_state = nullptr;
-        std::lock_guard<std::recursive_mutex> lk2(state->context_->mu_);
+        std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);
         {
-          std::lock_guard<std::recursive_mutex> lk3(state->step_mtx_);
+          std::lock_guard<std::recursive_mutex> lk2(state->step_mtx_);
           if (!state->context_->ready_to_write_states_.empty()) {
             writing_state = state->context_->ready_to_write_states_.front();
             state->context_->ready_to_write_states_.pop();
@@ -563,7 +541,7 @@ ModelStreamInferHandler::Process(
     } else if (state->step_ == Steps::WRITEREADY) {
       // Finish the state if all the transactions associated with
       // the state have completed.
-      std::lock_guard<std::recursive_mutex> lk2(state->context_->mu_);
+      std::lock_guard<std::recursive_mutex> lk1(state->context_->mu_);
       {
         if (state->IsComplete()) {
           state->context_->DecrementRequestCounter();
@@ -643,26 +621,12 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       static_cast<ResponseReleasePayload*>(userp));
   auto state = response_release_payload->state_;
 
-  // In triton_grpc_error mode, WriteGRPCErrorResponse closes the stream on
-  // the first error and sets grpc_stream_closed_. The backend may still send
-  // subsequent responses or the FINAL flag — safely discard them here.
-  // This flag is checked instead of state->context_ to avoid a race with
-  // the CQ thread that may release the state (setting context_ to nullptr)
-  // concurrently.
-  if (response_release_payload->triton_grpc_error_ &&
-      response_release_payload->grpc_stream_closed_.load()) {
-    LOG_VERBOSE(1)
-        << "ModelStreamInferHandler::StreamInferResponseComplete, "
-        << "skipping callback after stream closed (triton_grpc_error mode)";
-    if (iresponse != nullptr) {
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceResponseDelete(iresponse),
-          "deleting GRPC inference response");
+  // Ignore Response from CORE in case GRPC Strict as we dont care about
+  if (state->context_->gRPCErrorTracker_->triton_grpc_error_) {
+    std::lock_guard<std::recursive_mutex> lock(state->context_->mu_);
+    if (state->context_->gRPCErrorTracker_->GRPCErrorEncountered()) {
+      return;
     }
-    if (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) {
-      delete response_release_payload;
-    }
-    return;
   }
   // Increment the callback index
   uint32_t response_index = state->cb_count_++;
@@ -753,19 +717,12 @@ ModelStreamInferHandler::StreamInferResponseComplete(
         LOG_VERBOSE(1) << "GRPC streaming error detected with status: "
                        << status.error_code() << "Closing stream connection."
                        << std::endl;
-        // Mark the stream as closed BEFORE calling WriteGRPCErrorResponse,
-        // which triggers Finish() and eventual state release. Subsequent
-        // callbacks from the backend will see this flag and bail out
-        // without touching the (potentially released) state.
-        response_release_payload->grpc_stream_closed_.store(true);
         state->context_->WriteGRPCErrorResponse(state);
         TRITONSERVER_ErrorDelete(err);
         LOG_TRITONSERVER_ERROR(
             TRITONSERVER_InferenceResponseDelete(iresponse),
             "deleting GRPC inference response");
-        if (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) {
-          delete response_release_payload;
-        }
+        delete response_release_payload;
         return;
       }
     }

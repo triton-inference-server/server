@@ -1,4 +1,4 @@
-# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,7 +24,22 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required(VERSION 3.31.8)
+cmake_minimum_required(VERSION 3.18)
+
+# CMake 4.0+ rejects projects that call cmake_minimum_required(VERSION < 3.5).
+# The fetched third_party repo builds libevent 2.1.12 via ExternalProject using a
+# separate CMake invocation; that step does not inherit -D variables from the top
+# level unless they are also in the environment. If configure fails inside libevent
+# with "Compatibility with CMake < 3.5 has been removed", use either:
+#   export CMAKE_POLICY_VERSION_MINIMUM=3.5   # before cmake AND cmake --build
+# or install/use CMake 3.28.x–3.31.x for this build.
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.0")
+  message(
+    STATUS
+    "CMake ${CMAKE_VERSION}: for libevent/third_party with CMake 4.x, export "
+    "CMAKE_POLICY_VERSION_MINIMUM=3.5 in your shell before configure and build "
+    "(see docs/customization_guide/build.md).")
+endif()
 
 project(tritonserver LANGUAGES C CXX)
 
@@ -166,9 +181,22 @@ if (OPENSSL_ROOT_DIR)
   set(_CMAKE_ARGS_OPENSSL_ROOT_DIR "-DOPENSSL_ROOT_DIR:PATH=${OPENSSL_ROOT_DIR}")
 endif()
 
-set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/${LIB_DIR}/cmake/protobuf")
+# Location where protobuf-config.cmake will be installed varies by
+# platform
+if (WIN32)
+  set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/cmake")
+else()
+  set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/${LIB_DIR}/cmake/protobuf")
+endif()
 
-set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/opentelemetry-cpp/${LIB_DIR}/cmake/opentelemetry-cpp")
+# Triton with Opentelemetry is not supported on Windows
+# FIXME: add location for Windows, when support is added
+# JIRA DLIS-4786
+if (WIN32)
+  set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "")
+else()
+  set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/opentelemetry-cpp/${LIB_DIR}/cmake/opentelemetry-cpp")
+endif()
 
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(TRITON_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/install)
@@ -189,7 +217,7 @@ endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS || TRITON_ENABLE_SAGEMAKER
 if(${TRITON_ENABLE_GRPC})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} grpc)
 endif() # TRITON_ENABLE_GRPC
-if(${TRITON_ENABLE_TRACING})
+if(NOT WIN32 AND ${TRITON_ENABLE_TRACING})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} opentelemetry-cpp)
 endif() # TRITON_ENABLE_TRACING
 

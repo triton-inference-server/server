@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -152,25 +152,13 @@ sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" ${M
 rm -f ${MODELDIR}/simple_string_dyna_sequence/1/model.onnx
 cp ../custom_models/custom_dyna_sequence_int32/1/libtriton_dyna_sequence.so ${MODELDIR}/simple_string_dyna_sequence/1/
 
-# Prepare a dedicated model repository for GrpcTest in python_unit_test.py.
-# separate from MODELDIR avoids changing the model count expected by other
-# tests in this script.
-GRPC_TEST_MODELDIR=`pwd`/grpc_test_models
-rm -rf ${GRPC_TEST_MODELDIR}
-mkdir -p ${GRPC_TEST_MODELDIR}
-cp -r ${MODELDIR}/simple ${GRPC_TEST_MODELDIR}/
-cp -r ../python_models/string_identity ${GRPC_TEST_MODELDIR}/string_identity
-mkdir -p ${GRPC_TEST_MODELDIR}/string_identity/1
-mv ${GRPC_TEST_MODELDIR}/string_identity/model.py ${GRPC_TEST_MODELDIR}/string_identity/1/model.py
-sed -i "s/dims: \[ 1 \]/dims: [ -1 ]/g" ${GRPC_TEST_MODELDIR}/string_identity/config.pbtxt
-
 rm -f *.log
 rm -f *.log.*
 
 set -e
 
 CLIENT_LOG=`pwd`/client.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --allow-client-shm=true"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 source ../common/util.sh
 
 run_server
@@ -217,19 +205,19 @@ for i in \
         EXTRA_ARGS="-i grpc -u localhost:8001"
     fi
     if [[ ($SUFFIX == "image_client") || ($SUFFIX == "grpc_image_client") ]]; then
-        python $i -m densenet_onnx -s INCEPTION -a -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.async.${SUFFIX}" 2>&1
+        python $i -m inception_onnx -s INCEPTION -a -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.async.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.async.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.async.${SUFFIX}
             RET=1
         fi
-        python $i -m densenet_onnx -s INCEPTION -a --streaming -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.streaming.${SUFFIX}" 2>&1
+        python $i -m inception_onnx -s INCEPTION -a --streaming -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.streaming.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.streaming.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.streaming.${SUFFIX}
             RET=1
         fi
-        python $i -m densenet_onnx -s INCEPTION -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
+        python $i -m inception_onnx -s INCEPTION -c 1 -b 1 $EXTRA_ARGS $IMAGE >> "${CLIENT_LOG}.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.${SUFFIX}
@@ -282,19 +270,19 @@ for i in \
    BASE=$(basename -- $i)
    SUFFIX="${BASE%.*}"
     if [[ $SUFFIX == "image_client" ]]; then
-        $i -m densenet_onnx -s INCEPTION -a -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.async.${SUFFIX}" 2>&1
+        $i -m inception_onnx -s INCEPTION -a -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.async.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.c++.async.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.c++.${SUFFIX}
             RET=1
         fi
-        $i -m densenet_onnx -s INCEPTION -a --streaming -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.streaming.${SUFFIX}" 2>&1
+        $i -m inception_onnx -s INCEPTION -a --streaming -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.streaming.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.c++.streaming.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.c++.${SUFFIX}
             RET=1
         fi
-        $i -m densenet_onnx -s INCEPTION -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.${SUFFIX}" 2>&1
+        $i -m inception_onnx -s INCEPTION -c 1 -b 1 -i grpc -u localhost:8001 $IMAGE >> "${CLIENT_LOG}.c++.${SUFFIX}" 2>&1
         if [ `grep -c VULTURE ${CLIENT_LOG}.c++.${SUFFIX}` != "1" ]; then
             echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
             cat $CLIENT_LOG.c++.${SUFFIX}
@@ -358,29 +346,6 @@ done
 $SIMPLE_REUSE_INFER_OBJECTS_CLIENT -v -i grpc -u localhost:8001 >> ${CLIENT_LOG}.c++.reuse 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.c++.reuse
-    RET=1
-fi
-
-set -e
-kill $SERVER_PID
-wait $SERVER_PID
-
-# Test duplicate output and bytes_contents
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${GRPC_TEST_MODELDIR}"
-SERVER_LOG=./inference_server_grpc_test.log
-GRPC_TEST_CLIENT_LOG=./inference_client_grpc_test.log
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-python $PYTHON_UNIT_TEST GrpcTest >> $GRPC_TEST_CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $GRPC_TEST_CLIENT_LOG
-    echo -e "\n***\n*** Python GRPC Test Failed\n***"
     RET=1
 fi
 
@@ -604,7 +569,7 @@ done
 # Run python grpc aio unit test
 PYTHON_GRPC_AIO_TEST=python_grpc_aio_test.py
 CLIENT_LOG=`pwd`/python_grpc_aio_test.log
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --allow-client-shm=true"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

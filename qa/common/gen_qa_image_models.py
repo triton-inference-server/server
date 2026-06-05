@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -99,8 +99,7 @@ def export_vgg19(models_dir, model_name="model.onnx"):
     model.eval()
     dummy_input = torch.randn(1, 3, 224, 224)  # (batch, channels, height, width)
 
-    # Use legacy TorchScript-based ONNX export
-    # TODO: Update to use new torch.export-based ONNX exporter (default dynamo=True)
+    # Export the model to ONNX format
     torch.onnx.export(
         model,
         dummy_input,
@@ -108,7 +107,6 @@ def export_vgg19(models_dir, model_name="model.onnx"):
         input_names=["input"],
         output_names=["output"],
         dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
-        dynamo=False,
     )
 
     print(f"VGG19 model exported to: {model_path}")
@@ -131,8 +129,7 @@ def export_resnet152(models_dir, model_name="model.onnx"):
     model.eval()
     dummy_input = torch.randn(1, 3, 224, 224)  # (batch, channels, height, width)
 
-    # Use legacy TorchScript-based ONNX export
-    # TODO: Update to use new torch.export-based ONNX exporter (default dynamo=True)
+    # Export the model to ONNX format
     torch.onnx.export(
         model,
         dummy_input,
@@ -140,7 +137,6 @@ def export_resnet152(models_dir, model_name="model.onnx"):
         input_names=["input"],
         output_names=["output"],
         dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
-        dynamo=False,
     )
 
     print(f"ResNet-152 model exported to: {model_path}")
@@ -163,8 +159,7 @@ def export_resnet50(models_dir, model_name="model.onnx"):
     model.eval()
     dummy_input = torch.randn(1, 3, 224, 224)  # (batch, channels, height, width)
 
-    # Use legacy TorchScript-based ONNX export
-    # TODO: Update to use new torch.export-based ONNX exporter (default dynamo=True)
+    # Export the model to ONNX format
     torch.onnx.export(
         model,
         dummy_input,
@@ -172,7 +167,6 @@ def export_resnet50(models_dir, model_name="model.onnx"):
         input_names=["input"],
         output_names=["output"],
         dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
-        dynamo=False,
     )
 
     print(f"ResNet-50 model exported to: {model_path}")

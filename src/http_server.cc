@@ -1,4 +1,4 @@
-// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -31,14 +31,15 @@
 #include "http_server.h"
 
 #include <event2/buffer.h>
-#include <event2/bufferevent.h>
 #include <re2/re2.h>
 
 #include <algorithm>
-#include <cstdlib>
 #include <list>
+#include <memory>
+#include <mutex>
 #include <regex>
 #include <thread>
+#include <vector>
 
 #include "classification.h"
 
@@ -49,11 +50,6 @@
 #include "triton/common/triton_json.h"
 
 namespace triton { namespace server {
-
-// Transfer-Encoding: chunked — count non-empty chunks per request (worker
-// thread). Increment in ChunkCountIncrement. Caps evbuffer fan-out / RSS.
-constexpr uint64_t kMaxChunkedChunks =
-    1 << 16;  // reject on chunk count > kMaxChunkedChunks (65536)
 
 #define RETURN_AND_CALLBACK_IF_ERR(X, CALLBACK) \
   do {                                          \
@@ -296,43 +292,8 @@ HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
     server->conn_cnt_++;
   }
   evhtp_connection_set_hook(
-      conn, evhtp_hook_on_new_chunk,
-      (evhtp_hook)(void*)HTTPServer::ChunkCountIncrement, arg);
-  evhtp_connection_set_hook(
       conn, evhtp_hook_on_connection_fini,
       (evhtp_hook)(void*)HTTPServer::EndConnection, arg);
-  return EVHTP_RES_OK;
-}
-
-evhtp_res
-HTTPServer::ChunkCountIncrement(
-    evhtp_request_t* req, uint64_t chunk_len, void* arg)
-{
-  (void)arg;
-  if ((req->flags & EVHTP_REQ_FLAG_FINISHED) != 0) {
-    return EVHTP_RES_OK;
-  }
-
-  if (chunk_len == 0) {
-    return EVHTP_RES_OK;
-  }
-  if (++req->chunk_count > kMaxChunkedChunks) {
-    AddContentTypeHeader(req, "application/json");
-    const std::string msg =
-        std::string("Chunked request body exceeds maximum of ") +
-        std::to_string(kMaxChunkedChunks) +
-        " non-empty chunks. Send fewer or larger HTTP chunks.";
-    EVBufferAddErrorJson(req->buffer_out, msg.c_str());
-    // Force connection close after flushing this error response.
-    req->flags &= ~EVHTP_REQ_FLAG_KEEPALIVE;
-    if ((req->conn != nullptr) && (req->conn->bev != nullptr)) {
-      // Stop ingesting request bytes once over limit so memory won't keep
-      // growing while we flush the error response.
-      bufferevent_disable(req->conn->bev, EV_READ);
-    }
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return EVHTP_RES_OK;
-  }
   return EVHTP_RES_OK;
 }
 
@@ -479,18 +440,8 @@ AllocEVBuffer(const size_t byte_size, evbuffer** evb, void** base)
 // Recursively adds to byte_size from multi dimensional data input
 TRITONSERVER_Error*
 JsonBytesArrayByteSize(
-    triton::common::TritonJson::Value& tensor_data, size_t* byte_size,
-    int current_depth = 0)
+    triton::common::TritonJson::Value& tensor_data, size_t* byte_size)
 {
-  if (current_depth >= HTTP_MAX_JSON_NESTING_DEPTH) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        ("JSON nesting depth exceeds maximum allowed "
-         "limit (" +
-         std::to_string(HTTP_MAX_JSON_NESTING_DEPTH) + ")")
-            .c_str());
-  }
-
   *byte_size = 0;
   // Recurse if not last dimension...
   if (tensor_data.IsArray()) {
@@ -498,7 +449,7 @@ JsonBytesArrayByteSize(
       triton::common::TritonJson::Value el;
       RETURN_IF_ERR(tensor_data.At(i, &el));
       size_t byte_size_;
-      RETURN_IF_ERR(JsonBytesArrayByteSize(el, &byte_size_, current_depth + 1));
+      RETURN_IF_ERR(JsonBytesArrayByteSize(el, &byte_size_));
       *byte_size += byte_size_;
     }
   } else {
@@ -518,42 +469,24 @@ TRITONSERVER_Error*
 ReadDataFromJsonHelper(
     char* base, const TRITONSERVER_DataType dtype,
     triton::common::TritonJson::Value& tensor_data, int* counter,
-    int64_t expected_cnt, int current_depth = 0)
+    int64_t expected_cnt)
 {
-  if (!base) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL,
-        "Failed to parse 'data' field: output buffer unavailable");
-  }
   // FIXME should move 'switch' statement outside the recursive function and
   // pass in a read data callback once data type is confirmed.
   // Currently 'switch' is performed on each element even through all elements
   // have the same data type.
-
-  if (current_depth >= HTTP_MAX_JSON_NESTING_DEPTH || current_depth < 0) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        ("JSON nesting depth exceeds maximum allowed "
-         "limit (" +
-         std::to_string(HTTP_MAX_JSON_NESTING_DEPTH) + ")")
-            .c_str());
-  }
 
   // Recurse on array element if not last dimension...
   if (tensor_data.IsArray()) {
     for (size_t i = 0; i < tensor_data.ArraySize(); i++) {
       triton::common::TritonJson::Value el;
       RETURN_IF_ERR(tensor_data.At(i, &el));
-      RETURN_IF_ERR(ReadDataFromJsonHelper(
-          base, dtype, el, counter, expected_cnt, current_depth + 1));
+      RETURN_IF_ERR(
+          ReadDataFromJsonHelper(base, dtype, el, counter, expected_cnt));
     }
   } else {
-    if (!counter) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL, "Invalid counter provided");
-    }
     // Check if writing to 'serialized' is overrunning the expected byte_size
-    if (*counter < 0 || static_cast<int64_t>(*counter) >= expected_cnt) {
+    if (*counter >= expected_cnt) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
           "Shape does not match true shape of 'data' field");
@@ -654,22 +587,14 @@ ReadDataFromJsonHelper(
         break;
       }
       case TRITONSERVER_TYPE_BYTES: {
-        const char* cstr{nullptr};
-        size_t len{0};
+        const char* cstr;
+        size_t len = 0;
         RETURN_IF_ERR(tensor_data.AsString(&cstr, &len));
-        if (len > INT64_MAX) {
+        if (static_cast<int64_t>(*counter + len + sizeof(uint32_t)) >
+            expected_cnt) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
-              "Tensor size is too large to be processed");
-        }
-        // Quick sanity check to ensure we don't write beyond `expected_cnt`.
-        int64_t actual_cnt = static_cast<int64_t>(*counter) +
-                             static_cast<int64_t>(len) +
-                             static_cast<int64_t>(sizeof(uint32_t));
-        if (actual_cnt < 0 || actual_cnt > expected_cnt) {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INTERNAL,
-              "shape does not match true shape of 'data' field");
+              "Shape does not match true shape of 'data' field");
         }
         memcpy(
             base + *counter, reinterpret_cast<char*>(&len), sizeof(uint32_t));
@@ -719,11 +644,6 @@ ReadDataFromJson(
               .c_str());
 
     default:
-      if (!base) {
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INTERNAL,
-            "Failed to parse 'data' field: output buffer unavailable");
-      }
       RETURN_MSG_IF_ERR(
           ReadDataFromJsonHelper(
               base, dtype, tensor_data, &counter, expected_cnt),
@@ -735,7 +655,8 @@ ReadDataFromJson(
   if (counter != expected_cnt) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
-        "Failed to parse 'data' field: shape does not match true shape");
+        "Unable to parse 'data': Shape does not match true shape of 'data' "
+        "field");
   }
 
   return nullptr;
@@ -750,8 +671,7 @@ WriteDataToJsonCheck(
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
         std::string(
-            "Failed to write 'data' field: output tensor shape does not match "
-            "size of output for '" +
+            "output tensor shape does not match size of output for '" +
             output_name + "'")
             .c_str());
   }
@@ -772,8 +692,7 @@ WriteDataToJson(
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INTERNAL,
             std::string(
-                "Failed to write 'data' field: output tensor shape does not "
-                "match size of output for '" +
+                "output tensor shape does not match size of output for '" +
                 output_name + "'")
                 .c_str());
       }
@@ -1118,6 +1037,62 @@ ValidateOutputParameter(triton::common::TritonJson::Value& io)
   return nullptr;  // success
 }
 
+TRITONSERVER_Error*
+EVBufferToJson(
+    triton::common::TritonJson::Value* document, evbuffer_iovec* v, int* v_idx,
+    const size_t length, int n)
+{
+  size_t offset = 0, remaining_length = length;
+  char* json_base;
+  std::vector<char> json_buffer;
+
+  // No need to memcpy when number of iovecs is 1
+  if ((n > 0) && (v[0].iov_len >= remaining_length)) {
+    json_base = static_cast<char*>(v[0].iov_base);
+    if (v[0].iov_len > remaining_length) {
+      v[0].iov_base = static_cast<void*>(json_base + remaining_length);
+      v[0].iov_len -= remaining_length;
+      remaining_length = 0;
+    } else if (v[0].iov_len == remaining_length) {
+      remaining_length = 0;
+      *v_idx += 1;
+    }
+  } else {
+    json_buffer.resize(length);
+    json_base = json_buffer.data();
+    while ((remaining_length > 0) && (*v_idx < n)) {
+      char* base = static_cast<char*>(v[*v_idx].iov_base);
+      size_t base_size;
+      if (v[*v_idx].iov_len > remaining_length) {
+        base_size = remaining_length;
+        v[*v_idx].iov_base = static_cast<void*>(base + remaining_length);
+        v[*v_idx].iov_len -= remaining_length;
+        remaining_length = 0;
+      } else {
+        base_size = v[*v_idx].iov_len;
+        remaining_length -= v[*v_idx].iov_len;
+        *v_idx += 1;
+      }
+
+      memcpy(json_base + offset, base, base_size);
+      offset += base_size;
+    }
+  }
+
+  if (remaining_length != 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "unexpected size for request JSON, expecting " +
+            std::to_string(remaining_length) + " more bytes")
+            .c_str());
+  }
+
+  RETURN_IF_ERR(document->Parse(json_base, length));
+
+  return nullptr;  // success
+}
+
 std::string
 CompressionTypeUsed(const std::string accept_encoding)
 {
@@ -1150,12 +1125,7 @@ CompressionTypeUsed(const std::string accept_encoding)
       try {
         type_weight = std::stod(encoding.substr(weight_pos + 3));
       }
-      catch (const std::out_of_range& oor) {
-        type_weight = 0;
-        continue;
-      }
       catch (const std::invalid_argument& ia) {
-        type_weight = 0;
         continue;
       }
     }
@@ -1176,7 +1146,7 @@ HTTPAPIServer::HTTPAPIServer(
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const bool reuse_port, const std::string& address,
     const std::string& header_forward_pattern, const int thread_cnt,
-    const size_t max_input_size, const RestrictedFeatures& restricted_apis)
+    const RestrictedFeatures& restricted_apis)
     : HTTPServer(port, reuse_port, address, header_forward_pattern, thread_cnt),
       server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
@@ -1188,8 +1158,7 @@ HTTPAPIServer::HTTPAPIServer(
           R"(/v2/systemsharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
       cudasharedmemory_regex_(
           R"(/v2/cudasharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
-      trace_regex_(R"(/v2/trace/setting)"), max_input_size_(max_input_size),
-      restricted_apis_(restricted_apis)
+      trace_regex_(R"(/v2/trace/setting)"), restricted_apis_(restricted_apis)
 {
   // FIXME, don't cache server metadata. The http endpoint should
   // not be deciding that server metadata will not change during
@@ -1446,21 +1415,33 @@ HTTPAPIServer::HandleRepositoryIndex(
   }
 
   TRITONSERVER_Error* err = nullptr;
-  triton::common::TritonJson::Value index_request;
-  bool ready = false;
-  size_t buffer_len = 0;
-  RETURN_AND_RESPOND_IF_ERR(
-      req, EVRequestToJson(req, "registry index", &index_request, &buffer_len));
 
-  if (buffer_len > 0) {
-    triton::common::TritonJson::Value ready_json;
-    if (index_request.Find("ready", &ready_json)) {
-      if (!ready_json.IsBool()) {
-        err = TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            "Invalid value for 'ready': expected a boolean");
-      } else {
-        err = ready_json.AsBool(&ready);
+  struct evbuffer_iovec* v = nullptr;
+  int v_idx = 0;
+  int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+  if (n > 0) {
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
+    if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL,
+          "unexpected error getting registry index request body");
+    }
+  }
+
+  bool ready = false;
+
+  if (err == nullptr) {
+    // If no request json then just use all default values.
+    size_t buffer_len = evbuffer_get_length(req->buffer_in);
+    if (buffer_len > 0) {
+      triton::common::TritonJson::Value index_request;
+      err = EVBufferToJson(&index_request, v, &v_idx, buffer_len, n);
+      if (err == nullptr) {
+        triton::common::TritonJson::Value ready_json;
+        if (index_request.Find("ready", &ready_json)) {
+          err = ready_json.AsBool(&ready);
+        }
       }
     }
   }
@@ -1510,6 +1491,19 @@ HTTPAPIServer::HandleRepositoryControl(
         "'repository_name' specification is not supported");
   } else {
     if (action == "load") {
+      struct evbuffer_iovec* v = nullptr;
+      int v_idx = 0;
+      int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+      if (n > 0) {
+        v = static_cast<struct evbuffer_iovec*>(
+            alloca(sizeof(struct evbuffer_iovec) * n));
+        if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+          RETURN_AND_RESPOND_IF_ERR(
+              req, TRITONSERVER_ErrorNew(
+                       TRITONSERVER_ERROR_INTERNAL,
+                       "unexpected error getting load model request buffers"));
+        }
+      }
       static auto param_deleter =
           [](std::vector<TRITONSERVER_Parameter*>* params) {
             if (params != nullptr) {
@@ -1527,15 +1521,15 @@ HTTPAPIServer::HandleRepositoryControl(
       std::list<std::vector<char>> binary_files;
       // WAR for the const-ness check
       std::vector<const TRITONSERVER_Parameter*> const_params;
-      triton::common::TritonJson::Value load_request;
-      size_t buffer_len = 0;
-      RETURN_AND_RESPOND_IF_ERR(
-          req, EVRequestToJson(req, "load model", &load_request, &buffer_len));
-
+      size_t buffer_len = evbuffer_get_length(req->buffer_in);
       if (buffer_len > 0) {
+        triton::common::TritonJson::Value request;
+        RETURN_AND_RESPOND_IF_ERR(
+            req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
+
         // Parse request body for parameters
         triton::common::TritonJson::Value param_json;
-        if (load_request.Find("parameters", &param_json)) {
+        if (request.Find("parameters", &param_json)) {
           // Iterate over each member in 'param_json'
           std::vector<std::string> members;
           RETURN_AND_RESPOND_IF_ERR(req, param_json.Members(&members));
@@ -1581,25 +1575,37 @@ HTTPAPIServer::HandleRepositoryControl(
       // Check if the dependent models should be removed
       bool unload_dependents = false;
       {
-        triton::common::TritonJson::Value control_request;
-        size_t buffer_len = 0;
-        RETURN_AND_RESPOND_IF_ERR(
-            req, EVRequestToJson(
-                     req, "unload model", &control_request, &buffer_len));
+        struct evbuffer_iovec* v = nullptr;
+        int v_idx = 0;
+        int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+        if (n > 0) {
+          v = static_cast<struct evbuffer_iovec*>(
+              alloca(sizeof(struct evbuffer_iovec) * n));
+          if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                "unexpected error getting model control request body");
+          }
+        }
 
+        size_t buffer_len = evbuffer_get_length(req->buffer_in);
         if (buffer_len > 0) {
-          triton::common::TritonJson::Value params_json;
-          if (control_request.Find("parameters", &params_json)) {
-            triton::common::TritonJson::Value ud_json;
-            if (params_json.Find("unload_dependents", &ud_json)) {
-              auto parse_err = ud_json.AsBool(&unload_dependents);
-              if (parse_err != nullptr) {
-                err = TRITONSERVER_ErrorNew(
-                    TRITONSERVER_ErrorCode(parse_err),
-                    (std::string("Unable to parse 'unload_dependents': ") +
-                     TRITONSERVER_ErrorMessage(parse_err))
-                        .c_str());
-                TRITONSERVER_ErrorDelete(parse_err);
+          triton::common::TritonJson::Value control_request;
+          err = EVBufferToJson(&control_request, v, &v_idx, buffer_len, n);
+          if (err == nullptr) {
+            triton::common::TritonJson::Value params_json;
+            if (control_request.Find("parameters", &params_json)) {
+              triton::common::TritonJson::Value ud_json;
+              if (params_json.Find("unload_dependents", &ud_json)) {
+                auto parse_err = ud_json.AsBool(&unload_dependents);
+                if (parse_err != nullptr) {
+                  err = TRITONSERVER_ErrorNew(
+                      TRITONSERVER_ErrorCode(parse_err),
+                      (std::string("Unable to parse 'unload_dependents': ") +
+                       TRITONSERVER_ErrorMessage(parse_err))
+                          .c_str());
+                  TRITONSERVER_ErrorDelete(parse_err);
+                }
               }
             }
           }
@@ -1845,27 +1851,42 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 
   // Perform trace setting update if requested
   if (req->method == htp_method_POST) {
-    triton::common::TritonJson::Value trace_request;
+    struct evbuffer_iovec* v = nullptr;
+    int v_idx = 0;
+    int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+    if (n > 0) {
+      v = static_cast<struct evbuffer_iovec*>(
+          alloca(sizeof(struct evbuffer_iovec) * n));
+      if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+        RETURN_AND_RESPOND_IF_ERR(
+            req, TRITONSERVER_ErrorNew(
+                     TRITONSERVER_ERROR_INTERNAL,
+                     "unexpected error getting trace request buffers"));
+      }
+    }
+
+    triton::common::TritonJson::Value request;
+    size_t buffer_len = evbuffer_get_length(req->buffer_in);
     RETURN_AND_RESPOND_IF_ERR(
-        req, EVRequestToJsonAllowsEmpty(req, "trace", &trace_request));
+        req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
 
     TraceManager::NewSetting new_setting;
 
     triton::common::TritonJson::Value setting_json;
-    if (trace_request.Find("trace_file", &setting_json)) {
+    if (request.Find("trace_file", &setting_json)) {
       RETURN_AND_RESPOND_IF_ERR(
           req, TRITONSERVER_ErrorNew(
                    TRITONSERVER_ERROR_UNSUPPORTED,
                    "trace file location can not be updated through network "
                    "protocol"));
     }
-    if (trace_request.Find("trace_level", &setting_json)) {
+    if (request.Find("trace_level", &setting_json)) {
       if (setting_json.IsNull()) {
         new_setting.clear_level_ = true;
       } else {
         triton::common::TritonJson::Value level_array;
         RETURN_AND_RESPOND_IF_ERR(
-            req, trace_request.MemberAsArray("trace_level", &level_array));
+            req, request.MemberAsArray("trace_level", &level_array));
         for (size_t i = 0; i < level_array.ArraySize(); ++i) {
           std::string level_str;
           RETURN_AND_RESPOND_IF_ERR(
@@ -1892,7 +1913,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
         }
       }
     }
-    if (trace_request.Find("trace_rate", &setting_json)) {
+    if (request.Find("trace_rate", &setting_json)) {
       if (setting_json.IsNull()) {
         new_setting.clear_rate_ = true;
       } else {
@@ -1925,7 +1946,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
         }
       }
     }
-    if (trace_request.Find("trace_count", &setting_json)) {
+    if (request.Find("trace_count", &setting_json)) {
       if (setting_json.IsNull()) {
         new_setting.clear_count_ = true;
       } else {
@@ -1967,7 +1988,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
         }
       }
     }
-    if (trace_request.Find("log_frequency", &setting_json)) {
+    if (request.Find("log_frequency", &setting_json)) {
       if (setting_json.IsNull()) {
         new_setting.clear_log_frequency_ = true;
       } else {
@@ -2090,13 +2111,28 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
 #ifdef TRITON_ENABLE_LOGGING
   // Perform log setting update if requested
   if (req->method == htp_method_POST) {
-    triton::common::TritonJson::Value log_request;
+    struct evbuffer_iovec* v = nullptr;
+    int v_idx = 0;
+    int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+    if (n > 0) {
+      v = static_cast<struct evbuffer_iovec*>(
+          alloca(sizeof(struct evbuffer_iovec) * n));
+      if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+        RETURN_AND_RESPOND_IF_ERR(
+            req,
+            TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                "unexpected error getting dynamic logging request buffers"));
+      }
+    }
+    triton::common::TritonJson::Value request;
+    size_t buffer_len = evbuffer_get_length(req->buffer_in);
     RETURN_AND_RESPOND_IF_ERR(
-        req, EVRequestToJsonAllowsEmpty(req, "dynamic logging", &log_request));
+        req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
     // Server and Core repos do not have the same Logger object
     // Each update must be applied to both server and core repo versions
     triton::common::TritonJson::Value setting_json;
-    if (log_request.Find("log_file", &setting_json)) {
+    if (request.Find("log_file", &setting_json)) {
       if (!setting_json.IsNull()) {
         RETURN_AND_RESPOND_IF_ERR(
             req, TRITONSERVER_ErrorNew(
@@ -2105,7 +2141,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
                      "protocol"));
       }
     }
-    if (log_request.Find("log_info", &setting_json)) {
+    if (request.Find("log_info", &setting_json)) {
       if (!setting_json.IsNull()) {
         bool log_info_status;
         RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsBool(&log_info_status));
@@ -2113,7 +2149,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         TRITONSERVER_ServerOptionsSetLogInfo(nullptr, log_info_status);
       }
     }
-    if (log_request.Find("log_warning", &setting_json)) {
+    if (request.Find("log_warning", &setting_json)) {
       if (!setting_json.IsNull()) {
         bool log_warn_status;
         RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsBool(&log_warn_status));
@@ -2121,7 +2157,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         TRITONSERVER_ServerOptionsSetLogWarn(nullptr, log_warn_status);
       }
     }
-    if (log_request.Find("log_error", &setting_json)) {
+    if (request.Find("log_error", &setting_json)) {
       if (!setting_json.IsNull()) {
         bool log_error_status;
         RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsBool(&log_error_status));
@@ -2129,7 +2165,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         TRITONSERVER_ServerOptionsSetLogError(nullptr, log_error_status);
       }
     }
-    if (log_request.Find("log_verbose_level", &setting_json)) {
+    if (request.Find("log_verbose_level", &setting_json)) {
       if (!setting_json.IsNull()) {
         uint64_t verbose_level;
         RETURN_AND_RESPOND_IF_ERR(req, setting_json.AsUInt(&verbose_level));
@@ -2138,7 +2174,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
             nullptr, static_cast<int32_t>(verbose_level));
       }
     }
-    if (log_request.Find("log_format", &setting_json)) {
+    if (request.Find("log_format", &setting_json)) {
       if (!setting_json.IsNull()) {
         std::string log_format_parse;
         RETURN_AND_RESPOND_IF_ERR(
@@ -2252,60 +2288,71 @@ HTTPAPIServer::HandleSystemSharedMemory(
       }
     }
   } else if (action == "register") {
-    if (!shm_manager_->AllowClientSharedMemory()) {
-      err = TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
-    } else if (region_name.empty()) {
+    if (region_name.empty()) {
       err = TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           "'region name' is necessary to register system shared memory region");
     } else {
-      triton::common::TritonJson::Value register_request;
-      triton::common::TritonJson::Value key_json;
-      RETURN_AND_RESPOND_IF_ERR(
-          req, EVRequestToJsonAllowsEmpty(req, action, &register_request));
-      if (!register_request.Find("key", &key_json)) {
-        err = TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            "Shared memory register request has no 'key' field");
-      }
-
-      const char* shm_key = nullptr;
-      if (err == nullptr) {
-        size_t shm_key_len;
-        err = key_json.AsString(&shm_key, &shm_key_len);
-      }
-
-      uint64_t offset = 0;
-      if (err == nullptr) {
-        triton::common::TritonJson::Value offset_json;
-        if (register_request.Find("offset", &offset_json)) {
-          err = offset_json.AsUInt(&offset);
-        }
-      }
-
-      uint64_t byte_size = 0;
-      if (err == nullptr) {
-        triton::common::TritonJson::Value byte_size_json;
-        if (!register_request.Find("byte_size", &byte_size_json)) {
+      struct evbuffer_iovec* v = nullptr;
+      int v_idx = 0;
+      int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+      if (n > 0) {
+        v = static_cast<struct evbuffer_iovec*>(
+            alloca(sizeof(struct evbuffer_iovec) * n));
+        if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
           err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INVALID_ARG,
-              "Shared memory register request has no 'byte_size' field");
-        } else {
-          err = byte_size_json.AsUInt(&byte_size);
+              TRITONSERVER_ERROR_INTERNAL,
+              "unexpected error getting register request buffers");
         }
       }
 
       if (err == nullptr) {
-        err = shm_manager_->RegisterSystemSharedMemory(
-            region_name, shm_key, offset, byte_size);
+        triton::common::TritonJson::Value register_request;
+        size_t buffer_len = evbuffer_get_length(req->buffer_in);
+        err = EVBufferToJson(&register_request, v, &v_idx, buffer_len, n);
+        if (err == nullptr) {
+          triton::common::TritonJson::Value key_json;
+          if (!register_request.Find("key", &key_json)) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "Shared memory register request has no 'key' field");
+          }
+
+          const char* shm_key = nullptr;
+          if (err == nullptr) {
+            size_t shm_key_len;
+            err = key_json.AsString(&shm_key, &shm_key_len);
+          }
+
+          uint64_t offset = 0;
+          if (err == nullptr) {
+            triton::common::TritonJson::Value offset_json;
+            if (register_request.Find("offset", &offset_json)) {
+              err = offset_json.AsUInt(&offset);
+            }
+          }
+
+          uint64_t byte_size = 0;
+          if (err == nullptr) {
+            triton::common::TritonJson::Value byte_size_json;
+            if (!register_request.Find("byte_size", &byte_size_json)) {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  "Shared memory register request has no 'byte_size' field");
+            } else {
+              err = byte_size_json.AsUInt(&byte_size);
+            }
+          }
+
+          if (err == nullptr) {
+            err = shm_manager_->RegisterSystemSharedMemory(
+                region_name, shm_key, offset, byte_size);
+          }
+        }
       }
     }
   } else if (action == "unregister") {
-    if (!shm_manager_->AllowClientSharedMemory()) {
-      err = TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
-    } else if (region_name.empty()) {
+    if (region_name.empty()) {
       err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_CPU);
     } else {
       err = shm_manager_->Unregister(region_name, TRITONSERVER_MEMORY_CPU);
@@ -2347,59 +2394,73 @@ HTTPAPIServer::HandleCudaSharedMemory(
       }
     }
   } else if (action == "register") {
-    if (!shm_manager_->AllowClientSharedMemory()) {
-      err = TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
-    } else if (region_name.empty()) {
+    if (region_name.empty()) {
       err = TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           "'region name' is necessary to register cuda shared memory region");
     } else {
 #ifdef TRITON_ENABLE_GPU
-      triton::common::TritonJson::Value register_request;
-      RETURN_AND_RESPOND_IF_ERR(
-          req, EVRequestToJsonAllowsEmpty(req, action, &register_request));
-      const char* b64_handle = nullptr;
-      size_t b64_handle_len = 0;
-      triton::common::TritonJson::Value raw_handle_json;
-      if (!register_request.Find("raw_handle", &raw_handle_json)) {
-        err = TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            "Shared memory register request has no 'raw_handle' field");
-      } else {
-        err =
-            raw_handle_json.MemberAsString("b64", &b64_handle, &b64_handle_len);
-      }
-
-      uint64_t byte_size = 0;
-      if (err == nullptr) {
-        err = register_request.MemberAsUInt("byte_size", &byte_size);
-      }
-
-      uint64_t device_id = 0;
-      if (err == nullptr) {
-        err = register_request.MemberAsUInt("device_id", &device_id);
-      }
-
-      if (err == nullptr) {
-        size_t decoded_size;
-        std::vector<char> raw_handle;
-        RETURN_AND_RESPOND_IF_ERR(
-            req, DecodeBase64(
-                     b64_handle, b64_handle_len, raw_handle, decoded_size,
-                     "raw_handle"));
-
-        if (decoded_size != sizeof(cudaIpcMemHandle_t)) {
+      struct evbuffer_iovec* v = nullptr;
+      int v_idx = 0;
+      int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+      if (n > 0) {
+        v = static_cast<struct evbuffer_iovec*>(
+            alloca(sizeof(struct evbuffer_iovec) * n));
+        if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
           err = TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INVALID_ARG,
-              "'raw_handle' must be a valid base64 encoded "
-              "cudaIpcMemHandle_t");
-        } else {
-          raw_handle.resize(sizeof(cudaIpcMemHandle_t));
-          err = shm_manager_->RegisterCUDASharedMemory(
-              region_name.c_str(),
-              reinterpret_cast<const cudaIpcMemHandle_t*>(raw_handle.data()),
-              byte_size, device_id);
+              TRITONSERVER_ERROR_INTERNAL,
+              "unexpected error getting register request buffers");
+        }
+      }
+      if (err == nullptr) {
+        triton::common::TritonJson::Value register_request;
+        size_t buffer_len = evbuffer_get_length(req->buffer_in);
+        err = EVBufferToJson(&register_request, v, &v_idx, buffer_len, n);
+        if (err == nullptr) {
+          const char* b64_handle = nullptr;
+          size_t b64_handle_len = 0;
+          triton::common::TritonJson::Value raw_handle_json;
+          if (!register_request.Find("raw_handle", &raw_handle_json)) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "Shared memory register request has no 'raw_handle' field");
+          } else {
+            err = raw_handle_json.MemberAsString(
+                "b64", &b64_handle, &b64_handle_len);
+          }
+
+          uint64_t byte_size = 0;
+          if (err == nullptr) {
+            err = register_request.MemberAsUInt("byte_size", &byte_size);
+          }
+
+          uint64_t device_id = 0;
+          if (err == nullptr) {
+            err = register_request.MemberAsUInt("device_id", &device_id);
+          }
+
+          if (err == nullptr) {
+            size_t decoded_size;
+            std::vector<char> raw_handle;
+            RETURN_AND_RESPOND_IF_ERR(
+                req, DecodeBase64(
+                         b64_handle, b64_handle_len, raw_handle, decoded_size,
+                         "raw_handle"));
+
+            if (decoded_size != sizeof(cudaIpcMemHandle_t)) {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  "'raw_handle' must be a valid base64 encoded "
+                  "cudaIpcMemHandle_t");
+            } else {
+              raw_handle.resize(sizeof(cudaIpcMemHandle_t));
+              err = shm_manager_->RegisterCUDASharedMemory(
+                  region_name.c_str(),
+                  reinterpret_cast<const cudaIpcMemHandle_t*>(
+                      raw_handle.data()),
+                  byte_size, device_id);
+            }
+          }
         }
       }
 #else
@@ -2412,10 +2473,7 @@ HTTPAPIServer::HandleCudaSharedMemory(
 #endif  // TRITON_ENABLE_GPU
     }
   } else if (action == "unregister") {
-    if (!shm_manager_->AllowClientSharedMemory()) {
-      err = TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
-    } else if (region_name.empty()) {
+    if (region_name.empty()) {
       err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_GPU);
     } else {
       err = shm_manager_->Unregister(region_name, TRITONSERVER_MEMORY_GPU);
@@ -2440,23 +2498,13 @@ HTTPAPIServer::GetContentLength(
         evhtp_kv_find(req->headers_in, kContentLengthHeader);
     if (content_length_c_str != nullptr) {
       try {
-        lcontent_length = std::stoi(content_length_c_str);
+        lcontent_length = std::atoi(content_length_c_str);
       }
       catch (const std::invalid_argument& ia) {
         err = TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             (std::string("Unable to parse ") + kContentLengthHeader +
              ", got: " + content_length_c_str)
-                .c_str());
-      }
-      catch (const std::out_of_range& oor) {
-        err = TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            (std::string("Unable to parse ") + kContentLengthHeader +
-             ", value is out of range [ " +
-             std::to_string(std::numeric_limits<std::int32_t>::min()) + ", " +
-             std::to_string(std::numeric_limits<std::int32_t>::max()) +
-             " ], got: " + content_length_c_str)
                 .c_str());
       }
     }
@@ -2484,7 +2532,7 @@ HTTPAPIServer::GetInferenceHeaderLength(
   if (header_length_c_str != NULL) {
     int parsed_value;
     try {
-      parsed_value = std::stoi(header_length_c_str);
+      parsed_value = std::atoi(header_length_c_str);
     }
     catch (const std::invalid_argument& ia) {
       return TRITONSERVER_ErrorNew(
@@ -2691,29 +2739,12 @@ HTTPAPIServer::ParseJsonTritonIO(
       } else {
         const int64_t element_cnt = GetElementCount(shape_vec);
 
+        // FIXME, element count should never be 0 or negative so
+        // shouldn't we just return an error here?
         if (element_cnt == 0) {
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
               irequest, input_name, nullptr, 0 /* byte_size */,
               TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
-        } else if (element_cnt == -2) {
-          // -2 indicates invalid dimension
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INVALID_ARG,
-              std::string(
-                  "invalid shape for input '" + std::string(input_name) +
-                  "': shape " + ShapeToString(shape_vec) +
-                  " contains one or more invalid dimensions")
-                  .c_str());
-        } else if (element_cnt == -3) {
-          // -3 indicates integer overflow
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INVALID_ARG,
-              std::string(
-                  "invalid shape for input '" + std::string(input_name) +
-                  "': shape " + ShapeToString(shape_vec) +
-                  " causes total element count to exceed maximum size of " +
-                  std::to_string(INT64_MAX))
-                  .c_str());
         } else {
           // JSON... presence of "data" already validated but still
           // checking here. Flow in this endpoint needs to be
@@ -2726,35 +2757,7 @@ HTTPAPIServer::ParseJsonTritonIO(
           if (dtype == TRITONSERVER_TYPE_BYTES) {
             RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
           } else {
-            const uint32_t type_byte_size =
-                TRITONSERVER_DataTypeByteSize(dtype);
-            if ((type_byte_size > 1) &&
-                (element_cnt > (INT64_MAX / type_byte_size))) {
-              return TRITONSERVER_ErrorNew(
-                  TRITONSERVER_ERROR_INVALID_ARG,
-                  std::string(
-                      "byte size overflow for input '" +
-                      std::string(input_name) + "': element count (" +
-                      std::to_string(element_cnt) + ") * data type size (" +
-                      std::to_string(type_byte_size) +
-                      ") exceeds maximum allowed size (" +
-                      std::to_string(INT64_MAX) + ")")
-                      .c_str());
-            }
-            byte_size = element_cnt * type_byte_size;
-          }
-
-          // Check if byte_size is larger than max_input_size_
-          if (byte_size > max_input_size_) {
-            return TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INVALID_ARG,
-                ("JSON input '" + std::string(input_name) +
-                 "' has a byte_size (" + std::to_string(byte_size) +
-                 " bytes) that exceeds the maximum allowed value "
-                 "of " +
-                 std::to_string(max_input_size_) +
-                 " bytes. Use --http-max-input-size to increase the limit.")
-                    .c_str());
+            byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
           }
 
           infer_req->serialized_data_.emplace_back();
@@ -2930,7 +2933,8 @@ HTTPAPIServer::ParseJsonTritonParams(
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             ("parameter keys starting with 'triton_' are reserved for Triton "
-             "usage and should not be specified."));
+             "usage "
+             "and should not be specified."));
       } else {
         RETURN_IF_ERR(SetTritonParameterFromJsonParameter(
             parameter, params_json, irequest));
@@ -2962,50 +2966,25 @@ HTTPAPIServer::ParseJsonTritonRequestID(
   return nullptr;  // Success
 }
 
+// TODO: Can refactor other non-inference routes to re-use this helper instead.
 TRITONSERVER_Error*
-HTTPAPIServer::EVRequestToJsonImpl(
-    evhtp_request_t* req, std::string_view request_kind, bool allows_empty_body,
-    triton::common::TritonJson::Value* request_json, size_t* buffer_len)
+HTTPAPIServer::EVRequestToJson(
+    evhtp_request_t* req, triton::common::TritonJson::Value* request_json_ptr)
 {
   struct evbuffer_iovec* v = nullptr;
   int v_idx = 0;
-  std::vector<struct evbuffer_iovec> v_vec;
-
   int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
   if (n > 0) {
-    try {
-      v_vec = std::vector<struct evbuffer_iovec>(n);
-    }
-    catch (const std::bad_alloc& e) {
-      // Handle memory allocation failure
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          (std::string("Memory allocation failed for evbuffer: ") + e.what())
-              .c_str());
-    }
-    catch (const std::exception& e) {
-      // Catch any other std exceptions
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL,
-          (std::string("Exception while creating evbuffer vector: ") + e.what())
-              .c_str());
-    }
-
-    v = v_vec.data();
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
     if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
-          ("Unexpected error getting " + std::string(request_kind) +
-           " request buffers")
-              .c_str());
+          "Unexpected error getting request buffers");
     }
   }
-
-  *buffer_len = evbuffer_get_length(req->buffer_in);
-  if (allows_empty_body || *buffer_len > 0) {
-    RETURN_IF_ERR(EVBufferToJson(request_json, v, &v_idx, *buffer_len, n));
-  }
-
+  size_t buffer_len = evbuffer_get_length(req->buffer_in);
+  RETURN_IF_ERR(EVBufferToJson(request_json_ptr, v, &v_idx, buffer_len, n));
   return nullptr;  // success
 }
 
@@ -3022,29 +3001,11 @@ HTTPAPIServer::EVBufferToInput(
   // body.
   struct evbuffer_iovec* v = nullptr;
   int v_idx = 0;
-  std::vector<struct evbuffer_iovec> v_vec;
 
   int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
   if (n > 0) {
-    try {
-      v_vec = std::vector<struct evbuffer_iovec>(n);
-    }
-    catch (const std::bad_alloc& e) {
-      // Handle memory allocation failure
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          (std::string("Memory allocation failed for evbuffer: ") + e.what())
-              .c_str());
-    }
-    catch (const std::exception& e) {
-      // Catch any other std exceptions
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL,
-          (std::string("Exception while creating evbuffer vector: ") + e.what())
-              .c_str());
-    }
-
-    v = v_vec.data();
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
     if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
@@ -3077,18 +3038,6 @@ HTTPAPIServer::EVBufferToRawInput(
       TRITONSERVER_InferenceRequestAddRawInput(irequest, raw_input_name));
 
   size_t byte_size = evbuffer_get_length(input_buffer);
-
-  // Check if byte_size is larger than max_input_size_
-  if (byte_size > max_input_size_) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        ("Raw input has a byte_size (" + std::to_string(byte_size) +
-         " bytes) that exceeds the maximum allowed value of " +
-         std::to_string(max_input_size_) +
-         " bytes. Use --http-max-input-size to increase the limit.")
-            .c_str());
-  }
-
   // zero-shape tensor
   if (byte_size == 0) {
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
@@ -3097,30 +3046,10 @@ HTTPAPIServer::EVBufferToRawInput(
   } else {
     struct evbuffer_iovec* v = nullptr;
     int v_idx = 0;
-    std::vector<struct evbuffer_iovec> v_vec;
-
     int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
     if (n > 0) {
-      try {
-        v_vec = std::vector<struct evbuffer_iovec>(n);
-      }
-      catch (const std::bad_alloc& e) {
-        // Handle memory allocation failure
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            (std::string("Memory allocation failed for evbuffer: ") + e.what())
-                .c_str());
-      }
-      catch (const std::exception& e) {
-        // Catch any other std exceptions
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INTERNAL,
-            (std::string("Exception while creating evbuffer vector: ") +
-             e.what())
-                .c_str());
-      }
-
-      v = v_vec.data();
+      v = static_cast<struct evbuffer_iovec*>(
+          alloca(sizeof(struct evbuffer_iovec) * n));
       if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INTERNAL,
@@ -3152,72 +3081,6 @@ HTTPAPIServer::EVBufferToRawInput(
   return nullptr;  // success
 }
 
-TRITONSERVER_Error*
-HTTPAPIServer::EVBufferToJson(
-    triton::common::TritonJson::Value* document, evbuffer_iovec* v, int* v_idx,
-    const size_t length, int n)
-{
-  if (length > max_input_size_) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        ("request JSON size of " + std::to_string(length) +
-         " bytes exceeds the maximum allowed input size of " +
-         std::to_string(max_input_size_) +
-         " bytes. Use --http-max-input-size to increase the limit.")
-            .c_str());
-  }
-
-  size_t offset = 0, remaining_length = length;
-  char* json_base;
-  std::vector<char> json_buffer;
-
-  // No need to memcpy when number of iovecs is 1
-  if ((n > 0) && (v[0].iov_len >= remaining_length)) {
-    json_base = static_cast<char*>(v[0].iov_base);
-    if (v[0].iov_len > remaining_length) {
-      v[0].iov_base = static_cast<void*>(json_base + remaining_length);
-      v[0].iov_len -= remaining_length;
-      remaining_length = 0;
-    } else if (v[0].iov_len == remaining_length) {
-      remaining_length = 0;
-      *v_idx += 1;
-    }
-  } else {
-    json_buffer.resize(length);
-    json_base = json_buffer.data();
-    while ((remaining_length > 0) && (*v_idx < n)) {
-      char* base = static_cast<char*>(v[*v_idx].iov_base);
-      size_t base_size;
-      if (v[*v_idx].iov_len > remaining_length) {
-        base_size = remaining_length;
-        v[*v_idx].iov_base = static_cast<void*>(base + remaining_length);
-        v[*v_idx].iov_len -= remaining_length;
-        remaining_length = 0;
-      } else {
-        base_size = v[*v_idx].iov_len;
-        remaining_length -= v[*v_idx].iov_len;
-        *v_idx += 1;
-      }
-
-      memcpy(json_base + offset, base, base_size);
-      offset += base_size;
-    }
-  }
-
-  if (remaining_length != 0) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "unexpected size for request JSON, expecting " +
-            std::to_string(remaining_length) + " more bytes")
-            .c_str());
-  }
-
-  RETURN_IF_ERR(document->Parse(json_base, length));
-
-  return nullptr;  // success
-}
-
 struct HeaderSearchPayload {
   HeaderSearchPayload(
       const re2::RE2& regex, TRITONSERVER_InferenceRequest* request)
@@ -3233,25 +3096,14 @@ struct HeaderSearchPayload {
 int
 ForEachHeader(evhtp_header_t* header, void* arg)
 {
-  auto* header_search_payload = reinterpret_cast<HeaderSearchPayload*>(arg);
+  HeaderSearchPayload* header_search_payload =
+      reinterpret_cast<HeaderSearchPayload*>(arg);
 
   TRITONSERVER_InferenceRequest* request = header_search_payload->request_;
   const re2::RE2& regex = header_search_payload->regex_;
-  std::string header_key{header->key};
 
-  if (RE2::PartialMatch(header_key, regex)) {
-    if (std::find(
-            kReservedParameterKeys.begin(), kReservedParameterKeys.end(),
-            header_key) != kReservedParameterKeys.end() ||
-        header_key.rfind("triton_", 0) == 0) {
-      header_search_payload->error_ = TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          ("Header '" + header_key +
-           "' is reserved for Triton usage and cannot be forwarded.")
-              .c_str());
-      return 1;
-    }
-
+  std::string matched_string;
+  if (RE2::PartialMatch(std::string(header->key), regex)) {
     header_search_payload->error_ =
         TRITONSERVER_InferenceRequestSetStringParameter(
             request, header->key, header->val);
@@ -3310,16 +3162,15 @@ HTTPAPIServer::StartTrace(
 
 TRITONSERVER_Error*
 HTTPAPIServer::DecompressBuffer(
-    evhtp_request_t* req, EvbufferUniquePtr& decompressed_buffer)
+    evhtp_request_t* req, evbuffer** decompressed_buffer)
 {
   auto compression_type = GetRequestCompressionType(req);
   switch (compression_type) {
     case DataCompressor::Type::DEFLATE:
     case DataCompressor::Type::GZIP: {
-      decompressed_buffer.reset(evbuffer_new());
+      *decompressed_buffer = evbuffer_new();
       RETURN_IF_ERR(DataCompressor::DecompressData(
-          compression_type, req->buffer_in, decompressed_buffer.get(),
-          max_input_size_));
+          compression_type, req->buffer_in, *decompressed_buffer));
       break;
     }
     case DataCompressor::Type::UNKNOWN: {
@@ -3376,6 +3227,27 @@ HTTPAPIServer::ForwardHeaders(
   }
 
   return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+HTTPAPIServer::ScheduleInferAsync(
+    evhtp_request_t* req, TRITONSERVER_InferenceRequest* irequest,
+    InferRequestClass* infer_request,
+    RequestReleasePayload* request_release_payload,
+    TRITONSERVER_InferenceTrace* triton_trace,
+    void (*infer_response_complete_fn)(
+        TRITONSERVER_InferenceResponse* response, const uint32_t flags,
+        void* userp))
+{
+  RETURN_IF_ERR(ForwardHeaders(req, irequest));
+  RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetReleaseCallback(
+      irequest, InferRequestClass::InferRequestComplete,
+      request_release_payload));
+  RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetResponseCallback(
+      irequest, allocator_,
+      reinterpret_cast<void*>(&infer_request->alloc_payload_),
+      infer_response_complete_fn, reinterpret_cast<void*>(infer_request)));
+  return TRITONSERVER_ServerInferAsync(server_.get(), irequest, triton_trace);
 }
 
 void
@@ -3446,12 +3318,12 @@ HTTPAPIServer::HandleGenerate(
         server_.get(), req, GetResponseCompressionType(req),
         generate_stream_request_schema_.get(),
         generate_stream_response_schema_.get(), streaming, irequest_shared,
-        shm_manager_, max_input_size_));
+        shm_manager_));
   } else {
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_request_schema_.get(), generate_response_schema_.get(),
-        streaming, irequest_shared, shm_manager_, max_input_size_));
+        streaming, irequest_shared, shm_manager_));
   }
   generate_request->trace_ = trace;
 
@@ -3504,8 +3376,7 @@ HTTPAPIServer::HandleGenerate(
   //   arbitrary JSON message convoluted (added key is reference to a string and
   //   thus the string must live as long as the JSON message).
   triton::common::TritonJson::Value request;
-  RETURN_AND_CALLBACK_IF_ERR(
-      EVRequestToJsonAllowsEmpty(req, "generate", &request), error_callback);
+  RETURN_AND_CALLBACK_IF_ERR(EVRequestToJson(req, &request), error_callback);
   RETURN_AND_CALLBACK_IF_ERR(
       ParseJsonTritonRequestID(request, irequest), error_callback);
 
@@ -3598,16 +3469,13 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
   std::vector<std::string> members;
   RETURN_IF_ERR(generate_request.Members(&members));
 
-  size_t consumed_input_size{0};
-
   for (const auto& m : members) {
     auto it = schema->children_.find(m);
     if (it != schema->children_.end()) {
       switch (it->second->kind_) {
         case MappingSchema::Kind::EXACT_MAPPING: {
           // Read meta data
-          RETURN_IF_ERR(ExactMappingInput(
-              m, generate_request, input_metadata, consumed_input_size));
+          RETURN_IF_ERR(ExactMappingInput(m, generate_request, input_metadata));
           break;
         }
         case MappingSchema::Kind::MAPPING_SCHEMA: {
@@ -3637,8 +3505,7 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
       }
     } else if (schema->allow_unspecified_) {
       // Unspecified key follows EXACT_MAPPING
-      RETURN_IF_ERR(ExactMappingInput(
-          m, generate_request, input_metadata, consumed_input_size));
+      RETURN_IF_ERR(ExactMappingInput(m, generate_request, input_metadata));
     } else {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNSUPPORTED,
@@ -3652,8 +3519,7 @@ TRITONSERVER_Error*
 HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
     const std::string& name,
     triton::common::TritonJson::Value& generate_request,
-    std::map<std::string, triton::common::TritonJson::Value>& input_metadata,
-    size_t& consumed_input_byte_size)
+    std::map<std::string, triton::common::TritonJson::Value>& input_metadata)
 {
   auto it = input_metadata.find(name);
   if (it == input_metadata.end()) {
@@ -3677,58 +3543,14 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
               .c_str());
     }
 
-    size_t byte_size{0};
     size_t element_cnt = tensor_data.IsArray() ? tensor_data.ArraySize() : 1;
 
+    size_t byte_size = 0;
     if (dtype == TRITONSERVER_TYPE_BYTES) {
       RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
     } else {
-      size_t element_size = TRITONSERVER_DataTypeByteSize(dtype);
-      if (element_size == 0) {
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            (std::string("input '") + name + "' has unsupported datatype " +
-             value)
-                .c_str());
-      }
-
-      // Ensure that we do not have an integer overflow when calculating
-      // byte_size = element_cnt * element_size.
-      if (element_cnt > (SIZE_MAX / element_size)) {
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            (std::string("input '") + name +
-             "' has too many elements of datatype " + value)
-                .c_str());
-      }
-
-      byte_size = element_cnt * element_size;
+      byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
     }
-
-    // For zero-size input, we can skip the rest of the validation and just add
-    // it as an empty input.
-    if (byte_size == 0) {
-      RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(
-          triton_request_.get(), name.c_str(), dtype, nullptr, 0));
-      return nullptr;
-    }
-
-    // Ensure that the resulting array size in bytes does not exceed the maximum
-    // allowed input size.
-    if (byte_size + consumed_input_byte_size > max_input_size_ ||
-        byte_size + consumed_input_byte_size < consumed_input_byte_size) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          (std::string("request size of ") +
-           std::to_string(consumed_input_byte_size) + " bytes with input '" +
-           name + "' of size " + std::to_string(byte_size) +
-           " bytes exceeds the maximum allowed input size of " +
-           std::to_string(max_input_size_) +
-           ". Use --http-max-input-size to increase the limit.")
-              .c_str());
-    }
-
-    consumed_input_byte_size += byte_size;
 
     std::vector<int64_t> shape_vec;
     {
@@ -3741,13 +3563,11 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
              name)
                 .c_str());
       }
-
       for (size_t i = 0; i < value.ArraySize(); ++i) {
         int64_t d = 0;
         RETURN_IF_ERR(value.IndexAsInt(i, &d));
         shape_vec.push_back(d);
       }
-
       // Because generate request don't carry too much shape information, using
       // a two-pass process to pad the request value to match input shape.
       // 1. iterate shape for fixed dimension to distribute 'element_cnt'.
@@ -3765,14 +3585,12 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
           element_cnt /= *rit;
         }
       }
-
       for (auto rit = shape_vec.rbegin(); rit != shape_vec.rend(); ++rit) {
         if (*rit == -1) {
           *rit = element_cnt;
           element_cnt = 1;
         }
       }
-
       if (element_cnt != 1) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
@@ -3787,10 +3605,10 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
     serialized_data_.emplace_back();
     std::vector<char>& serialized = serialized_data_.back();
     serialized.resize(byte_size);
-
     RETURN_IF_ERR(ReadDataFromJson(
         name.c_str(), tensor_data, &serialized[0], dtype,
         dtype == TRITONSERVER_TYPE_BYTES ? byte_size : element_cnt));
+
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(
         triton_request_.get(), name.c_str(), dtype, &shape_vec[0],
         shape_vec.size()));
@@ -3801,6 +3619,632 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
   return nullptr;  // success
 }
 
+namespace {
+
+constexpr size_t kMaxMultiInferRequests = 16;
+
+TRITONSERVER_Error*
+ParseEvbufferToTritonJson(
+    evbuffer* buf, triton::common::TritonJson::Value* out)
+{
+  struct evbuffer_iovec* v = nullptr;
+  int v_idx = 0;
+  const size_t buffer_len = evbuffer_get_length(buf);
+  int n = evbuffer_peek(buf, -1, NULL, NULL, 0);
+  if (n > 0) {
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
+    if (evbuffer_peek(buf, -1, NULL, v, n) != n) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL,
+          "Unexpected error getting request buffer");
+    }
+  }
+  return EVBufferToJson(out, v, &v_idx, buffer_len, n);
+}
+
+TRITONSERVER_Error*
+CopyInferSlotBodyJson(
+    triton::common::TritonJson::Value& slot,
+    triton::common::TritonJson::Value* infer_json)
+{
+  *infer_json = triton::common::TritonJson::Value(
+      triton::common::TritonJson::ValueType::OBJECT);
+  {
+    triton::common::TritonJson::Value v;
+    if (slot.Find("id", &v)) {
+      RETURN_IF_ERR(infer_json->Add("id", std::move(v)));
+    }
+  }
+  {
+    triton::common::TritonJson::Value v;
+    if (!slot.Find("inputs", &v)) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          "Each entry in 'requests' must contain an 'inputs' array");
+    }
+    RETURN_IF_ERR(infer_json->Add("inputs", std::move(v)));
+  }
+  {
+    triton::common::TritonJson::Value v;
+    if (slot.Find("outputs", &v)) {
+      RETURN_IF_ERR(infer_json->Add("outputs", std::move(v)));
+    }
+  }
+  {
+    triton::common::TritonJson::Value v;
+    if (slot.Find("parameters", &v)) {
+      RETURN_IF_ERR(infer_json->Add("parameters", std::move(v)));
+    }
+  }
+  return nullptr;
+}
+
+TRITONSERVER_Error*
+GetModelVersionStringFromSlot(
+    triton::common::TritonJson::Value& slot, std::string* ver_out)
+{
+  ver_out->clear();
+  triton::common::TritonJson::Value mv;
+  if (!slot.Find("model_version", &mv)) {
+    return nullptr;
+  }
+  if (mv.IsString()) {
+    const char* s;
+    size_t len;
+    RETURN_IF_ERR(mv.AsString(&s, &len));
+    ver_out->assign(s, len);
+    return nullptr;
+  }
+  if (mv.IsNumber()) {
+    int64_t iv;
+    RETURN_IF_ERR(mv.AsInt(&iv));
+    *ver_out = std::to_string(iv);
+    return nullptr;
+  }
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_INVALID_ARG,
+      "'model_version' must be a string or integer");
+}
+
+class MultiInferAggregator
+    : public std::enable_shared_from_this<MultiInferAggregator> {
+ private:
+  struct FinishPayload {
+    std::shared_ptr<MultiInferAggregator> agg;
+  };
+
+ public:
+  MultiInferAggregator(
+      evhtp_request_t* req, size_t slot_count, evthr_t* reply_thread,
+      std::vector<std::shared_ptr<TRITONSERVER_InferenceRequest>> irequests)
+      : req_(req), n_(slot_count), reply_thread_(reply_thread),
+        irequests_(std::move(irequests)), success_json_(slot_count),
+        error_text_(slot_count), have_error_(slot_count, 0)
+  {
+  }
+
+  std::shared_ptr<TRITONSERVER_InferenceRequest> IrequestAt(size_t i) const
+  {
+    return irequests_[i];
+  }
+
+  void CancelAllSubRequests()
+  {
+    std::lock_guard<std::mutex> lk(mu_);
+    if (cancel_sent_) {
+      return;
+    }
+    cancel_sent_ = true;
+    for (auto& ir : irequests_) {
+      if (ir != nullptr) {
+        LOG_TRITONSERVER_ERROR(
+            TRITONSERVER_InferenceRequestCancel(ir.get()),
+            "cancelling multi_infer sub-request");
+      }
+    }
+  }
+
+  void OnShardDone(
+      size_t slot, TRITONSERVER_Error* finalize_err,
+      const std::string& response_json)
+  {
+    std::shared_ptr<MultiInferAggregator> self;
+    {
+      std::lock_guard<std::mutex> lk(mu_);
+      if (finalize_err != nullptr) {
+        have_error_[slot] = 1;
+        error_text_[slot] = TRITONSERVER_ErrorMessage(finalize_err);
+        TRITONSERVER_ErrorDelete(finalize_err);
+        if (!cancel_sent_) {
+          cancel_sent_ = true;
+          for (auto& ir : irequests_) {
+            if (ir != nullptr) {
+              LOG_TRITONSERVER_ERROR(
+                  TRITONSERVER_InferenceRequestCancel(ir.get()),
+                  "cancelling multi_infer sub-request");
+            }
+          }
+        }
+      } else {
+        success_json_[slot] = response_json;
+      }
+      done_count_++;
+      if (done_count_ < n_ || reply_scheduled_) {
+        return;
+      }
+      reply_scheduled_ = true;
+      self = shared_from_this();
+    }
+
+    auto* fp = new FinishPayload{std::move(self)};
+    evthr_defer(reply_thread_, FinishThunk, fp);
+  }
+
+ private:
+  static void
+  FinishThunk(evthr_t* /*thr*/, void* arg, void* /*shared*/)
+  {
+    std::unique_ptr<FinishPayload> fp(static_cast<FinishPayload*>(arg));
+    fp->agg->WriteHttpReply();
+  }
+
+  void
+  WriteHttpReply()
+  {
+    triton::common::TritonJson::Value root(
+        triton::common::TritonJson::ValueType::OBJECT);
+    triton::common::TritonJson::Value responses(
+        root, triton::common::TritonJson::ValueType::ARRAY);
+    for (size_t i = 0; i < n_; ++i) {
+      if (have_error_[i]) {
+        triton::common::TritonJson::Value item(
+            root, triton::common::TritonJson::ValueType::OBJECT);
+        triton::common::TritonJson::Value err_part(
+            root, triton::common::TritonJson::ValueType::OBJECT);
+        TRITONSERVER_Error* ae =
+            err_part.AddString("message", error_text_[i]);
+        if (ae != nullptr) {
+          LOG_TRITONSERVER_ERROR(ae, "multi_infer: building error JSON");
+          TRITONSERVER_ErrorDelete(ae);
+        }
+        TRITONSERVER_Error* be = item.Add("error", std::move(err_part));
+        if (be != nullptr) {
+          LOG_TRITONSERVER_ERROR(be, "multi_infer: building error JSON");
+          TRITONSERVER_ErrorDelete(be);
+        }
+        TRITONSERVER_Error* ce = responses.Append(std::move(item));
+        if (ce != nullptr) {
+          LOG_TRITONSERVER_ERROR(ce, "multi_infer: appending response");
+          TRITONSERVER_ErrorDelete(ce);
+        }
+      } else {
+        triton::common::TritonJson::Value item;
+        TRITONSERVER_Error* perr =
+            item.Parse(success_json_[i].c_str(), success_json_[i].size());
+        if (perr != nullptr) {
+          triton::common::TritonJson::Value wrap(
+              root, triton::common::TritonJson::ValueType::OBJECT);
+          triton::common::TritonJson::Value err_part(
+              root, triton::common::TritonJson::ValueType::OBJECT);
+          TRITONSERVER_Error* ae = err_part.AddString(
+              "message", TRITONSERVER_ErrorMessage(perr));
+          TRITONSERVER_ErrorDelete(perr);
+          if (ae != nullptr) {
+            TRITONSERVER_ErrorDelete(ae);
+          }
+          TRITONSERVER_Error* be = wrap.Add("error", std::move(err_part));
+          if (be != nullptr) {
+            TRITONSERVER_ErrorDelete(be);
+          }
+          TRITONSERVER_Error* ce = responses.Append(std::move(wrap));
+          if (ce != nullptr) {
+            TRITONSERVER_ErrorDelete(ce);
+          }
+        } else {
+          TRITONSERVER_Error* ce = responses.Append(std::move(item));
+          if (ce != nullptr) {
+            LOG_TRITONSERVER_ERROR(ce, "multi_infer: appending response");
+            TRITONSERVER_ErrorDelete(ce);
+          }
+        }
+      }
+    }
+
+    TRITONSERVER_Error* re = root.Add("responses", std::move(responses));
+    if (re != nullptr) {
+      LOG_TRITONSERVER_ERROR(re, "multi_infer: building root JSON");
+      AddContentTypeHeader(req_, "application/json");
+      EVBufferAddErrorJson(req_->buffer_out, re);
+      evhtp_send_reply(req_, HttpCodeFromError(re));
+      TRITONSERVER_ErrorDelete(re);
+      evhtp_request_resume(req_);
+      return;
+    }
+
+    triton::common::TritonJson::WriteBuffer wb;
+    TRITONSERVER_Error* we = root.Write(&wb);
+    if (we != nullptr) {
+      AddContentTypeHeader(req_, "application/json");
+      EVBufferAddErrorJson(req_->buffer_out, we);
+      evhtp_send_reply(req_, HttpCodeFromError(we));
+      TRITONSERVER_ErrorDelete(we);
+    } else {
+      AddContentTypeHeader(req_, "application/json");
+      evbuffer_add(req_->buffer_out, wb.Base(), wb.Size());
+      evhtp_send_reply(req_, EVHTP_RES_OK);
+    }
+    evhtp_request_resume(req_);
+  }
+
+  evhtp_request_t* req_;
+  const size_t n_;
+  evthr_t* reply_thread_;
+  std::vector<std::shared_ptr<TRITONSERVER_InferenceRequest>> irequests_;
+
+  std::mutex mu_;
+  size_t done_count_{0};
+  std::vector<std::string> success_json_;
+  std::vector<std::string> error_text_;
+  std::vector<char> have_error_;
+  bool cancel_sent_{false};
+  bool reply_scheduled_{false};
+};
+
+class MultiInferShardRequest : public HTTPAPIServer::InferRequestClass {
+ public:
+  MultiInferShardRequest(
+      TRITONSERVER_Server* server, evhtp_request_t* req,
+      DataCompressor::Type response_compression_type,
+      const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
+      const std::shared_ptr<SharedMemoryManager>& shm_manager,
+      std::shared_ptr<MultiInferAggregator> aggregator, const size_t slot)
+      : HTTPAPIServer::InferRequestClass(
+            server, req, response_compression_type, triton_request, shm_manager,
+            false /* pause */, false /* fini hook */),
+        aggregator_(std::move(aggregator)), slot_(slot)
+  {
+  }
+
+  static void
+  InferResponseComplete(
+      TRITONSERVER_InferenceResponse* response, const uint32_t flags,
+      void* userp)
+  {
+    auto* infer_request = reinterpret_cast<MultiInferShardRequest*>(userp);
+
+    if (response != nullptr) {
+      ++infer_request->response_count_;
+    }
+
+    TRITONSERVER_Error* err = nullptr;
+    evbuffer* shard_json = evbuffer_new();
+    if (infer_request->response_count_ != 1) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL,
+          (std::string("expected a single response, got ") +
+           std::to_string(infer_request->response_count_))
+              .c_str());
+    } else if (response != nullptr) {
+      err = infer_request->FinalizeResponse(response, shard_json);
+#ifdef TRITON_ENABLE_TRACING
+      if (infer_request->trace_ != nullptr) {
+        infer_request->trace_->CaptureTimestamp(
+            "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp());
+      }
+#endif  // TRITON_ENABLE_TRACING
+    }
+
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceResponseDelete(response),
+        "deleting inference response");
+
+    std::string json_fragment;
+    if (err == nullptr) {
+      const size_t len = evbuffer_get_length(shard_json);
+      if (len > 0) {
+        const unsigned char* p = evbuffer_pullup(shard_json, -1);
+        if (p != nullptr) {
+          json_fragment.assign(reinterpret_cast<const char*>(p), len);
+        }
+      }
+    }
+    evbuffer_free(shard_json);
+
+    if (err != nullptr) {
+      infer_request->aggregator_->OnShardDone(infer_request->slot_, err, "");
+    } else {
+      infer_request->aggregator_->OnShardDone(
+          infer_request->slot_, nullptr, json_fragment);
+    }
+
+    if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+      return;
+    }
+    evthr_defer(
+        infer_request->thread_, DeleteMultiInferShardRequestThunk,
+        infer_request);
+  }
+
+ private:
+  static void
+  DeleteMultiInferShardRequestThunk(
+      evthr_t* /*thr*/, void* arg, void* /*shared*/)
+  {
+    delete reinterpret_cast<MultiInferShardRequest*>(arg);
+  }
+
+  std::shared_ptr<MultiInferAggregator> aggregator_;
+  const size_t slot_;
+};
+
+}  // namespace
+
+void
+HTTPAPIServer::HandleMultiInfer(evhtp_request_t* req)
+{
+  RETURN_AND_RESPOND_IF_RESTRICTED(
+      req, RestrictedCategory::INFERENCE, restricted_apis_);
+
+  if (req->method != htp_method_POST) {
+    RETURN_AND_RESPOND_WITH_ERR(
+        req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+  }
+
+  evhtp_request_pause(req);
+
+  evbuffer* decompressed_buffer = nullptr;
+  TRITONSERVER_Error* derr = DecompressBuffer(req, &decompressed_buffer);
+  if (derr != nullptr) {
+    AddContentTypeHeader(req, "application/json");
+    EVBufferAddErrorJson(req->buffer_out, derr);
+    evhtp_send_reply(req, HttpCodeFromError(derr));
+    TRITONSERVER_ErrorDelete(derr);
+    evhtp_request_resume(req);
+    return;
+  }
+
+  evbuffer* body_buf =
+      (decompressed_buffer != nullptr) ? decompressed_buffer : req->buffer_in;
+
+  triton::common::TritonJson::Value root;
+  TRITONSERVER_Error* err = ParseEvbufferToTritonJson(body_buf, &root);
+  if (decompressed_buffer != nullptr) {
+    evbuffer_free(decompressed_buffer);
+    decompressed_buffer = nullptr;
+  }
+  if (err != nullptr) {
+    AddContentTypeHeader(req, "application/json");
+    EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, HttpCodeFromError(err));
+    TRITONSERVER_ErrorDelete(err);
+    evhtp_request_resume(req);
+    return;
+  }
+
+  triton::common::TritonJson::Value requests;
+  if (!root.Find("requests", &requests)) {
+    err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        "Request body must include a JSON array field 'requests'");
+    AddContentTypeHeader(req, "application/json");
+    EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, HttpCodeFromError(err));
+    TRITONSERVER_ErrorDelete(err);
+    evhtp_request_resume(req);
+    return;
+  }
+
+  const size_t n = requests.ArraySize();
+  if (n == 0) {
+    err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG, "'requests' array must be non-empty");
+    AddContentTypeHeader(req, "application/json");
+    EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, HttpCodeFromError(err));
+    TRITONSERVER_ErrorDelete(err);
+    evhtp_request_resume(req);
+    return;
+  }
+  if (n > kMaxMultiInferRequests) {
+    err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string("At most ") + std::to_string(kMaxMultiInferRequests) +
+         " sub-requests are allowed per multi_infer call")
+            .c_str());
+    AddContentTypeHeader(req, "application/json");
+    EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, HttpCodeFromError(err));
+    TRITONSERVER_ErrorDelete(err);
+    evhtp_request_resume(req);
+    return;
+  }
+
+  struct SlotPrep {
+    std::string model_name;
+    int64_t model_version{0};
+    std::string infer_body_json;
+  };
+  std::vector<SlotPrep> slots;
+  slots.reserve(n);
+
+  for (size_t i = 0; i < n; ++i) {
+    triton::common::TritonJson::Value slot;
+    err = requests.At(i, &slot);
+    if (err != nullptr) {
+      AddContentTypeHeader(req, "application/json");
+      EVBufferAddErrorJson(req->buffer_out, err);
+      evhtp_send_reply(req, HttpCodeFromError(err));
+      TRITONSERVER_ErrorDelete(err);
+      evhtp_request_resume(req);
+      return;
+    }
+    const char* mn_c;
+    size_t mn_len;
+    err = slot.MemberAsString("model_name", &mn_c, &mn_len);
+    if (err != nullptr) {
+      AddContentTypeHeader(req, "application/json");
+      EVBufferAddErrorJson(req->buffer_out, err);
+      evhtp_send_reply(req, HttpCodeFromError(err));
+      TRITONSERVER_ErrorDelete(err);
+      evhtp_request_resume(req);
+      return;
+    }
+    SlotPrep prep;
+    prep.model_name.assign(mn_c, mn_len);
+    std::string ver_str;
+    err = GetModelVersionStringFromSlot(slot, &ver_str);
+    if (err != nullptr) {
+      AddContentTypeHeader(req, "application/json");
+      EVBufferAddErrorJson(req->buffer_out, err);
+      evhtp_send_reply(req, HttpCodeFromError(err));
+      TRITONSERVER_ErrorDelete(err);
+      evhtp_request_resume(req);
+      return;
+    }
+    err = GetModelVersionFromString(ver_str, &prep.model_version);
+    if (err != nullptr) {
+      AddContentTypeHeader(req, "application/json");
+      EVBufferAddErrorJson(req->buffer_out, err);
+      evhtp_send_reply(req, HttpCodeFromError(err));
+      TRITONSERVER_ErrorDelete(err);
+      evhtp_request_resume(req);
+      return;
+    }
+    err = CheckTransactionPolicy(req, prep.model_name, prep.model_version);
+    if (err != nullptr) {
+      AddContentTypeHeader(req, "application/json");
+      EVBufferAddErrorJson(req->buffer_out, err);
+      evhtp_send_reply(req, HttpCodeFromError(err));
+      TRITONSERVER_ErrorDelete(err);
+      evhtp_request_resume(req);
+      return;
+    }
+    triton::common::TritonJson::Value infer_only;
+    err = CopyInferSlotBodyJson(slot, &infer_only);
+    if (err != nullptr) {
+      AddContentTypeHeader(req, "application/json");
+      EVBufferAddErrorJson(req->buffer_out, err);
+      evhtp_send_reply(req, HttpCodeFromError(err));
+      TRITONSERVER_ErrorDelete(err);
+      evhtp_request_resume(req);
+      return;
+    }
+    triton::common::TritonJson::WriteBuffer wb;
+    err = infer_only.Write(&wb);
+    if (err != nullptr) {
+      AddContentTypeHeader(req, "application/json");
+      EVBufferAddErrorJson(req->buffer_out, err);
+      evhtp_send_reply(req, HttpCodeFromError(err));
+      TRITONSERVER_ErrorDelete(err);
+      evhtp_request_resume(req);
+      return;
+    }
+    prep.infer_body_json.assign(wb.Base(), wb.Size());
+    slots.push_back(std::move(prep));
+  }
+
+  evthr_t* reply_thread = evhtp_request_get_connection(req)->thread;
+  std::vector<std::shared_ptr<TRITONSERVER_InferenceRequest>> irequests;
+  irequests.reserve(n);
+  for (size_t i = 0; i < n; ++i) {
+    TRITONSERVER_InferenceRequest* ireq = nullptr;
+    err = TRITONSERVER_InferenceRequestNew(
+        &ireq, server_.get(), slots[i].model_name.c_str(),
+        slots[i].model_version);
+    if (err != nullptr) {
+      for (auto& ir : irequests) {
+        if (ir != nullptr) {
+          LOG_TRITONSERVER_ERROR(
+              TRITONSERVER_InferenceRequestDelete(ir.get()),
+              "deleting unused multi_infer sub-request");
+        }
+      }
+      AddContentTypeHeader(req, "application/json");
+      EVBufferAddErrorJson(req->buffer_out, err);
+      evhtp_send_reply(req, HttpCodeFromError(err));
+      TRITONSERVER_ErrorDelete(err);
+      evhtp_request_resume(req);
+      return;
+    }
+    irequests.emplace_back(
+        ireq, [](TRITONSERVER_InferenceRequest* r) {
+          LOG_TRITONSERVER_ERROR(
+              TRITONSERVER_InferenceRequestDelete(r),
+              "deleting HTTP multi_infer sub-request");
+        });
+  }
+
+  std::shared_ptr<MultiInferAggregator> aggregator =
+      std::make_shared<MultiInferAggregator>(req, n, reply_thread, irequests);
+
+  std::vector<std::unique_ptr<MultiInferShardRequest>> shard_holders;
+  std::vector<std::unique_ptr<RequestReleasePayload>> release_holders;
+  shard_holders.reserve(n);
+  release_holders.reserve(n);
+
+  for (size_t i = 0; i < n; ++i) {
+    evbuffer* body_i = evbuffer_new();
+    evbuffer_add(
+        body_i, slots[i].infer_body_json.data(),
+        slots[i].infer_body_json.size());
+
+    const int32_t content_length =
+        static_cast<int32_t>(evbuffer_get_length(body_i));
+    size_t header_length = 0;
+    err = GetInferenceHeaderLength(req, content_length, &header_length);
+    if (err != nullptr) {
+      aggregator->CancelAllSubRequests();
+      AddContentTypeHeader(req, "application/json");
+      EVBufferAddErrorJson(req->buffer_out, err);
+      evhtp_send_reply(req, HttpCodeFromError(err));
+      TRITONSERVER_ErrorDelete(err);
+      evhtp_request_resume(req);
+      return;
+    }
+
+    auto shard = std::unique_ptr<MultiInferShardRequest>(
+        new MultiInferShardRequest(
+            server_.get(), req, GetResponseCompressionType(req),
+            irequests[i], shm_manager_, aggregator, i));
+
+    err = EVRequestToTritonRequest(
+        req, slots[i].model_name, irequests[i].get(), body_i, shard.get(),
+        header_length);
+    if (err != nullptr) {
+      aggregator->CancelAllSubRequests();
+      evbuffer_free(body_i);
+      AddContentTypeHeader(req, "application/json");
+      EVBufferAddErrorJson(req->buffer_out, err);
+      evhtp_send_reply(req, HttpCodeFromError(err));
+      TRITONSERVER_ErrorDelete(err);
+      evhtp_request_resume(req);
+      return;
+    }
+
+    auto rel = std::make_unique<RequestReleasePayload>(irequests[i], body_i);
+    err = ScheduleInferAsync(
+        req, irequests[i].get(), shard.get(), rel.get(), nullptr,
+        MultiInferShardRequest::InferResponseComplete);
+    if (err != nullptr) {
+      aggregator->CancelAllSubRequests();
+      AddContentTypeHeader(req, "application/json");
+      EVBufferAddErrorJson(req->buffer_out, err);
+      evhtp_send_reply(req, HttpCodeFromError(err));
+      TRITONSERVER_ErrorDelete(err);
+      evhtp_request_resume(req);
+      return;
+    }
+
+    shard_holders.push_back(std::move(shard));
+    release_holders.push_back(std::move(rel));
+  }
+
+  for (size_t i = 0; i < n; ++i) {
+    release_holders[i].release();
+    shard_holders[i].release();
+  }
+}
 void
 HTTPAPIServer::HandleInfer(
     evhtp_request_t* req, const std::string& model_name,
@@ -3829,13 +4273,13 @@ HTTPAPIServer::HandleInfer(
   }
 
   // Decompress request body if it is compressed in supported type
-  EvbufferUniquePtr decompressed_buffer;
-  RETURN_AND_RESPOND_IF_ERR(req, DecompressBuffer(req, decompressed_buffer));
+  evbuffer* decompressed_buffer = nullptr;
+  RETURN_AND_RESPOND_IF_ERR(req, DecompressBuffer(req, &decompressed_buffer));
 
   // Get content length as a default header_length if no header specified
   int32_t content_length = 0;
   RETURN_AND_RESPOND_IF_ERR(
-      req, GetContentLength(req, decompressed_buffer.get(), &content_length));
+      req, GetContentLength(req, decompressed_buffer, &content_length));
 
   // Get the header length
   size_t header_length = 0;
@@ -3887,8 +4331,8 @@ HTTPAPIServer::HandleInfer(
   // Parse EV request and fill Triton request fields from it
   RETURN_AND_CALLBACK_IF_ERR(
       EVRequestToTritonRequest(
-          req, model_name, irequest, decompressed_buffer.get(),
-          infer_request.get(), header_length),
+          req, model_name, irequest, decompressed_buffer, infer_request.get(),
+          header_length),
       error_callback);
 
   // Get request ID for logging in case of error.
@@ -3900,25 +4344,11 @@ HTTPAPIServer::HandleInfer(
     request_id = "<id_unknown>";
   }
 
-  RETURN_AND_CALLBACK_IF_ERR(ForwardHeaders(req, irequest), error_callback);
-
   auto request_release_payload = std::make_unique<RequestReleasePayload>(
-      irequest_shared, decompressed_buffer.release());
-  RETURN_AND_CALLBACK_IF_ERR(
-      TRITONSERVER_InferenceRequestSetReleaseCallback(
-          irequest, InferRequestClass::InferRequestComplete,
-          request_release_payload.get()),
-      error_callback);
-  RETURN_AND_CALLBACK_IF_ERR(
-      TRITONSERVER_InferenceRequestSetResponseCallback(
-          irequest, allocator_,
-          reinterpret_cast<void*>(&infer_request->alloc_payload_),
-          InferRequestClass::InferResponseComplete,
-          reinterpret_cast<void*>(infer_request.get())),
-      error_callback);
-
-  auto err =
-      TRITONSERVER_ServerInferAsync(server_.get(), irequest, triton_trace);
+      irequest_shared, decompressed_buffer);
+  auto err = ScheduleInferAsync(
+      req, irequest, infer_request.get(), request_release_payload.get(),
+      triton_trace);
 #ifdef TRITON_ENABLE_TRACING
   // Ownership of trace passed to Triton core, set trace to null to mark it
   // as no longer owned here.
@@ -3981,17 +4411,23 @@ HTTPAPIServer::InferRequestClass::InferRequestClass(
     TRITONSERVER_Server* server, evhtp_request_t* req,
     DataCompressor::Type response_compression_type,
     const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
-    const std::shared_ptr<SharedMemoryManager>& shm_manager)
+    const std::shared_ptr<SharedMemoryManager>& shm_manager,
+    bool pause_http_request, bool register_fini_cancel_hook)
     : server_(server), req_(req),
       response_compression_type_(response_compression_type), response_count_(0),
+      register_fini_cancel_hook_(register_fini_cancel_hook),
       triton_request_(triton_request), shm_manager_(shm_manager)
 {
   evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
   thread_ = htpconn->thread;
-  evhtp_request_pause(req);
-  evhtp_request_set_hook(
-      req_, evhtp_hook_on_request_fini, (evhtp_hook)(void*)RequestFiniHook,
-      reinterpret_cast<void*>(this));
+  if (pause_http_request) {
+    evhtp_request_pause(req);
+  }
+  if (register_fini_cancel_hook_) {
+    evhtp_request_set_hook(
+        req_, evhtp_hook_on_request_fini, (evhtp_hook)(void*)RequestFiniHook,
+        reinterpret_cast<void*>(this));
+  }
 }
 
 void
@@ -4038,7 +4474,7 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
             std::to_string(infer_request->response_count_))
             .c_str());
   } else if (response != nullptr) {
-    err = infer_request->FinalizeResponse(response);
+    err = infer_request->FinalizeResponse(response, nullptr);
 #ifdef TRITON_ENABLE_TRACING
     if (infer_request->trace_ != nullptr) {
       infer_request->trace_->CaptureTimestamp(
@@ -4068,7 +4504,7 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
 
 TRITONSERVER_Error*
 HTTPAPIServer::InferRequestClass::FinalizeResponse(
-    TRITONSERVER_InferenceResponse* response)
+    TRITONSERVER_InferenceResponse* response, evbuffer* json_only_out)
 {
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseError(response));
 
@@ -4164,6 +4600,16 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
 
     // Handle data. SHM outputs will not have an info.
     auto info = reinterpret_cast<AllocPayload::OutputInfo*>(userp);
+
+    if (json_only_out != nullptr) {
+      if (info == nullptr || info->kind_ != AllocPayload::OutputInfo::JSON ||
+          info->class_cnt_ > 0) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_UNSUPPORTED,
+            "multi_infer sub-request: only plain JSON outputs are supported (no "
+            "shared memory, binary tensor data, or classification)");
+      }
+    }
 
     size_t element_count = 1;
     uint32_t batch_size = 0;
@@ -4302,34 +4748,45 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
   }
 
   evbuffer* response_body = response_placeholder;
-  switch (response_compression_type_) {
-    case DataCompressor::Type::DEFLATE:
-    case DataCompressor::Type::GZIP: {
-      auto compressed_buffer = evbuffer_new();
-      auto err = DataCompressor::CompressData(
-          response_compression_type_, response_placeholder, compressed_buffer);
-      if (err == nullptr) {
-        response_body = compressed_buffer;
-        evbuffer_free(response_placeholder);
-      } else {
-        // just log the compression error and return the uncompressed data
-        LOG_VERBOSE(1) << "unable to compress response: "
-                       << TRITONSERVER_ErrorMessage(err);
-        TRITONSERVER_ErrorDelete(err);
-        evbuffer_free(compressed_buffer);
-        response_compression_type_ = DataCompressor::Type::IDENTITY;
+  if (json_only_out == nullptr) {
+    switch (response_compression_type_) {
+      case DataCompressor::Type::DEFLATE:
+      case DataCompressor::Type::GZIP: {
+        auto compressed_buffer = evbuffer_new();
+        auto err = DataCompressor::CompressData(
+            response_compression_type_, response_placeholder,
+            compressed_buffer);
+        if (err == nullptr) {
+          response_body = compressed_buffer;
+          evbuffer_free(response_placeholder);
+        } else {
+          // just log the compression error and return the uncompressed data
+          LOG_VERBOSE(1) << "unable to compress response: "
+                         << TRITONSERVER_ErrorMessage(err);
+          TRITONSERVER_ErrorDelete(err);
+          evbuffer_free(compressed_buffer);
+          response_compression_type_ = DataCompressor::Type::IDENTITY;
+        }
+        break;
       }
-      break;
+      case DataCompressor::Type::IDENTITY:
+      case DataCompressor::Type::UNKNOWN:
+        // Do nothing for other cases
+        break;
     }
-    case DataCompressor::Type::IDENTITY:
-    case DataCompressor::Type::UNKNOWN:
-      // Do nothing for other cases
-      break;
+    SetResponseHeader(!ordered_buffers.empty(), buffer.Size());
+    evbuffer_add_buffer(req_->buffer_out, response_body);
+  } else {
+    if (!ordered_buffers.empty()) {
+      evbuffer_free(response_placeholder);
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "multi_infer sub-request: binary outputs are not supported");
+    }
+    evbuffer_add_buffer(json_only_out, response_body);
   }
-  SetResponseHeader(!ordered_buffers.empty(), buffer.Size());
-  evbuffer_add_buffer(req_->buffer_out, response_body);
   // Destroy the evbuffer object as the data has been moved
-  // to HTTP response buffer
+  // to HTTP response buffer (or json_only_out)
   evbuffer_free(response_body);
 
   return nullptr;  // success
@@ -4400,7 +4857,7 @@ HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
 
   TRITONSERVER_Error* err = nullptr;
   if (response != nullptr) {
-    err = infer_request->FinalizeResponse(response);
+    err = infer_request->FinalizeResponse(response, nullptr);
   }
   if (err != nullptr) {
     infer_request->AddErrorJson(err);
@@ -4560,8 +5017,13 @@ HTTPAPIServer::GenerateRequestClass::SendChunkResponse(bool end)
 
 TRITONSERVER_Error*
 HTTPAPIServer::GenerateRequestClass::FinalizeResponse(
-    TRITONSERVER_InferenceResponse* response)
+    TRITONSERVER_InferenceResponse* response, evbuffer* json_only_out)
 {
+  if (json_only_out != nullptr) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "JSON-only response aggregation is not supported for generate");
+  }
   triton_response_ = response;
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseError(response));
 
@@ -4847,6 +5309,11 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " "
                  << req->uri->path->full;
 
+  if (std::string(req->uri->path->full) == "/v2/multi_infer") {
+    HandleMultiInfer(req);
+    return;
+  }
+
   if (std::string(req->uri->path->full) == "/v2/models/stats") {
     // model statistics
     HandleModelStats(req);
@@ -4950,12 +5417,12 @@ HTTPAPIServer::Create(
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const bool reuse_port, const std::string& address,
     const std::string& header_forward_pattern, const int thread_cnt,
-    const size_t max_input_size, const RestrictedFeatures& restricted_features,
+    const RestrictedFeatures& restricted_features,
     std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new HTTPAPIServer(
       server, trace_manager, shm_manager, port, reuse_port, address,
-      header_forward_pattern, thread_cnt, max_input_size, restricted_features));
+      header_forward_pattern, thread_cnt, restricted_features));
 
   const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started HTTPService at " << addr;
@@ -4988,8 +5455,7 @@ HTTPAPIServer::Create(
 
   return Create(
       server, trace_manager, shm_manager, port, reuse_port, address,
-      header_forward_pattern, thread_count, HTTP_DEFAULT_MAX_INPUT_SIZE,
-      restricted_features, service);
+      header_forward_pattern, thread_count, restricted_features, service);
 }
 
 

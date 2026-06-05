@@ -73,12 +73,10 @@ class ModelStreamInferHandler
       ::grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count,
       size_t max_response_queue_size, grpc_compression_level compression_level,
       std::pair<std::string, std::string> restricted_kv,
-      const std::string& header_forward_pattern, std::shared_mutex* conn_mtx,
-      std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn)
+      const std::string& header_forward_pattern)
       : InferHandler(
             name, tritonserver, service, cq, max_state_bucket_count,
-            max_response_queue_size, restricted_kv, header_forward_pattern,
-            conn_mtx, conn_cnt, accepting_new_conn),
+            max_response_queue_size, restricted_kv, header_forward_pattern),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         compression_level_(compression_level)
   {
@@ -108,7 +106,8 @@ class ModelStreamInferHandler
 
  protected:
   void StartNewRequest() override;
-  bool Process(State* state, bool rpc_ok, bool is_notification) override;
+  bool Process(
+      State* state, bool rpc_ok, bool is_notification = false) override;
 
  private:
   static void StreamInferResponseComplete(

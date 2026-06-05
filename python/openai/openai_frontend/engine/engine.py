@@ -1,4 +1,4 @@
-# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,8 +34,6 @@ from schemas.openai import (
     CreateChatCompletionResponse,
     CreateCompletionRequest,
     CreateCompletionResponse,
-    CreateEmbeddingRequest,
-    CreateEmbeddingResponse,
     Model,
 )
 
@@ -92,27 +90,5 @@ class LLMEngine(Protocol):
             'data: [DONE]\n\n'
 
         If request.stream is False, this returns a CreateCompletionResponse.
-        """
-        pass
-
-    def embedding(self, request: CreateEmbeddingRequest) -> CreateEmbeddingResponse:
-        """
-        Returns a CreateEmbeddingResponse.
-        """
-        pass
-
-    async def load_model(self, model_name: str) -> Model:
-        """
-        Loads a model by name. Only available in EXPLICIT model control mode.
-        Blocks until the model is fully loaded and ready, matching standard
-        Triton server load behavior.
-        """
-        pass
-
-    async def unload_model(self, model_name: str) -> None:
-        """
-        Unloads a model by name. Only available in EXPLICIT model control mode.
-        Blocks until the model is fully unloaded, matching standard Triton
-        server unload behavior. In-flight requests complete before unload.
         """
         pass

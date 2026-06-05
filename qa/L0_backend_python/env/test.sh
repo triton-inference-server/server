@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -48,13 +48,13 @@ install_conda
 path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python_3_12_environment.tar.gz'
 create_conda_env "3.12" "python-3-12"
 conda install -c conda-forge libstdcxx-ng=14 -y
-TORCH_VERSION="2.8.0"
+TORCH_VERSION="2.6.0"
 conda install numpy=1.26.4 -y
-if [[ ${TRITON_RHEL} -eq "1" ]] && grep -qE 'rhel|centos|fedora' /etc/os-release; then
+if [ $TRITON_RHEL -eq 1 ]; then
     TORCH_VERISON="2.17.0"
 fi
-conda install pytorch=${TORCH_VERSION} -y
-PY312_VERSION_STRING="Python version is 3.12, NumPy version is 1.26.4, and PyTorch version is ${TORCH_VERSION}"
+conda install torch=${TORCH_VERSION} -y
+PY312_VERSION_STRING="Python version is 3.12, NumPy version is 1.26.4, and PyTorch version is ${TORCH_VERISON}"
 conda pack -o python3.12.tar.gz
 mkdir -p models/python_3_12/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_12
@@ -122,7 +122,7 @@ fi
 kill_server
 
 set +e
-grep "Locale is ('C', 'UTF-8')" $SERVER_LOG
+grep "Locale is ('en_US', 'UTF-8')" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
         echo -e "\n***\n*** Locale UTF-8 was not found in Triton logs. \n***"
@@ -182,6 +182,10 @@ aws s3 mb "${BUCKET_URL}"
 BUCKET_URL=${BUCKET_URL%/}
 BUCKET_URL_SLASH="${BUCKET_URL}/"
 
+# Remove Python 3.7 model because it contains absolute paths and cannot be used
+# with S3.
+rm -rf models/python_3_7
+
 # Test with the bucket url as model repository
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 
@@ -201,10 +205,10 @@ fi
 kill_server
 
 set +e
-grep "$PY312_VERSION_STRING" $SERVER_LOG
+grep "$PY36_VERSION_STRING" $SERVER_LOG
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
-    echo -e "\n***\n*** $PY312_VERSION_STRING was not found in Triton logs. \n***"
+    echo -e "\n***\n*** $PY36_VERSION_STRING was not found in Triton logs. \n***"
     RET=1
 fi
 set -e
@@ -213,6 +217,8 @@ set -e
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 
 # Test with EXECUTION_ENV_PATH outside the model directory
+sed -i "s/TRITON_MODEL_DIRECTORY\/python_3_6_environment/TRITON_MODEL_DIRECTORY\/..\/python_3_6_environment/" models/python_3_6/config.pbtxt
+mv models/python_3_6/python_3_6_environment.tar.gz models
 sed -i "s/\$\$TRITON_MODEL_DIRECTORY\/python_3_12_environment/s3:\/\/triton-bucket-${CI_JOB_ID}\/python_3_12_environment/" models/python_3_12/config.pbtxt
 mv models/python_3_12/python_3_12_environment.tar.gz models
 
@@ -232,7 +238,7 @@ fi
 kill_server
 
 set +e
-for EXPECTED_VERSION_STRING in "$PY312_VERSION_STRING"; do
+for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY312_VERSION_STRING"; do
     grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
@@ -245,63 +251,6 @@ set -e
 # Clean up bucket contents and delete bucket
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 aws s3 rb "${BUCKET_URL}"
-
-# EXECUTION_ENV_PATH path-traversal regression test. For each
-# traversal vector, load a Python-backend model with archive is malicious
-# and assert: (a) Triton refuses to start, (b) no file was written outside
-# the extraction directory, (c) the server log contains the libarchive
-# rejection. See zipslip_test.py for the archive layout.
-ZIPSLIP_REPO="`pwd`/zipslip_models"
-ZIPSLIP_EXECUTION_ENV_PATH='$$TRITON_MODEL_DIRECTORY/malicious_env.tar.gz'
-
-ZIPSLIP_CASES=(
-    "relative:Path contains '..'"
-    "absolute:Path is absolute"
-)
-
-for case in "${ZIPSLIP_CASES[@]}"; do
-    mode="${case%%:*}"
-    expected_msg="${case#*:}"
-    model="zipslip_${mode}"
-    marker="/tmp/zipslip_${mode}_marker_$$"
-    SERVER_LOG="./zipslip_${mode}_server.log"
-
-    rm -rf "${marker}" "${SERVER_LOG}" "${ZIPSLIP_REPO}"
-    mkdir -p "${ZIPSLIP_REPO}/${model}/1"
-
-    cp ../../python_models/identity_fp32/config.pbtxt "${ZIPSLIP_REPO}/${model}/config.pbtxt"
-    cp ../../python_models/identity_fp32/model.py     "${ZIPSLIP_REPO}/${model}/1/model.py"
-    (cd "${ZIPSLIP_REPO}/${model}" && \
-        sed -i "s/^name:.*/name: \"${model}\"/" config.pbtxt && \
-        echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$ZIPSLIP_EXECUTION_ENV_PATH\"}}" >> config.pbtxt)
-    python3 ./zipslip_test.py \
-        --mode   "${mode}" \
-        --output "${ZIPSLIP_REPO}/${model}/malicious_env.tar.gz" \
-        --marker "${marker}"
-
-    SERVER_ARGS="--model-repository=${ZIPSLIP_REPO} --log-verbose=1"
-    run_server
-    if [ "$SERVER_PID" != "0" ]; then
-        kill_server
-        echo -e "\n***\n*** Zip Slip (mode=${mode}): tritonserver started despite malicious EXECUTION_ENV_PATH archive.\n***"
-        RET=1
-    fi
-
-    set +e
-    if [ -e "${marker}" ]; then
-        ls -la "${marker}"
-        echo -e "\n***\n*** Zip Slip (mode=${mode}): marker file written outside extraction directory.\n***"
-        RET=1
-    fi
-    if ! grep -q "${expected_msg}" "${SERVER_LOG}"; then
-        cat "${SERVER_LOG}"
-        echo -e "\n***\n*** Zip Slip (mode=${mode}): expected '${expected_msg}' not found in server log.\n***"
-        RET=1
-    fi
-    set -e
-
-    rm -f "${marker}"
-done
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Env Manager Test PASSED.\n***"

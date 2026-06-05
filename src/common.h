@@ -1,4 +1,4 @@
-// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,12 +25,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <array>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <string_view>
 #include <typeinfo>
 #include <unordered_map>
 #include <variant>
@@ -47,36 +45,13 @@ constexpr char kContentEncodingHTTPHeader[] = "Content-Encoding";
 constexpr char kContentTypeHeader[] = "Content-Type";
 constexpr char kContentLengthHeader[] = "Content-Length";
 
-// The error message for client shared memory is disabled by default.
-constexpr char kClientShmDisabledErrorStr[] =
-    "Client shared memory is disabled. Start the server with "
-    "'--allow-client-shm=true' to enable.";
-
-// This prefix is reserved for shm regions created internally by Triton
-constexpr char kTritonSharedMemoryRegionPrefix[] =
-    "triton_python_backend_shm_region_";
-
 constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 
 /// The value for a dimension in a shape that indicates that that
 /// dimension can take on any size.
 constexpr int WILDCARD_DIM = -1;
 
-// Maximum allowed depth for JSON parsing
-constexpr int32_t HTTP_MAX_JSON_NESTING_DEPTH = 100;
-
-// Default maximum allowed HTTP request input size in bytes (64MB)
-constexpr size_t HTTP_DEFAULT_MAX_INPUT_SIZE = 1 << 26;
-
-/// Reserved parameter keys for Triton usage (also HTTP/gRPC header forward).
-/// Other locations:
-/// - client/src/python/library/tritonclient/utils/__init__.py
-/// - server/docs/protocol/extension_parameters.md
-constexpr std::array<std::string_view, 7> kReservedParameterKeys{
-    "sequence_id", "sequence_start", "sequence_end",      "priority",
-    "timeout",     "headers",        "binary_data_output"};
-
-// Request parameter keys that start with a "triton_" prefix for internal use
+/// Request parameter keys that start with a "triton_" prefix for internal use
 const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{
     "triton_enable_empty_final_response"};
 
@@ -180,17 +155,10 @@ std::string GetEnvironmentVariableOrDefault(
 /// Get the number of elements in a shape.
 ///
 /// \param dims The shape.
-/// \return The number of elements, -1 if the number of elements
+/// \return The number of elements, or -1 if the number of elements
 /// cannot be determined because the shape contains one or more
-/// wildcard dimensions, -2 if the shape contains an invalid dim,
-/// or -3 if the number is too large to represent as an int64_t.
+/// wildcard dimensions.
 int64_t GetElementCount(const std::vector<int64_t>& dims);
-
-/// Convert shape to string representation.
-///
-/// \param shape The shape as a vector.
-/// \return The string representation of the shape.
-std::string ShapeToString(const std::vector<int64_t>& shape);
 
 /// Returns if 'vec' contains 'str'.
 ///
@@ -210,16 +178,6 @@ bool Contains(const std::vector<std::string>& vec, const std::string& str);
 TRITONSERVER_Error* DecodeBase64(
     const char* input, size_t input_len, std::vector<char>& decoded_data,
     size_t& decoded_size, const std::string& name);
-
-
-/// Validate shared memory key
-///
-/// \param name The name of the memory block.
-/// \param shm_key The name of the posix shared memory object
-/// \return The error status.
-TRITONSERVER_Error* ValidateSharedMemoryKey(
-    const std::string& name, const std::string& shm_key);
-
 
 /// Joins container of strings into a single string delimited by
 /// 'delim'.

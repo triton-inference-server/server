@@ -1,4 +1,4 @@
-// Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -23,7 +23,6 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #pragma once
 
 #include <sys/stat.h>
@@ -46,7 +45,6 @@ class SagemakerAPIServer : public HTTPAPIServer {
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
       const int32_t port, const std::string address, const int thread_cnt,
-      const size_t max_input_size, const RestrictedFeatures& restricted_apis,
       std::unique_ptr<HTTPServer>* sagemaker_server);
 
   class SagemakeInferRequestClass : public InferRequestClass {
@@ -55,10 +53,12 @@ class SagemakerAPIServer : public HTTPAPIServer {
         TRITONSERVER_Server* server, evhtp_request_t* req,
         DataCompressor::Type response_compression_type,
         const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
-        const std::shared_ptr<SharedMemoryManager>& shm_manager)
+        const std::shared_ptr<SharedMemoryManager>& shm_manager,
+        bool pause_http_request = true,
+        bool register_fini_cancel_hook = true)
         : InferRequestClass(
               server, req, response_compression_type, triton_request,
-              shm_manager)
+              shm_manager, pause_http_request, register_fini_cancel_hook)
     {
     }
     using InferRequestClass::InferResponseComplete;
@@ -75,12 +75,10 @@ class SagemakerAPIServer : public HTTPAPIServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const int32_t port, const std::string address, const int thread_cnt,
-      const size_t max_input_size, const RestrictedFeatures& restricted_apis)
+      const int32_t port, const std::string address, const int thread_cnt)
       : HTTPAPIServer(
             server, trace_manager, shm_manager, port, false /* reuse_port */,
-            address, "" /* header_forward_pattern */, thread_cnt,
-            max_input_size, restricted_apis),
+            address, "" /* header_forward_pattern */, thread_cnt),
         ping_regex_(R"(/ping)"), invocations_regex_(R"(/invocations)"),
         models_regex_(R"(/models(?:/)?([^/]+)?(/invoke)?)"),
         model_path_regex_(
@@ -127,12 +125,13 @@ class SagemakerAPIServer : public HTTPAPIServer {
 
   std::unique_ptr<InferRequestClass> CreateInferRequest(
       evhtp_request_t* req,
-      const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
-      override
+      const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
+      bool pause_http_request = true,
+      bool register_fini_cancel_hook = true) override
   {
     return std::unique_ptr<InferRequestClass>(new SagemakeInferRequestClass(
         server_.get(), req, GetResponseCompressionType(req), triton_request,
-        shm_manager_));
+        shm_manager_, pause_http_request, register_fini_cancel_hook));
   }
   TRITONSERVER_Error* GetInferenceHeaderLength(
       evhtp_request_t* req, int32_t content_length,

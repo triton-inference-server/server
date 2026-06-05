@@ -1,4 +1,4 @@
-// Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -80,31 +80,6 @@ GetEnvironmentVariableOrDefault(
   return value ? value : default_value;
 }
 
-std::string
-ShapeToString(const int64_t* dims, const size_t dims_count)
-{
-  bool first = true;
-
-  std::string str("[");
-  for (size_t i = 0; i < dims_count; ++i) {
-    const int64_t dim = dims[i];
-    if (!first) {
-      str += ",";
-    }
-    str += std::to_string(dim);
-    first = false;
-  }
-
-  str += "]";
-  return str;
-}
-
-std::string
-ShapeToString(const std::vector<int64_t>& shape)
-{
-  return ShapeToString(shape.data(), shape.size());
-}
-
 int64_t
 GetElementCount(const std::vector<int64_t>& dims)
 {
@@ -113,20 +88,12 @@ GetElementCount(const std::vector<int64_t>& dims)
   for (auto dim : dims) {
     if (dim == WILDCARD_DIM) {
       return -1;
-    } else if (dim < 0) {  // invalid dim
-      return -2;
-    } else if (dim == 0) {
-      return 0;
     }
 
     if (first) {
       cnt = dim;
       first = false;
     } else {
-      // Check for overflow before multiplication
-      if (cnt > (INT64_MAX / dim)) {
-        return -3;
-      }
       cnt *= dim;
     }
   }
@@ -160,41 +127,6 @@ DecodeBase64(
   decoded_size =
       base64_decode_block(input, input_len, decoded_data.data(), &state);
 
-  return nullptr;
-}
-
-TRITONSERVER_Error*
-ValidateSharedMemoryKey(const std::string& name, const std::string& shm_key)
-{
-  std::string_view key_view(shm_key);
-
-  // Find the index of the first character that is not a slash
-  const std::size_t first_non_slash = key_view.find_first_not_of('/');
-
-  // If the entire key is slashes
-  if (first_non_slash == std::string_view::npos) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "cannot register shared memory region '" + name +
-            "' - invalid shm key '" + shm_key + "'")
-            .c_str());
-  }
-
-  // Check whether the substring starting at first_non_slash starts with the
-  // reserved prefix
-  if (key_view.substr(first_non_slash)
-          .rfind(kTritonSharedMemoryRegionPrefix, 0) == 0) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "cannot register shared memory region '" + name + "' with key '" +
-            shm_key + "' as the key contains the reserved prefix '" +
-            kTritonSharedMemoryRegionPrefix + "'")
-            .c_str());
-  }
-
-  // Valid shm key
   return nullptr;
 }
 

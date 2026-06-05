@@ -1,4 +1,4 @@
-// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -354,10 +354,7 @@ SharedMemoryManager::RegisterSystemSharedMemory(
     const std::string& name, const std::string& shm_key, const size_t offset,
     const size_t byte_size)
 {
-  // Check if the shared memory key starts with the reserved prefix
-  RETURN_IF_ERR(ValidateSharedMemoryKey(name, shm_key));
-
-  std::lock_guard<std::mutex> lock{mu_};
+  std::lock_guard<std::mutex> lock(mu_);
 
   if (shared_memory_map_.find(name) != shared_memory_map_.end()) {
     return TRITONSERVER_ErrorNew(
@@ -367,10 +364,23 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   }
 
   // register
-  void* mapped_addr{nullptr};
-  int shm_fd{-1};
+  void* mapped_addr;
+  int shm_fd = -1;
 
-  RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_fd));
+  // don't re-open if shared memory is already open
+  for (auto itr = shared_memory_map_.begin(); itr != shared_memory_map_.end();
+       ++itr) {
+    if (itr->second->shm_key_ == shm_key) {
+      // FIXME: Consider invalid file descriptors after close
+      shm_fd = itr->second->shm_fd_;
+      break;
+    }
+  }
+
+  // open and set new shm_fd if new shared memory key
+  if (shm_fd == -1) {
+    RETURN_IF_ERR(OpenSharedMemoryRegion(shm_key, &shm_fd));
+  }
 
   // Enforce that registered region is in-bounds of shm file object.
   RETURN_IF_ERR(
@@ -413,7 +423,7 @@ SharedMemoryManager::RegisterCUDASharedMemory(
     const size_t byte_size, const int device_id)
 {
   // Serialize all operations that write/read current shared memory regions
-  std::lock_guard<std::mutex> lock{mu_};
+  std::lock_guard<std::mutex> lock(mu_);
 
   // If name is already in shared_memory_map_ then return error saying already
   // registered
@@ -462,32 +472,22 @@ SharedMemoryManager::GetMemoryInfo(
   }
 
   // validate offset
-  size_t shm_region_size = 0;
-  if (it->second->byte_size_ > 0) {
-    shm_region_size += it->second->byte_size_;
+  size_t shm_region_end = 0;
+  if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
+    shm_region_end = it->second->offset_;
   }
-  if (offset >= shm_region_size) {
+  if (it->second->byte_size_ > 0) {
+    shm_region_end += it->second->byte_size_ - 1;
+  }
+  if (offset > shm_region_end) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string("Invalid offset for shared memory region: '" + name + "'")
             .c_str());
   }
-
-  // Check for potential integer overflow before validating bounds
-  if (byte_size > (SIZE_MAX - offset)) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string(
-            "Integer overflow detected: byte_size (" +
-            std::to_string(byte_size) + ") + offset (" +
-            std::to_string(offset) + ") exceeds maximum value (" +
-            std::to_string(SIZE_MAX) + ") for region '" + name + "'")
-            .c_str());
-  }
-
   // validate byte_size + offset is within memory bounds
-  size_t total_req_shm = offset + byte_size;
-  if (total_req_shm > shm_region_size) {
+  size_t total_req_shm = offset + byte_size - 1;
+  if (total_req_shm > shm_region_end) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
@@ -500,7 +500,12 @@ SharedMemoryManager::GetMemoryInfo(
     *shm_info = std::static_pointer_cast<const SharedMemoryInfo>(it->second);
   }
 
-  *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ + offset);
+  if (it->second->kind_ == TRITONSERVER_MEMORY_CPU) {
+    *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ +
+                               it->second->offset_ + offset);
+  } else {
+    *shm_mapped_addr = (void*)((uint8_t*)it->second->mapped_addr_ + offset);
+  }
 
   *memory_type = it->second->kind_;
   *device_id = it->second->device_id_;
@@ -652,6 +657,7 @@ SharedMemoryManager::UnregisterAll(TRITONSERVER_MemoryType memory_type)
       ++next_it;
       if (it->second->kind_ == TRITONSERVER_MEMORY_GPU) {
         TRITONSERVER_Error* err = UnregisterHelper(it->first, memory_type);
+        ;
         if (err != nullptr) {
           unregister_fails.push_back(it->first);
           LOG_VERBOSE(1) << TRITONSERVER_ErrorMessage(err);

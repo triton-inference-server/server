@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,15 +34,15 @@
 # Make all generated files accessible outside of container
 umask 0000
 # Set the version of the models
-TRITON_VERSION=${TRITON_VERSION:=26.05}
+TRITON_VERSION=${TRITON_VERSION:=25.03}
 # Set the CUDA device to use
-NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:=0}
+CUDA_DEVICE=${RUNNER_ID:=0}
 # Set TensorRT image
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3-igpu}
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:24.04}
 
 # Set CI specific parameters
-DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ -v RUNNER_GPUS && $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=$NVIDIA_VISIBLE_DEVICES" )}
+DOCKER_GPU_ARGS=${DOCKER_GPU_ARGS:-$([[ $RUNNER_GPUS =~ ^[0-9] ]] && eval $NV_DOCKER_ARGS || echo "--gpus device=$CUDA_DEVICE" )}
 
 ############################################################################
 # Check if Docker volume exists
@@ -142,7 +142,6 @@ docker pull $TENSORRT_IMAGE
 
 docker run $DOCKER_GPU_ARGS \
    --rm -v $DOCKER_VOLUME:/mnt \
-   -e TRT_VERBOSE \
   $TENSORRT_IMAGE bash -xe $VOLUME_SRCDIR/$TRT_MODEL_SCRIPT
 
 # Copy generated models to /tmp/ if not running in CI

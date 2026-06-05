@@ -1,4 +1,4 @@
-// Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -23,10 +23,7 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #include "sagemaker_server.h"
-
-#include <filesystem>
 
 namespace triton { namespace server {
 
@@ -39,16 +36,6 @@ namespace triton { namespace server {
       TRITONSERVER_ErrorDelete(err__);                \
       return;                                         \
     }                                                 \
-  } while (false)
-
-#define RETURN_AND_RESPOND_IF_RESTRICTED(REQ, RESTRICTED_CATEGORY)       \
-  do {                                                                   \
-    auto const& is_restricted_api =                                      \
-        restricted_apis_.IsRestricted(RESTRICTED_CATEGORY);              \
-    auto const& restriction = restricted_apis_.Get(RESTRICTED_CATEGORY); \
-    if (is_restricted_api && RespondIfRestricted((REQ), restriction)) {  \
-      return;                                                            \
-    }                                                                    \
   } while (false)
 
 namespace {
@@ -67,6 +54,63 @@ EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err)
 
   evbuffer_add(buffer, buffer_json.Base(), buffer_json.Size());
 }
+
+TRITONSERVER_Error*
+EVBufferToJson(
+    triton::common::TritonJson::Value* document, evbuffer_iovec* v, int* v_idx,
+    const size_t length, int n)
+{
+  size_t offset = 0, remaining_length = length;
+  char* json_base;
+  std::vector<char> json_buffer;
+
+  // No need to memcpy when number of iovecs is 1
+  if ((n > 0) && (v[0].iov_len >= remaining_length)) {
+    json_base = static_cast<char*>(v[0].iov_base);
+    if (v[0].iov_len > remaining_length) {
+      v[0].iov_base = static_cast<void*>(json_base + remaining_length);
+      v[0].iov_len -= remaining_length;
+      remaining_length = 0;
+    } else if (v[0].iov_len == remaining_length) {
+      remaining_length = 0;
+      *v_idx += 1;
+    }
+  } else {
+    json_buffer.resize(length);
+    json_base = json_buffer.data();
+    while ((remaining_length > 0) && (*v_idx < n)) {
+      char* base = static_cast<char*>(v[*v_idx].iov_base);
+      size_t base_size;
+      if (v[*v_idx].iov_len > remaining_length) {
+        base_size = remaining_length;
+        v[*v_idx].iov_base = static_cast<void*>(base + remaining_length);
+        v[*v_idx].iov_len -= remaining_length;
+        remaining_length = 0;
+      } else {
+        base_size = v[*v_idx].iov_len;
+        remaining_length -= v[*v_idx].iov_len;
+        *v_idx += 1;
+      }
+
+      memcpy(json_base + offset, base, base_size);
+      offset += base_size;
+    }
+  }
+
+  if (remaining_length != 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "unexpected size for request JSON, expecting " +
+            std::to_string(remaining_length) + " more bytes")
+            .c_str());
+  }
+
+  RETURN_IF_ERR(document->Parse(json_base, length));
+
+  return nullptr;  // success
+}
+
 }  // namespace
 
 
@@ -98,7 +142,7 @@ SagemakerAPIServer::GetInferenceHeaderLength(
       int32_t parsed_value;
       try {
         parsed_value =
-            std::stoi(content_type_c_str + binary_mime_type_.length());
+            std::atoi(content_type_c_str + binary_mime_type_.length());
       }
       catch (const std::invalid_argument& ia) {
         return TRITONSERVER_ErrorNew(
@@ -183,15 +227,11 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
         if (multi_model_name.empty()) {
           LOG_VERBOSE(1) << "SageMaker request: LIST ALL MODELS";
 
-          RETURN_AND_RESPOND_IF_RESTRICTED(
-              req, RestrictedCategory::MODEL_REPOSITORY);
           SageMakerMMEListModel(req);
           return;
         } else {
           LOG_VERBOSE(1) << "SageMaker request: GET MODEL";
 
-          RETURN_AND_RESPOND_IF_RESTRICTED(
-              req, RestrictedCategory::MODEL_REPOSITORY);
           SageMakerMMEGetModel(req, multi_model_name.c_str());
           return;
         }
@@ -199,13 +239,10 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
         if (action == "/invoke") {
           LOG_VERBOSE(1) << "SageMaker request: INVOKE MODEL";
 
-          {
-            std::lock_guard<std::mutex> lock(models_list_mutex_);
-            if (sagemaker_models_list_.find(multi_model_name.c_str()) ==
-                sagemaker_models_list_.end()) {
-              evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
-              return;
-            }
+          if (sagemaker_models_list_.find(multi_model_name.c_str()) ==
+              sagemaker_models_list_.end()) {
+            evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
+            return;
           }
           LOG_VERBOSE(1) << "SageMaker MME Custom Invoke Model Path";
 
@@ -227,22 +264,15 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
         if (action.empty()) {
           LOG_VERBOSE(1) << "SageMaker request: LOAD MODEL";
 
-          RETURN_AND_RESPOND_IF_RESTRICTED(
-              req, RestrictedCategory::MODEL_REPOSITORY);
           std::unordered_map<std::string, std::string> parse_load_map;
           ParseSageMakerRequest(req, &parse_load_map, "load");
-          if (!parse_load_map.empty()) {
-            SageMakerMMELoadModel(req, parse_load_map);
-          }
+          SageMakerMMELoadModel(req, parse_load_map);
           return;
         }
         break;
       case htp_method_DELETE: {
         // UNLOAD MODEL
         LOG_VERBOSE(1) << "SageMaker request: UNLOAD MODEL";
-
-        RETURN_AND_RESPOND_IF_RESTRICTED(
-            req, RestrictedCategory::MODEL_REPOSITORY);
         req->method = htp_method_POST;
 
         SageMakerMMEUnloadModel(req, multi_model_name.c_str());
@@ -272,12 +302,10 @@ SagemakerAPIServer::Create(
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const std::string address, const int thread_cnt,
-    const size_t max_input_size, const RestrictedFeatures& restricted_apis,
     std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new SagemakerAPIServer(
-      server, trace_manager, shm_manager, port, address, thread_cnt,
-      max_input_size, restricted_apis));
+      server, trace_manager, shm_manager, port, address, thread_cnt));
 
   const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started Sagemaker HTTPService at " << addr;
@@ -292,15 +320,29 @@ SagemakerAPIServer::ParseSageMakerRequest(
     std::unordered_map<std::string, std::string>* parse_map,
     const std::string& action)
 {
-  size_t buffer_len;
-  triton::common::TritonJson::Value request;
-  HTTP_RESPOND_IF_ERR(
-      req, EVRequestToJson(req, "load model", &request, &buffer_len));
+  struct evbuffer_iovec* v = nullptr;
+  int v_idx = 0;
+  int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+  if (n > 0) {
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
+    if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+      HTTP_RESPOND_IF_ERR(
+          req, TRITONSERVER_ErrorNew(
+                   TRITONSERVER_ERROR_INTERNAL,
+                   "unexpected error getting load model request buffers"));
+    }
+  }
 
   std::string model_name_string;
   std::string url_string;
 
+  size_t buffer_len = evbuffer_get_length(req->buffer_in);
   if (buffer_len > 0) {
+    triton::common::TritonJson::Value request;
+    HTTP_RESPOND_IF_ERR(
+        req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
+
     triton::common::TritonJson::Value url;
     triton::common::TritonJson::Value model_name;
 
@@ -313,22 +355,6 @@ SagemakerAPIServer::ParseSageMakerRequest(
       HTTP_RESPOND_IF_ERR(req, url.AsString(&url_string));
       LOG_VERBOSE(1) << "Received url: " << url_string.c_str();
     }
-  }
-
-  std::filesystem::path url_path(url_string);
-  url_path = std::filesystem::absolute(
-      url_path.lexically_normal());  // Normalize the path to remove any
-                                     // redundant components.
-  auto url_abspath = url_path.string();
-
-  if (url_abspath.find("/dev/") == 0 || url_abspath.find("/proc/") == 0 ||
-      url_abspath.find("/sys/") == 0) {
-    LOG_ERROR << "Invalid URL: " << url_string
-              << ". \"url\" property value cannot start with /dev/, /proc/, or "
-                 "/sys/."
-              << std::endl;
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
   }
 
   if (action == "load") {
@@ -349,7 +375,7 @@ SagemakerAPIServer::ParseSageMakerRequest(
     (*parse_map)["target_model"] = model_name_string.c_str();
   }
 
-  LOG_INFO << "Loading SageMaker TargetModel: " << (*parse_map)["target_model"];
+  LOG_INFO << "Loading SageMaker TargetModel: " << target_model;
 
   return;
 }
@@ -479,8 +505,7 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
       case DataCompressor::Type::GZIP: {
         decompressed_buffer = evbuffer_new();
         err = DataCompressor::DecompressData(
-            compression_type, req->buffer_in, decompressed_buffer,
-            max_input_size_);
+            compression_type, req->buffer_in, decompressed_buffer);
         break;
       }
       case DataCompressor::Type::UNKNOWN: {
@@ -508,7 +533,7 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
           evhtp_kv_find(req->headers_in, kContentLengthHeader);
       if (content_length_c_str != nullptr) {
         try {
-          content_length = std::stoi(content_length_c_str);
+          content_length = std::atoi(content_length_c_str);
         }
         catch (const std::invalid_argument& ia) {
           err = TRITONSERVER_ErrorNew(
@@ -690,7 +715,6 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
     target_model = model_name_hash;
   }
 
-  std::lock_guard<std::mutex> lock(models_list_mutex_);
   if (sagemaker_models_list_.find(model_name_hash) ==
       sagemaker_models_list_.end()) {
     LOG_VERBOSE(1) << "Model " << target_model << " with model hash "
@@ -775,7 +799,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
       server_.get(), repo_parent_path.c_str());
 
   if (unregister_err != nullptr) {
-    EVBufferAddErrorJson(req->buffer_out, unregister_err);
+    EVBufferAddErrorJson(req->buffer_out, unload_err);
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     LOG_ERROR << "Unable to unregister model repository for path: "
               << repo_parent_path << std::endl;
@@ -785,6 +809,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
 
   TRITONSERVER_ErrorDelete(unregister_err);
 
+  std::lock_guard<std::mutex> lock(models_list_mutex_);
   sagemaker_models_list_.erase(model_name_hash);
 }
 
@@ -931,27 +956,11 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     evhtp_request_t* req,
     const std::unordered_map<std::string, std::string> parse_map)
 {
-  std::string url_string = parse_map.at("url");
+  std::string repo_path = parse_map.at("url");
   std::string model_name_hash = parse_map.at("model_name_hash");
   std::string target_model = parse_map.at("target_model");
 
-  std::filesystem::path url_path(url_string);
-  url_path = std::filesystem::absolute(
-      url_path.lexically_normal());  // Normalize the path to remove any
-                                     // redundant components.
-  std::string url_abspath = url_path.string();
-
-  if (url_abspath.find("/dev/") == 0 || url_abspath.find("/proc/") == 0 ||
-      url_abspath.find("/sys/") == 0) {
-    LOG_ERROR << "Invalid repository path: " << url_string
-              << ". \"url\" property of `parse_map`cannot start with /dev/, "
-                 "/proc/, or /sys/."
-              << std::endl;
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    return;
-  }
-
-  /* Check subdirs for models and find ensemble model within the url_abspath
+  /* Check subdirs for models and find ensemble model within the repo_path
    * If only 1 model, that will be selected as model_subdir
    * Else ensemble model directory is set as model_subdir
    */
@@ -960,8 +969,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   int dir_count = 0;
   std::string model_subdir, ensemble_model_subdir;
 
-  if ((dir = opendir(url_abspath.c_str())) != NULL) {
-    std::shared_ptr<DIR> dir_ptr{dir, closedir};
+  if ((dir = opendir(repo_path.c_str())) != NULL) {
     while ((ent = readdir(dir)) != NULL) {
       if ((ent->d_type == DT_DIR) && (!strcmp(ent->d_name, ".") == 0) &&
           (!strcmp(ent->d_name, "..") == 0)) {
@@ -980,7 +988,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
 
       // Read the config.pbtxt file at each path, if available
       std::string ensemble_config_path =
-          url_abspath + "/" + model_subdir + "/config.pbtxt";
+          repo_path + "/" + model_subdir + "/" + "config.pbtxt";
       std::ifstream config_fstream(ensemble_config_path);
       std::stringstream ensemble_config_content;
 
@@ -1011,6 +1019,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
             << std::endl;
       }
     }
+    closedir(dir);
   }
 
   if (!strcmp(ensemble_model_subdir.c_str(), "") == 0) {
@@ -1027,20 +1036,11 @@ SagemakerAPIServer::SageMakerMMELoadModel(
    */
 
   std::string repo_parent_path, subdir, customer_subdir;
-  bool matched = RE2::FullMatch(
-      url_abspath, model_path_regex_, &repo_parent_path, &subdir,
+  RE2::FullMatch(
+      repo_path, model_path_regex_, &repo_parent_path, &subdir,
       &customer_subdir);
-  if (!matched) {
-    HTTP_RESPOND_IF_ERR(
-        req, TRITONSERVER_ErrorNew(
-                 TRITONSERVER_ERROR_INVALID_ARG,
-                 ("Invalid \"url\" '" + url_string +
-                  "': expected a path of the form "
-                  "/opt/ml/models/<hash>/model[/<subdir>]")
-                     .c_str()));
-  }
 
-  std::string config_path = url_abspath + "/config.pbtxt";
+  std::string config_path = repo_path + "/config.pbtxt";
   struct stat buffer;
 
   /* If config.pbtxt is at repo root,
@@ -1051,7 +1051,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   if (stat(config_path.c_str(), &buffer) == 0) {
     model_subdir = subdir;
   } else {
-    repo_parent_path = url_abspath;
+    repo_parent_path = repo_path;
   }
 
   auto param = TRITONSERVER_ParameterNew(

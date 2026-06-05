@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,7 +30,6 @@ import argparse
 import sys
 from builtins import range
 
-import ml_dtypes
 import numpy as np
 import requests as httpreq
 import tritonclient.grpc as grpcclient
@@ -202,8 +201,8 @@ if __name__ == "__main__":
             ("identity_nobatch_int8", np.int8, [0]),
             ("identity_nobatch_int8", np.int8, [7]),
             ("identity_bytes", object, [1, 1]),
-            ("identity_bf16", ml_dtypes.bfloat16, [1, 0]),
-            ("identity_bf16", ml_dtypes.bfloat16, [1, 5])
+            ("identity_bf16", np.float32, [1, 0]),
+            ("identity_bf16", np.float32, [1, 5])
         ):
             # yapf: enable
             if np_dtype != object:
@@ -235,20 +234,40 @@ if __name__ == "__main__":
                 print("error: expected 'OUTPUT0'")
                 sys.exit(1)
 
-            if output_data.dtype != input_data.dtype:
-                print(
-                    "error: expected output dtype {} to match input dtype {} for {}".format(
-                        output_data.dtype, input_data.dtype, model_name
+            if model_name == "identity_bf16":
+                if input_data.shape != output_data.shape:
+                    print(
+                        "error: expected output shape {} to match input shape {}".format(
+                            output_data.shape, input_data.shape
+                        )
                     )
-                )
-                sys.exit(1)
-            if not np.array_equal(output_data, input_data):
-                print(
-                    "error: expected output {} to match input {} for {}".format(
-                        output_data, input_data, model_name
+                    sys.exit(1)
+                for input, output in zip(
+                    np.nditer(input_data, flags=["refs_ok", "zerosize_ok"], order="C"),
+                    np.nditer(output_data, flags=["refs_ok", "zerosize_ok"], order="C"),
+                ):
+                    if input.tobytes()[2:4] != output.tobytes()[2:4]:
+                        print(
+                            "error: expected low-order bits of output {} to match low-order bits of input {}".format(
+                                output, input
+                            )
+                        )
+                        sys.exit(1)
+                    if output.tobytes()[0:2] != b"\x00\x00":
+                        print(
+                            "error: expected output {} to have all-zero high-order bits, got {}".format(
+                                output, output.tobytes()[0:2]
+                            )
+                        )
+                        sys.exit(1)
+            else:
+                if not np.array_equal(output_data, input_data):
+                    print(
+                        "error: expected output {} to match input {}".format(
+                            output_data, input_data
+                        )
                     )
-                )
-                sys.exit(1)
+                    sys.exit(1)
 
             # Make sure response parameters are correct
             response = results.get_response()

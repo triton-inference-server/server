@@ -1,4 +1,4 @@
-// Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -42,12 +42,10 @@ VertexAiAPIServer::VertexAiAPIServer(
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const std::string address, const int thread_cnt,
     const std::string& prediction_route, const std::string& health_route,
-    const std::string& default_model_name, const size_t max_input_size,
-    const RestrictedFeatures& restricted_apis)
+    const std::string& default_model_name)
     : HTTPAPIServer(
           server, trace_manager, shm_manager, port, false /* reuse_port */,
-          address, "" /* header_forward_pattern */, thread_cnt, max_input_size,
-          restricted_apis),
+          address, "" /* header_forward_pattern */, thread_cnt),
       prediction_regex_(prediction_route), health_regex_(health_route),
       health_mode_("ready"), model_name_(default_model_name),
       model_version_str_("")
@@ -79,7 +77,7 @@ VertexAiAPIServer::GetInferenceHeaderLength(
       int32_t parsed_value;
       try {
         parsed_value =
-            std::stoi(content_type_c_str + binary_mime_type_.length());
+            std::atoi(content_type_c_str + binary_mime_type_.length());
       }
       catch (const std::invalid_argument& ia) {
         return TRITONSERVER_ErrorNew(
@@ -196,40 +194,32 @@ VertexAiAPIServer::Handle(evhtp_request_t* req)
       } else if (RE2::FullMatch(
                      redirect_endpoint, systemsharedmemory_regex_, &region,
                      &action)) {
+        // system shared memory
         if (action == "status") {
           req->method = htp_method_GET;
-          HandleSystemSharedMemory(req, region, action);
-          return;
         }
-        // Only read-only status queries are permitted through redirect.
-        // Mutating operations (register/unregister) require the core
-        // HTTP endpoint.
-        LOG_VERBOSE(1) << "Vertex AI redirect blocked: " << redirect_endpoint;
-        evhtp_send_reply(req, EVHTP_RES_FORBIDDEN);
+        HandleSystemSharedMemory(req, region, action);
         return;
       } else if (RE2::FullMatch(
                      redirect_endpoint, cudasharedmemory_regex_, &region,
                      &action)) {
+        // cuda shared memory
         if (action == "status") {
           req->method = htp_method_GET;
-          HandleCudaSharedMemory(req, region, action);
-          return;
         }
-        LOG_VERBOSE(1) << "Vertex AI redirect blocked: " << redirect_endpoint;
-        evhtp_send_reply(req, EVHTP_RES_FORBIDDEN);
+        HandleCudaSharedMemory(req, region, action);
         return;
       } else if (RE2::FullMatch(
                      redirect_endpoint, modelcontrol_regex_, &repo_name, &kind,
                      &model_name, &action)) {
+        // model repository
         if (kind == "index") {
           HandleRepositoryIndex(req, repo_name);
           return;
+        } else if (kind.find("models", 0) == 0) {
+          HandleRepositoryControl(req, repo_name, model_name, action);
+          return;
         }
-        // Only repository index queries are permitted through redirect.
-        // Model load/unload requires the core HTTP endpoint.
-        LOG_VERBOSE(1) << "Vertex AI redirect blocked: " << redirect_endpoint;
-        evhtp_send_reply(req, EVHTP_RES_FORBIDDEN);
-        return;
       }
     }
   }
@@ -279,7 +269,6 @@ VertexAiAPIServer::Create(
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const std::string address, const int thread_cnt,
-    const size_t max_input_size, const RestrictedFeatures& restricted_apis,
     std::string default_model_name, std::unique_ptr<HTTPServer>* http_server)
 {
   auto predict_route = GetEnvironmentVariableOrDefault("AIP_PREDICT_ROUTE", "");
@@ -355,8 +344,7 @@ VertexAiAPIServer::Create(
 
   http_server->reset(new VertexAiAPIServer(
       server, trace_manager, shm_manager, port, address, thread_cnt,
-      predict_route, health_route, default_model_name, max_input_size,
-      restricted_apis));
+      predict_route, health_route, default_model_name));
 
   const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started Vertex AI HTTPService at " << addr;

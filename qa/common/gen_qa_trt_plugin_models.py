@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,12 +44,7 @@ trt.init_libnvinfer_plugins(TRT_LOGGER, "")
 def get_trt_plugin(plugin_name):
     plugin = None
     field_collection = None
-    # The upstream onnx_custom_plugin sample is V2 on TRT 10.x release
-    # branches and V3 on rel-11.0 (and TRT 11 removed the V2 plugin
-    # registry surface). Pick the matching API at runtime.
-    registry = trt.get_plugin_registry()
-    use_v3 = not hasattr(registry, "plugin_creator_list")
-    plugin_creators = registry.all_creators if use_v3 else registry.plugin_creator_list
+    plugin_creators = trt.get_plugin_registry().plugin_creator_list
     for plugin_creator in plugin_creators:
         if (plugin_creator.name == "CustomHardmax") and (
             plugin_name == "CustomHardmax"
@@ -62,16 +57,9 @@ def get_trt_plugin(plugin_name):
 
     if field_collection is None:
         raise RuntimeError("Plugin not found: " + plugin_name)
-    if use_v3:
-        plugin = plugin_creator.create_plugin(
-            name=plugin_name,
-            field_collection=field_collection,
-            phase=trt.TensorRTPhase.BUILD,
-        )
-    else:
-        plugin = plugin_creator.create_plugin(
-            name=plugin_name, field_collection=field_collection
-        )
+    plugin = plugin_creator.create_plugin(
+        name=plugin_name, field_collection=field_collection
+    )
 
     return plugin
 
@@ -90,6 +78,9 @@ def create_plan_modelfile(
         input_dtype,
         output0_dtype,
         output0_dtype,
+        input_shape,
+        output0_shape,
+        output0_shape,
     ):
         return
 
@@ -116,16 +107,9 @@ def create_plan_modelfile(
     input_layer = network.add_input(
         name="INPUT0", dtype=trt_input_dtype, shape=input_with_batchsize
     )
-    # add_plugin_v2 was removed in TRT 11; add_plugin_v3 has existed since
-    # TRT 10.0. Pick the API that exists on this TRT install; the plugin
-    # object returned by get_trt_plugin() is matched to the same version.
-    plugin_obj = get_trt_plugin(plugin_name)
-    if hasattr(network, "add_plugin_v2"):
-        plugin_layer = network.add_plugin_v2(inputs=[input_layer], plugin=plugin_obj)
-    else:
-        plugin_layer = network.add_plugin_v3(
-            inputs=[input_layer], shape_inputs=[], plugin=plugin_obj
-        )
+    plugin_layer = network.add_plugin_v2(
+        inputs=[input_layer], plugin=get_trt_plugin(plugin_name)
+    )
     plugin_layer.get_output(0).name = "OUTPUT0"
     network.mark_output(plugin_layer.get_output(0))
 
@@ -163,7 +147,7 @@ def create_plan_modelfile(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -173,6 +157,7 @@ def create_plan_modelfile(
 def create_plan_modelconfig(
     models_dir,
     max_batch,
+    model_version,
     plugin_name,
     input_shape,
     output0_shape,
@@ -183,6 +168,9 @@ def create_plan_modelconfig(
         input_dtype,
         output0_dtype,
         output0_dtype,
+        input_shape,
+        output0_shape,
+        output0_shape,
     ):
         return
 
@@ -231,7 +219,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -245,6 +233,7 @@ def create_plugin_models(models_dir):
     create_plan_modelconfig(
         models_dir,
         8,
+        model_version,
         "CustomHardmax",
         (2, 2),
         (2, 2),
@@ -265,6 +254,7 @@ def create_plugin_models(models_dir):
     create_plan_modelconfig(
         models_dir,
         0,
+        model_version,
         "CustomHardmax",
         (16, 1, 1),
         (16, 1, 1),

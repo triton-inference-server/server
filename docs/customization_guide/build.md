@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -59,6 +59,10 @@ to build Triton on a platform that is not listed here.
 
 * [Ubuntu 22.04, x86-64](#building-for-ubuntu-2204)
 
+* [Jetpack 4.x, NVIDIA Jetson (Xavier, Nano, TX2)](#building-for-jetpack-4x)
+
+* [Windows 10, x86-64](#building-for-windows-10)
+
 If you are developing or debugging Triton, see [Development and
 Incremental Builds](#development-and-incremental-builds) for information
 on how to perform incremental build.
@@ -68,8 +72,8 @@ on how to perform incremental build.
 For Ubuntu-22.04, build.py supports both a Docker build and a
 non-Docker build.
 
-* [Build using Docker](#building-with-docker) and the PyTorch
-  Docker image from [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com).
+* [Build using Docker](#building-with-docker) and the TensorFlow and PyTorch
+  Docker images from [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com).
 
 * [Build without Docker](#building-without-docker).
 
@@ -186,10 +190,14 @@ If you want to build without GPU support you must specify individual
 feature flags and not include the `--enable-gpu` and
 `--enable-gpu-metrics` flags. Only the following backends are
 available for a non-GPU / CPU-only build: `identity`, `repeat`, `ensemble`,
-`square`, `pytorch`, `onnxruntime`, `openvino`,
+`square`, `tensorflow2`, `pytorch`, `onnxruntime`, `openvino`,
 `python` and `fil`.
 
-CPU-only builds of the PyTorch backends require some CUDA stubs
+To include the TensorFlow2 backend in your CPU-only build, you must
+provide this additional flag to build.py:
+`--extra-backend-cmake-arg=tensorflow2:TRITON_TENSORFLOW_INSTALL_EXTRA_DEPS=ON`.
+
+CPU-only builds of the TensorFlow and PyTorch backends require some CUDA stubs
 and runtime dependencies that are not present in the CPU-only base container.
 These are retrieved from a GPU base container, which can be changed with the
 `--image=gpu-base,nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min` flag.
@@ -259,6 +267,90 @@ For a given version of Triton you can attempt to build with
 non-supported versions of TensorRT but you may have build or execution
 issues since non-supported versions are not tested.
 
+## Building for Windows 10
+
+For Windows 10, build.py supports both a Docker build and a non-Docker
+build in a similar way as described for [Ubuntu](#building-for-ubuntu-2204). The primary
+difference is that the minimal/base image used as the base of
+Dockerfile.buildbase image can be built from the provided
+[Dockerfile.win10.min](https://github.com/triton-inference-server/server/blob/main/Dockerfile.win10.min)
+file as described in [Windows 10 "Min" Image](#windows-10-min-image). When running build.py
+use the --image flag to specify the tag that you assigned to this
+image. For example, --image=base,win10-py3-min.
+
+### Windows and Docker
+
+Depending on your version of Windows 10 and your version of Docker you
+may need to perform these additional steps before any of the following
+step.
+
+* Set your Docker to work with "Windows containers". Right click on
+  the whale icon in the lower-right status area and select "Switch to
+  Windows containers".
+
+### Windows 10 "Min" Image
+
+The "min" container describes the base dependencies needed to perform
+the Windows build. The Windows min container is
+[Dockerfile.win10.min](https://github.com/triton-inference-server/server/blob/main/Dockerfile.win10.min).
+
+Before building the min container you must download the appropriate
+cuDNN and TensorRT versions and place them in the same directory as
+Dockerfile.win10.min.
+
+* For cuDNN the CUDNN_VERSION and CUDNN_ZIP arguments defined in
+  Dockerfile.win10.min indicate the version of cuDNN that your should
+  download from https://developer.nvidia.com/rdp/cudnn-download.
+
+* For TensorRT the TENSORRT_VERSION and TENSORRT_ZIP arguments defined
+  in Dockerfile.win10.min indicate the version of TensorRT that your
+  should download from
+  https://developer.nvidia.com/nvidia-tensorrt-download.
+
+After downloading the zip files for cuDNN and TensorRT, you build the
+min container using the following command.
+
+```bash
+$ docker build -t win10-py3-min -f Dockerfile.win10.min .
+```
+
+### Build Triton Server
+
+Triton is built using the build.py script. The build system must have
+Docker, Python3 (plus pip installed *docker* module) and git installed
+so that it can execute build.py and perform a docker build. By
+default, build.py does not enable any of Triton's optional features
+and so you must enable them explicitly. The following build.py
+invocation builds all features and backends available on windows.
+
+```bash
+python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --endpoint=http --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=onnxruntime:<container tag> --backend=openvino:<container tag> --backend=python:<container tag>
+```
+
+If you are building on *main* branch then `<container tag>` will
+default to "main". If you are building on a release branch then
+`<container tag>` will default to the branch name. For example, if you
+are building on the r24.12 branch, `<container tag>` will default to
+r24.12. Therefore, you typically do not need to provide `<container
+tag>` at all (nor the preceding colon). You can use a different
+`<container tag>` for a component to instead use the corresponding
+branch/tag in the build. For example, if you have a branch called
+"mybranch" in the
+[onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
+repo that you want to use in the build, you would specify
+--backend=onnxruntime:mybranch.
+
+### Extract Build Artifacts
+
+When build.py completes, a Docker image called *tritonserver* will
+contain the built Triton Server executable, libraries and other
+artifacts. Windows containers do not support GPU access so you likely
+want to extract the necessary files from the tritonserver image and
+run them directly on your host system. All the Triton artifacts can be
+found in /opt/tritonserver directory of the tritonserver image.  Your
+host system will need to install the CUDA, cuDNN, TensorRT and other
+dependencies that were used for the build.
+
 ## Building on Unsupported Platforms
 
 Building for an unsupported OS and/or hardware platform is
@@ -310,6 +402,17 @@ and cmake_build or the equivalent commands to perform a build.
   build.py. In general, you should start by running build.py with the
   minimal required feature set.
 
+* The
+  [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend)
+  backend extracts pre-built shared libraries from the TensorFlow NGC
+  container as part of the build. This container is only available for
+  Ubuntu-22.04 / x86-64, so if you require the TensorFlow backend for
+  your platform you will need download the TensorFlow container and
+  modify its build to produce shared libraries for your platform. You
+  must use the TensorFlow source and build scripts from within the NGC
+  container because they contain Triton-specific patches that are
+  required for the Triton TensorFlow backend.
+
 * By default, the
   [PyTorch](https://github.com/triton-inference-server/pytorch_backend)
   backend build extracts pre-built shared libraries from The PyTorch
@@ -323,8 +426,8 @@ and cmake_build or the equivalent commands to perform a build.
 
 If you are [building without Docker](#building-without-docker) use the
 CMake invocation steps in cmake_build to invoke CMake to set-up a
-build environment where you can invoke make to incremental build the Triton
-core, a backend, or a repository agent.
+build environment where you can invoke make/msbuild.exe to incremental
+build the Triton core, a backend, or a repository agent.
 
 ### Development Builds With Docker
 
@@ -337,7 +440,8 @@ agents.
 
 To perform an incremental build within the *tritonserver_buildbase*
 container, map your source into the container and then run the
-appropriate CMake and `make` steps from cmake_build within the container.
+appropriate CMake and `make` (or `msbuild.exe`) steps from cmake_build
+within the container.
 
 #### Development Build of Triton Core
 
@@ -363,9 +467,10 @@ CMakeLists.txt file and source:
 $ cmake <options> /server
 ```
 
-Then you can change directory into the build directory and run `make` as shown
-in cmake_build. As you make changes to the source on your host system, you can
-perform incremental builds by re-running `make`.
+Then you can change directory into the build directory and run `make`
+(or `msbuild.exe`) as shown in cmake_build. As you make changes to the
+source on your host system, you can perform incremental builds by
+re-running `make` (or `msbuild.exe`).
 
 #### Development Build of Backend or Repository Agent
 
@@ -379,8 +484,10 @@ incremental builds to test those changes. Your source code is in
 /home/me/tritonserver_backend. Run the *tritonserver_buildbase*
 container and map your TensorRT backend source directory into the
 container at /tensorrt_backend. Note that some backends will use
-Docker as part of their build, and so the host's Docker registry must be made
-available within the *tritonserver_buildbase* by mounting docker.sock.
+Docker as part of their build, and so the host's Docker registry must
+be made available within the *tritonserver_buildbase* by mounting
+docker.sock (on Windows use
+-v\\.\pipe\docker_engine:\\.\pipe\docker_engine).
 
 ```
 $ docker run -it --rm -v/var/run/docker.sock:/var/run/docker.sock -v/home/me/tensorrt_backend:/tensorrt_backend tritonserver_buildbase bash
@@ -397,9 +504,10 @@ CMakeLists.txt file and source:
 $ cmake <options> /tensorrt_backend
 ```
 
-Then you can change directory into the build directory and run `make` as shown
-in cmake_build. As you make changes to the source on your host system, you can
-perform incremental builds by re-running `make`.
+Then you can change directory into the build directory and run `make`
+(or `msbuild.exe`) as shown in cmake_build. As you make changes to the
+source on your host system, you can perform incremental builds by
+re-running `make` (or `msbuild.exe`).
 
 ### Building with Debug Symbols
 

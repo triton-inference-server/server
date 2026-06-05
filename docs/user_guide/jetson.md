@@ -1,5 +1,5 @@
 <!--
-# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,7 +41,7 @@ Triton Inference Server support on JetPack includes:
 * [Model pipelines](architecture.md#ensemble-models)
 * [Extensible backends](https://github.com/triton-inference-server/backend)
 * [HTTP/REST and GRPC inference protocols](../customization_guide/inference_protocols.md)
-* [C API](../customization_guide/inprocess_c_api.md)
+* [C API](../customization_guide/inference_protocols.md#in-process-triton-server-api)
 
 Limitations on JetPack 5.0:
 
@@ -52,7 +52,7 @@ The CUDA execution provider is in Beta.
 * GPU metrics, GCS storage, S3 storage and Azure storage are not supported.
 
 On JetPack, although HTTP/REST and GRPC inference protocols are supported, for edge
-use cases, direct [C API integration](../customization_guide/inprocess_c_api.md)
+use cases, direct [C API integration](../customization_guide/inference_protocols.md#in-process-triton-server-api)
 is recommended.
 
 You can download the `.tgz` file for Jetson from the Triton Inference Server
@@ -190,11 +190,13 @@ LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib/llvm-8/lib"
 ```
 
 **Note**: On Jetson, the backend directory must be explicitly specified using the
-`--backend-directory` flag.
+`--backend-directory` flag. Starting from 23.04, Triton no longer supports
+TensorFlow 1.x. If you'd like to use TensorFlow 1.x with Triton prior to 23.04,
+a version string is required to use TensorFlow 1.x.
 
 ```
 tritonserver --model-repository=/path/to/model_repo --backend-directory=/path/to/tritonserver/backends \
-             --backend-config=onnx,version=2
+             --backend-config=tensorflow,version=2
 ```
 
 **Note**:

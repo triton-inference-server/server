@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,11 +45,7 @@ def create_data_dependent_modelfile(
     trt_input_dtype = np_to_trt_dtype(input_dtype)
 
     # Create the model
-    TRT_LOGGER = (
-        trt.Logger(trt.Logger.INFO)
-        if os.environ.get("TRT_VERBOSE") != "1"
-        else trt.Logger(trt.Logger.VERBOSE)
-    )
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 
@@ -86,17 +82,11 @@ def create_data_dependent_modelfile(
 
     # serialized model
     engine_bytes = builder.build_serialized_network(network, config)
-    if engine_bytes is None:
-        print(
-            f"warning: Skipping {model_name}: TRT engine build failed "
-            f"(NonZero op may not be supported on this GPU/TRT version)"
-        )
-        return
 
     model_version_dir = models_dir + "/" + model_name + "/1"
     try:
         os.makedirs(model_version_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -135,7 +125,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:

@@ -1,4 +1,4 @@
-// Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -291,8 +291,8 @@ SetInferenceRequestMetadata(
             TRITONSERVER_ERROR_INVALID_ARG,
             (std::string(
                  "parameter keys starting with 'triton_' are reserved for "
-                 "Triton usage. Only the following keys starting with "
-                 "'triton_' are "
+                 "Triton "
+                 "usage. Only the following keys starting with 'triton_' are "
                  "allowed: ") +
              Join(TRITON_RESERVED_REQUEST_PARAMS, " "))
                 .c_str());
@@ -587,16 +587,7 @@ InferGRPCToInput(
           serialized_data->emplace_back();
           auto& serialized = serialized_data->back();
 
-          // Pre-compute the total serialized byte size and reserve once to
-          // avoid repeated std::string reallocations and heap fragmentation
-          // when 'bytes_contents' carries a large number of elements.
-          size_t serialized_byte_size = 0;
-          for (const auto& element : io.contents().bytes_contents()) {
-            serialized_byte_size += sizeof(uint32_t) + element.size();
-          }
-          serialized.reserve(serialized_byte_size);
-
-          // Serialize the input tensor strings. Each string is
+          // Serialize the output tensor strings. Each string is
           // serialized as a 4-byte length followed by the string itself
           // with no null-terminator.
           for (const auto& element : io.contents().bytes_contents()) {
@@ -690,7 +681,7 @@ ModelInferHandler::Process(
     InferHandler::State* state, bool rpc_ok, bool is_notification)
 {
   // There are multiple handlers registered in the gRPC service.
-  // Hence, we can have a case where a handler thread is
+  // Hence, there we can have a case where a handler thread is
   // making progress in the state machine for a request and the
   // other thread is issuing cancellation on the same request.
   // Need to protect the state transitions for these cases.
@@ -706,23 +697,9 @@ ModelInferHandler::Process(
         std::chrono::milliseconds(state->delay_process_ms_));
   }
 
-  if (is_notification) {
-    state->context_->SetReceivedNotification(true);
-  }
-
   // Handle notification for cancellation which can be raised
   // asynchronously if detected on the network.
   if (state->IsGrpcContextCancelled()) {
-    if (is_notification) {
-      // Received the cancellation notification
-      LOG_VERBOSE(1) << "Cancellation notification received for " << Name()
-                     << ", rpc_ok=" << rpc_ok << ", context "
-                     << state->context_->unique_id_ << " step "
-                     << state->context_->step_ << ", state "
-                     << state->unique_id_ << " step " << state->step_;
-    }
-
-    bool skip_handle_cancellation = false;
     if (rpc_ok && (state->step_ == Steps::START) &&
         (state->context_->step_ != Steps::CANCELLED)) {
 #ifdef TRITON_ENABLE_TRACING
@@ -738,16 +715,10 @@ ModelInferHandler::Process(
       // thread, and cancellation at step START was not reproducible in a
       // single thread scenario.
       StartNewRequest();
-    } else if (
-        state->step_ == Steps::COMPLETE || state->step_ == Steps::FINISH) {
-      // If the request is completed, simply ignore the cancellation.
-      skip_handle_cancellation = true;
     }
-
-    if (!skip_handle_cancellation) {
-      bool resume = state->context_->HandleCancellation(state, rpc_ok, Name());
-      return resume;
-    }
+    bool resume = state->context_->HandleCancellation(
+        state, rpc_ok, Name(), is_notification);
+    return resume;
   }
 
 
@@ -782,24 +753,14 @@ ModelInferHandler::Process(
       StartNewRequest();
     }
 
-    std::shared_lock<std::shared_mutex> lk1(*conn_mtx_);
-
-    if (*accepting_new_conn_ && ExecutePrecondition(state)) {
+    if (ExecutePrecondition(state)) {
       Execute(state);
     } else {
-      ::grpc::Status status;
-      if (*accepting_new_conn_) {
-        status = ::grpc::Status(
-            ::grpc::StatusCode::UNAVAILABLE,
-            "This protocol is restricted, expecting header '" +
-                restricted_kv_.first + "'");
-      } else {
-        status = ::grpc::Status(
-            ::grpc::StatusCode::UNAVAILABLE,
-            "GRPC server is shutting down and has stopped accepting new "
-            "requests.");
-      }
-      lk1.unlock();
+      ::grpc::Status status = ::grpc::Status(
+          ::grpc::StatusCode::UNAVAILABLE,
+          std::string("This protocol is restricted, expecting header '") +
+              restricted_kv_.first + "'");
+
 
 #ifdef TRITON_ENABLE_TRACING
       state->trace_timestamps_.emplace_back(
@@ -1062,29 +1023,17 @@ ModelInferHandler::InferResponseComplete(
   // notification.
   std::lock_guard<std::recursive_mutex> lock(state->step_mtx_);
 
-  if (state->delay_response_complete_exec_ms_ != 0) {
-    // Will delay the Process execution of state at step ISSUED by the
-    // specified time. This can be used to test the flow when cancellation
-    // request issued for the request before InferResponseComplete.
-    LOG_INFO << "Delaying InferResponseComplete execution by "
-             << state->delay_response_complete_exec_ms_ << " ms...";
-    std::this_thread::sleep_for(
-        std::chrono::milliseconds(state->delay_response_complete_exec_ms_));
-  }
-
   // Increment the callback index if received valid 'iresponse'
   if (iresponse != nullptr) {
     state->cb_count_++;
   }
-
-  bool is_final_response = (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0;
 
   LOG_VERBOSE(1) << "ModelInferHandler::InferResponseComplete, "
                  << state->unique_id_ << " step " << state->step_;
 
   // Allow sending 1 response and final flag separately, only mark
   // non-inflight when seeing final flag
-  if (is_final_response) {
+  if (flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) {
     state->context_->EraseInflightState(state);
   }
 
@@ -1104,23 +1053,22 @@ ModelInferHandler::InferResponseComplete(
                    << ", skipping response generation as grpc transaction was "
                       "cancelled... ";
 
-    if (is_final_response) {
-      if (state->delay_enqueue_ms_ != 0) {
-        // Will delay PutTaskBackToQueue by the specified time.
-        // This can be used to test the flow when cancellation request
-        // issued for the request during InferResponseComplete
-        // callback right before Process in the notification thread.
-        LOG_INFO << "Delaying PutTaskBackToQueue by "
-                 << state->delay_enqueue_ms_ << " ms...";
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(state->delay_enqueue_ms_));
-      }
-
-      // Send state back to the queue so that state can be released
-      // in the next cycle.
-      state->context_->PutTaskBackToQueue(state);
-      delete response_release_payload;
+    if (state->delay_enqueue_ms_ != 0) {
+      // Will delay PutTaskBackToQueue by the specified time.
+      // This can be used to test the flow when cancellation request
+      // issued for the request during InferResponseComplete
+      // callback right before Process in the notification thread.
+      LOG_INFO << "Delaying PutTaskBackToQueue by " << state->delay_enqueue_ms_
+               << " ms...";
+      std::this_thread::sleep_for(
+          std::chrono::milliseconds(state->delay_enqueue_ms_));
     }
+
+    // Send state back to the queue so that state can be released
+    // in the next cycle.
+    state->context_->PutTaskBackToQueue(state);
+
+    delete response_release_payload;
     return;
   }
 
@@ -1168,7 +1116,7 @@ ModelInferHandler::InferResponseComplete(
 
   // Defer sending the response until FINAL flag is seen or
   // there is error
-  if (!is_final_response) {
+  if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
     return;
   }
 

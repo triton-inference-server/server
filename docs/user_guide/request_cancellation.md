@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,20 +28,20 @@
 
 # Request Cancellation
 
-Triton supports handling request cancellation received from the gRPC Python
-client or a C API user (since r23.10), and C++ client (since r26.05).
-Long running inference requests such as for auto generative large language
-models may run for an indeterminate amount of time or indeterminate number of
-steps. Additionally clients may enqueue a large number of requests as part of
-a sequence or request stream and later determine the results are no longer
-needed. Continuing to process requests whose results are no longer required can
-significantly impact server resources.
+Starting from r23.10, Triton supports handling request cancellation received
+from the gRPC client or a C API user. Long running inference requests such
+as for auto generative large language models may run for an indeterminate
+amount of time or indeterminate number of steps. Additionally clients may
+enqueue a large number of requests as part of a sequence or request stream
+and later determine the results are no longer needed. Continuing to process
+requests whose results are no longer required can significantly impact server
+resources.
 
 ## Issuing Request Cancellation
 
 ### In-Process C API
 
-[In-Process Triton Server C API](../customization_guide/inprocess_c_api.md) has been enhanced with `TRITONSERVER_InferenceRequestCancel`
+[In-Process Triton Server C API](../customization_guide/inference_protocols.md#in-process-triton-server-api) has been enhanced with `TRITONSERVER_InferenceRequestCancel`
 and `TRITONSERVER_InferenceRequestIsCancelled` to issue cancellation and query
 whether cancellation has been issued on an inflight request respectively. Read more
 about the APIs in [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
@@ -51,7 +51,8 @@ about the APIs in [tritonserver.h](https://github.com/triton-inference-server/co
 
 In addition, [gRPC endpoint](../customization_guide/inference_protocols.md#httprest-and-grpc-protocols) can
 now detect cancellation from the client and attempt to terminate request.
-See [request-cancellation](https://github.com/triton-inference-server/client#request-cancellation)
+At present, only gRPC python client supports issuing request cancellation
+to the server endpoint. See [request-cancellation](https://github.com/triton-inference-server/client#request-cancellation)
 for more details on how to issue requests from the client-side.
 See gRPC guide on RPC [cancellation](https://grpc.io/docs/guides/cancellation/) for
 finer details.
@@ -59,14 +60,14 @@ finer details.
 ## Handling in Triton Core
 
 Triton core checks for requests that have been cancelled at some critical points
-when using [dynamic](batcher.md#dynamic-batcher) or
-[sequence](batcher.md#sequence-batcher) batching. The checking is
+when using [dynamic](./model_configuration.md#dynamic-batcher) or
+[sequence](./model_configuration.md#sequence-batcher) batching. The checking is
 also performed between each
-[ensemble](./scheduler.md#ensemble-scheduler) steps and terminates
+[ensemble](./model_configuration.md#ensemble-scheduler) steps and terminates
 further processing if the request is cancelled.
 
 On detecting a cancelled request, Triton core responds with CANCELLED status. If a request
-is cancelled when using [sequence_batching](batcher.md#sequence-batcher),
+is cancelled when using [sequence_batching](./model_configuration.md#sequence-batcher),
 then all the pending requests in the same sequence will also be cancelled. The sequence
 is represented by the requests that has identical sequence id.
 

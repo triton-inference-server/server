@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,14 +49,14 @@ The Performance Analyzer is an essential tool for optimizing your model's
 performance.
 
 As a running example demonstrating the optimization features and
-options, we will use a ONNX Inception model that you can obtain
+options, we will use a TensorFlow Inception model that you can obtain
 by following the [QuickStart](../getting_started/quickstart.md). As a baseline we use
 perf_analyzer to determine the performance of the model using a [basic
 model configuration that does not enable any performance
-features](../examples/model_repository/inception_onnx/config.pbtxt).
+features](../examples/model_repository/inception_graphdef/config.pbtxt).
 
 ```
-$ perf_analyzer -m inception_onnx --percentile=95 --concurrency-range 1:4
+$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
 ...
 Inferences/Second vs. Client p95 Batch Latency
 Concurrency: 1, throughput: 62.6 infer/sec, latency 21371 usec
@@ -81,7 +81,7 @@ latency.
 
 For most models, the Triton feature that provides the largest
 performance improvement is [dynamic
-batching](batcher.md#dynamic-batcher).
+batching](model_configuration.md#dynamic-batcher).
 [This example](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_2-improving_resource_utilization#dynamic-batching--concurrent-model-execution)
  sheds more light on conceptual details. If your model does not
 support batching then you can skip ahead to [Model
@@ -95,7 +95,7 @@ larger batch that will often execute much more efficiently than
 executing the individual requests independently. To enable the dynamic
 batcher stop Triton, add the following line to the end of the [model
 configuration file for
-inception_onnx](../examples/model_repository/inception_onnx/config.pbtxt),
+inception_graphdef](../examples/model_repository/inception_graphdef/config.pbtxt),
 and then restart Triton.
 
 ```
@@ -108,7 +108,7 @@ inference. To see this run perf_analyzer with request concurrency from
 1 to 8.
 
 ```
-$ perf_analyzer -m inception_onnx --percentile=95 --concurrency-range 1:8
+$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:8
 ...
 Inferences/Second vs. Client p95 Batch Latency
 Concurrency: 1, throughput: 66.8 infer/sec, latency 19785 usec
@@ -138,7 +138,7 @@ instance. So for maximum-batch-size 4 we want to run perf_analyzer
 with request concurrency of `2 * 4 * 1 = 8`.
 
 ```
-$ perf_analyzer -m inception_onnx --percentile=95 --concurrency-range 8
+$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 8
 ...
 Inferences/Second vs. Client p95 Batch Latency
 Concurrency: 8, throughput: 267.8 infer/sec, latency 35590 usec
@@ -158,12 +158,12 @@ utilization by allowing more inference work to be executed
 simultaneously on the GPU. Smaller models may benefit from more than
 two instances; you can use perf_analyzer to experiment.
 
-To specify two instances of the inception_onnx model: stop Triton,
+To specify two instances of the inception_graphdef model: stop Triton,
 remove any dynamic batching settings you may have previously added to
 the model configuration (we discuss combining dynamic batcher and
 multiple model instances below), add the following lines to the end of
 the [model configuration
-file](../examples/model_repository/inception_onnx/config.pbtxt), and
+file](../examples/model_repository/inception_graphdef/config.pbtxt), and
 then restart Triton.
 
 ```
@@ -173,7 +173,7 @@ instance_group [ { count: 2 }]
 Now run perf_analyzer using the same options as for the baseline.
 
 ```
-$ perf_analyzer -m inception_onnx --percentile=95 --concurrency-range 1:4
+$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
 ...
 Inferences/Second vs. Client p95 Batch Latency
 Concurrency: 1, throughput: 70.6 infer/sec, latency 19547 usec
@@ -199,7 +199,7 @@ When we run perf_analyzer with the same options used for just the
 dynamic batcher above.
 
 ```
-$ perf_analyzer -m inception_onnx --percentile=95 --concurrency-range 16
+$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 16
 ...
 Inferences/Second vs. Client p95 Batch Latency
 Concurrency: 16, throughput: 289.6 infer/sec, latency 59817 usec
@@ -293,6 +293,121 @@ optimization { execution_accelerators {
   }]
 }}
 ```
+
+### TensorFlow with TensorRT Optimization (TF-TRT)
+
+TensorRT optimization applied to a TensorFlow model works similarly to
+TensorRT and ONNX described above. To enable TensorRT optimization you
+must set the model configuration appropriately. For TensorRT
+optimization of TensorFlow models there are several options that you
+can enable, including selection of the compute precision.
+
+```
+optimization { execution_accelerators {
+  gpu_execution_accelerator : [ {
+    name : "tensorrt"
+    parameters { key: "precision_mode" value: "FP16" }}]
+}}
+```
+
+The options are described in detail in the
+[ModelOptimizationPolicy](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
+section of the model configuration protobuf.
+
+As an example of TensorRT optimization applied to a TensorFlow model,
+we will use a TensorFlow Inception model that you can obtain by
+following the [QuickStart](../getting_started/quickstart.md). As a baseline we use
+perf_analyzer to determine the performance of the model using a [basic
+model configuration that does not enable any performance
+features](../examples/model_repository/inception_graphdef/config.pbtxt).
+
+```
+$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
+...
+Inferences/Second vs. Client p95 Batch Latency
+Concurrency: 1, throughput: 62.6 infer/sec, latency 21371 usec
+Concurrency: 2, throughput: 73.2 infer/sec, latency 34381 usec
+Concurrency: 3, throughput: 73.2 infer/sec, latency 50298 usec
+Concurrency: 4, throughput: 73.4 infer/sec, latency 65569 usec
+```
+
+To enable TensorRT optimization for the model: stop Triton, add the
+lines from above to the end of the model configuration file, and then
+restart Triton. As Triton starts you should check the console output
+and wait until the server prints the "Staring endpoints" message. Now
+run perf_analyzer using the same options as for the baseline. Note
+that the first run of perf_analyzer might timeout because the TensorRT
+optimization is performed when the inference request is received and
+may take significant time. In production you can use [model
+warmup](model_configuration.md#model-warmup) to avoid this model
+startup/optimization slowdown. For now, if this happens just run
+perf_analyzer again.
+
+```
+$ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
+...
+Inferences/Second vs. Client p95 Batch Latency
+Concurrency: 1, throughput: 140 infer/sec, latency 8987 usec
+Concurrency: 2, throughput: 195.6 infer/sec, latency 12583 usec
+Concurrency: 3, throughput: 189 infer/sec, latency 19020 usec
+Concurrency: 4, throughput: 191.6 infer/sec, latency 24622 usec
+```
+
+The TensorRT optimization provided 2.5x throughput improvement while
+cutting latency by more than half. The benefit provided by TensorRT
+will vary based on the model, but in general it can provide
+significant performance improvement.
+
+### TensorFlow JIT Graph Optimizations
+
+Tensorflow allows its user to specify the optimization level
+while running the model graph via GlobalJitLevel setting.
+See [config.proto](https://github.com/tensorflow/tensorflow/blob/v2.10.0/tensorflow/core/protobuf/config.proto)
+for more information. When running
+TensorFlow models in Triton, the users can provide this setting
+by providing graph levels like below:
+
+```
+optimization {
+  graph { level: 1
+}}
+```
+
+The users can also utilize the [XLA optimization](https://www.tensorflow.org/xla)
+by setting `TF_XLA_FLAGS` environment variable before launching
+Triton. An example to launch Triton with GPU and CPU auto-clustering:
+
+```
+$ TF_XLA_FLAGS="--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit" tritonserver --model-repository=...
+```
+
+As in the case of TensorRT optimization above, these optimizations
+occur when the first inference request is run. To mitigate the
+model startup slowdown in production systems, you can use
+[model warmup](model_configuration.md#model-warmup).
+
+### TensorFlow Automatic FP16 Optimization
+
+TensorFlow has an option to provide FP16 optimization that can be
+enabled in the model configuration. As with the TensorRT optimization
+described above, you can enable this optimization by using the
+gpu_execution_accelerator property.
+
+```
+optimization { execution_accelerators {
+  gpu_execution_accelerator : [
+    { name : "auto_mixed_precision" }
+  ]
+}}
+```
+
+The options are described in detail in the
+[ModelOptimizationPolicy](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
+section of the model configuration protobuf.
+
+You can follow the steps described above for TensorRT to see how this
+automatic FP16 optimization benefits a model by using perf_analyzer
+to evaluate the model's performance with and without the optimization.
 
 ## NUMA Optimization
 

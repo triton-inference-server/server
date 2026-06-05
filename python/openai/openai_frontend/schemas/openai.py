@@ -1,4 +1,4 @@
-# Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel, confloat, conint
 
@@ -103,7 +103,7 @@ class CreateCompletionRequest(BaseModel):
         description="Include the log probabilities on the `logprobs` most likely output tokens, as well the chosen tokens. For example, if `logprobs` is 5, the API will return a list of the 5 most likely tokens. The API will always return the `logprob` of the sampled token, so there may be up to `logprobs+1` elements in the response.\n\nThe maximum value for `logprobs` is 5.\n",
     )
     max_tokens: Optional[conint(ge=0)] = Field(
-        None,
+        16,
         description="The maximum number of [tokens](/tokenizer) that can be generated in the completion.\n\nThe token count of your prompt plus `max_tokens` cannot exceed the model's context length. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens.\n",
         examples=[16],
     )
@@ -132,10 +132,6 @@ class CreateCompletionRequest(BaseModel):
     stream: Optional[bool] = Field(
         False,
         description="Whether to stream back partial progress. If set, tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message. [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).\n",
-    )
-    stream_options: Optional[StreamOptions] = Field(
-        None,
-        description="Options for streaming responses. Only use when `stream` is set to `true`.",
     )
     suffix: Optional[str] = Field(
         None,
@@ -324,6 +320,10 @@ class ChatCompletionFunctionCallOption(BaseModel):
     name: str = Field(..., description="The name of the function to call.")
 
 
+class Type2(Enum):
+    function = "function"
+
+
 class FunctionObject(BaseModel):
     description: Optional[str] = Field(
         None,
@@ -347,7 +347,7 @@ class Function(BaseModel):
 
 
 class ChatCompletionNamedToolChoice(BaseModel):
-    type: str = Field(
+    type: Type2 = Field(
         ...,
         description="The type of the tool. Currently, only `function` is supported.",
     )
@@ -364,7 +364,7 @@ class Function1(BaseModel):
 
 class ChatCompletionMessageToolCall(BaseModel):
     id: str = Field(..., description="The ID of the tool call.")
-    type: str = Field(
+    type: Type2 = Field(
         ...,
         description="The type of the tool. Currently, only `function` is supported.",
     )
@@ -382,7 +382,7 @@ class Function2(BaseModel):
 class ChatCompletionMessageToolCallChunk(BaseModel):
     index: int
     id: Optional[str] = Field(None, description="The ID of the tool call.")
-    type: Optional[str] = Field(
+    type: Optional[Type2] = Field(
         None,
         description="The type of the tool. Currently, only `function` is supported.",
     )
@@ -471,13 +471,6 @@ class ResponseFormat(BaseModel):
     )
 
 
-class StreamOptions(BaseModel):
-    include_usage: Optional[bool] = Field(
-        False,
-        description="If enabled, an additional chunk is sent before the `data: [DONE]` message. That chunk’s `usage` field reports the total token usage for the request and its `choices` array is always empty. All other chunks include a `usage` field with a null value.",
-    )
-
-
 class FunctionCall3(Enum):
     none = "none"
     auto = "auto"
@@ -530,16 +523,24 @@ class ChatCompletionTokenLogprob(BaseModel):
     )
 
 
-class ChatCompletionLogprobs(BaseModel):
+class Logprobs2(BaseModel):
     content: List[ChatCompletionTokenLogprob] = Field(
         ...,
         description="A list of message content tokens with log probability information.",
     )
 
 
+class ChatCompletionFinishReason(Enum):
+    stop = "stop"
+    length = "length"
+    tool_calls = "tool_calls"
+    content_filter = "content_filter"
+    function_call = "function_call"
+
+
 class ChatCompletionStreamingResponseChoice(BaseModel):
     delta: ChatCompletionStreamResponseDelta
-    logprobs: Optional[ChatCompletionLogprobs] = Field(
+    logprobs: Optional[Logprobs2] = Field(
         None, description="Log probability information for the choice."
     )
     finish_reason: ChatCompletionFinishReason | None = Field(
@@ -576,7 +577,6 @@ class CreateChatCompletionStreamResponse(BaseModel):
     object: Object4 = Field(
         ..., description="The object type, which is always `chat.completion.chunk`."
     )
-    usage: Optional[CompletionUsage] = None
 
 
 class CreateChatCompletionImageResponse(BaseModel):
@@ -601,21 +601,14 @@ class Model(BaseModel):
     owned_by: str = Field(..., description="The organization that owns the model.")
 
 
-class BaseUsage(BaseModel):
+class CompletionUsage(BaseModel):
+    completion_tokens: int = Field(
+        ..., description="Number of tokens in the generated completion."
+    )
     prompt_tokens: int = Field(..., description="Number of tokens in the prompt.")
     total_tokens: int = Field(
         ...,
         description="Total number of tokens used in the request (prompt + completion).",
-    )
-
-
-class EmbeddingUsage(BaseUsage):
-    pass
-
-
-class CompletionUsage(BaseUsage):
-    completion_tokens: int = Field(
-        ..., description="Number of tokens in the generated completion."
     )
 
 
@@ -690,7 +683,7 @@ class ChatCompletionRequestUserMessage(BaseModel):
 
 
 class ChatCompletionTool(BaseModel):
-    type: str = Field(
+    type: Type2 = Field(
         ...,
         description="The type of the tool. Currently, only `function` is supported.",
     )
@@ -730,7 +723,7 @@ class ChatCompletionChoice(BaseModel):
         ..., description="The index of the choice in the list of choices."
     )
     message: ChatCompletionResponseMessage
-    logprobs: ChatCompletionLogprobs | None = Field(
+    logprobs: Logprobs2 | None = Field(
         ..., description="Log probability information for the choice."
     )
 
@@ -861,14 +854,10 @@ class CreateChatCompletionRequest(BaseModel):
         None,
         description="An integer between 0 and 20 specifying the number of most likely tokens to return at each token position, each with an associated log probability. `logprobs` must be set to `true` if this parameter is used.",
     )
-    max_completion_tokens: Optional[conint(ge=0)] = Field(
-        None,
-        description="The maximum number of [tokens](/tokenizer) that can be generated in the chat completion.\n\nThe total length of input tokens and generated tokens is limited by the model's context length. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens.\n",
-    )
-    # TODO: Remove support for max_tokens field in the future: https://platform.openai.com/docs/api-reference/chat/create#chat-create-max_completion_tokens
+    # TODO: Consider new max_completion_tokens field in the future: https://platform.openai.com/docs/api-reference/chat/create#chat-create-max_completion_tokens
     max_tokens: Optional[conint(ge=0)] = Field(
-        None,
-        description="DEPRECATED: Use `max_completion_tokens` instead. The maximum number of [tokens](/tokenizer) that can be generated in the chat completion.\n\nThe total length of input tokens and generated tokens is limited by the model's context length. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens.\n",
+        16,
+        description="The maximum number of [tokens](/tokenizer) that can be generated in the chat completion.\n\nThe total length of input tokens and generated tokens is limited by the model's context length. [Example Python code](https://cookbook.openai.com/examples/how_to_count_tokens_with_tiktoken) for counting tokens.\n",
     )
     # TODO: Extension, flesh out description and defaults
     min_tokens: Optional[conint(ge=0)] = Field(
@@ -886,7 +875,7 @@ class CreateChatCompletionRequest(BaseModel):
     )
     response_format: Optional[ResponseFormat] = Field(
         None,
-        description='An object specifying the format that the model must output. Compatible with [GPT-4 Turbo](/docs/models/gpt-4-and-gpt-4-turbo) and all GPT-3.5 Turbo models newer than `gpt-3.5-turbo-1106`.\n\nSetting to `{ "type": "json_object" }` enables JSON mode, which guarantees the message the model generates is valid JSON.\n\n**Important:** when using JSON mode, you **must** also instruct the model to produce JSON yourself via a system or user message. Without this, the model may generate an unending stream of whitespace until the generation reaches the token limit, resulting in a long-running and seemingly "stuck" request. Also note that the message content may be partially cut off if `finish_reason="length"`, which indicates the generation exceeded `max_completion_tokens` or the conversation exceeded the max context length.\n',
+        description='An object specifying the format that the model must output. Compatible with [GPT-4 Turbo](/docs/models/gpt-4-and-gpt-4-turbo) and all GPT-3.5 Turbo models newer than `gpt-3.5-turbo-1106`.\n\nSetting to `{ "type": "json_object" }` enables JSON mode, which guarantees the message the model generates is valid JSON.\n\n**Important:** when using JSON mode, you **must** also instruct the model to produce JSON yourself via a system or user message. Without this, the model may generate an unending stream of whitespace until the generation reaches the token limit, resulting in a long-running and seemingly "stuck" request. Also note that the message content may be partially cut off if `finish_reason="length"`, which indicates the generation exceeded `max_tokens` or the conversation exceeded the max context length.\n',
     )
     seed: Optional[conint(ge=-9223372036854775808, le=9223372036854775807)] = Field(
         None,
@@ -899,10 +888,6 @@ class CreateChatCompletionRequest(BaseModel):
     stream: Optional[bool] = Field(
         False,
         description="If set, partial message deltas will be sent, like in ChatGPT. Tokens will be sent as data-only [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#Event_stream_format) as they become available, with the stream terminated by a `data: [DONE]` message. [Example Python code](https://cookbook.openai.com/examples/how_to_stream_completions).\n",
-    )
-    stream_options: Optional[StreamOptions] = Field(
-        None,
-        description="Options for streaming responses. Only use when `stream` is set to `true`.",
     )
     temperature: Optional[confloat(ge=0.0, le=2.0)] = Field(
         0.7,
@@ -947,69 +932,3 @@ class ObjectType:
     text_completion = Object1.text_completion
     chat_completion_chunk = Object4.chat_completion_chunk
     chat_completion = Object2.chat_completion
-
-
-class EmbeddingObject(BaseModel):
-    model_config: ConfigDict = ConfigDict(extra="forbid")
-
-    object: Literal["embedding"] = Field(
-        description="The object type, which is always 'embedding'.",
-    )
-    embedding: Union[List[float], str] = Field(
-        ...,
-        description="The embedding vector, which is a list of floats or a base64-encoded string.",
-    )
-    index: int = Field(
-        ...,
-        description="The index of the embedding in the list of embeddings.",
-    )
-
-
-class CreateEmbeddingRequest(BaseModel):
-    # Explicitly return errors for unknown fields.
-    model_config: ConfigDict = ConfigDict(extra="forbid")
-
-    input: Union[str, List[int]] = Field(
-        ...,
-        description="Input text to embed, encoded as a string or array of tokens. To embed multiple inputs in a single request, pass an array of strings or array of token arrays.",
-        min_length=1,
-        examples=["The food was delicious and the waiter..."],
-    )
-    model: Union[str, Model2] = Field(
-        ...,
-        description="ID of the model to use. See the [model endpoint compatibility](/docs/models/model-endpoint-compatibility) table for details on which models work with the Chat API.",
-        examples=["text-embedding-ada-002"],
-    )
-    dimensions: Optional[int] = Field(
-        None,
-        description="The number of dimensions the resulting output embeddings should have. Only supported in text-embedding-3 and later models.",
-    )
-    encoding_format: Optional[Literal["float", "base64"]] = Field(
-        "float",
-        description="The format to return the embeddings in.",
-    )
-    user: Optional[str] = Field(
-        None,
-        description="A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse. [Learn more](/docs/guides/safety-best-practices/end-user-ids).\n",
-        examples=["user-1234"],
-    )
-
-
-class CreateEmbeddingResponse(BaseModel):
-    model_config: ConfigDict = ConfigDict(extra="forbid")
-
-    object: Literal["list"] = Field(
-        description="The object type, which is always 'list'.",
-    )
-    data: List[EmbeddingObject] = Field(
-        ...,
-        description="The list of embeddings.",
-    )
-    model: Union[str, Model2] = Field(
-        ...,
-        description="The model used to generate the embeddings.",
-    )
-    usage: Optional[EmbeddingUsage] = Field(
-        ...,
-        description="The usage for the request.",
-    )

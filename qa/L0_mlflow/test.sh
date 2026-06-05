@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -39,11 +39,7 @@ rm -fr *.log *.json
 # install a higher version of python which uses blinker 1.6,
 # but it is unknown whether this test should rely on
 # the default installation of python.
-
-apt update -qq && apt install python3-venv -y
-python3 -m venv .venv
-
-source .venv/bin/activate
+apt remove -y python3-blinker
 
 RET=0
 
@@ -187,7 +183,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Python Test Failed\n***"
     RET=1
 else
-    check_test_results $TEST_RESULT_FILE 3
+    check_test_results $TEST_RESULT_FILE 2
     if [ $? -ne 0 ]; then
         cat $PY_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -256,7 +252,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Python Test Failed\n***"
     RET=1
 else
-    check_test_results $TEST_RESULT_FILE 3
+    check_test_results $TEST_RESULT_FILE 2
     if [ $? -ne 0 ]; then
         cat $PY_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"

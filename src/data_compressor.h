@@ -1,4 +1,4 @@
-// Copyright (c) 2021-2025, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -93,12 +93,11 @@ class DataCompressor {
         &stream, deflateEnd);
 
     // Get the addr and size of each chunk of memory in 'source'
-    std::unique_ptr<struct evbuffer_iovec[]> buffer_array_holder;
     struct evbuffer_iovec* buffer_array = nullptr;
     int buffer_count = evbuffer_peek(source, -1, NULL, NULL, 0);
     if (buffer_count > 0) {
-      buffer_array_holder.reset(new struct evbuffer_iovec[buffer_count]);
-      buffer_array = buffer_array_holder.get();
+      buffer_array = static_cast<struct evbuffer_iovec*>(
+          alloca(sizeof(struct evbuffer_iovec) * buffer_count));
       if (evbuffer_peek(source, -1, NULL, buffer_array, buffer_count) !=
           buffer_count) {
         return TRITONSERVER_ErrorNew(
@@ -112,7 +111,7 @@ class DataCompressor {
     RETURN_MSG_IF_ERR(
         AllocEVBuffer(
             expected_compressed_size, compressed_data, &current_reserved_space),
-        "unexpected error allocating output buffer for compression");
+        "unexpected error allocating output buffer for compression: ");
     stream.next_out =
         reinterpret_cast<unsigned char*>(current_reserved_space.iov_base);
     stream.avail_out = expected_compressed_size;
@@ -131,12 +130,12 @@ class DataCompressor {
               CommitEVBuffer(
                   compressed_data, &current_reserved_space,
                   expected_compressed_size),
-              "unexpected error committing output buffer for compression");
+              "unexpected error committing output buffer for compression: ");
           RETURN_MSG_IF_ERR(
               AllocEVBuffer(
                   expected_compressed_size, compressed_data,
                   &current_reserved_space),
-              "unexpected error allocating output buffer for compression");
+              "unexpected error allocating output buffer for compression: ");
           stream.next_out =
               reinterpret_cast<unsigned char*>(current_reserved_space.iov_base);
           stream.avail_out = expected_compressed_size;
@@ -156,14 +155,13 @@ class DataCompressor {
           CommitEVBuffer(
               compressed_data, &current_reserved_space,
               expected_compressed_size - stream.avail_out),
-          "unexpected error committing output buffer for compression");
+          "unexpected error committing output buffer for compression: ");
     }
     return nullptr;  // success
   }
 
   static TRITONSERVER_Error* DecompressData(
-      const Type type, evbuffer* source, evbuffer* decompressed_data,
-      const size_t max_decompressed_size = 0)
+      const Type type, evbuffer* source, evbuffer* decompressed_data)
   {
     size_t source_byte_size = evbuffer_get_length(source);
     // nothing to be decompressed
@@ -175,13 +173,6 @@ class DataCompressor {
     size_t output_buffer_size = (source_byte_size > (1 << 20 /* 1MB */))
                                     ? source_byte_size
                                     : (1 << 20 /* 1MB */);
-
-    // Cap the initial buffer allocation to the decompression limit.
-    // This avoids over-allocating when a decompression limit is set.
-    if (max_decompressed_size > 0 &&
-        output_buffer_size > max_decompressed_size) {
-      output_buffer_size = max_decompressed_size;
-    }
 
     switch (type) {
       case Type::UNKNOWN:
@@ -210,12 +201,11 @@ class DataCompressor {
               &stream, inflateEnd);
 
           // Get the addr and size of each chunk of memory in 'source'
-          std::unique_ptr<struct evbuffer_iovec[]> buffer_array_holder;
           struct evbuffer_iovec* buffer_array = nullptr;
           int buffer_count = evbuffer_peek(source, -1, NULL, NULL, 0);
           if (buffer_count > 0) {
-            buffer_array_holder.reset(new struct evbuffer_iovec[buffer_count]);
-            buffer_array = buffer_array_holder.get();
+            buffer_array = static_cast<struct evbuffer_iovec*>(
+                alloca(sizeof(struct evbuffer_iovec) * buffer_count));
             if (evbuffer_peek(source, -1, NULL, buffer_array, buffer_count) !=
                 buffer_count) {
               return TRITONSERVER_ErrorNew(
@@ -230,17 +220,12 @@ class DataCompressor {
               AllocEVBuffer(
                   output_buffer_size, decompressed_data,
                   &current_reserved_space),
-              "unexpected error allocating output buffer for decompression");
+              "unexpected error allocating output buffer for decompression: ");
           stream.next_out =
               reinterpret_cast<unsigned char*>(current_reserved_space.iov_base);
           stream.avail_out = output_buffer_size;
 
-          // Track total decompressed size and current buffer size for limit
-          // checking
-          size_t total_decompressed = 0;
-          size_t current_buffer_size = output_buffer_size;
-
-          // Decompress until end of 'source'
+          // Compress until end of 'source'
           for (int idx = 0; idx < buffer_count; ++idx) {
             stream.next_in =
                 reinterpret_cast<unsigned char*>(buffer_array[idx].iov_base);
@@ -250,59 +235,21 @@ class DataCompressor {
             do {
               // Need additional buffer
               if (stream.avail_out == 0) {
-                total_decompressed += current_buffer_size;
-
-                // Check decompression size limit before allocating memory
-                if (max_decompressed_size > 0 &&
-                    total_decompressed > max_decompressed_size) {
-                  return TRITONSERVER_ErrorNew(
-                      TRITONSERVER_ERROR_INVALID_ARG,
-                      ("Decompressed data size exceeds the maximum allowed "
-                       "value of " +
-                       std::to_string(max_decompressed_size) +
-                       " bytes. Use --http-max-input-size to increase the "
-                       "limit.")
-                          .c_str());
-                }
-
                 RETURN_MSG_IF_ERR(
                     CommitEVBuffer(
                         decompressed_data, &current_reserved_space,
-                        current_buffer_size),
+                        output_buffer_size),
                     "unexpected error committing output buffer for "
-                    "decompression");
-
-                // Calculate next buffer size, capped by remaining limit
-                current_buffer_size = output_buffer_size;
-                if (max_decompressed_size > 0) {
-                  size_t remaining_size =
-                      max_decompressed_size - total_decompressed;
-                  // If no space remains but decompression needs more, we've hit
-                  // the limit
-                  if (remaining_size == 0) {
-                    return TRITONSERVER_ErrorNew(
-                        TRITONSERVER_ERROR_INVALID_ARG,
-                        ("Decompressed data size exceeds the maximum allowed "
-                         "value of " +
-                         std::to_string(max_decompressed_size) +
-                         " bytes. Use --http-max-input-size to increase the "
-                         "limit.")
-                            .c_str());
-                  }
-                  if (current_buffer_size > remaining_size) {
-                    current_buffer_size = remaining_size;
-                  }
-                }
-
+                    "decompression: ");
                 RETURN_MSG_IF_ERR(
                     AllocEVBuffer(
-                        current_buffer_size, decompressed_data,
+                        output_buffer_size, decompressed_data,
                         &current_reserved_space),
                     "unexpected error allocating output buffer for "
-                    "decompression");
+                    "decompression: ");
                 stream.next_out = reinterpret_cast<unsigned char*>(
                     current_reserved_space.iov_base);
-                stream.avail_out = current_buffer_size;
+                stream.avail_out = output_buffer_size;
               }
               auto ret = inflate(&stream, Z_NO_FLUSH);
               if (ret == Z_STREAM_ERROR) {
@@ -311,34 +258,15 @@ class DataCompressor {
                     "encountered inconsistent stream state during "
                     "decompression");
               }
-              // Break if decompression is complete, even if buffer is exactly
-              // full
-              if (ret == Z_STREAM_END) {
-                break;
-              }
             } while (stream.avail_out == 0);
           }
           // Make sure the last buffer is committed
           if (current_reserved_space.iov_base != nullptr) {
-            size_t final_chunk_size = current_buffer_size - stream.avail_out;
-            if (max_decompressed_size > 0 &&
-                (total_decompressed + final_chunk_size) >
-                    max_decompressed_size) {
-              return TRITONSERVER_ErrorNew(
-                  TRITONSERVER_ERROR_INVALID_ARG,
-                  ("Decompressed data size exceeds the maximum allowed value "
-                   "of " +
-                   std::to_string(max_decompressed_size) +
-                   " bytes. Use --http-max-input-size to increase the limit.")
-                      .c_str());
-            }
-
             RETURN_MSG_IF_ERR(
                 CommitEVBuffer(
                     decompressed_data, &current_reserved_space,
-                    final_chunk_size),
-                "unexpected error committing output buffer for "
-                "decompression");
+                    output_buffer_size - stream.avail_out),
+                "unexpected error committing output buffer for compression: ");
           }
           break;
         }

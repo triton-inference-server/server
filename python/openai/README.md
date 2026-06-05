@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2024-2026, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,7 +25,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-# OpenAI-Compatible Frontend for Triton Inference Server
+# OpenAI-Compatible Frontend for Triton Inference Server (Beta)
+
+> [!NOTE]
+> The OpenAI-Compatible API is currently in BETA. Its features and functionality
+> are subject to change as we collect feedback. We're excited to hear any thoughts
+> you have and what features you'd like to see!
 
 ## Pre-requisites
 
@@ -38,7 +43,7 @@
 ## VLLM
 
 1. Launch the container and install dependencies:
-  - Mounts the `~/.cache/huggingface` for re-use of downloaded models across runs, containers, etc.
+  - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
   - Sets the [`HF_TOKEN`](https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#hftoken) environment variable to
     access gated models, make sure this is set in your local environment if needed.
 
@@ -46,7 +51,7 @@
 docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
-  nvcr.io/nvidia/tritonserver:26.05-vllm-python-py3
+  nvcr.io/nvidia/tritonserver:25.03-vllm-python-py3
 ```
 
 2. Launch the OpenAI-compatible Triton Inference Server:
@@ -93,7 +98,7 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
 
 ```json
 {
-  "id": "cmpl-0242093d-51ae-11f0-b339-e7480668bfbe",
+  "id": "cmpl-6930b296-7ef8-11ef-bdd1-107c6149ca79",
   "choices": [
     {
       "finish_reason": "stop",
@@ -108,15 +113,11 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
       "logprobs": null
     }
   ],
-  "created": 1750846825,
+  "created": 1727679085,
   "model": "llama-3.1-8b-instruct",
   "system_fingerprint": null,
   "object": "chat.completion",
-  "usage": {
-    "completion_tokens": 7,
-    "prompt_tokens": 42,
-    "total_tokens": 49
-  }
+  "usage": null
 }
 ```
 
@@ -137,32 +138,28 @@ curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json'
 
 ```json
 {
-  "id": "cmpl-58fba3a0-51ae-11f0-859d-e7480668bfbe",
+  "id": "cmpl-d51df75c-7ef8-11ef-bdd1-107c6149ca79",
   "choices": [
     {
       "finish_reason": "stop",
       "index": 0,
       "logprobs": null,
-      "text": " an amazing field that can truly understand the hidden patterns that exist in the data,"
+      "text": " a field of computer science that focuses on developing algorithms that allow computers to learn from"
     }
   ],
-  "created": 1750846970,
+  "created": 1727679266,
   "model": "llama-3.1-8b-instruct",
   "system_fingerprint": null,
   "object": "text_completion",
-  "usage": {
-    "completion_tokens": 16,
-    "prompt_tokens": 4,
-    "total_tokens": 20
-  }
+  "usage": null
 }
 ```
 
 </details>
 
 5. Benchmark with `genai-perf`:
-- To install genai-perf in this container, see the instructions [here](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#install-genai-perf-ubuntu-2404-python-310)
-- Or try using genai-perf from the [SDK container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
+- To install genai-perf in this container, see the instructions [here](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#install-perf-analyzer-ubuntu-python-38)
+- Or try using genai-perf from the [SDK container](https://github.com/triton-inference-server/perf_analyzer/tree/main/genai-perf#install-perf-analyzer-ubuntu-python-38)
 
 ```bash
 MODEL="llama-3.1-8b-instruct"
@@ -219,7 +216,7 @@ completion = client.chat.completions.create(
         },
         {"role": "user", "content": "What are LLMs?"},
     ],
-    max_completion_tokens=256,
+    max_tokens=256,
 )
 
 print(completion.choices[0].message.content)
@@ -233,208 +230,6 @@ pip install -r requirements-test.txt
 pytest -v tests/
 ```
 
-### LoRA Adapters
-
-If the command line argument `--lora-separator=<separator_string>` is provided
-when starting the OpenAI Frontend, a LoRA adaptor listed in `multi_lora.json`
-may be selected by appending the LoRA name to the model name,
-separated by the LoRA separator, on the inference request in
-`<model_name><separator_string><lora_name>` format.
-
-<details>
-<summary>For example</summary>
-
-```bash
-# start server with model named gemma-2b
-python3 openai_frontend/main.py --lora-separator=_lora_ ...
-
-# inference without LoRA
-curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json' -d '{
-  "model": "gemma-2b",
-  "temperature": 0,
-  "prompt": "When was the wheel invented?"
-}'
-{
-  ...
-  "choices":[{..."text":"\n\nThe wheel was invented by the Sumerians in Mesopotamia around 350"}],
-  ...
-}
-
-# inference with LoRA named doll
-curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json' -d '{
-  "model": "gemma-2b_lora_doll",
-  "temperature": 0,
-  "prompt": "When was the wheel invented?"
-}'
-{
-  ...
-  "choices":[{..."text":"\n\nThe wheel was invented in Mesopotamia around 3500 BC.\n\n"}],
-  ...
-}
-
-# inference with LoRA named sheep
-curl -s http://localhost:9000/v1/completions -H 'Content-Type: application/json' -d '{
-  "model": "gemma-2b_lora_sheep",
-  "temperature": 0,
-  "prompt": "When was the wheel invented?"
-}'
-{
-  ...
-  "choices":[{..."text":"\n\nThe wheel was invented around 3000 BC in Mesopotamia.\n\n"}],
-  ...
-}
-```
-
-</details>
-
-When listing or retrieving model(s), the model id will include the LoRA name in
-the same `<model_name><separator_string><lora_name>` format for each LoRA
-adapter listed on the `multi_lora.json`. Note: The LoRA name inclusion is
-limited to locally stored models, inference requests are not limited though.
-
-#### vLLM
-See the
-[vLLM documentation](https://github.com/triton-inference-server/vllm_backend/blob/main/docs/llama_multi_lora_tutorial.md)
-on how to serve a vLLM model with LoRA adapters.
-
-#### TensorRT-LLM
-Similarly, see [TensorRT-LLM document](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/lora.md)
-on how to prepare LoRA-enabled TensorRT-LLM engines and generate LoRA tensors.
-The path of LoRA adapter in `multi_lora.json` is the directory of
-`model.lora_config.npy` and `model.lora_weights.npy` tensors.
-
-<details>
-<summary>For example</summary>
-
-model repository
-```
-inflight_batcher_llm
-├── postprocessing
-|   ├── 1
-|   |   └── model.py
-|   └── config.pbtxt
-├── preprocessing
-|   ├── 1
-|   |   └── model.py
-|   └── config.pbtxt
-├── tensorrt_llm
-|   ├── 1
-|   |   └── model.py
-|   └── config.pbtxt
-└── tensorrt_llm_bls
-    ├── 1
-    |   ├── Japanese-Alpaca-LoRA-7b-v0-weights
-    |   |   ├── model.lora_config.npy
-    |   |   └── model.lora_weights.npy
-    |   ├── luotuo-lora-7b-0.1-weights
-    |   |   ├── model.lora_config.npy
-    |   |   └── model.lora_weights.npy
-    |   ├── model.py
-    |   └── multi_lora.json
-    └── config.pbtxt
-```
-
-multi_lora.json
-```
-{
-  "doll": "inflight_batcher_llm/tensorrt_llm_bls/1/luotuo-lora-7b-0.1-weights",
-  "sheep": "inflight_batcher_llm/tensorrt_llm_bls/1/Japanese-Alpaca-LoRA-7b-v0-weights"
-}
-```
-</details>
-
-### Embedding Models
-Currently, OpenAI-Compatible Frontend supports loading embedding models and embeddings endpoints via vLLM backend. Check [vLLM supported models](https://docs.vllm.ai/en/latest/models/supported_models.html#embedding) for all supported embedding models from vLLM.
-
-1. Launch the container and install dependencies:
-  - Mounts the `~/.cache/huggingface` for re-use of downloaded models across runs, containers, etc.
-  - Sets the [`HF_TOKEN`](https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#hftoken) environment variable to
-    access gated models, make sure this is set in your local environment if needed.
-
-```bash
-docker run -it --net=host --gpus all --rm \
-  -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
-  -e HF_TOKEN \
-  nvcr.io/nvidia/tritonserver:26.05-vllm-python-py3
-```
-
-2. Launch the OpenAI-compatible Triton Inference Server:
-```bash
-cd /opt/tritonserver/python/openai
-
-# NOTE: Embeddings endpoint does not require "--tokenizer"
-python3 openai_frontend/main.py --model-repository tests/vllm_embedding_models
-```
-
-<details>
-<summary>Example output</summary>
-
-```
-...
-+------------------+---------+--------+
-| Model            | Version | Status |
-+------------------+---------+--------+
-| all-MiniLM-L6-v2 | 1       | READY  | <- Correct Model Loaded in Triton
-+------------------+---------+--------+
-...
-Found model: name='all-MiniLM-L6-v2', backend='vllm'
-[WARNING] Adding CORS for the following origins: ['http://localhost']
-INFO:     Started server process [133]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:9000 (Press CTRL+C to quit) <- OpenAI Frontend Started Successfully
-```
-
-</details>
-
-3. Send a `/v1/embeddings` request:
-  - Note the use of `jq` is optional, but provides a nicely formatted output for JSON responses.
-```bash
-MODEL="all-MiniLM-L6-v2"
-curl -s http://localhost:9000/v1/embeddings \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "model": "'${MODEL}'",
-    "input": "The food was delicious and the waiter...",
-    "dimensions": 10,
-    "encoding_format": "float"
-  }' | jq
-```
-
-<details>
-<summary>Example output</summary>
-
-```json
-{
-  "object": "list",
-  "data": [
-    {
-      "object": "embedding",
-      "embedding": [
-        -0.1914404183626175,
-        0.4000193178653717,
-        0.058502197265625,
-        0.18909454345703125,
-        -0.4690297544002533,
-        0.004936536308377981,
-        0.45893096923828125,
-        -0.31141534447669983,
-        0.18299102783203125,
-        -0.4907582700252533
-      ],
-      "index": 0
-    }
-  ],
-  "model": "all-MiniLM-L6-v2",
-  "usage": {
-    "prompt_tokens": 12,
-    "total_tokens": 12
-  }
-}
-```
-
-</details>
-
 ## TensorRT-LLM
 
 0. Prepare your model repository for a TensorRT-LLM model, build the engine, etc. You can try any of the following options:
@@ -442,7 +237,7 @@ curl -s http://localhost:9000/v1/embeddings \
   - [TRT-LLM Backend Quickstart](https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#quick-start)
 
 1. Launch the container:
-  - Mounts the `~/.cache/huggingface` for re-use of downloaded models across runs, containers, etc.
+  - Mounts the `~/.huggingface/cache` for re-use of downloaded models across runs, containers, etc.
   - Sets the [`HF_TOKEN`](https://huggingface.co/docs/huggingface_hub/en/package_reference/environment_variables#hftoken) environment variable to
     access gated models, make sure this is set in your local environment if needed.
 
@@ -451,7 +246,7 @@ docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
   -e TRTLLM_ORCHESTRATOR=1 \
-  nvcr.io/nvidia/tritonserver:26.05-trtllm-python-py3
+  nvcr.io/nvidia/tritonserver:24.11-trtllm-python-py3
 ```
 
 2. Install dependencies inside the container:
@@ -488,13 +283,13 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
 
 ```json
 {
-  "id": "cmpl-5ad4f860-bf13-11f0-b137-b75b7f0a8586",
+  "id": "cmpl-704c758c-8a84-11ef-b106-107c6149ca79",
   "choices": [
     {
       "finish_reason": "stop",
       "index": 0,
       "message": {
-        "content": "It looks like you're ready to see if I'm functioning properly. What would",
+        "content": "It looks like you're testing the system!",
         "tool_calls": null,
         "role": "assistant",
         "function_call": null
@@ -502,15 +297,11 @@ curl -s http://localhost:9000/v1/chat/completions -H 'Content-Type: application/
       "logprobs": null
     }
   ],
-  "created": 1762875029,
-  "model": "tensorrt_llm_bls",
+  "created": 1728948689,
+  "model": "llama-3-8b-instruct",
   "system_fingerprint": null,
   "object": "chat.completion",
-  "usage": {
-    "prompt_tokens": 42,
-    "total_tokens": 58,
-    "completion_tokens": 16
-  }
+  "usage": null
 }
 ```
 
@@ -542,125 +333,6 @@ available arguments and default values.
 For more information on the `tritonfrontend` python bindings, see the docs
 [here](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/tritonfrontend.md).
 
-## Model Management
-
-The OpenAI-compatible frontend supports explicit model control, allowing you to
-dynamically load and unload models at runtime without restarting the server.
-This is particularly useful when hosting multiple large models on a shared GPU
-cluster and needing to swap models on demand.
-
-### Model Control Mode
-
-Use `--model-control-mode` to specify how models are managed at startup and
-runtime. The default is `none`.
-
-| Mode | Behavior |
-|------|----------|
-| `none` (default) | All models in the repository are loaded at startup. Load/unload APIs are not available. |
-| `explicit` | No models are loaded at startup unless specified with `--load-model`. Load and unload are controlled via the management API. |
-
-> [!NOTE]
-> This matches the native `tritonserver --model-control-mode` behavior.
-> See [Triton Model Management](../../docs/user_guide/model_management.md) for
-> more details.
-
-### Load Models at Startup (Explicit Mode)
-
-When using `--model-control-mode=explicit`, use `--load-model` to specify which
-models should be loaded at startup. It may be specified multiple times to load
-multiple models.
-
-<details>
-<summary>Example</summary>
-
-```bash
-# Start in explicit mode with no models loaded
-python3 openai_frontend/main.py \
-  --model-repository /path/to/models \
-  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
-  --model-control-mode explicit
-
-# Start in explicit mode and load a specific model at startup
-python3 openai_frontend/main.py \
-  --model-repository /path/to/models \
-  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
-  --model-control-mode explicit \
-  --load-model llama-3.1-8b-instruct
-
-# Load multiple models at startup
-python3 openai_frontend/main.py \
-  --model-repository /path/to/models \
-  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
-  --model-control-mode explicit \
-  --load-model model-a \
-  --load-model model-b
-
-# Load ALL models in the repository at startup
-python3 openai_frontend/main.py \
-  --model-repository /path/to/models \
-  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
-  --model-control-mode explicit \
-  --load-model '*'
-```
-
-</details>
-
-> [!IMPORTANT]
-> - `--load-model` requires `--model-control-mode=explicit`.
-> - `--load-model=*` can not be used together with loading specific models.
-
-### Dynamic Load / Unload API
-
-Once the server is running in `explicit` mode, models can be loaded and unloaded
-at runtime via the following endpoints:
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/v1/models/{model_name}/load` | Load a model. Blocks until model is fully loaded and ready. |
-| `POST` | `/v1/models/{model_name}/unload` | Unload a model. Blocks until fully unloaded. In-flight requests complete before removal. |
-
-Both endpoints return an error if `--model-control-mode` is not `explicit`.
-
-#### Load a model
-
-```bash
-MODEL="llama-3.1-8b-instruct"
-curl -s -X POST http://localhost:9000/v1/models/${MODEL}/load | jq
-```
-
-<details>
-<summary>Example output</summary>
-
-```json
-{
-  "id": "llama-3.1-8b-instruct",
-  "object": "model",
-  "created": 1750000000,
-  "owned_by": "Triton Inference Server"
-}
-```
-
-</details>
-
-#### Unload a model
-
-```bash
-MODEL="llama-3.1-8b-instruct"
-curl -s -X POST http://localhost:9000/v1/models/${MODEL}/unload | jq
-```
-
-<details>
-<summary>Example output</summary>
-
-```json
-{
-  "status": "success",
-  "model": "llama-3.1-8b-instruct"
-}
-```
-
-</details>
-
 ## Model Parallelism Support
 
 - [x] vLLM ([EngineArgs](https://github.com/triton-inference-server/vllm_backend/blob/main/README.md#using-the-vllm-backend))
@@ -670,307 +342,3 @@ curl -s -X POST http://localhost:9000/v1/models/${MODEL}/unload | jq
     - Set the following environment variable: `export TRTLLM_ORCHESTRATOR=1`
 - [ ] TensorRT-LLM ([Leader Mode](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/README.md#leader-mode))
     - Not currently supported
-
-## Tool Calling
-
-The OpenAI frontend supports `tools` and `tool_choice` in the `v1/chat/completions` API. Please refer to the OpenAI API reference for more details about these parameters:
-  [tools](https://platform.openai.com/docs/api-reference/chat/create#chat-create-tools),
-  [tool_choice](https://platform.openai.com/docs/api-reference/chat/create#chat-create-tool_choice)
-
-To enable the tool-calling feature, add the `--tool-call-parser {parser_name}` flag when starting the server. The two available parsers are `llama3` and `mistral`.
-The `llama3` parser supports tool-calling features for LLaMA 3.1, 3.2, and 3.3 models, while the `mistral` parser supports tool-calling features for the Mistral Instruct model.
-
-Example for launching the OpenAI frontend with a tool call parser:
-```
-python3 openai_frontend/main.py \
-  --model-repository tests/vllm_models \
-  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
-  --tool-call-parser llama3
-```
-
-Example for making a tool calling request:
-
-```python
-import json
-from openai import OpenAI
-
-
-def get_current_weather(city: str, state: str, unit: "str"):
-    return (
-        "The weather in Dallas, Texas is 85 degrees fahrenheit. It is "
-        "partly cloudly, with highs in the 90's."
-    )
-
-available_tools = {"get_current_weather": get_current_weather}
-
-openai_api_key = "EMPTY"
-openai_api_base = "http://localhost:9000/v1"
-
-client = OpenAI(
-    api_key=openai_api_key,
-    base_url=openai_api_base,
-)
-
-model = "llama-3.1-8b-instruct" # change this to the model in the repository
-
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_current_weather",
-            "description": "Get the current weather in a given location",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "city": {
-                        "type": "string",
-                        "description": "The city to find the weather for, e.g. 'San Francisco'",
-                    },
-                    "state": {
-                        "type": "string",
-                        "description": "the two-letter abbreviation for the state that the city is"
-                        " in, e.g. 'CA' which would mean 'California'",
-                    },
-                    "unit": {
-                        "type": "string",
-                        "description": "The unit to fetch the temperature in",
-                        "enum": ["celsius", "fahrenheit"],
-                    },
-                },
-                "required": ["city", "state", "unit"],
-            },
-        },
-    }
-]
-
-messages = [
-    {
-        "role": "system",
-        "content": "You're a helpful assistant! Answer the users question best you can.",
-    },
-    {"role": "user", "content": "What is the weather in Dallas, Texas in Fahrenheit?"},
-]
-
-tool_calls = client.chat.completions.create(
-    messages=messages, model=model, tools=tools, max_completion_tokens=128
-)
-function_name = tool_calls.choices[0].message.tool_calls[0].function.name
-function_arguments = tool_calls.choices[0].message.tool_calls[0].function.arguments
-
-print(f"function name: " f"{function_name}")
-print(f"function arguments: {function_arguments}")
-print(f"tool calling result: {available_tools[function_name](**json.loads(function_arguments))}")
-```
-
-Example output:
-```
-function name: get_current_weather
-function arguments: {"city": "Dallas", "state": "TX", "unit": "fahrenheit"}
-tool calling result: The weather in Dallas, Texas is 85 degrees fahrenheit. It is partly cloudly, with highs in the 90's.
-```
-
-#### Named Tool Calling
-
-The OpenAI frontend supports named function calling, utilizing structured outputs in the vLLM backend and guided decoding in TensorRT-LLM backend. Users can specify one of the tools in `tool_choice` to force the model to select a specific tool for function calling.
-
-> [!NOTE]
-> For instructions on enabling guided decoding in the TensorRT-LLM backend, please refer to [this guide](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/guided_decoding.md)
-
-Example for making a named tool calling request:
-
-```python
-import json
-from openai import OpenAI
-
-
-def get_current_weather(city: str, state: str, unit: "str"):
-    return (
-        "The weather in Dallas, Texas is 85 degrees fahrenheit. It is "
-        "partly cloudly, with highs in the 90's."
-    )
-
-def get_n_day_weather_forecast(city: str, state: str, unit: str, num_days: int):
-    return (
-        f"The weather in Dallas, Texas is 85 degrees fahrenheit in next {num_days} days."
-    )
-
-available_tools = {"get_current_weather": get_current_weather,
-                  "get_n_day_weather_forecast": get_n_day_weather_forecast}
-
-openai_api_key = "EMPTY"
-openai_api_base = "http://localhost:9000/v1"
-client = OpenAI(
-    api_key=openai_api_key,
-    base_url=openai_api_base,
-)
-model = "llama-3.1-8b-instruct" # change this to the model in the repository
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_current_weather",
-            "description": "Get the current weather in a given location",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "city": {
-                        "type": "string",
-                        "description": "The city to find the weather for, e.g. 'San Francisco'",
-                    },
-                    "state": {
-                        "type": "string",
-                        "description": "the two-letter abbreviation for the state that the city is"
-                        " in, e.g. 'CA' which would mean 'California'",
-                    },
-                    "unit": {
-                        "type": "string",
-                        "description": "The unit to fetch the temperature in",
-                        "enum": ["celsius", "fahrenheit"],
-                    },
-                },
-                "required": ["city", "state", "unit"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_n_day_weather_forecast",
-            "description": "Get an N-day weather forecast",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "city": {
-                        "type": "string",
-                        "description": "The city to find the weather for, "
-                        "e.g. 'San Francisco'",
-                    },
-                    "state": {
-                        "type": "string",
-                        "description": "must the two-letter abbreviation for the state "
-                        "that the city is in, e.g. 'CA' which would "
-                        "mean 'California'",
-                    },
-                    "unit": {
-                        "type": "string",
-                        "description": "The unit to fetch the temperature in",
-                        "enum": ["celsius", "fahrenheit"],
-                    },
-                    "num_days": {
-                        "type": "integer",
-                        "description": "The number of days to forecast",
-                    },
-                },
-                "required": ["city", "state", "unit", "num_days"],
-            },
-        },
-     }
-]
-
-tool_choice = {"function": {"name": "get_n_day_weather_forecast"}, "type": "function"}
-
-messages = [
-    {
-        "role": "system",
-        "content": "You're a helpful assistant! Answer the users question best you can.",
-    },
-    {"role": "user", "content": "What is the weather in Dallas, Texas in Fahrenheit?"},
-]
-
-tool_calls = client.chat.completions.create(
-    messages=messages, model=model, tools=tools, tool_choice=tool_choice, max_completion_tokens=128
-)
-function_name = tool_calls.choices[0].message.tool_calls[0].function.name
-function_arguments = tool_calls.choices[0].message.tool_calls[0].function.arguments
-
-print(f"function name: {function_name}")
-print(f"function arguments: {function_arguments}")
-print(f"tool calling result: {available_tools[function_name](**json.loads(function_arguments))}")
-```
-
-Example output:
-```
-function name: get_n_day_weather_forecast
-function arguments: {"city": "Dallas", "state": "TX", "unit": "fahrenheit", num_days: 1}
-tool calling result: The weather in Dallas, Texas is 85 degrees fahrenheit in next 1 days.
-```
-
-## Limit Endpoint Access
-
-The OpenAI-compatible server supports restricting access to specific API endpoints through authentication headers. This feature allows you to protect sensitive endpoints while keeping others publicly accessible.
-
-### Configuration
-
-Use the `--openai-restricted-api` command-line argument to configure endpoint restrictions:
-
-```
---openai-restricted-api <API_1>,<API_2>,... <restricted-key> <restricted-value>
-```
-
-- **`API`**: A comma-separated list of APIs to be included in this group. Note that currently a given API is not allowed to be included in multiple groups. The following protocols / APIs are recognized:
-  - **inference**: Chat completions and text completions endpoints
-    - `POST /v1/chat/completions`
-    - `POST /v1/completions`
-  - **embedding**: Embedding endpoint
-    - `POST /v1/embeddings`
-  - **model-repository**: Model listing, information, and dynamic load/unload endpoints
-    - `GET /v1/models`
-    - `GET /v1/models/{model_name}`
-    - `POST /v1/models/{model_name}/load`
-    - `POST /v1/models/{model_name}/unload`
-  - **metrics**: Server metrics endpoint
-    - `GET /metrics`
-  - **health**: Health check endpoint
-    - `GET /health/ready`
-
-- **`restricted-key`**: The HTTP request header to be checked when a request is received.
-- **`restricted-value`**: The header value required to access the specified protocols.
-
-### Examples
-
-#### Restrict Inference API Endpoints Only
-```bash
---openai-restricted-api "inference api-key my-secret-key"
-```
-
-Clients must include the header:
-```bash
-curl -H "api-key: my-secret-key" \
-     -X POST http://localhost:9000/v1/chat/completions \
-     -d '{"model": "my-model", "messages": [{"role": "user", "content": "Hello"}]}'
-```
-
-#### Restrict Multiple API Endpoints
-```bash
-# Different authentication for different APIs
---openai-restricted-api "inference user-key user-secret" \
---openai-restricted-api "model-repository admin-key admin-secret"
-
-# Multiple APIs in single argument with shared authentication
---openai-restricted-api "inference,model-repository shared-key shared-secret"
-```
-
-## HTTP Request Body Size Limit
-
-The frontend enforces a maximum request body size prior to JSON parsing. Requests that exceed this limit are rejected with an error response.
-
-Use `--http-max-input-size` to configure the limit (default: `67108864` bytes / 64 MiB):
-
-```bash
-python3 openai_frontend/main.py \
-  --model-repository /path/to/models \
-  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
-  --http-max-input-size 67108864
-```
-
-The limit applies to all endpoints. Example error response:
-
-```json
-{
-  "error": {
-    "message": "Request content size exceeds the maximum allowed input size of 67108864 bytes. Use --http-max-input-size to increase the limit.",
-    "type": "invalid_request_error",
-    "code": "content_too_large"
-  }
-}
-```

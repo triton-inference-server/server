@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,8 +42,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 # Clients
-pip3 install perf_analyzer
-PERF_ANALYZER=perf_analyzer
+PERF_ANALYZER=../clients/perf_analyzer
 IMAGE=../images/vulture.jpeg
 
 # Models
@@ -102,7 +101,7 @@ export MAX_ALLOWED_ALLOC="100"
 
 # Create local model repository
 mkdir -p models/
-cp -r $DATADIR/perf_model_store/resnet50_* models/
+cp -r $DATADIR/perf_model_store/resnet50* models/
 
 # Create the TensorRT plan from ONNX model
 rm -fr models/resnet50_fp32_plan && mkdir -p models/resnet50_fp32_plan/1 && \
@@ -132,9 +131,7 @@ RET=0
 for MODEL in $(ls models); do
     # Skip the resnet50_fp32_libtorch model as it is running into `misaligned address'
     # Tracked here: https://nvbugs/3954104
-    # Skip the resnet50_fp32_onnx model as the inference hangs on A100 with batch size > 1.
-    # Tracked here: https://linear.app/nvidia/issue/TRI-304
-    if [[ "$MODEL" == "resnet50_fp32_libtorch" || "$MODEL" == "resnet50_fp32_onnx" ]]; then
+    if [ "$MODEL" == "resnet50_fp32_libtorch" ]; then
         continue
     fi
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@ np_dtype_string = np.dtype(object)
 
 
 def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_dyna_sequence_model_name(
@@ -246,14 +246,14 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
 
-def create_onnx_modelconfig(models_dir, max_batch, dtype, shape):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
+def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_dyna_sequence_model_name(
@@ -348,7 +348,7 @@ instance_group [
 
     try:
         os.makedirs(config_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -357,11 +357,7 @@ instance_group [
 
 def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
-    TRT_LOGGER = (
-        trt.Logger(trt.Logger.INFO)
-        if os.environ.get("TRT_VERBOSE") != "1"
-        else trt.Logger(trt.Logger.VERBOSE)
-    )
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 
@@ -485,7 +481,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -496,11 +492,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     trt_dtype = np_to_trt_dtype(dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
 
-    TRT_LOGGER = (
-        trt.Logger(trt.Logger.INFO)
-        if os.environ.get("TRT_VERBOSE") != "1"
-        else trt.Logger(trt.Logger.VERBOSE)
-    )
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 
@@ -575,8 +567,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
     flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
     flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
-    if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
-        flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
     if trt_dtype == trt.int8:
         flags |= 1 << int(trt.BuilderFlag.INT8)
@@ -650,7 +641,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
     try:
         os.makedirs(model_version_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -658,7 +649,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
 def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
-    if not tu.validate_for_trt_model(dtype, dtype, dtype):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     if dtype != np.float32:
@@ -667,8 +658,8 @@ def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
         create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
-def create_plan_modelconfig(models_dir, max_batch, dtype, shape):
-    if not tu.validate_for_trt_model(dtype, dtype, dtype):
+def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_dyna_sequence_model_name(
@@ -763,7 +754,7 @@ instance_group [
 
     try:
         os.makedirs(config_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -774,20 +765,20 @@ def create_models(models_dir, dtype, shape, no_batch=True):
     model_version = 1
 
     if FLAGS.onnx:
-        create_onnx_modelconfig(models_dir, 8, dtype, shape)
+        create_onnx_modelconfig(models_dir, model_version, 8, dtype, shape)
         create_onnx_modelfile(models_dir, model_version, 8, dtype, shape)
         if no_batch:
-            create_onnx_modelconfig(models_dir, 0, dtype, shape)
+            create_onnx_modelconfig(models_dir, model_version, 0, dtype, shape)
             create_onnx_modelfile(models_dir, model_version, 0, dtype, shape)
 
     if FLAGS.tensorrt:
         if dtype == bool:
             return
 
-        create_plan_modelconfig(models_dir, 8, dtype, shape)
+        create_plan_modelconfig(models_dir, model_version, 8, dtype, shape)
         create_plan_models(models_dir, model_version, 8, dtype, shape)
         if no_batch:
-            create_plan_modelconfig(models_dir, 0, dtype, shape)
+            create_plan_modelconfig(models_dir, model_version, 0, dtype, shape)
             create_plan_models(models_dir, model_version, 0, dtype, shape)
 
 

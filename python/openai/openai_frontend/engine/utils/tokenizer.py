@@ -1,4 +1,4 @@
-# Copyright (c) 2024-2026, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,8 +32,6 @@ from typing import Optional, Union
 
 from transformers import AutoTokenizer, PreTrainedTokenizer, PreTrainedTokenizerFast
 
-AnyTokenizer = Union[PreTrainedTokenizer, PreTrainedTokenizerFast]
-
 
 def get_cached_tokenizer(
     tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast]
@@ -47,6 +45,7 @@ def get_cached_tokenizer(
     function caches these properties for faster access."""
 
     tokenizer_all_special_ids = set(tokenizer.all_special_ids)
+    tokenizer_all_special_tokens_extended = tokenizer.all_special_tokens_extended
     tokenizer_all_special_tokens = set(tokenizer.all_special_tokens)
     tokenizer_len = len(tokenizer)
 
@@ -58,6 +57,10 @@ def get_cached_tokenizer(
         @property
         def all_special_tokens(self):
             return tokenizer_all_special_tokens
+
+        @property
+        def all_special_tokens_extended(self):
+            return tokenizer_all_special_tokens_extended
 
         def __len__(self):
             return tokenizer_len

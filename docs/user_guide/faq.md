@@ -1,5 +1,5 @@
 <!--
-# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,14 +35,14 @@ same as when using the model's framework directly. However, with
 Triton you get benefits like [concurrent model
 execution](architecture.md#concurrent-model-execution) (the ability to
 run multiple models at the same time on the same GPU) and [dynamic
-batching](batcher.md#dynamic-batcher) to get better
+batching](model_configuration.md#dynamic-batcher) to get better
 throughput. You can also [replace or upgrade models while Triton and
 client application are running](model_management.md). Another benefit
 is that Triton can be deployed as a Docker container, anywhere – on
 premises and on public clouds. Triton Inference Server also [supports
 multiple
 frameworks](https://github.com/triton-inference-server/backend) such
-as TensorRT, PyTorch, and ONNX on both GPUs and CPUs
+as TensorRT, TensorFlow, PyTorch, and ONNX on both GPUs and CPUs
 leading to a streamlined deployment.
 
 ## Can Triton Inference Server run on systems that don't have GPUs?
@@ -122,13 +122,13 @@ concurrency](model_configuration.md#instance-groups) on a
 model-by-model basis.
 
 * Triton can [batch together multiple inference requests into a single
-  inference execution](batcher.md#dynamic-batcher). Typically,
+  inference execution](model_configuration.md#dynamic-batcher). Typically,
   batching inference requests leads to much higher thoughput with only
   a relatively small increase in latency.
 
 As a general rule, batching is the most beneficial way to increase GPU
 utilization. So you should always try enabling the [dynamic
-batcher](batcher.md#dynamic-batcher) with your models. Using
+batcher](model_configuration.md#dynamic-batcher) with your models. Using
 multiple instances of a model can also provide some benefit but is
 typically most useful for models that have small compute
 requirements. Most models will benefit from using two instances but

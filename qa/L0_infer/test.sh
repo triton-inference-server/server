@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -73,7 +73,7 @@ fi
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
     EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="33"}
 else
-    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="46"}
+    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="44"}
 fi
 
 TEST_JETSON=${TEST_JETSON:=0}
@@ -109,9 +109,6 @@ fi
 
 # Allow more time to exit. Ensemble brings in too many models
 SERVER_ARGS_EXTRA="--exit-timeout-secs=${SERVER_TIMEOUT} --backend-directory=${BACKEND_DIR} --backend-config=python,stub-timeout-seconds=120 --backend-config=python,shm-default-byte-size=${DEFAULT_SHM_SIZE_BYTES}"
-if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
-    SERVER_ARGS_EXTRA="${SERVER_ARGS_EXTRA} --allow-client-shm=true"
-fi
 SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
@@ -163,9 +160,6 @@ function generate_model_repository() {
         # Types that need to use SubAdd instead of AddSub
         swap_types="float32 int32 int16 int8"
         for onnx_model in $onnx_models; do
-          # Skip BF16 models: Not yet supported by Python backend
-          [[ "$onnx_model" == *bf16* ]] && continue
-
           if [ "$BACKEND" == "python_dlpack" ]; then
             python_model=`echo $onnx_model | sed 's/onnx/python_dlpack/g' | sed 's,'"$DATADIR/qa_model_repository/"',,g'`
           else
@@ -218,10 +212,6 @@ function generate_model_repository() {
       else
         cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
           models/.
-        # Remove ONNX BF16 models from CPU models
-        if [ "$BACKEND" == "onnx" ] && [ "$TARGET" == "cpu" ]; then
-          rm -rf models/onnx_*bf16*
-        fi
       fi
     done
 
@@ -260,24 +250,20 @@ function generate_model_repository() {
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in $BACKENDS; do
-      [ "$FW" == "plan" ] && continue
-      for MC in `ls models/${FW}*/config.pbtxt`; do
-        # BF16 models: ORT CPU has no BF16 kernels, force GPU
-        if [ "$FW" == "onnx" ] && [ "$MC" == *bf16* ]; then
-          MC_KIND="KIND_GPU"
-        else
-          MC_KIND=${KIND}
-        fi
-
-        if [ "$FW" == "onnx" ] && [ "$TEST_VALGRIND" -eq 1 ]; then
-          # Reduce the instance count to make loading onnx models faster
-          echo "instance_group [ { kind: ${MC_KIND} count: 1 }]" >> $MC
-        elif [ "$FW" == "python" ] || [ "$FW" == "python_dlpack" ] || [ "$FW" == "openvino" ]; then
-          echo "instance_group [ { kind: KIND_CPU }]" >> $MC
-        else
-          echo "instance_group [ { kind: ${KIND} }]" >> $MC
-        fi
-      done
+      if [ "$FW" == "onnx" ] && [ "$TEST_VALGRIND" -eq 1 ]; then
+        # Reduce the instance count to make loading onnx models faster
+        for MC in `ls models/${FW}*/config.pbtxt`; do
+            echo "instance_group [ { kind: ${KIND} count: 1 }]" >> $MC
+        done
+      elif [ "$FW" != "plan" ] && [ "$FW" != "python" ] && [ "$FW" != "python_dlpack" ] && [ "$FW" != "openvino" ];then
+        for MC in `ls models/${FW}*/config.pbtxt`; do
+            echo "instance_group [ { kind: ${KIND} }]" >> $MC
+        done
+      elif [ "$FW" == "python" ] || [ "$FW" == "python_dlpack" ] || [ "$FW" == "openvino" ]; then
+        for MC in `ls models/${FW}*/config.pbtxt`; do
+            echo "instance_group [ { kind: KIND_CPU }]" >> $MC
+        done
+      fi
     done
 
     # Modify custom_zero_1_float32 and custom_nobatch_zero_1_float32 for relevant ensembles
@@ -363,7 +349,7 @@ done
 # separately to reduce the loading time.
 if [ "$TEST_VALGRIND" -eq 1 ]; then
   TESTING_BACKENDS="python python_dlpack onnx"
-  EXPECTED_NUM_TESTS=36
+  EXPECTED_NUM_TESTS=42
   if [[ "aarch64" != $(uname -m) ]] ; then
       pip3 install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   else
@@ -378,11 +364,6 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
       mkdir nobatch_models
       mv ./models/*nobatch_* ./nobatch_models/.
       cp -fr ./models/nop_* ./nobatch_models/.
-      if [[ $BACKENDS == *"onnx"* ]]; then
-        # These two models are required by test_ensemble_mix_batch_nobatch test case.
-        cp -fr ./models/onnx_float32_float32_float32 ./nobatch_models/.
-        cp -fr ./models/custom_zero_1_float32 ./nobatch_models/.
-      fi
 
       for BATCHING_MODE in batch nobatch; do
         if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
@@ -422,7 +403,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
 
         set +e
 
-        VALGRIND_TESTS="1" python3 $INFER_TEST >$CLIENT_LOG 2>&1
+        python3 $INFER_TEST >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             RET=1

@@ -1579,8 +1579,8 @@ check_unit_test
 set -e
 
 # check server log
-if [ `grep -c "Found 1 gRPC service connections and inference handlers" $SERVER_LOG` == "0" ]; then
-    echo -e "\n***\n*** Expect logging for in-flight gRPC connection count\n***"
+if [ `grep -c "Model 'custom_zero_1_float32' (version 1) has 1 in-flight inferences" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Expect logging for model and in-flight inference count\n***"
     RET=1
 fi
 
@@ -1615,6 +1615,10 @@ set -e
 # check server log
 if [ `grep -c "Model 'custom_sequence_int32' (version 1) has 2 in-flight inferences" $SERVER_LOG` == "0" ]; then
     echo -e "\n***\n*** Expect logging for model having 2 in-flight inferences\n***"
+    RET=1
+fi
+if [ `grep -c "Model 'custom_sequence_int32' (version 1) has 1 in-flight inferences" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Expect logging for model having 1 in-flight inference\n***"
     RET=1
 fi
 
@@ -1654,8 +1658,8 @@ check_unit_test
 set -e
 
 # check server log
-if [ `grep -c "Found 1 gRPC service connections and inference handlers" $SERVER_LOG` == "0" ]; then
-    echo -e "\n***\n*** Expect logging for in-flight gRPC connection count\n***"
+if [ `grep -c "Model 'ensemble_zero_1_float32' (version 1) has 1 in-flight inferences" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Expect logging for model and in-flight inference count\n***"
     RET=1
 fi
 
@@ -1666,7 +1670,7 @@ LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_load_gpu_limit
 # dependency of the Python model to be used
-pip install "cuda-python>=12,<13"
+pip install cuda-python
 rm -fr models config.pbtxt.*
 mkdir models
 cp -r ../python_models/cuda_memory_consumer models/cuda_memory_consumer_1 && \

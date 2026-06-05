@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,18 +49,16 @@ def create_plan_modelfile(
     models_dir, model_version, max_batch, dtype, input_shapes, output_shapes
 ):
     assert len(input_shapes) == len(output_shapes)
-    if not tu.validate_for_trt_model(dtype, dtype, dtype):
+    if not tu.validate_for_trt_model(
+        dtype, dtype, dtype, input_shapes[0], input_shapes[0], input_shapes[0]
+    ):
         return
 
     trt_dtype = np_to_trt_dtype(dtype)
     io_cnt = len(input_shapes)
 
     # Create the model that copies inputs to corresponding outputs.
-    TRT_LOGGER = (
-        trt.Logger(trt.Logger.INFO)
-        if os.environ.get("TRT_VERBOSE") != "1"
-        else trt.Logger(trt.Logger.VERBOSE)
-    )
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
     network = builder.create_network()
 
@@ -116,7 +114,7 @@ def create_plan_modelfile(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -125,6 +123,7 @@ def create_plan_modelfile(
 
 def create_plan_modelconfig(
     models_dir,
+    model_version,
     max_batch,
     dtype,
     input_shapes,
@@ -135,7 +134,9 @@ def create_plan_modelconfig(
     assert len(input_shapes) == len(input_model_shapes)
     assert len(output_shapes) == len(output_model_shapes)
     assert len(input_shapes) == len(output_shapes)
-    if not tu.validate_for_trt_model(dtype, dtype, dtype):
+    if not tu.validate_for_trt_model(
+        dtype, dtype, dtype, input_shapes[0], input_shapes[0], input_shapes[0]
+    ):
         return
 
     io_cnt = len(input_shapes)
@@ -195,7 +196,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -413,7 +414,7 @@ def create_libtorch_modelfile(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     traced.save(model_version_dir + "/model.pt")
@@ -421,6 +422,7 @@ def create_libtorch_modelfile(
 
 def create_libtorch_modelconfig(
     models_dir,
+    model_version,
     max_batch,
     dtype,
     input_shapes,
@@ -500,7 +502,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -511,7 +513,15 @@ def create_ensemble_modelfile(
     models_dir, model_version, max_batch, dtype, input_shapes, output_shapes
 ):
     assert len(input_shapes) == len(output_shapes)
-    if not tu.validate_for_ensemble_model("reshape", dtype, dtype, dtype):
+    if not tu.validate_for_ensemble_model(
+        "reshape",
+        dtype,
+        dtype,
+        dtype,
+        input_shapes[0],
+        input_shapes[0],
+        input_shapes[0],
+    ):
         return
 
     emu.create_identity_ensemble_modelfile(
@@ -538,7 +548,15 @@ def create_ensemble_modelconfig(
     assert len(input_shapes) == len(input_model_shapes)
     assert len(output_shapes) == len(output_model_shapes)
     assert len(input_shapes) == len(output_shapes)
-    if not tu.validate_for_ensemble_model("reshape", dtype, dtype, dtype):
+    if not tu.validate_for_ensemble_model(
+        "reshape",
+        dtype,
+        dtype,
+        dtype,
+        input_shapes[0],
+        input_shapes[0],
+        input_shapes[0],
+    ):
         return
 
     # No reason to reshape ensemble inputs / outputs to empty as the inner models
@@ -572,7 +590,9 @@ def create_onnx_modelfile(
     models_dir, model_version, max_batch, dtype, input_shapes, output_shapes
 ):
     assert len(input_shapes) == len(output_shapes)
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
+    if not tu.validate_for_onnx_model(
+        dtype, dtype, dtype, input_shapes[0], input_shapes[0], input_shapes[0]
+    ):
         return
 
     onnx_dtype = np_to_onnx_dtype(dtype)
@@ -632,7 +652,7 @@ def create_onnx_modelfile(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
@@ -640,6 +660,7 @@ def create_onnx_modelfile(
 
 def create_onnx_modelconfig(
     models_dir,
+    model_version,
     max_batch,
     dtype,
     input_shapes,
@@ -650,7 +671,9 @@ def create_onnx_modelconfig(
     assert len(input_shapes) == len(input_model_shapes)
     assert len(output_shapes) == len(output_model_shapes)
     assert len(input_shapes) == len(output_shapes)
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
+    if not tu.validate_for_onnx_model(
+        dtype, dtype, dtype, input_shapes[0], input_shapes[0], input_shapes[0]
+    ):
         return
 
     io_cnt = len(input_shapes)
@@ -677,7 +700,7 @@ def create_onnx_modelconfig(
 
     try:
         os.makedirs(config_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -699,6 +722,8 @@ def create_openvino_modelfile(
         dtype,
         dtype,
         dtype,
+        batch_dim + input_shapes[0],
+        batch_dim + input_shapes[0],
         batch_dim + input_shapes[0],
     ):
         return
@@ -737,6 +762,7 @@ def create_openvino_modelfile(
 
 def create_openvino_modelconfig(
     models_dir,
+    model_version,
     max_batch,
     dtype,
     input_shapes,
@@ -758,6 +784,8 @@ def create_openvino_modelconfig(
         dtype,
         dtype,
         dtype,
+        batch_dim + input_shapes[0],
+        batch_dim + input_shapes[0],
         batch_dim + input_shapes[0],
     ):
         return
@@ -821,7 +849,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError:
+    except OSError as ex:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -846,6 +874,7 @@ def create_models(
     if FLAGS.onnx:
         create_onnx_modelconfig(
             models_dir,
+            model_version,
             8,
             dtype,
             input_shapes,
@@ -859,6 +888,7 @@ def create_models(
         if no_batch:
             create_onnx_modelconfig(
                 models_dir,
+                model_version,
                 0,
                 dtype,
                 input_shapes,
@@ -938,6 +968,7 @@ def create_trt_models(
     if FLAGS.tensorrt:
         create_plan_modelconfig(
             models_dir,
+            model_version,
             8,
             dtype,
             input_shapes,
@@ -951,6 +982,7 @@ def create_trt_models(
         if no_batch:
             create_plan_modelconfig(
                 models_dir,
+                model_version,
                 0,
                 dtype,
                 input_shapes,
@@ -986,6 +1018,7 @@ def create_libtorch_models(
     if FLAGS.libtorch:
         create_libtorch_modelconfig(
             models_dir,
+            model_version,
             8,
             dtype,
             input_shapes,
@@ -1000,6 +1033,7 @@ def create_libtorch_models(
         if no_batch and (dtype != np_dtype_string):
             create_libtorch_modelconfig(
                 models_dir,
+                model_version,
                 0,
                 dtype,
                 input_shapes,
@@ -1035,6 +1069,7 @@ def create_openvino_models(
     if FLAGS.openvino:
         create_openvino_modelconfig(
             models_dir,
+            model_version,
             8,
             dtype,
             input_shapes,
@@ -1048,6 +1083,7 @@ def create_openvino_models(
         if no_batch:
             create_openvino_modelconfig(
                 models_dir,
+                model_version,
                 0,
                 dtype,
                 input_shapes,

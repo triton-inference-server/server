@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,13 +34,17 @@ set +e
 
 RET=0
 
-# Check image_client and perf_analyzer
+# Check image_client and perf_client
 if [[ ! -x "triton_client/bin/image_client" ]]; then
     echo -e "*** image_client executable not present\n"
     RET=1
 fi
-if ! command -v perf_analyzer >/dev/null 2>&1; then
-    echo -e "*** perf_analyzer is not installed\n"
+if [[ ! -x "triton_client/bin/perf_analyzer" ]]; then
+    echo -e "*** perf_analyzer executable is not present\n"
+    RET=1
+fi
+if [[ ! -x "triton_client/bin/perf_client" ]]; then
+    echo -e "*** perf_client link is not present\n"
     RET=1
 fi
 
@@ -153,9 +157,11 @@ fi
 # we need to replace the text here as well to match the normalized version.
 WHLVERSION=`cat /workspace/TRITON_VERSION | sed 's/dev/\.dev0/'`
 if [[ "aarch64" != $(uname -m) ]] ; then
-    WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl"
+    WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl \
+          tritonclient-${WHLVERSION}-py3-none-manylinux1_x86_64.whl"
 else
-    WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl"
+    WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl \
+          tritonclient-${WHLVERSION}-py3-none-manylinux2014_aarch64.whl"
 fi
 for l in $WHLS; do
     if [[ ! -f "triton_client/python/$l" ]]; then
@@ -173,7 +179,7 @@ python -c """import tritonclient; import tritonclient.grpc; import tritonclient.
           import tritonclient.utils.cuda_shared_memory; import tritonclient.utils.shared_memory"""
 RET=$(($RET+$?))
 
-EXECUTABLES="perf_analyzer"
+EXECUTABLES="perf_analyzer perf_client"
 for l in $EXECUTABLES; do
   if [ $(which -a $l | grep "/usr/local/bin/$l" | wc -l) -ne 1 ]; then
     which -a $l
