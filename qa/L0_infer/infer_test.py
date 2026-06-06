@@ -35,6 +35,7 @@ import unittest
 
 import infer_util as iu
 import numpy as np
+import requests
 import test_util as tu
 from tritonclient.utils import *
 
@@ -313,6 +314,60 @@ class InferTest(tu.TestResultCollector):
         self._full_exact(
             np.uint8, np.uint8, np.uint8, output0_raw=True, output1_raw=True, swap=True
         )
+
+    @unittest.skipIf(not USE_HTTP, "HTTP testing is disabled")
+    @unittest.skipIf("onnx" not in BACKENDS, "ONNX backend is disabled")
+    def test_http_json_tensor_data_out_of_range(self):
+        if BATCH:
+            model_prefix = "onnx"
+            shape = [1, 16]
+        elif NOBATCH:
+            model_prefix = "onnx_nobatch"
+            shape = [16]
+        else:
+            self.skipTest("No ONNX model is enabled")
+
+        test_cases = [
+            (np.uint8, "UINT8", 256, "UINT8 data value 256 is out of range"),
+            (np.int8, "INT8", 128, "INT8 data value 128 is out of range"),
+        ]
+
+        for input_dtype, datatype, invalid_value, expected_error in test_cases:
+            with self.subTest(datatype=datatype):
+                model_name = tu.get_model_name(
+                    model_prefix, input_dtype, input_dtype, input_dtype
+                )
+                tensor_data = [invalid_value] + ([0] * 15)
+                payload = {
+                    "inputs": [
+                        {
+                            "name": "INPUT0",
+                            "shape": shape,
+                            "datatype": datatype,
+                            "data": tensor_data,
+                        },
+                        {
+                            "name": "INPUT1",
+                            "shape": shape,
+                            "datatype": datatype,
+                            "data": [0] * 16,
+                        },
+                    ],
+                    "outputs": [{"name": "OUTPUT0"}, {"name": "OUTPUT1"}],
+                }
+
+                infer_url = (
+                    f"http://{os.environ.get('TRITONSERVER_IPADDR', 'localhost')}:8000"
+                    f"/v2/models/{model_name}/infer"
+                )
+                response = requests.post(
+                    infer_url,
+                    json=payload,
+                    timeout=NETWORK_TIMEOUT,
+                )
+
+                self.assertEqual(response.status_code, 400, response.text)
+                self.assertIn(expected_error, response.json()["error"])
 
     def test_raw_bbb(self):
         self._full_exact(
