@@ -37,6 +37,18 @@ class ConcurrencyTest(unittest.TestCase):
         # Initialize client
         self._triton = grpcclient.InferenceServerClient("localhost:8001")
 
+    def tearDown(self):
+        # Always tear down the stream and close the channel, even if a test
+        # raised before reaching its own stop_stream(). The gRPC stream runs on
+        # a non-daemon thread; leaving it open keeps the pytest process alive
+        # forever (CI hang). cancel_requests=True guarantees this cannot itself
+        # block if the server-side stream is still open.
+        try:
+            self._triton.stop_stream(cancel_requests=True)
+        except Exception:
+            pass
+        self._triton.close()
+
     def _generate_streaming_callback_and_response_pair(self):
         response = []  # [{"result": result, "error": error}, ...]
 
