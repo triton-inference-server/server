@@ -450,10 +450,14 @@ class PBBLSTest(unittest.TestCase):
         print(torch.cuda.memory_summary())
 
         # Checking the same with the GPU tensors.
+        infer_responses = None
+        output0_pytorch = None
         for index in range(50):
             input0 = None
             infer_request = None
             input0_pb = None
+            infer_responses = None
+            output0_pytorch = None
             fail_msg = f"GPU memory lifecycle test failed at index: {index}"
 
             torch.cuda.empty_cache()
