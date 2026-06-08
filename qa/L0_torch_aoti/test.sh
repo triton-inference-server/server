@@ -172,15 +172,15 @@ SERVER_ARGS="--model-repository=${BAD_MODELDIR} --exit-on-error=false --log-verb
 SERVER_LOG="./torch_aoti_negative-server.log"
 run_server_tolive
 if [[ "${SERVER_PID}" -eq 0 ]]; then
-    echo -e "${COLOR_ERROR}\n***\n*** Failed to start ${SERVER} (negative phase)\n***${COLOR_RESET}" &1>2
-    cat ${SERVER_LOG} &1>2
+    echo -e "${COLOR_ERROR}\n***\n*** Failed to start ${SERVER} (negative phase)\n***${COLOR_RESET}" 1>&2
+    cat ${SERVER_LOG} 1>&2
     RET=1
 else
     wait_for_model_stable ${SERVER_TIMEOUT}
     for model in "${bad_models[@]}"; do
         code=$(curl -s -o /dev/null -w "%{http_code}" localhost:8000/v2/models/${model}/ready)
         if [[ "${code}" == "200" ]]; then
-            echo -e "${COLOR_ERROR}*** Negative model '${model}' unexpectedly loaded (ready)${COLOR_RESET}" &1>2
+            echo -e "${COLOR_ERROR}*** Negative model '${model}' unexpectedly loaded (ready)${COLOR_RESET}" 1>&2
             RET=1
         else
             echo -e "${COLOR_INFO}*** Negative model '${model}' correctly failed to load${COLOR_RESET}"

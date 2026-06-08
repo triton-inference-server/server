@@ -455,27 +455,36 @@ class TorchAotiSequenceTest(tu.TestResultCollector):
                     self.assertAlmostEqual(float(out[0, 0]), sums[s] + s, places=3)
 
     def test_staggered_sequences(self):
-        # Sequences of different lengths that start/end at different steps, so
-        # batch slots are freed and reused. Each sequence's state is independent
-        # and resets on its own START.
+        # Sequences of different lengths begin and end at different ticks on a
+        # shared timeline, so they overlap: some finish (freeing their batch
+        # slot) while others stay live and new ones start into the freed slots.
+        # Each sequence keeps independent state that resets on its own START.
+        # plan: seq_id -> (first_tick, values)
         plans = {
-            400: [1.0, 2.0],  # short
-            401: [3.0, 4.0, 5.0, 6.0],  # long
-            402: [10.0, 10.0, 10.0],
+            400: (0, [1.0, 2.0]),  # ticks 0-1
+            401: (0, [3.0, 4.0, 5.0, 6.0]),  # ticks 0-3
+            402: (2, [10.0, 10.0, 10.0]),  # ticks 2-4 (starts after 400 ends)
+            403: (3, [7.0, 8.0]),  # ticks 3-4
         }
+        last_tick = max(start + len(values) - 1 for start, values in plans.values())
+        running = {seq_id: 0.0 for seq_id in plans}
         with http.InferenceServerClient("localhost:8000") as client:
-            for seq_id, steps in plans.items():
-                running = 0.0
-                for i, value in enumerate(steps):
-                    running += value
+            for tick in range(last_tick + 1):
+                for seq_id, (first_tick, values) in plans.items():
+                    idx = tick - first_tick
+                    if idx < 0 or idx >= len(values):
+                        continue  # sequence not live at this tick
+                    running[seq_id] += values[idx]
                     out = self._infer_step(
                         client,
                         seq_id=seq_id,
-                        value=value,
-                        start=(i == 0),
-                        end=(i == len(steps) - 1),
+                        value=values[idx],
+                        start=(idx == 0),
+                        end=(idx == len(values) - 1),
                     )
-                    self.assertAlmostEqual(float(out[0, 0]), running + seq_id, places=3)
+                    self.assertAlmostEqual(
+                        float(out[0, 0]), running[seq_id] + seq_id, places=3
+                    )
 
     def test_initial_state_sequence(self):
         # Model relies on a declared zero initial_state (no START reset). Output
