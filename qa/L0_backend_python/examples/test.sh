@@ -72,7 +72,22 @@ if [ "$TEST_JETSON" == "0" ] && [ ${PYTHON_ENV_VERSION} != "8" ]; then
     pip install -U "jax[cuda12]"
 fi
 
-git clone ${TRITON_REPO_ORGANIZATION}/python_backend -b $PYTHON_BACKEND_REPO_TAG
+# Retry the clone to tolerate transient network failures.
+CLONE_MAX_RETRIES=3
+clone_ret=1
+for clone_attempt in $(seq 1 ${CLONE_MAX_RETRIES}); do
+    rm -rf python_backend
+    if git clone ${TRITON_REPO_ORGANIZATION}/python_backend -b $PYTHON_BACKEND_REPO_TAG; then
+        clone_ret=0
+        break
+    fi
+    echo -e "\n*** git clone of python_backend failed (attempt ${clone_attempt}/${CLONE_MAX_RETRIES}); retrying...\n"
+    sleep 10
+done
+if [ ${clone_ret} -ne 0 ]; then
+    echo -e "\n***\n*** Failed to clone python_backend after ${CLONE_MAX_RETRIES} attempts.\n***"
+    exit 1
+fi
 cd python_backend
 
 # Example 1
@@ -393,35 +408,65 @@ if [ "$TEST_JETSON" == "0" ]; then
 fi
 
 # Example 7
-
 # Model Instance Kind
+
+# NOTE: This example downloads a ResNet50 model and its utils from torch.hub
+# (GitHub) at runtime and it is prone to transient network failures (e.g.
+# "HTTP Error 504: Gateway Time-out", connection resets, DNS hiccups).
+# Retry the whole example when the failure is network-related.
 CLIENT_LOG="../examples_model_instance_kind.log"
 mkdir -p models/resnet50/1
 cp examples/instance_kind/model.py models/resnet50/1/
 cp examples/instance_kind/config.pbtxt models/resnet50/
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
+
+INSTANCE_KIND_MAX_RETRIES=3
+INSTANCE_KIND_RET=1
+NETWORK_ERROR_PATTERN="Gateway Time-out|HTTPError|URLError|Temporary failure in name resolution|Connection reset\
+|Connection refused|Connection aborted|timed out|Timed out|Max retries exceeded|Read timed out\
+|Failed to establish a new connection|EOF occurred|TLS|[^0-9](502|503|504)[^0-9]"
+
+for ATTEMPT in $(seq 1 ${INSTANCE_KIND_MAX_RETRIES}); do
+    echo -e "\n*** Model Instance Kind example: attempt ${ATTEMPT}/${INSTANCE_KIND_MAX_RETRIES}\n"
+    # Clear any partially-downloaded torch.hub cache that may have resulted from a previous failed attempt.
+    rm -rf "${HOME}/.cache/torch/hub" /root/.cache/torch/hub 2>/dev/null
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER (attempt ${ATTEMPT})\n***"
+        cat $SERVER_LOG
+        sleep 10
+        continue
+    fi
+
+    set +e
+    python3 examples/instance_kind/client.py --label_file examples/instance_kind/resnet50_labels.txt > $CLIENT_LOG 2>&1
+    CLIENT_RET=$?
+    set -e
+
+    kill_server
+
+    if [ ${CLIENT_RET} -eq 0 ] && grep -q "PASS" $CLIENT_LOG; then
+        INSTANCE_KIND_RET=0
+        break
+    fi
+
+    if grep -qiE "${NETWORK_ERROR_PATTERN}" $CLIENT_LOG $SERVER_LOG 2>/dev/null; then
+        echo -e "\n*** Model Instance Kind example hit a transient network error on attempt ${ATTEMPT}/${INSTANCE_KIND_MAX_RETRIES}; retrying...\n"
+        cat $CLIENT_LOG
+        sleep 10
+        continue
+    else
+        # Not a recognized network failure, a real error occurred.
+        echo -e "\n***\n*** Failed to verify Model Instance Kind example. \n***"
+        cat $CLIENT_LOG
+        break
+    fi
+done
+
+if [ ${INSTANCE_KIND_RET} -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify Model Instance Kind example after ${INSTANCE_KIND_MAX_RETRIES} attempt(s). \n***"
     RET=1
 fi
-
-set +e
-python3 examples/instance_kind/client.py --label_file examples/instance_kind/resnet50_labels.txt > $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify Model instance Kind example. \n***"
-    RET=1
-fi
-
-grep "PASS" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify Model Instance Kind example. Example failed to pass. \n***"
-    cat $CLIENT_LOG
-    RET=1
-fi
-set -e
-
-kill_server
 
 # Custom Metrics
 CLIENT_LOG="../examples_custom_metrics_client.log"
