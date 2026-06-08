@@ -1399,7 +1399,7 @@ def create_torch_aoti_forward_modelconfig(models_dir, model_version):
     try:
         os.makedirs(dst_dir)
     except OSError:
-        pass
+        pass  # ignore existing dir
     shutil.copy(src_pt2, dst_dir + "/model.pt2")
 
     config = f"""
@@ -1446,7 +1446,7 @@ def create_torch_aoti_initstate_model(models_dir, model_version, max_batch=8):
     try:
         os.makedirs(dst_dir)
     except OSError:
-        pass
+        pass  # ignore existing dir
 
     class SequenceNet(nn.Module):
         def forward(self, INPUT0, INPUT_STATE, START, READY):
@@ -1566,7 +1566,7 @@ instance_group [{{ kind: {gpu} }}]
         try:
             os.makedirs(dst_dir)
         except OSError:
-            pass
+            pass  # ignore existing dir
         shutil.copy(src_pt2, dst_dir + "/model.pt2")
         with open(models_dir + "/" + model_name + "/config.pbtxt", "w") as f:
             f.write(config)

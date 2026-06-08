@@ -1858,7 +1858,7 @@ def create_torch_aoti_variable_model(models_dir, max_batch=8):
     try:
         os.makedirs(model_version_dir)
     except OSError:
-        pass
+        pass  # ignore existing dir
 
     print(f"{_color_green}Creating model {model_name}{_color_reset}")
 
@@ -1931,7 +1931,7 @@ def create_torch_aoti_multi_instance_model(models_dir, max_batch=8):
     try:
         os.makedirs(model_version_dir)
     except OSError:
-        pass
+        pass  # ignore existing dir
     shutil.copy(src_pt2, os.path.join(model_version_dir, "model.pt2"))
 
     print(f"{_color_green}Creating model {model_name}{_color_reset}")

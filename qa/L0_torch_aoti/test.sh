@@ -62,6 +62,7 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
+SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
 
 # PyTorch on SBSA requires libgomp to be loaded first. See the following
 # GitHub issue for more information:
@@ -169,12 +170,13 @@ done
 
 SERVER_ARGS="--model-repository=${BAD_MODELDIR} --exit-on-error=false --log-verbose=1"
 SERVER_LOG="./torch_aoti_negative-server.log"
-run_server
+run_server_tolive
 if [[ "${SERVER_PID}" -eq 0 ]]; then
     echo -e "${COLOR_ERROR}\n***\n*** Failed to start ${SERVER} (negative phase)\n***${COLOR_RESET}" &1>2
     cat ${SERVER_LOG} &1>2
     RET=1
 else
+    wait_for_model_stable ${SERVER_TIMEOUT}
     for model in "${bad_models[@]}"; do
         code=$(curl -s -o /dev/null -w "%{http_code}" localhost:8000/v2/models/${model}/ready)
         if [[ "${code}" == "200" ]]; then
