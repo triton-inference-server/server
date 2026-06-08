@@ -53,7 +53,7 @@ function build_gpt2_tensorrt_engine {
     trtllm-build --checkpoint_dir "./c-model/gpt2/${NUM_GPUS}-gpu/" \
         --gpt_attention_plugin float16 \
         --remove_input_padding enable \
-        --paged_kv_cache enable \
+        --kv_cache_type paged \
         --gemm_plugin float16 \
         --workers "${NUM_GPUS}" \
         --output_dir "${ENGINES_DIR}"
