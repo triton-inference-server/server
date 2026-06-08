@@ -29,6 +29,7 @@ RET=0
 BASE_DIR=$(pwd)
 NUM_GPUS=${NUM_GPUS:=1}
 TENSORRTLLM_BACKEND_REPO_TAG=${TENSORRTLLM_BACKEND_REPO_TAG:="main"}
+TRITON_REPO_ORG=${TRITON_REPO_ORG:="https://github.com/triton-inference-server"}
 TRT_ROOT="/usr/local/tensorrt"
 
 MODEL_NAME="gpt2_tensorrt_llm"
@@ -76,6 +77,9 @@ function upgrade_openmpi {
     }
 
     # Update environment variables
+    export PATH=/opt/hpcx/ompi/bin:$PATH
+    export LD_LIBRARY_PATH=/opt/hpcx/ompi/lib:$LD_LIBRARY_PATH
+
     if ! grep -q '/opt/hpcx/ompi/bin' ~/.bashrc; then
         echo 'export PATH=/opt/hpcx/ompi/bin:$PATH' >>~/.bashrc
     fi
@@ -84,7 +88,6 @@ function upgrade_openmpi {
         echo 'export LD_LIBRARY_PATH=/opt/hpcx/ompi/lib:$LD_LIBRARY_PATH' >>~/.bashrc
     fi
     ldconfig
-    source ~/.bashrc
     cd "$BASE_DIR"
     mpirun --version
 }
@@ -96,7 +99,7 @@ build_gpt2_tensorrt_engine
 prepare_model_repository
 
 # Install perf_analyzer
-pip3 install tritonclient
+pip3 install perf_analyzer
 
 ARCH="amd64"
 STATIC_BATCH=1
