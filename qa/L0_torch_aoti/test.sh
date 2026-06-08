@@ -89,6 +89,8 @@ models=(
     "torch_aoti_int64_int64"
     "torch_aoti_float16_float16"
     "torch_aoti_float32_float32"
+    "torch_aoti_variable_float32"
+    "torch_aoti_multi_instance_float32"
     "torchvision_aoti"
 )
 for model in "${models[@]}"; do
@@ -100,6 +102,8 @@ done
 # Sequence-batching AOTI models live in the implicit-state sequence repository.
 sequence_models=(
     "torch_aoti_sequence_float32"
+    "torch_aoti_sequence_initstate_float32"
+    "torch_aoti_sequence_forward_float32"
 )
 for model in "${sequence_models[@]}"; do
     cp -r ${DATADIR}/qa_sequence_implicit_model_repository/${model} ${MODELDIR}/${model}
@@ -148,6 +152,42 @@ echo -e "${COLOR_DARK}Removing model repository${COLOR_RESET}"
 for model in "${models[@]}" "${sequence_models[@]}"; do
     rm -rf ${MODELDIR}/${model}
 done
+
+# Negative tests: these models declare unsupported types (TYPE_STRING CORRID /
+# state) and must fail to load. Start a separate server (exit-on-error=false) so
+# it stays up despite the load failures, then assert the models are not ready.
+echo -e "${COLOR_DARK}Negative (load-failure) tests${COLOR_RESET}"
+BAD_MODELDIR=`pwd`/bad_models
+rm -rf ${BAD_MODELDIR} && mkdir -p ${BAD_MODELDIR}
+bad_models=(
+    "torch_aoti_sequence_bad_corrid"
+    "torch_aoti_sequence_bad_state"
+)
+for model in "${bad_models[@]}"; do
+    cp -r ${DATADIR}/qa_sequence_implicit_model_repository/${model} ${BAD_MODELDIR}/${model}
+done
+
+SERVER_ARGS="--model-repository=${BAD_MODELDIR} --exit-on-error=false --log-verbose=1"
+SERVER_LOG="./torch_aoti_negative-server.log"
+run_server
+if [[ "${SERVER_PID}" -eq 0 ]]; then
+    echo -e "${COLOR_ERROR}\n***\n*** Failed to start ${SERVER} (negative phase)\n***${COLOR_RESET}" &1>2
+    cat ${SERVER_LOG} &1>2
+    RET=1
+else
+    for model in "${bad_models[@]}"; do
+        code=$(curl -s -o /dev/null -w "%{http_code}" localhost:8000/v2/models/${model}/ready)
+        if [[ "${code}" == "200" ]]; then
+            echo -e "${COLOR_ERROR}*** Negative model '${model}' unexpectedly loaded (ready)${COLOR_RESET}" &1>2
+            RET=1
+        else
+            echo -e "${COLOR_INFO}*** Negative model '${model}' correctly failed to load${COLOR_RESET}"
+        fi
+    done
+    kill -s SIGINT ${SERVER_PID}
+    wait ${SERVER_PID} || true
+fi
+rm -rf ${BAD_MODELDIR}
 
 # Report results and exit.
 if [[ ${RET} -ne 0 ]]; then

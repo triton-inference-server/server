@@ -1641,15 +1641,22 @@ def create_torchvision_aoti_model_file(
     model = model.to(device)
     model = model.eval()
 
-    SHAPE = (max_batch, 3, 224, 224)
+    # When batching is enabled, export with a dynamic first (batch) dimension so
+    # the AOTI artifact accepts any batch size in [1, max_batch]. A batch>=2
+    # sample is used to avoid 0/1 specialization.
+    if max_batch > 0:
+        SHAPE = (2, 3, 224, 224)
+        dynamic_shapes = ({0: torch.export.Dim("batch", min=1, max=max_batch)},)
+    else:
+        SHAPE = (1, 3, 224, 224)
+        dynamic_shapes = None
 
-    # Example input tensor with batch size 1 and 3 color channels (RGB), height and width of 224
     sample_inputs = (torch.zeros(SHAPE, dtype=torch.float32, device=device),)
 
     package_path = os.path.join(model_version_dir, "model.pt2")
 
     try:
-        ep = torch.export.export(model, sample_inputs)
+        ep = torch.export.export(model, sample_inputs, dynamic_shapes=dynamic_shapes)
         torch._inductor.aoti_compile_and_package(ep, package_path=package_path)
     except Exception as e:
         print(
@@ -1796,6 +1803,10 @@ name: "{model_name}"
 platform: "torch_aoti"
 max_batch_size: {max_batch}
 version_policy: {version_policy_str}
+dynamic_batching {{
+  preferred_batch_size: [ 4, 8 ]
+  max_queue_delay_microseconds: 1000
+}}
 input [
   {{
     name: "ARGS[0]"
@@ -1836,6 +1847,112 @@ instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU
         for l in range(output_label_cnt):
             file.write(f"label{l}\n")
         print(f"Created {label_path}")
+
+
+def create_torch_aoti_variable_model(models_dir, max_batch=8):
+    # AOTI add model exported with two dynamic dimensions (batch + feature) so
+    # batching can be exercised on a model whose non-batch shape is variable
+    # (dims: [-1]). Float32 only.
+    model_name = "torch_aoti_variable_float32"
+    model_version_dir = os.path.join(models_dir, model_name, "1")
+    try:
+        os.makedirs(model_version_dir)
+    except OSError:
+        pass
+
+    print(f"{_color_green}Creating model {model_name}{_color_reset}")
+
+    class AddNet(nn.Module):
+        def forward(self, INPUT0, INPUT1):
+            return INPUT0 + INPUT1
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = AddNet().to(device).eval()
+
+    # Sample uses batch>=2 and feature>=2 to avoid 0/1 specialization.
+    sample = (
+        torch.zeros(2, 4, dtype=torch.float32, device=device),
+        torch.zeros(2, 4, dtype=torch.float32, device=device),
+    )
+    batch = torch.export.Dim("batch", min=1, max=max_batch)
+    feature = torch.export.Dim("feature", min=1, max=512)
+    dynamic_shapes = (
+        {0: batch, 1: feature},
+        {0: batch, 1: feature},
+    )
+    try:
+        ep = torch.export.export(model, sample, dynamic_shapes=dynamic_shapes)
+        torch._inductor.aoti_compile_and_package(
+            ep, package_path=os.path.join(model_version_dir, "model.pt2")
+        )
+    except Exception as e:
+        print(
+            f"{_color_red}error: Failed to create model {model_name}: {e}{_color_reset}",
+            file=sys.stderr,
+        )
+        return
+
+    config = f"""
+backend: "pytorch"
+name: "{model_name}"
+platform: "torch_aoti"
+max_batch_size: {max_batch}
+dynamic_batching {{ max_queue_delay_microseconds: 1000 }}
+input [
+  {{ name: "ARGS[0]" data_type: TYPE_FP32 dims: [ -1 ] }},
+  {{ name: "ARGS[1]" data_type: TYPE_FP32 dims: [ -1 ] }}
+]
+output [
+  {{ name: "RESULT" data_type: TYPE_FP32 dims: [ -1 ] }}
+]
+instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"} }}]
+"""
+    with open(os.path.join(models_dir, model_name, "config.pbtxt"), "w") as f:
+        f.write(config)
+    print(f"Created config for {model_name}")
+
+
+def create_torch_aoti_multi_instance_model(models_dir, max_batch=8):
+    # Config-only variant that reuses the float32 add model artifact but runs
+    # with two instances, to exercise batching across multiple model instances.
+    import shutil
+
+    src_name = tu.get_model_name("torch_aoti", np.float32, np.float32, None)
+    src_pt2 = os.path.join(models_dir, src_name, "1", "model.pt2")
+    if not os.path.exists(src_pt2):
+        print(
+            f"{_color_yellow}warning: {src_pt2} not found; skipping multi-instance "
+            f"model{_color_reset}"
+        )
+        return
+
+    model_name = "torch_aoti_multi_instance_float32"
+    model_version_dir = os.path.join(models_dir, model_name, "1")
+    try:
+        os.makedirs(model_version_dir)
+    except OSError:
+        pass
+    shutil.copy(src_pt2, os.path.join(model_version_dir, "model.pt2"))
+
+    print(f"{_color_green}Creating model {model_name}{_color_reset}")
+    config = f"""
+backend: "pytorch"
+name: "{model_name}"
+platform: "torch_aoti"
+max_batch_size: {max_batch}
+dynamic_batching {{ max_queue_delay_microseconds: 1000 }}
+input [
+  {{ name: "ARGS[0]" data_type: TYPE_FP32 dims: [ 16 ] }},
+  {{ name: "ARGS[1]" data_type: TYPE_FP32 dims: [ 16 ] }}
+]
+output [
+  {{ name: "RESULT" data_type: TYPE_FP32 dims: [ 16 ] }}
+]
+instance_group [{{ count: 2 kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"} }}]
+"""
+    with open(os.path.join(models_dir, model_name, "config.pbtxt"), "w") as f:
+        f.write(config)
+    print(f"Created config for {model_name}")
 
 
 def create_torch_aoti_complex_model_config(
@@ -3065,9 +3182,14 @@ if __name__ == "__main__":
         )
         if create_torch_aoti_complex_model_file(FLAGS.models_dir):
             create_torch_aoti_complex_model_config(FLAGS.models_dir)
+        # Batching coverage models: variable non-batch dim, and a multi-instance
+        # variant that reuses the float32 add model artifact.
+        create_torch_aoti_variable_model(FLAGS.models_dir)
+        create_torch_aoti_multi_instance_model(FLAGS.models_dir)
 
     if FLAGS.torchvision_aoti:
-        # TODO: Add support for variable batch size and version policy for torchvision AOTI models.
         print(f"{_color_blue}TorchVision AOTI model generation requested{_color_reset}")
-        if create_torchvision_aoti_model_file(FLAGS.models_dir, 1):
-            create_torchvision_aoti_model_config(FLAGS.models_dir, 1)
+        # Export with a dynamic batch dimension (max_batch_size 8) to exercise
+        # batching of a real, higher-rank ([N,3,224,224]) model.
+        if create_torchvision_aoti_model_file(FLAGS.models_dir, 8):
+            create_torchvision_aoti_model_config(FLAGS.models_dir, 8)

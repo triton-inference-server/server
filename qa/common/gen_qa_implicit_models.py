@@ -1380,6 +1380,199 @@ instance_group [
         cfile.write(config)
 
 
+def create_torch_aoti_forward_modelconfig(models_dir, model_version):
+    # Config-only variant of the float32 sequence model that addresses the
+    # control/state tensors via the forward-argument interface (ARGS[...] /
+    # RESULT[...]) instead of the ordinal INPUT__N / OUTPUT__N names. It reuses
+    # the float32 sequence artifact (5 positional inputs -> ARGS[0..4], two
+    # outputs -> RESULT[0], RESULT[1]).
+    import shutil
+
+    src = models_dir + "/" + tu.get_sequence_model_name("torch_aoti", np.float32)
+    src_pt2 = src + "/" + str(model_version) + "/model.pt2"
+    if not os.path.exists(src_pt2):
+        print(f"warning: {src_pt2} not found; skipping forward-interface model")
+        return
+
+    model_name = "torch_aoti_sequence_forward_float32"
+    dst_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    try:
+        os.makedirs(dst_dir)
+    except OSError:
+        pass
+    shutil.copy(src_pt2, dst_dir + "/model.pt2")
+
+    config = f"""
+name: "{model_name}"
+backend: "pytorch"
+platform: "torch_aoti"
+max_batch_size: 8
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {{ name: "ARGS[2]" control [{{ kind: CONTROL_SEQUENCE_START fp32_false_true: [ 0, 1 ] }}] }},
+    {{ name: "ARGS[3]" control [{{ kind: CONTROL_SEQUENCE_READY fp32_false_true: [ 0, 1 ] }}] }},
+    {{ name: "ARGS[4]" control [{{ kind: CONTROL_SEQUENCE_CORRID data_type: TYPE_INT32 }}] }}
+  ]
+  state [
+    {{
+      input_name: "ARGS[1]"
+      output_name: "RESULT[1]"
+      data_type: {np_to_model_dtype(np.float32)}
+      dims: [ 1 ]
+    }}
+  ]
+}}
+input [
+  {{ name: "ARGS[0]" data_type: {np_to_model_dtype(np.float32)} dims: [ 1 ] }}
+]
+output [
+  {{ name: "RESULT[0]" data_type: {np_to_model_dtype(np.float32)} dims: [ 1 ] }}
+]
+instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"} }}]
+"""
+    with open(models_dir + "/" + model_name + "/config.pbtxt", "w") as f:
+        f.write(config)
+    print(f"Created forward-interface sequence model {model_name}")
+
+
+def create_torch_aoti_initstate_model(models_dir, model_version, max_batch=8):
+    # Sequence model that relies on a declared zero initial_state rather than a
+    # START-driven reset: new_state = INPUT0 + INPUT_STATE (accumulate). On the
+    # first step the state input is the zero initial_state, so it behaves as a
+    # running sum that resets when the sequence (and its state) is recycled.
+    model_name = "torch_aoti_sequence_initstate_float32"
+    dst_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    try:
+        os.makedirs(dst_dir)
+    except OSError:
+        pass
+
+    class SequenceNet(nn.Module):
+        def forward(self, INPUT0, INPUT_STATE, START, READY):
+            new_state = INPUT0 + INPUT_STATE
+            out = new_state * READY.to(new_state.dtype)
+            return out, new_state
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = SequenceNet().to(device).eval()
+    batch = torch.export.Dim("batch", min=1, max=max_batch)
+    sample = (
+        torch.zeros(2, 1, dtype=torch.float32, device=device),
+        torch.zeros(2, 1, dtype=torch.float32, device=device),
+        torch.zeros(2, 1, dtype=torch.float32, device=device),
+        torch.zeros(2, 1, dtype=torch.float32, device=device),
+    )
+    ds = ({0: batch}, {0: batch}, {0: batch}, {0: batch})
+    ep = torch.export.export(model, sample, dynamic_shapes=ds)
+    torch._inductor.aoti_compile_and_package(ep, package_path=dst_dir + "/model.pt2")
+
+    config = f"""
+name: "{model_name}"
+backend: "pytorch"
+platform: "torch_aoti"
+max_batch_size: {max_batch}
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {{ name: "INPUT__2" control [{{ kind: CONTROL_SEQUENCE_START fp32_false_true: [ 0, 1 ] }}] }},
+    {{ name: "INPUT__3" control [{{ kind: CONTROL_SEQUENCE_READY fp32_false_true: [ 0, 1 ] }}] }}
+  ]
+  state [
+    {{
+      input_name: "INPUT__1"
+      output_name: "OUTPUT__1"
+      data_type: {np_to_model_dtype(np.float32)}
+      dims: [ 1 ]
+      initial_state: {{
+        name: "zero state"
+        data_type: {np_to_model_dtype(np.float32)}
+        dims: [ 1 ]
+        zero_data: true
+      }}
+    }}
+  ]
+}}
+input [
+  {{ name: "INPUT__0" data_type: {np_to_model_dtype(np.float32)} dims: [ 1 ] }}
+]
+output [
+  {{ name: "OUTPUT__0" data_type: {np_to_model_dtype(np.float32)} dims: [ 1 ] }}
+]
+instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"} }}]
+"""
+    with open(models_dir + "/" + model_name + "/config.pbtxt", "w") as f:
+        f.write(config)
+    print(f"Created initial-state sequence model {model_name}")
+
+
+def create_torch_aoti_negative_configs(models_dir, model_version):
+    # Config-only negative models that reuse the float32 sequence artifact but
+    # declare an unsupported TYPE_STRING correlation id / state. These must fail
+    # to load; the L0 test starts a dedicated server and asserts the failure.
+    import shutil
+
+    src = models_dir + "/" + tu.get_sequence_model_name("torch_aoti", np.float32)
+    src_pt2 = src + "/" + str(model_version) + "/model.pt2"
+    if not os.path.exists(src_pt2):
+        print(f"warning: {src_pt2} not found; skipping negative models")
+        return
+
+    fp32 = np_to_model_dtype(np.float32)
+    gpu = "KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"
+    variants = {
+        "torch_aoti_sequence_bad_corrid": f"""
+name: "torch_aoti_sequence_bad_corrid"
+backend: "pytorch"
+platform: "torch_aoti"
+max_batch_size: 8
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {{ name: "INPUT__2" control [{{ kind: CONTROL_SEQUENCE_START fp32_false_true: [ 0, 1 ] }}] }},
+    {{ name: "INPUT__3" control [{{ kind: CONTROL_SEQUENCE_READY fp32_false_true: [ 0, 1 ] }}] }},
+    {{ name: "INPUT__4" control [{{ kind: CONTROL_SEQUENCE_CORRID data_type: TYPE_STRING }}] }}
+  ]
+  state [
+    {{ input_name: "INPUT__1" output_name: "OUTPUT__1" data_type: {fp32} dims: [ 1 ] }}
+  ]
+}}
+input [ {{ name: "INPUT__0" data_type: {fp32} dims: [ 1 ] }} ]
+output [ {{ name: "OUTPUT__0" data_type: {fp32} dims: [ 1 ] }} ]
+instance_group [{{ kind: {gpu} }}]
+""",
+        "torch_aoti_sequence_bad_state": f"""
+name: "torch_aoti_sequence_bad_state"
+backend: "pytorch"
+platform: "torch_aoti"
+max_batch_size: 8
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {{ name: "INPUT__2" control [{{ kind: CONTROL_SEQUENCE_START fp32_false_true: [ 0, 1 ] }}] }},
+    {{ name: "INPUT__3" control [{{ kind: CONTROL_SEQUENCE_READY fp32_false_true: [ 0, 1 ] }}] }}
+  ]
+  state [
+    {{ input_name: "INPUT__1" output_name: "OUTPUT__1" data_type: TYPE_STRING dims: [ 1 ] }}
+  ]
+}}
+input [ {{ name: "INPUT__0" data_type: {fp32} dims: [ 1 ] }} ]
+output [ {{ name: "OUTPUT__0" data_type: {fp32} dims: [ 1 ] }} ]
+instance_group [{{ kind: {gpu} }}]
+""",
+    }
+    for model_name, config in variants.items():
+        dst_dir = models_dir + "/" + model_name + "/" + str(model_version)
+        try:
+            os.makedirs(dst_dir)
+        except OSError:
+            pass
+        shutil.copy(src_pt2, dst_dir + "/model.pt2")
+        with open(models_dir + "/" + model_name + "/config.pbtxt", "w") as f:
+            f.write(config)
+        print(f"Created negative sequence model {model_name}")
+
+
 def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
     model_version = 1
 
@@ -1426,6 +1619,13 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
         # AOTI sequence models are generated with first-dim batching enabled.
         create_torch_aoti_modelconfig(models_dir, 8, dtype, shape)
         create_torch_aoti_modelfile(models_dir, model_version, 8, dtype, shape)
+        # Generate the float32-only variants once (they reuse / extend the
+        # float32 sequence artifact): forward-interface naming, declared zero
+        # initial_state, and the negative (unsupported-type) load-failure models.
+        if dtype == np.float32 and no_batch:
+            create_torch_aoti_forward_modelconfig(models_dir, model_version)
+            create_torch_aoti_initstate_model(models_dir, model_version, 8)
+            create_torch_aoti_negative_configs(models_dir, model_version)
 
 
 if __name__ == "__main__":
