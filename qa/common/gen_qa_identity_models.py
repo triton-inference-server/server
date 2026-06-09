@@ -552,7 +552,7 @@ def create_plan_dynamic_rf_modelfile(
         out_node = network.add_identity(in_node)
 
         out_node.get_output(0).name = "OUTPUT{}".format(io_num)
-        out_node.get_output(0).dtype = trt_dtype
+        out_node.set_output_type(0, trt_dtype)
         network.mark_output(out_node.get_output(0))
         out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
@@ -668,11 +668,11 @@ def create_plan_shape_tensor_modelfile(
 
         dummy_out_node.name = "DUMMY_OUTPUT{}".format(io_num)
 
-        dummy_out_node.dtype = trt_dtype
+        resize_layer.set_output_type(0, trt_dtype)
         network.mark_output(dummy_out_node)
         dummy_out_node.allowed_formats = 1 << int(trt_memory_format)
 
-        out_node.get_output(0).dtype = trt.int64
+        out_node.set_output_type(0, trt.int64)
         network.mark_output_for_shapes(out_node.get_output(0))
         out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
