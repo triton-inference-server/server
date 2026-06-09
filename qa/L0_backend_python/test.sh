@@ -75,6 +75,14 @@ source ./common.sh
 
 rm -fr *.log ./models
 
+# Remove any orphaned Python backend shared memory regions left over from a
+# previous (possibly aborted) run. No Triton server is running at this point, so
+# these are guaranteed to be stale. Leaving them in place lets regions created
+# with one shm-default-byte-size leak into later sections that assert a
+# different region size, which previously caused intermittent/persistent
+# failures of the shm-region-size check below.
+rm -f /dev/shm/triton_python_backend_shm_region_* 2>/dev/null || true
+
 python3 --version | grep "3.12" > /dev/null
 if [ $? -ne 0 ]; then
     echo -e "Expecting Python default version to be: Python 3.12 but actual version is $(python3 --version)"
@@ -352,6 +360,15 @@ cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbt
 shm_default_byte_size=$((1024*1024*4))
 SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=$shm_default_byte_size"
 
+# Record the Python backend shared memory regions that already exist before
+# starting this server. Earlier sections of this test start servers with a
+# larger shm-default-byte-size (e.g. 5 MB), and regions left over from a prior
+# (possibly aborted) run can persist in /dev/shm. Such leftovers must not be
+# mistaken for regions created by this server: this section verifies that the
+# regions created with shm-default-byte-size=4 MB are exactly 4 MB, so checking
+# unrelated stale regions of a different size would spuriously fail the job.
+shm_pages_before=" $(ls /dev/shm/ 2>/dev/null | grep '^triton_python_backend_shm' | tr '\n' ' ') "
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
@@ -361,6 +378,10 @@ fi
 
 for shm_page in `ls /dev/shm/`; do
     if [[ $shm_page !=  triton_python_backend_shm* ]]; then
+        continue
+    fi
+    # Only validate regions created by this server; skip pre-existing leftovers.
+    if [[ "$shm_pages_before" == *" $shm_page "* ]]; then
         continue
     fi
     page_size=`ls -l /dev/shm/$shm_page 2>&1 | awk '{print $5}'`
