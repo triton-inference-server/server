@@ -28,6 +28,7 @@ import gc
 import os
 import sys
 import threading
+import time
 import unittest
 from multiprocessing import Pool
 
@@ -164,6 +165,18 @@ def bls_libtorch(model_name, result_device):
 class PBBLSTest(unittest.TestCase):
     def setUp(self):
         self._is_decoupled = True if os.environ["BLS_KIND"] == "decoupled" else False
+        # DIAG: per-test wall-clock timing to pinpoint which sub-test is slow in
+        # the decoupled + small-CUDA-pool configuration (see bls.decoupled.64).
+        self._test_start_time = time.time()
+        print(
+            f"[TIMING] START {self.id()} "
+            f"(decoupled={self._is_decoupled})",
+            flush=True,
+        )
+
+    def tearDown(self):
+        elapsed = time.time() - getattr(self, "_test_start_time", time.time())
+        print(f"[TIMING] END   {self.id()} took {elapsed:.3f}s", flush=True)
 
     def add_deferred_exception(self, ex):
         global _deferred_exceptions
@@ -423,7 +436,8 @@ class PBBLSTest(unittest.TestCase):
         # Sending the tensor 50 times to test whether the deallocation is
         # happening correctly. If the deallocation doesn't happen correctly,
         # there will be an out of shared memory error.
-        for _ in range(50):
+        for cpu_index in range(50):
+            _iter_start = time.time()
             input0 = np.ones([1, input_size], dtype=np.float32)
             input0_pb = pb_utils.Tensor("INPUT0", input0)
             infer_request = pb_utils.InferenceRequest(
@@ -445,19 +459,21 @@ class PBBLSTest(unittest.TestCase):
             np.testing.assert_equal(
                 output0.as_numpy(), input0, "BLS CPU memory lifecycle failed."
             )
+            print(
+                f"[TIMING][lifecycle][CPU] iter={cpu_index} "
+                f"took {time.time() - _iter_start:.3f}s",
+                flush=True,
+            )
 
         # Show total memory stats before gpu tensor test
         print(torch.cuda.memory_summary())
 
         # Checking the same with the GPU tensors.
-        infer_responses = None
-        output0_pytorch = None
         for index in range(50):
+            _iter_start = time.time()
             input0 = None
             infer_request = None
             input0_pb = None
-            infer_responses = None
-            output0_pytorch = None
             fail_msg = f"GPU memory lifecycle test failed at index: {index}"
 
             torch.cuda.empty_cache()
@@ -521,6 +537,11 @@ class PBBLSTest(unittest.TestCase):
             self.assertTrue(
                 torch.all(output0_pytorch == input0),
                 f"input ({input0}) and output ({output0_pytorch}) didn't match for identity model.",
+            )
+            print(
+                f"[TIMING][lifecycle][GPU] iter={index} "
+                f"took {time.time() - _iter_start:.3f}s",
+                flush=True,
             )
 
         print(torch.cuda.memory_summary())
