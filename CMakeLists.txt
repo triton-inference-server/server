@@ -80,6 +80,10 @@ option(TRITON_ENABLE_GCS "Include GCS Filesystem support in server" OFF)
 option(TRITON_ENABLE_S3 "Include S3 Filesystem support in server" OFF)
 option(TRITON_ENABLE_AZURE_STORAGE "Include Azure Storage Filesystem support in server" OFF)
 
+option(TRITON_ENABLE_MYSQL_ODBC
+  "Enable MySQL ODBC connection pool in tritonserver (requires unixODBC / ODBC dev package)"
+  OFF)
+
 # Need to know if TensorRT is available when building unit tests
 option(TRITON_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
 
@@ -276,6 +280,7 @@ ExternalProject_Add(triton-server
     -DTRITON_ENABLE_S3:BOOL=${TRITON_ENABLE_S3}
     -DTRITON_ENABLE_TENSORRT:BOOL=${TRITON_ENABLE_TENSORRT}
     -DTRITON_ENABLE_ENSEMBLE:BOOL=${TRITON_ENABLE_ENSEMBLE}
+    -DTRITON_ENABLE_MYSQL_ODBC:BOOL=${TRITON_ENABLE_MYSQL_ODBC}
     -DTRITON_MIN_CXX_STANDARD:STRING=${TRITON_MIN_CXX_STANDARD}
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
