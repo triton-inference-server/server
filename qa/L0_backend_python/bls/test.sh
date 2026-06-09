@@ -35,6 +35,73 @@ TRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION:=http://github.com/triton-in
 RET=0
 rm -fr *.log ./models *.txt *.xml
 
+# ---------------------------------------------------------------------------
+# Diagnostics for the sporadic decoupled BLS hang.
+#
+# A decoupled BLS call (e.g. bls_square -> square_int32) occasionally hangs: the
+# parent process produces all responses but one decoupled response is never
+# observed by the stub's response iterator, so the stub blocks until the client
+# times out (DEADLINE_EXCEEDED ~240s). To root-cause it we need the *thread
+# states* of the wedged stub and the tritonserver process while it is hung.
+#
+# This collector dumps all-thread backtraces of the tritonserver process and
+# every Python backend stub process. It is invoked by a watchdog (below) that
+# fires only when a run is hung (healthy runs finish in ~20s), so it captures
+# the blocked threads in the act, e.g.:
+#   - stub main thread parked in ResponseIterator::Next -> cv_.wait  (waiting for a response)
+#   - stub ParentToStubMQMonitor parked in MessageQueue::Pop         (no message queued)
+#   - a server thread parked in SendBLSDecoupledResponse -> wait     (ack lost), or none
+# That combination tells us definitively whether the final response was never
+# pushed, or was pushed and the ack/notify was lost.
+collect_hang_diagnostics() {
+    local diag_log="$1"
+    {
+        echo "=================== BLS HANG DIAGNOSTICS ==================="
+        date
+        echo "SERVER_PID=${SERVER_PID}"
+
+        local stub_pids
+        stub_pids=$(pgrep -f triton_python_backend_stub | tr '\n' ' ')
+        echo "stub pids: ${stub_pids}"
+
+        echo "--- threads (ps -eLf) ---"
+        ps -eLf 2>/dev/null | grep -E "tritonserver|triton_python_backend_stub" | grep -v grep
+
+        local pid
+        for pid in ${SERVER_PID} ${stub_pids}; do
+            [ -z "${pid}" ] && continue
+            echo "--- /proc/${pid}: blocked-thread summary (wchan) ---"
+            local t
+            for t in /proc/${pid}/task/*; do
+                [ -e "${t}/comm" ] || continue
+                echo "tid $(basename ${t}) comm=$(cat ${t}/comm 2>/dev/null) wchan=$(cat ${t}/wchan 2>/dev/null)"
+            done
+        done
+
+        if command -v py-spy >/dev/null 2>&1; then
+            for pid in ${stub_pids}; do
+                echo "--- py-spy dump stub ${pid} (python-level stacks) ---"
+                py-spy dump --pid ${pid} --nonblocking 2>&1
+            done
+        else
+            echo "py-spy not available (pip install py-spy for python-level stacks)"
+        fi
+
+        if command -v gdb >/dev/null 2>&1; then
+            for pid in ${SERVER_PID} ${stub_pids}; do
+                [ -z "${pid}" ] && continue
+                echo "--- gdb 'thread apply all bt' pid ${pid} ---"
+                gdb -p ${pid} -batch -ex "set pagination off" -ex "thread apply all bt" 2>&1
+            done
+        else
+            echo "gdb not available (apt-get install gdb for C++-level stacks)"
+        fi
+
+        echo "=================== END BLS HANG DIAGNOSTICS ==============="
+    } >> "${diag_log}" 2>&1
+    cat "${diag_log}"
+}
+
 # FIXME: [DLIS-5970] Until Windows supports GPU tensors, only test CPU
 if [[ ${TEST_WINDOWS} == 0 ]]; then
     pip3 uninstall -y torch
@@ -119,9 +186,22 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
 
             for MODEL_NAME in bls bls_memory bls_memory_async bls_async; do
                 export MODEL_NAME=${MODEL_NAME}
+
+                # Watchdog: if this run hangs (healthy runs finish in ~20s), capture
+                # stub/server thread stacks at 90s while the processes are still
+                # wedged, so the next log pinpoints the lost decoupled response.
+                DIAG_LOG="./bls_hang_diag.${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.${MODEL_NAME}.log"
+                ( sleep 90; collect_hang_diagnostics "${DIAG_LOG}" ) &
+                WATCHDOG_PID=$!
+
                 # Run with pytest to capture the return code correctly
                 pytest --junitxml="${MODEL_NAME}.${TRIAL}.${CUDA_MEMORY_POOL_SIZE_MB}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
                 EXIT_CODE=$?
+
+                # Stop the watchdog if the test finished before it fired.
+                kill ${WATCHDOG_PID} 2>/dev/null
+                wait ${WATCHDOG_PID} 2>/dev/null
+
                 if [ $EXIT_CODE -ne 0 ]; then
                     echo -e "\n***\n*** ${MODEL_NAME} ${BLS_KIND} test FAILED. \n***"
                     RET=$EXIT_CODE
