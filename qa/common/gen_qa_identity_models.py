@@ -37,6 +37,7 @@ from gen_common import (
     np_to_onnx_dtype,
     np_to_trt_dtype,
     openvino_save_model,
+    trt_set_dynamic_range,
 )
 
 FLAGS = None
@@ -562,9 +563,8 @@ def create_plan_dynamic_rf_modelfile(
         out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
         if trt_dtype == trt.int8:
-            in_node.dynamic_range = (-128.0, 127.0)
-            out_node.get_output(0).dynamic_range = (-128.0, 127.0)
-
+            trt_set_dynamic_range(in_node, -128.0, 127.0)
+            trt_set_dynamic_range(out_node.get_output(0), -128.0, 127.0)
     min_shape = []
     opt_shape = []
     max_shape = []
@@ -694,9 +694,8 @@ def create_plan_shape_tensor_modelfile(
         out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
         if trt_dtype == trt.int8:
-            in_node.dynamic_range = (-128.0, 127.0)
-            out_node.get_output(0).dynamic_range = (-128.0, 127.0)
-
+            trt_set_dynamic_range(in_node, -128.0, 127.0)
+            trt_set_dynamic_range(out_node.get_output(0), -128.0, 127.0)
     config = builder.create_builder_config()
 
     min_prefix = []

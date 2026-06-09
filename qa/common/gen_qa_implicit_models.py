@@ -37,6 +37,7 @@ from gen_common import (
     np_to_onnx_dtype,
     np_to_torch_dtype,
     np_to_trt_dtype,
+    trt_set_dynamic_range,
 )
 
 FLAGS = None
@@ -923,7 +924,11 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
     not_start = network.add_elementwise(
         constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB
     )
-    not_start.set_output_type(0, trt_dtype)
+    # set_output_type was removed from all layers in TensorRT 11; the
+    # elementwise output already has trt_dtype (both inputs do), so this
+    # call was a no-op on modern TRT. Guard for older versions.
+    if hasattr(not_start, "set_output_type"):
+        not_start.set_output_type(0, trt_dtype)
     internal_state = network.add_elementwise(
         in_state0, not_start.get_output(0), trt.ElementWiseOperation.PROD
     )
@@ -1033,7 +1038,11 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     not_start = network.add_elementwise(
         constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB
     )
-    not_start.set_output_type(0, trt_dtype)
+    # set_output_type was removed from all layers in TensorRT 11; the
+    # elementwise output already has trt_dtype (both inputs do), so this
+    # call was a no-op on modern TRT. Guard for older versions.
+    if hasattr(not_start, "set_output_type"):
+        not_start.set_output_type(0, trt_dtype)
     internal_state = network.add_elementwise(
         in_state0, not_start.get_output(0), trt.ElementWiseOperation.PROD
     )
@@ -1049,8 +1058,16 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     out0_state.get_output(0).name = "OUTPUT_STATE"
     network.mark_output(out0_state.get_output(0))
 
-    out0.get_output(0).dtype = trt_dtype
-    out0_state.get_output(0).dtype = trt_dtype
+    # ITensor.dtype setter removed in TRT 11; elementwise output dtype
+    # already matches trt_dtype.
+    try:
+        out0.get_output(0).dtype = trt_dtype
+    except AttributeError:
+        pass
+    try:
+        out0_state.get_output(0).dtype = trt_dtype
+    except AttributeError:
+        pass
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     start0.allowed_formats = 1 << int(trt_memory_format)
@@ -1058,20 +1075,22 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     out0.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
     if trt_dtype == trt.int8:
-        in0.dynamic_range = (-128.0, 127.0)
-        in_state0.dynamic_range = (-128.0, 127.0)
-        out0.dynamic_range = (-128.0, 127.0)
-        start0.dynamic_range = (-128.0, 127.0)
-        ready0.dynamic_range = (-128.0, 127.0)
-
+        trt_set_dynamic_range(in0, -128.0, 127.0)
+        trt_set_dynamic_range(in_state0, -128.0, 127.0)
+        trt_set_dynamic_range(out0, -128.0, 127.0)
+        trt_set_dynamic_range(start0, -128.0, 127.0)
+        trt_set_dynamic_range(ready0, -128.0, 127.0)
     flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
-    flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    # TensorRT 11 removed PREFER_PRECISION_CONSTRAINTS / INT8 / FP16
+    # BuilderFlags (strongly-typed networks). Older TRT still has them.
+    if hasattr(trt.BuilderFlag, "PREFER_PRECISION_CONSTRAINTS"):
+        flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
     if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
         flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
-    if trt_dtype == trt.int8:
+    if trt_dtype == trt.int8 and hasattr(trt.BuilderFlag, "INT8"):
         flags |= 1 << int(trt.BuilderFlag.INT8)
-    elif trt_dtype == trt.float16:
+    elif trt_dtype == trt.float16 and hasattr(trt.BuilderFlag, "FP16"):
         flags |= 1 << int(trt.BuilderFlag.FP16)
 
     min_shape = []

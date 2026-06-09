@@ -37,6 +37,7 @@ from gen_common import (
     np_to_torch_dtype,
     np_to_trt_dtype,
     openvino_save_model,
+    trt_set_dynamic_range,
 )
 
 FLAGS = None
@@ -90,15 +91,28 @@ def create_plan_shape_tensor_modelfile(
     shape_out0 = network.add_shape(resized_out0)
 
     shape_out0.get_output(0).name = "SHAPE_OUTPUT"
-    shape_out0.get_output(0).dtype = trt.int64
+    # The ITensor.dtype setter was removed in TensorRT 11. The shape, resize
+    # and elementwise outputs already have the correct dtype, so on TRT 11+
+    # this assignment is unnecessary; keep the explicit form for older TRT
+    # under a guard.
+    try:
+        shape_out0.get_output(0).dtype = trt.int64
+    except AttributeError:
+        pass
     network.mark_output_for_shapes(shape_out0.get_output(0))
 
     out0.name = "OUTPUT"
-    out0.dtype = trt_dtype
+    try:
+        out0.dtype = trt_dtype
+    except AttributeError:
+        pass
     network.mark_output(out0)
 
     resized_out0.name = "RESIZED_OUTPUT"
-    resized_out0.dtype = trt_dtype
+    try:
+        resized_out0.dtype = trt_dtype
+    except AttributeError:
+        pass
     network.mark_output(resized_out0)
 
     in0.allowed_formats = 1 << int(trt_memory_format)
@@ -110,20 +124,22 @@ def create_plan_shape_tensor_modelfile(
     resized_out0.allowed_formats = 1 << int(trt_memory_format)
 
     if trt_dtype == trt.int8:
-        in0.dynamic_range = (-128.0, 127.0)
-        out0.dynamic_range = (-128.0, 127.0)
-        resized_out0.dynamic_range = (-128.0, 127.0)
-        start0.dynamic_range = (-128.0, 127.0)
-        ready0.dynamic_range = (-128.0, 127.0)
-
+        trt_set_dynamic_range(in0, -128.0, 127.0)
+        trt_set_dynamic_range(out0, -128.0, 127.0)
+        trt_set_dynamic_range(resized_out0, -128.0, 127.0)
+        trt_set_dynamic_range(start0, -128.0, 127.0)
+        trt_set_dynamic_range(ready0, -128.0, 127.0)
     flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
-    flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    # TensorRT 11 removed PREFER_PRECISION_CONSTRAINTS / INT8 / FP16
+    # BuilderFlags (strongly-typed networks). Older TRT still has them.
+    if hasattr(trt.BuilderFlag, "PREFER_PRECISION_CONSTRAINTS"):
+        flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
     if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
         flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
-    if trt_dtype == trt.int8:
+    if trt_dtype == trt.int8 and hasattr(trt.BuilderFlag, "INT8"):
         flags |= 1 << int(trt.BuilderFlag.INT8)
-    elif trt_dtype == trt.float16:
+    elif trt_dtype == trt.float16 and hasattr(trt.BuilderFlag, "FP16"):
         flags |= 1 << int(trt.BuilderFlag.FP16)
 
     min_prefix = []
@@ -306,7 +322,12 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     out0.get_output(0).name = "OUTPUT"
     network.mark_output(out0.get_output(0))
 
-    out0.get_output(0).dtype = trt_dtype
+    # ITensor.dtype setter removed in TRT 11; elementwise output already has
+    # the correct dtype.
+    try:
+        out0.get_output(0).dtype = trt_dtype
+    except AttributeError:
+        pass
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     start0.allowed_formats = 1 << int(trt_memory_format)
@@ -314,19 +335,21 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     out0.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
     if trt_dtype == trt.int8:
-        in0.dynamic_range = (-128.0, 127.0)
-        out0.dynamic_range = (-128.0, 127.0)
-        start0.dynamic_range = (-128.0, 127.0)
-        ready0.dynamic_range = (-128.0, 127.0)
-
+        trt_set_dynamic_range(in0, -128.0, 127.0)
+        trt_set_dynamic_range(out0, -128.0, 127.0)
+        trt_set_dynamic_range(start0, -128.0, 127.0)
+        trt_set_dynamic_range(ready0, -128.0, 127.0)
     flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
-    flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    # TensorRT 11 removed PREFER_PRECISION_CONSTRAINTS / INT8 / FP16
+    # BuilderFlags (strongly-typed networks). Older TRT still has them.
+    if hasattr(trt.BuilderFlag, "PREFER_PRECISION_CONSTRAINTS"):
+        flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
     if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
         flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
-    if trt_dtype == trt.int8:
+    if trt_dtype == trt.int8 and hasattr(trt.BuilderFlag, "INT8"):
         flags |= 1 << int(trt.BuilderFlag.INT8)
-    elif trt_dtype == trt.float16:
+    elif trt_dtype == trt.float16 and hasattr(trt.BuilderFlag, "FP16"):
         flags |= 1 << int(trt.BuilderFlag.FP16)
 
     min_shape = []
