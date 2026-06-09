@@ -26,6 +26,21 @@
 
 cmake_minimum_required(VERSION 3.18)
 
+# CMake 4.0+ rejects projects that call cmake_minimum_required(VERSION < 3.5).
+# The fetched third_party repo builds libevent 2.1.12 via ExternalProject using a
+# separate CMake invocation; that step does not inherit -D variables from the top
+# level unless they are also in the environment. If configure fails inside libevent
+# with "Compatibility with CMake < 3.5 has been removed", use either:
+#   export CMAKE_POLICY_VERSION_MINIMUM=3.5   # before cmake AND cmake --build
+# or install/use CMake 3.28.x–3.31.x for this build.
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.0")
+  message(
+    STATUS
+    "CMake ${CMAKE_VERSION}: for libevent/third_party with CMake 4.x, export "
+    "CMAKE_POLICY_VERSION_MINIMUM=3.5 in your shell before configure and build "
+    "(see docs/customization_guide/build.md).")
+endif()
+
 project(tritonserver LANGUAGES C CXX)
 
 include(CMakeDependentOption)
@@ -64,6 +79,10 @@ option(TRITON_ENABLE_METRICS_CPU "Include CPU metrics support in server" ON)
 option(TRITON_ENABLE_GCS "Include GCS Filesystem support in server" OFF)
 option(TRITON_ENABLE_S3 "Include S3 Filesystem support in server" OFF)
 option(TRITON_ENABLE_AZURE_STORAGE "Include Azure Storage Filesystem support in server" OFF)
+
+option(TRITON_ENABLE_MYSQL_ODBC
+  "Enable MySQL ODBC connection pool in tritonserver (requires unixODBC / ODBC dev package)"
+  OFF)
 
 # Need to know if TensorRT is available when building unit tests
 option(TRITON_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
@@ -261,6 +280,7 @@ ExternalProject_Add(triton-server
     -DTRITON_ENABLE_S3:BOOL=${TRITON_ENABLE_S3}
     -DTRITON_ENABLE_TENSORRT:BOOL=${TRITON_ENABLE_TENSORRT}
     -DTRITON_ENABLE_ENSEMBLE:BOOL=${TRITON_ENABLE_ENSEMBLE}
+    -DTRITON_ENABLE_MYSQL_ODBC:BOOL=${TRITON_ENABLE_MYSQL_ODBC}
     -DTRITON_MIN_CXX_STANDARD:STRING=${TRITON_MIN_CXX_STANDARD}
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}

@@ -90,6 +90,12 @@ endif()
 #
 find_package(re2 REQUIRED)
 
+option(TRITON_ENABLE_MYSQL_ODBC "Build tritonserver with MySQL ODBC connection pool (requires ODBC::ODBC / unixODBC)" OFF)
+if(TRITON_ENABLE_MYSQL_ODBC)
+  find_package(ODBC REQUIRED)
+  message(STATUS "Using ODBC ${ODBC_VERSION}")
+endif()
+
 #
 # tritonserver executable
 #
@@ -101,8 +107,10 @@ add_executable(
   main.cc
   shared_memory_manager.cc
   triton_signal.cc
+  database_config.cc
   classification.h
   common.h
+  database_config.h
   shared_memory_manager.h
   triton_signal.h
 )
@@ -155,6 +163,17 @@ else()
   )
   endif()
 
+if(TRITON_ENABLE_MYSQL_ODBC)
+  target_sources(
+    main
+    PRIVATE
+      mysql_odbc_connection_pool.cc
+      mysql_odbc_connection_pool.h
+  )
+  target_link_libraries(main PRIVATE ODBC::ODBC)
+  target_compile_definitions(main PRIVATE TRITON_ENABLE_MYSQL_ODBC=1)
+endif()
+
 set(LIB_DIR "lib")
 if(LINUX)
   file(STRINGS "/etc/os-release" DISTRO_ID_LIKE REGEX "ID_LIKE")
@@ -180,6 +199,7 @@ target_link_libraries(
     triton-common-async-work-queue  # from repo-common
     triton-common-error             # from repo-common
     triton-common-logging           # from repo-common
+    triton-common-json              # from repo-common (RapidJSON)
     triton-core-serverapi           # from repo-core
     triton-core-serverstub          # from repo-core
 )
