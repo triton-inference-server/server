@@ -80,7 +80,9 @@ export BACKENDS
 
 # Copy the models into the model repository
 echo -e "${COLOR_DARK}Setting up model repository in ${MODELDIR}${COLOR_RESET}"
-rm -rf ${MODELDIR} && mkdir -p ${MODELDIR}
+BAD_MODELDIR=`pwd`/bad_models
+rm -rf ${MODELDIR} ${BAD_MODELDIR}
+mkdir -p ${MODELDIR}
 models=(
     "torch_aoti_complex_index"
     "torch_aoti_complex_named"
@@ -149,17 +151,12 @@ fi
 echo -e "${COLOR_DARK}Killing server (pid: ${SERVER_PID})${COLOR_RESET}"
 kill -s SIGINT ${SERVER_PID}
 wait ${SERVER_PID} || true
-echo -e "${COLOR_DARK}Removing model repository${COLOR_RESET}"
-for model in "${models[@]}" "${sequence_models[@]}"; do
-    rm -rf ${MODELDIR}/${model}
-done
 
 # Negative tests: these models declare unsupported types (TYPE_STRING CORRID /
 # state) and must fail to load. Start a separate server (exit-on-error=false) so
 # it stays up despite the load failures, then assert the models are not ready.
 echo -e "${COLOR_DARK}Negative (load-failure) tests${COLOR_RESET}"
-BAD_MODELDIR=`pwd`/bad_models
-rm -rf ${BAD_MODELDIR} && mkdir -p ${BAD_MODELDIR}
+mkdir -p ${BAD_MODELDIR}
 bad_models=(
     "torch_aoti_sequence_bad_corrid"
     "torch_aoti_sequence_bad_state"
@@ -189,7 +186,6 @@ else
     kill -s SIGINT ${SERVER_PID}
     wait ${SERVER_PID} || true
 fi
-rm -rf ${BAD_MODELDIR}
 
 # Report results and exit.
 if [[ ${RET} -ne 0 ]]; then
