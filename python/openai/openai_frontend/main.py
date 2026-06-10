@@ -33,7 +33,6 @@ from functools import partial
 
 import tritonserver
 from engine.triton_engine import TritonLLMEngine
-from engine.utils.tool_call_parsers.utils import DEFAULT_MAX_TOOL_CALL_PARSE_BYTES
 from frontend.fastapi_frontend import FastApiFrontend
 from utils.utils import HTTP_DEFAULT_MAX_INPUT_SIZE, validate_positive_int
 
@@ -134,15 +133,6 @@ def parse_args():
         type=str,
         default=None,
         help="Specify the parser for handling tool calling related response text. Options include: 'llama3' and 'mistral'.",
-    )
-    triton_group.add_argument(
-        "--max-tool-call-parse-bytes",
-        type=int,
-        default=DEFAULT_MAX_TOOL_CALL_PARSE_BYTES,
-        help="Maximum accumulated output (in bytes) that the streaming tool-call parser will process per request. "
-        "Once this limit is reached, the stream is truncated with finish_reason='length' and backend inference is cancelled. "
-        "This prevents unbounded memory growth caused by excessively large tool-call arguments. "
-        f"Default: {DEFAULT_MAX_TOOL_CALL_PARSE_BYTES}.",
     )
     # Allows the user to try a different chat template to craft better prompts and receive more targeted tool-calling responses from the model.
     # Some Mistral models have a separate chat template file, in addition to the tokenizer_config.json,
@@ -276,7 +266,6 @@ def main():
         backend=args.backend,
         lora_separator=args.lora_separator,
         tool_call_parser=args.tool_call_parser,
-        max_tool_call_parse_bytes=args.max_tool_call_parse_bytes,
         chat_template=args.chat_template,
         default_max_tokens=args.default_max_tokens,
     )
