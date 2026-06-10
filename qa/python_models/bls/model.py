@@ -423,7 +423,7 @@ class PBBLSTest(unittest.TestCase):
         # Sending the tensor 50 times to test whether the deallocation is
         # happening correctly. If the deallocation doesn't happen correctly,
         # there will be an out of shared memory error.
-        for cpu_index in range(50):
+        for _ in range(50):
             input0 = np.ones([1, input_size], dtype=np.float32)
             input0_pb = pb_utils.Tensor("INPUT0", input0)
             infer_request = pb_utils.InferenceRequest(
