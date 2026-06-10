@@ -107,21 +107,21 @@ def create_plan_shape_tensor_modelfile(
     try:
         shape_out0.get_output(0).dtype = trt.int64
     except AttributeError:
-        pass
+        pass  # ITensor.dtype setter removed in TensorRT 11+
     network.mark_output_for_shapes(shape_out0.get_output(0))
 
     out0.name = "OUTPUT"
     try:
         out0.dtype = trt.int32
     except AttributeError:
-        pass
+        pass  # ITensor.dtype setter removed in TensorRT 11+
     network.mark_output(out0)
 
     resized_out0.name = "RESIZED_OUTPUT"
     try:
         resized_out0.dtype = trt_dtype
     except AttributeError:
-        pass
+        pass  # ITensor.dtype setter removed in TensorRT 11+
     network.mark_output(resized_out0)
 
     shape_in0.allowed_formats = 1 << int(trt_memory_format)
@@ -372,7 +372,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     try:
         out0.get_output(0).dtype = trt_dtype
     except AttributeError:
-        pass
+        pass  # ITensor.dtype setter removed in TensorRT 11+
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     start0.allowed_formats = 1 << int(trt_memory_format)

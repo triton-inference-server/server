@@ -155,7 +155,7 @@ def trt_set_dynamic_range(tensor, lo, hi):
     try:
         tensor.dynamic_range = (lo, hi)
     except AttributeError:
-        pass
+        pass  # ITensor.dynamic_range removed in TensorRT 11+ (strongly-typed)
 
 
 def trt_cast_tensor(network, tensor, target_dtype):

@@ -127,11 +127,11 @@ def create_plan_dynamic_rf_modelfile(
     try:
         out0.get_output(0).dtype = trt_output0_dtype
     except AttributeError:
-        pass
+        pass  # ITensor.dtype setter removed in TensorRT 11+
     try:
         out1.get_output(0).dtype = trt_output1_dtype
     except AttributeError:
-        pass
+        pass  # ITensor.dtype setter removed in TensorRT 11+
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     in1.allowed_formats = 1 << int(trt_memory_format)
@@ -431,11 +431,11 @@ def create_plan_fixed_rf_modelfile(
     try:
         out0.get_output(0).dtype = trt_output0_dtype
     except AttributeError:
-        pass
+        pass  # ITensor.dtype setter removed in TensorRT 11+
     try:
         out1.get_output(0).dtype = trt_output1_dtype
     except AttributeError:
-        pass
+        pass  # ITensor.dtype setter removed in TensorRT 11+
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     in1.allowed_formats = 1 << int(trt_memory_format)

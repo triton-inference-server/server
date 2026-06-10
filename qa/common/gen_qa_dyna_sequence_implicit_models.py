@@ -568,14 +568,14 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     try:
         out0.get_output(0).dtype = trt_dtype
     except AttributeError:
-        pass
+        pass  # ITensor.dtype setter removed in TensorRT 11+
 
     out0_state.get_output(0).name = "OUTPUT_STATE"
     network.mark_output(out0_state.get_output(0))
     try:
         out0_state.get_output(0).dtype = trt_dtype
     except AttributeError:
-        pass
+        pass  # ITensor.dtype setter removed in TensorRT 11+
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     in_state0.allowed_formats = 1 << int(trt_memory_format)
