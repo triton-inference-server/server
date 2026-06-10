@@ -592,4 +592,3 @@ class TestAsyncClientToolCalling:
                 tools=[],
                 logprobs=False,
             )
-         

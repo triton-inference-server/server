@@ -64,19 +64,12 @@ def setup_fastapi_app(
     server: tritonserver.Server,
     backend: str,
     default_max_tokens: int = 16,
-    tool_call_parser: Optional[str] = None,
-    max_tool_call_parse_bytes: Optional[int] = None,
 ):
-    engine_kwargs = {}
-    if max_tool_call_parse_bytes is not None:
-        engine_kwargs["max_tool_call_parse_bytes"] = max_tool_call_parse_bytes
     engine: TritonLLMEngine = TritonLLMEngine(
         server=server,
         tokenizer=tokenizer,
         backend=backend,
         default_max_tokens=default_max_tokens,
-        tool_call_parser=tool_call_parser,
-        **engine_kwargs,
     )
     frontend: FastApiFrontend = FastApiFrontend(engine=engine)
     return frontend.app
