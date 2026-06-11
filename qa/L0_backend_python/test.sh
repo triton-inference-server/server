@@ -75,6 +75,9 @@ source ./common.sh
 
 rm -fr *.log ./models
 
+# Remove orphaned Python backend shm regions from previous runs
+rm -f /dev/shm/triton_python_backend_shm_region_* 2>/dev/null || true
+
 python3 --version | grep "3.12" > /dev/null
 if [ $? -ne 0 ]; then
     echo -e "Expecting Python default version to be: Python 3.12 but actual version is $(python3 --version)"
@@ -352,6 +355,11 @@ cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbt
 shm_default_byte_size=$((1024*1024*4))
 SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=$shm_default_byte_size"
 
+# Record existing Python backend shm regions before starting the server.
+# This prevents stale regions from previous runs from being misidentified 
+# as regions created by this server, ensuring accurate verification.
+shm_pages_before=" $(ls /dev/shm/ 2>/dev/null | grep '^triton_python_backend_shm' | tr '\n' ' ') "
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
@@ -361,6 +369,10 @@ fi
 
 for shm_page in `ls /dev/shm/`; do
     if [[ $shm_page !=  triton_python_backend_shm* ]]; then
+        continue
+    fi
+    # Only validate regions created by this server
+    if [[ "$shm_pages_before" == *" $shm_page "* ]]; then
         continue
     fi
     page_size=`ls -l /dev/shm/$shm_page 2>&1 | awk '{print $5}'`

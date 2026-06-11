@@ -37,6 +37,13 @@ class ConcurrencyTest(unittest.TestCase):
         # Initialize client
         self._triton = grpcclient.InferenceServerClient("localhost:8001")
 
+    def tearDown(self):
+        try:
+            self._triton.stop_stream(cancel_requests=True)
+        except Exception:
+            pass
+        self._triton.close()
+
     def _generate_streaming_callback_and_response_pair(self):
         response = []  # [{"result": result, "error": error}, ...]
 

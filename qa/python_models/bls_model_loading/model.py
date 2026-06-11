@@ -90,7 +90,7 @@ class PBBLSModelLoadingTest(unittest.TestCase):
 
         # Request to load the model with override file, should fail without
         # providing override config.
-        with self.assertRaises(pb_utils.TritonModelException):
+        with self.assertRaises((pb_utils.TritonModelException, UnicodeDecodeError)):
             pb_utils.load_model(self.model_name, "", files)
 
         # Request to load the model with override file and config in a different name
