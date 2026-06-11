@@ -40,8 +40,8 @@ class ConcurrencyTest(unittest.TestCase):
     def tearDown(self):
         try:
             self._triton.stop_stream(cancel_requests=True)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Exception occurred while stopping stream: {e}")
         self._triton.close()
 
     def _generate_streaming_callback_and_response_pair(self):
