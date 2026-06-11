@@ -62,6 +62,7 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
+SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
 
 # PyTorch on SBSA requires libgomp to be loaded first. See the following
 # GitHub issue for more information:
@@ -79,7 +80,9 @@ export BACKENDS
 
 # Copy the models into the model repository
 echo -e "${COLOR_DARK}Setting up model repository in ${MODELDIR}${COLOR_RESET}"
-rm -rf ${MODELDIR} && mkdir -p ${MODELDIR}
+BAD_MODELDIR=`pwd`/bad_models
+rm -rf ${MODELDIR} ${BAD_MODELDIR}
+mkdir -p ${MODELDIR}
 models=(
     "torch_aoti_complex_index"
     "torch_aoti_complex_named"
@@ -89,6 +92,8 @@ models=(
     "torch_aoti_int64_int64"
     "torch_aoti_float16_float16"
     "torch_aoti_float32_float32"
+    "torch_aoti_variable_float32"
+    "torch_aoti_multi_instance_float32"
     "torchvision_aoti"
 )
 for model in "${models[@]}"; do
@@ -96,6 +101,19 @@ for model in "${models[@]}"; do
     echo -e "${COLOR_DARK}ls ${MODELDIR}/${model}${COLOR_RESET}"
     ls -lha ${MODELDIR}/${model}
 done
+
+# Sequence-batching AOTI models live in the implicit-state sequence repository.
+sequence_models=(
+    "torch_aoti_sequence_float32"
+    "torch_aoti_sequence_initstate_float32"
+    "torch_aoti_sequence_forward_float32"
+)
+for model in "${sequence_models[@]}"; do
+    cp -r ${DATADIR}/qa_sequence_implicit_model_repository/${model} ${MODELDIR}/${model}
+    echo -e "${COLOR_DARK}ls ${MODELDIR}/${model}${COLOR_RESET}"
+    ls -lha ${MODELDIR}/${model}
+done
+
 echo -e "${COLOR_DARK}ls ${MODELDIR}${COLOR_RESET}"
 ls -lha ${MODELDIR}
 
@@ -133,10 +151,41 @@ fi
 echo -e "${COLOR_DARK}Killing server (pid: ${SERVER_PID})${COLOR_RESET}"
 kill -s SIGINT ${SERVER_PID}
 wait ${SERVER_PID} || true
-echo -e "${COLOR_DARK}Removing model repository${COLOR_RESET}"
-for model in "${models[@]}"; do
-    rm -rf ${MODELDIR}/${model}
+
+# Negative tests: these models declare unsupported types (TYPE_STRING CORRID /
+# state) and must fail to load. Start a separate server (exit-on-error=false) so
+# it stays up despite the load failures, then assert the models are not ready.
+echo -e "${COLOR_DARK}Negative (load-failure) tests${COLOR_RESET}"
+mkdir -p ${BAD_MODELDIR}
+bad_models=(
+    "torch_aoti_sequence_bad_corrid"
+    "torch_aoti_sequence_bad_state"
+)
+for model in "${bad_models[@]}"; do
+    cp -r ${DATADIR}/qa_sequence_implicit_model_repository/${model} ${BAD_MODELDIR}/${model}
 done
+
+SERVER_ARGS="--model-repository=${BAD_MODELDIR} --exit-on-error=false --log-verbose=1"
+SERVER_LOG="./torch_aoti_negative-server.log"
+run_server_tolive
+if [[ "${SERVER_PID}" -eq 0 ]]; then
+    echo -e "${COLOR_ERROR}\n***\n*** Failed to start ${SERVER} (negative phase)\n***${COLOR_RESET}" 1>&2
+    cat ${SERVER_LOG} 1>&2
+    RET=1
+else
+    wait_for_model_stable ${SERVER_TIMEOUT}
+    for model in "${bad_models[@]}"; do
+        code=$(curl -s -o /dev/null -w "%{http_code}" localhost:8000/v2/models/${model}/ready)
+        if [[ "${code}" == "200" ]]; then
+            echo -e "${COLOR_ERROR}*** Negative model '${model}' unexpectedly loaded (ready)${COLOR_RESET}" 1>&2
+            RET=1
+        else
+            echo -e "${COLOR_INFO}*** Negative model '${model}' correctly failed to load${COLOR_RESET}"
+        fi
+    done
+    kill -s SIGINT ${SERVER_PID}
+    wait ${SERVER_PID} || true
+fi
 
 # Report results and exit.
 if [[ ${RET} -ne 0 ]]; then
