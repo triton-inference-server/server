@@ -39,7 +39,7 @@ from partial_json_parser.core.options import Allow
 # streaming tool-call parser processes per request.
 # Since the parser re-parses the entire buffer with each new chunk,
 # this limit helps bound per-request CPU and memory usage.
-DEFAULT_MAX_TOOL_CALL_PARSE_BYTES: int = 16 * 1024  # 16 KiB
+DEFAULT_MAX_TOOL_CALL_PARSE_BYTES: int = 128 * 1024  # 128 KiB
 
 
 # partial_json_parser doesn't support extra data and
