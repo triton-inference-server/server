@@ -356,7 +356,7 @@ shm_default_byte_size=$((1024*1024*4))
 SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=$shm_default_byte_size"
 
 # Record existing Python backend shm regions before starting the server.
-# This prevents stale regions from previous runs from being misidentified 
+# This prevents stale regions from previous runs from being misidentified
 # as regions created by this server, ensuring accurate verification.
 shm_pages_before=" $(ls /dev/shm/ 2>/dev/null | grep '^triton_python_backend_shm' | tr '\n' ' ') "
 
