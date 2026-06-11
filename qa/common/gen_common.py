@@ -146,6 +146,28 @@ def np_to_torch_dtype(np_dtype):
     return None
 
 
+def trt_set_dynamic_range(tensor, lo, hi):
+    """Set ITensor.dynamic_range on TRT versions that support it.
+
+    Removed in TensorRT 11+ (strongly-typed networks). Silently skip on
+    versions where the attribute is gone so the QA model-gen scripts stay
+    compatible with both old and new TRT."""
+    try:
+        tensor.dynamic_range = (lo, hi)
+    except AttributeError:
+        pass  # ITensor.dynamic_range removed in TensorRT 11+ (strongly-typed)
+
+
+def trt_cast_tensor(network, tensor, target_dtype):
+    """Insert an explicit dtype cast that works on both TRT 8.5+ (add_cast)
+    and older TRT (add_identity + set_output_type). Returns the cast layer."""
+    if hasattr(network, "add_cast"):
+        return network.add_cast(tensor, target_dtype)
+    layer = network.add_identity(tensor)
+    layer.set_output_type(0, target_dtype)
+    return layer
+
+
 def openvino_save_model(model_version_dir, model):
     import openvino as ov
 

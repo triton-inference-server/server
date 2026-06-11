@@ -32,7 +32,7 @@ import os
 import numpy as np
 import tensorrt as trt
 import test_util as tu
-from gen_common import np_to_model_dtype, np_to_trt_dtype
+from gen_common import np_to_model_dtype, np_to_trt_dtype, trt_set_dynamic_range
 
 np_dtype_string = np.dtype(object)
 
@@ -98,16 +98,22 @@ def create_plan_modelfile(
     add = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUM)
     sub = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUB)
 
-    out0 = network.add_identity(add.get_output(0))
-    out1 = network.add_identity(sub.get_output(0))
+    # TRT 11 removed Layer.set_output_type; on modern TRT use add_cast to
+    # produce the desired output dtype. On older TRT, fall back to the
+    # original identity + set_output_type pattern.
+    if hasattr(network, "add_cast"):
+        out0 = network.add_cast(add.get_output(0), trt_output0_dtype)
+        out1 = network.add_cast(sub.get_output(0), trt_output1_dtype)
+    else:
+        out0 = network.add_identity(add.get_output(0))
+        out1 = network.add_identity(sub.get_output(0))
+        out0.set_output_type(0, trt_output0_dtype)
+        out1.set_output_type(0, trt_output1_dtype)
 
     out0.get_output(0).name = "OUTPUT0"
     out1.get_output(0).name = "OUTPUT1"
     network.mark_output(out0.get_output(0))
     network.mark_output(out1.get_output(0))
-
-    out0.set_output_type(0, trt_output0_dtype)
-    out1.set_output_type(0, trt_output1_dtype)
 
     in0.allowed_formats = 1 << int(trt_input_memory_format)
     in1.allowed_formats = 1 << int(trt_input_memory_format)
@@ -115,13 +121,12 @@ def create_plan_modelfile(
     out1.get_output(0).allowed_formats = 1 << int(trt_output_memory_format)
 
     if trt_input_dtype == trt.int8:
-        in0.dynamic_range = (-128.0, 127.0)
-        in1.dynamic_range = (-128.0, 127.0)
+        trt_set_dynamic_range(in0, -128.0, 127.0)
+        trt_set_dynamic_range(in1, -128.0, 127.0)
     if trt_output0_dtype == trt.int8:
-        out0.get_output(0).dynamic_range = (-128.0, 127.0)
+        trt_set_dynamic_range(out0.get_output(0), -128.0, 127.0)
     if trt_output1_dtype == trt.int8:
-        out1.get_output(0).dynamic_range = (-128.0, 127.0)
-
+        trt_set_dynamic_range(out1.get_output(0), -128.0, 127.0)
     min_shape = []
     opt_shape = []
     max_shape = []
@@ -146,14 +151,18 @@ def create_plan_modelfile(
     # Commenting this because from I/O Formats from TensorRT Developer Guide:
     # The build will fail if TensorRT cannot build an engine without introducing such reformatting. The failure may happen only for some target platforms, because of what formats are supported by kernels for those platforms.
     # flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
-    flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    # TensorRT 11 removed PREFER_PRECISION_CONSTRAINTS / INT8 / FP16
+    # BuilderFlags (strongly-typed networks). Older TRT still has them.
+    flags = 0
+    if hasattr(trt.BuilderFlag, "PREFER_PRECISION_CONSTRAINTS"):
+        flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
     if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
         flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
     datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
     for dt in datatype_set:
-        if dt == trt.int8:
+        if dt == trt.int8 and hasattr(trt.BuilderFlag, "INT8"):
             flags |= 1 << int(trt.BuilderFlag.INT8)
-        elif dt == trt.float16:
+        elif dt == trt.float16 and hasattr(trt.BuilderFlag, "FP16"):
             flags |= 1 << int(trt.BuilderFlag.FP16)
     config = builder.create_builder_config()
     config.flags = flags

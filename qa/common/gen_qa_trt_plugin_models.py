@@ -40,6 +40,13 @@ TRT_LOGGER = trt.Logger()
 
 trt.init_libnvinfer_plugins(TRT_LOGGER, "")
 
+# TRT 11 removed the IPluginV2 registry surface (plugin_creator_list).
+# Decide V2 vs V3 once at import time and use the same flag for both
+# plugin creation and network.add_plugin_v* dispatch. add_plugin_v2 is
+# still bound on INetworkDefinition in TRT 11, so hasattr() on the
+# network is not a safe gate -- only this registry probe is.
+TRT_USES_V3_PLUGINS = not hasattr(trt.get_plugin_registry(), "plugin_creator_list")
+
 
 def get_trt_plugin(plugin_name):
     plugin = None
@@ -48,8 +55,9 @@ def get_trt_plugin(plugin_name):
     # branches and V3 on rel-11.0 (and TRT 11 removed the V2 plugin
     # registry surface). Pick the matching API at runtime.
     registry = trt.get_plugin_registry()
-    use_v3 = not hasattr(registry, "plugin_creator_list")
-    plugin_creators = registry.all_creators if use_v3 else registry.plugin_creator_list
+    plugin_creators = (
+        registry.all_creators if TRT_USES_V3_PLUGINS else registry.plugin_creator_list
+    )
     for plugin_creator in plugin_creators:
         if (plugin_creator.name == "CustomHardmax") and (
             plugin_name == "CustomHardmax"
@@ -62,7 +70,7 @@ def get_trt_plugin(plugin_name):
 
     if field_collection is None:
         raise RuntimeError("Plugin not found: " + plugin_name)
-    if use_v3:
+    if TRT_USES_V3_PLUGINS:
         plugin = plugin_creator.create_plugin(
             name=plugin_name,
             field_collection=field_collection,
@@ -116,16 +124,17 @@ def create_plan_modelfile(
     input_layer = network.add_input(
         name="INPUT0", dtype=trt_input_dtype, shape=input_with_batchsize
     )
-    # add_plugin_v2 was removed in TRT 11; add_plugin_v3 has existed since
-    # TRT 10.0. Pick the API that exists on this TRT install; the plugin
-    # object returned by get_trt_plugin() is matched to the same version.
+    # add_plugin_v2 is still bound on INetworkDefinition in TRT 11 but
+    # rejects IPluginV3 objects; dispatch on the same TRT_USES_V3_PLUGINS
+    # flag that get_trt_plugin() used to pick the plugin object kind so
+    # both halves agree on V2 vs V3.
     plugin_obj = get_trt_plugin(plugin_name)
-    if hasattr(network, "add_plugin_v2"):
-        plugin_layer = network.add_plugin_v2(inputs=[input_layer], plugin=plugin_obj)
-    else:
+    if TRT_USES_V3_PLUGINS:
         plugin_layer = network.add_plugin_v3(
             inputs=[input_layer], shape_inputs=[], plugin=plugin_obj
         )
+    else:
+        plugin_layer = network.add_plugin_v2(inputs=[input_layer], plugin=plugin_obj)
     plugin_layer.get_output(0).name = "OUTPUT0"
     network.mark_output(plugin_layer.get_output(0))
 
