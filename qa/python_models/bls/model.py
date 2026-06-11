@@ -570,6 +570,42 @@ class PBBLSTest(unittest.TestCase):
                     input0_device, input1_device, self._is_decoupled
                 )
 
+    def test_gpu_bls_decoupled(self):
+        # Regression test for the decoupled-BLS + CUDA-memory-pool deadlock.
+        # 'dlpack_square' is decoupled and, given a GPU input, returns GPU
+        # tensors. Delivering each decoupled response requires the stub's single
+        # ParentToStubMQMonitor thread to first run GetCUDAMemoryPoolAddress
+        # (CUDA pool init) and then enqueue the response that this thread is
+        # blocked on in the iterator. This used to deadlock; the test passes
+        # only if the CUDA-pool handshake does not block response delivery.
+        if not self._is_decoupled:
+            return
+
+        response_value = 8
+        input0 = torch.as_tensor(
+            np.array([response_value], dtype=np.int32), device="cuda"
+        )
+        input0_pb = pb_utils.Tensor.from_dlpack("IN", to_dlpack(input0))
+        infer_request = pb_utils.InferenceRequest(
+            model_name="dlpack_square",
+            inputs=[input0_pb],
+            requested_output_names=["OUT"],
+        )
+        infer_responses = infer_request.exec(decoupled=True)
+
+        response_count = 0
+        for infer_response in infer_responses:
+            self.assertFalse(infer_response.has_error())
+            if len(infer_response.output_tensors()) > 0:
+                output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUT")
+                self.assertIsNotNone(output0)
+                self.assertFalse(output0.is_cpu())
+                output0 = from_dlpack(output0.to_dlpack()).to("cpu").numpy()
+                self.assertEqual(response_value, output0[0])
+            response_count += 1
+
+        self.assertEqual(response_count, response_value + 1)
+
     def test_multiprocess(self):
         # Test multiprocess Pool with sync BLS
         if self._is_decoupled:
