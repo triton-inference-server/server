@@ -167,7 +167,7 @@ class TritonPythonModel:
             ]
 
             result = subprocess.run(
-                curl_cmd, capture_output=True, text=True, timeout=10
+                curl_cmd, capture_output=True, text=True, timeout=60
             )
 
             # Parse curl output - last line is status code, rest is response body
