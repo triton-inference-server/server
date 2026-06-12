@@ -425,6 +425,8 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
+  RETURN_AND_RESPOND_IF_RESTRICTED(req, RestrictedCategory::INFERENCE);
+
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;

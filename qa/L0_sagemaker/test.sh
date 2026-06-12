@@ -749,6 +749,113 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+### Restricted INFERENCE API regression for SageMaker MME endpoint ###
+# Regression test for the SageMaker MME /invoke handler missing the
+# --http-restricted-api=inference gate. The peer HTTPAPIServer::HandleInfer
+# (and the inherited /invocations path) enforce the gate via the
+# RETURN_AND_RESPOND_IF_RESTRICTED macro; SageMakerMMEHandleInfer must do
+# the same. See sagemaker_server.cc::SageMakerMMEHandleInfer.
+
+rm -rf /opt/ml/models/sm_mme_model
+mkdir -p /opt/ml/models/sm_mme_model/model
+cp -r `pwd`/models/sm_model/* /opt/ml/models/sm_mme_model/model/
+
+SERVER_LOG="./sagemaker_restricted_inference_server.log"
+SERVER_ARGS="--allow-sagemaker=true --allow-http=true \
+  --allow-grpc=false --allow-metrics=false \
+  --model-repository=`pwd`/models \
+  --model-control-mode=explicit \
+  --load-model=sm_model \
+  --http-restricted-api=inference:X-Auth=secret"
+run_server_nowait
+sagemaker_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+# Register the MME-style model. INFERENCE is restricted by the flag above,
+# but MODEL_REPOSITORY is not, so this LOAD does not need an X-Auth header.
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8080/models \
+    -H "Content-Type: application/json" \
+    -d '{"model_name":"sm_mme_model","url":"/opt/ml/models/sm_mme_model/model"}'`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. SageMaker MME LOAD setup returned $code, expected 200\n***"
+    RET=1
+fi
+
+# Payload mirrors the existing /invocations test above (two INT32 inputs).
+SM_INFER_PAYLOAD='{"inputs":[{"name":"INPUT0","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]},{"name":"INPUT1","datatype":"INT32","shape":[1,16],"data":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]}]}'
+
+# Primary regression: SageMaker MME /invoke without the restriction header
+# must be rejected with HTTP 403. Pre-fix this returned 200 with inference
+# output because SageMakerMMEHandleInfer skipped the gate.
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8080/models/sm_mme_model/invoke \
+    -H "Content-Type: application/json" \
+    -d "$SM_INFER_PAYLOAD"`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected POST /models/<m>/invoke to return 403 without restricted header (got $code)\n***"
+    RET=1
+else
+    grep "This API is restricted" ./curl.out
+    if [ $? -ne 0 ]; then
+        cat ./curl.out
+        echo -e "\n***\n*** Failed. Expected restriction error message in MME invoke response body\n***"
+        RET=1
+    fi
+fi
+
+# SageMaker MME /invoke WITH the correct restriction header must succeed.
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8080/models/sm_mme_model/invoke \
+    -H "Content-Type: application/json" \
+    -H "X-Auth: secret" \
+    -d "$SM_INFER_PAYLOAD"`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected POST /models/<m>/invoke with auth header to return 200 (got $code)\n***"
+    RET=1
+fi
+
+# SageMaker single-model /invocations delegates inference through
+# HTTPAPIServer::HandleInfer, so it must enforce the same gate.
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8080/invocations \
+    -H "Content-Type: application/json" \
+    -d "$SM_INFER_PAYLOAD"`
+if [ "$code" != "403" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected POST /invocations to return 403 without restricted header (got $code)\n***"
+    RET=1
+fi
+
+# /invocations WITH the correct header must succeed.
+rm -f ./curl.out
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8080/invocations \
+    -H "Content-Type: application/json" \
+    -H "X-Auth: secret" \
+    -d "$SM_INFER_PAYLOAD"`
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Failed. Expected POST /invocations with auth header to return 200 (got $code)\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+rm -rf /opt/ml/models/sm_mme_model
+
 ### HTTP max input size enforcement on SageMaker endpoint ###
 # Verify that --http-max-input-size is enforced on the SageMaker /invocations
 # path, not just the core HTTP endpoint.
