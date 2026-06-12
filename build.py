@@ -1724,7 +1724,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         if not FLAGS.no_container_interactive:
             runargs += ["-it"]
 
-        runargs += ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
+        runargs += docker_runargs()
         if FLAGS.use_user_docker_config:
             if os.path.exists(FLAGS.use_user_docker_config):
                 runargs += [
@@ -2243,6 +2243,29 @@ def min_cuda_arch(arch_list_str):
             val = val / 10.0
         mins.append(val)
     return f"{min(mins):.1f}" if mins else None
+
+
+def docker_runargs():
+    # Docker run args for the host-mounted build container: how to reach the
+    # daemon socket, and whether the host network is needed.
+    #
+    # DOCKER_HOST unset → system docker; mount the default socket. The default
+    # bridge has DNS, so no `--network host`.
+    #
+    # DOCKER_HOST set → rootless or remote daemon. Forward the env var so the
+    # in-container `docker build` reaches the same daemon. Rootless's default
+    # bridge has no DNS, so add `--network host` to let FetchContent resolve
+    # github.com. (We don't probe `docker info --format .Rootless` because if
+    # DOCKER_HOST is set we're already in the rootless/remote-daemon case.)
+    docker_host = os.getenv("DOCKER_HOST")
+    if docker_host is None:
+        return ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
+
+    runargs = ["--network", "host", "-e", f"DOCKER_HOST={docker_host}"]
+    if docker_host.startswith("unix://"):
+        socket_path = docker_host[len("unix://") :]
+        runargs += ["-v", f"{socket_path}:{socket_path}"]
+    return runargs
 
 
 def enable_all():
