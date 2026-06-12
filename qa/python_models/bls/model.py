@@ -584,16 +584,6 @@ class PBBLSTest(unittest.TestCase):
             pool.close()
             pool.join()
 
-    def _assert_missing_model_error(self, error_message):
-        # The Triton core wording for a request against a missing model has
-        # changed across versions (older: "... is not ready.", newer:
-        # "Request for unknown model: '...' is not found"). Assert on the
-        # version-stable facts instead of the exact phrasing.
-        self.assertIn("non_existent_model", error_message)
-        self.assertTrue(
-            ("is not ready" in error_message) or ("is not found" in error_message),
-            error_message,
-        )
 
     def test_bls_sync(self):
         infer_request = pb_utils.InferenceRequest(
@@ -607,7 +597,10 @@ class PBBLSTest(unittest.TestCase):
                 # Because the model doesn't exist, the inference response must have an
                 # error
                 self.assertTrue(infer_response.has_error())
-                self._assert_missing_model_error(infer_response.error().message())
+                self.assertIn(
+                    "Error when running inference: Request for unknown model: 'non_existent_model' is not found",
+                    infer_response.error().message(),
+                )
 
                 # Make sure that the inference requests can be performed properly after
                 # an error.
@@ -618,7 +611,10 @@ class PBBLSTest(unittest.TestCase):
             # Because the model doesn't exist, the inference response must have an
             # error
             self.assertTrue(infer_response.has_error())
-            self._assert_missing_model_error(infer_response.error().message())
+            self.assertIn(
+                "Error when running inference: Request for unknown model: 'non_existent_model' is not found",
+                infer_response.error().message(),
+            )
 
             # Make sure that the inference requests can be performed properly after
             # an error.

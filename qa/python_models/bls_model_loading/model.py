@@ -45,20 +45,16 @@ class PBBLSModelLoadingTest(unittest.TestCase):
         print("Done sleeping.")
 
     def _is_model_ready(self, model_name, model_version=""):
-        # Newer Triton core raises "Request for unknown model: '...' is not
-        # found" for a model that exists in the repository but is not currently
-        # loaded, whereas older versions returned False. Treat that specific
-        # condition as "not ready" so the load/unload assertions remain stable
-        # across core versions.
         try:
             return pb_utils.is_model_ready(
                 model_name=model_name, model_version=model_version
             )
         except pb_utils.TritonModelException as ex:
-            message = str(ex)
-            if "is not found" in message or "unknown model" in message:
-                return False
-            raise
+            self.assertIn(
+                f"Request for unknown model: '{model_name}' is not found",
+                str(ex),
+            )
+            return False
 
     def test_load_unload_model(self):
         self.assertFalse(self._is_model_ready(model_name=self.model_name))
