@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -63,6 +63,7 @@ SKIP_PATHS = (
     "docs/repositories.txt",
     "docs/exclusions.txt",
     "docker",
+    "qa/common/resnet50_labels.txt",
     "qa/ensemble_models/mix_platform_float32_float32_float32/output0_labels.txt",
     "qa/ensemble_models/mix_type_int32_float32_float32/output0_labels.txt",
     "qa/ensemble_models/mix_ensemble_int32_float32_float32/output0_labels.txt",
