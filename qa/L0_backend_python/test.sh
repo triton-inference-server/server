@@ -175,7 +175,7 @@ else
   pip3 install torch==2.3.1 -f https://download.pytorch.org/whl/torch_stable.html
 fi
 
-pip3 install pytest requests virtualenv
+pip3 install numpy setuptools pytest requests virtualenv
 
 # Set the default byte size to 5MBs to avoid going out of shared memory. The
 # environment that this job runs on has only 1GB of shared-memory available.
