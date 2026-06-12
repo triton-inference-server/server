@@ -75,9 +75,7 @@ class PBBLSModelLoadingTest(unittest.TestCase):
         # The model should not be changed after a failed load model request
         for version in ["2", "3"]:
             self.assertTrue(
-                self._is_model_ready(
-                    model_name=self.model_name, model_version=version
-                )
+                self._is_model_ready(model_name=self.model_name, model_version=version)
             )
 
         # Send the config with the correct format
