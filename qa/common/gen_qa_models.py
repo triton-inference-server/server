@@ -109,29 +109,19 @@ def create_plan_dynamic_rf_modelfile(
     out0 = add if not swap else sub
     out1 = sub if not swap else add
 
-    # uint8 conversion after operations
-    # FIXME: Remove support check when jetson supports TRT 8.5 (DLIS-4256)
-    if tu.support_trt_uint8():
-        if trt_output0_dtype == trt.uint8:
-            out0 = trt_cast_tensor(network, out0.get_output(0), trt.uint8)
-        if trt_output1_dtype == trt.uint8:
-            out1 = trt_cast_tensor(network, out1.get_output(0), trt.uint8)
+    # TRT 11 strongly-typed networks: ITensor.dtype setter no longer coerces
+    # output dtype, so insert an explicit cast whenever the elementwise op's
+    # natural output dtype differs from the declared output dtype. Covers
+    # both float<->float and uint8 cases.
+    if out0.get_output(0).dtype != trt_output0_dtype:
+        out0 = trt_cast_tensor(network, out0.get_output(0), trt_output0_dtype)
+    if out1.get_output(0).dtype != trt_output1_dtype:
+        out1 = trt_cast_tensor(network, out1.get_output(0), trt_output1_dtype)
 
     out0.get_output(0).name = "OUTPUT0"
     out1.get_output(0).name = "OUTPUT1"
     network.mark_output(out0.get_output(0))
     network.mark_output(out1.get_output(0))
-
-    # ITensor.dtype setter removed in TRT 11; cast above already produced
-    # the desired output dtype on modern TRT.
-    try:
-        out0.get_output(0).dtype = trt_output0_dtype
-    except AttributeError:
-        pass  # ITensor.dtype setter removed in TensorRT 11+
-    try:
-        out1.get_output(0).dtype = trt_output1_dtype
-    except AttributeError:
-        pass  # ITensor.dtype setter removed in TensorRT 11+
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     in1.allowed_formats = 1 << int(trt_memory_format)
@@ -422,20 +412,18 @@ def create_plan_fixed_rf_modelfile(
     out0 = add if not swap else sub
     out1 = sub if not swap else add
 
+    # TRT 11 strongly-typed networks: ITensor.dtype setter no longer coerces
+    # output dtype, so insert an explicit cast whenever the elementwise op's
+    # natural output dtype differs from the declared output dtype.
+    if out0.get_output(0).dtype != trt_output0_dtype:
+        out0 = trt_cast_tensor(network, out0.get_output(0), trt_output0_dtype)
+    if out1.get_output(0).dtype != trt_output1_dtype:
+        out1 = trt_cast_tensor(network, out1.get_output(0), trt_output1_dtype)
+
     out0.get_output(0).name = "OUTPUT0"
     out1.get_output(0).name = "OUTPUT1"
     network.mark_output(out0.get_output(0))
     network.mark_output(out1.get_output(0))
-
-    # ITensor.dtype setter removed in TRT 11; output dtype already matches.
-    try:
-        out0.get_output(0).dtype = trt_output0_dtype
-    except AttributeError:
-        pass  # ITensor.dtype setter removed in TensorRT 11+
-    try:
-        out1.get_output(0).dtype = trt_output1_dtype
-    except AttributeError:
-        pass  # ITensor.dtype setter removed in TensorRT 11+
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     in1.allowed_formats = 1 << int(trt_memory_format)
