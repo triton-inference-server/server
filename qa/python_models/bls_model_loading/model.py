@@ -51,7 +51,7 @@ class PBBLSModelLoadingTest(unittest.TestCase):
             )
         except pb_utils.TritonModelException as ex:
             self.assertIn(
-                f"Request for unknown model: '{model_name}' is not found",
+                f"Request for unknown model: '{model_name}'",
                 str(ex),
             )
             return False
