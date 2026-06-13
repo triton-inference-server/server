@@ -55,6 +55,8 @@ class PBBLSModelLoadingTest(unittest.TestCase):
                 str(ex),
             )
             return False
+        except UnicodeDecodeError:
+            return False
 
     def test_load_unload_model(self):
         self.assertFalse(self._is_model_ready(model_name=self.model_name))
