@@ -36,7 +36,6 @@ SERVER_LOG="./env_server.log"
 
 RET=0
 
-unset PYTHONPATH
 rm -fr ./models
 rm -rf *.tar.gz
 install_build_deps

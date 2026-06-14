@@ -169,21 +169,13 @@ cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
 
 
 if [ "$TEST_JETSON" == "0" ] && [[ ${TEST_WINDOWS} == 0 ]]; then
-  pip3 install torch==2.11.0+cu128 --index-url https://download.pytorch.org/whl/cu128
+  pip3 install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
 else
   # GPU tensor tests are disabled on jetson
   pip3 install torch==2.3.1 -f https://download.pytorch.org/whl/torch_stable.html
 fi
 
-pip3 install numpy 'setuptools<82' pytest requests virtualenv
-
-if [ "${TRITON_RHEL:-0}" == "1" ]; then
-  if [ -z "${PYTHONPATH:-}" ]; then
-    export PYTHONPATH="$(python3 -c 'import site; print(":".join(site.getsitepackages()))')"
-  else
-    export PYTHONPATH="$(python3 -c 'import site; print(":".join(site.getsitepackages()))'):${PYTHONPATH}"
-  fi
-fi
+pip3 install pytest requests virtualenv
 
 # Set the default byte size to 5MBs to avoid going out of shared memory. The
 # environment that this job runs on has only 1GB of shared-memory available.
