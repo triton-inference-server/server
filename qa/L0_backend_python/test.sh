@@ -176,10 +176,13 @@ else
 fi
 
 pip3 install numpy 'setuptools<82' pytest requests virtualenv
-if [ -z "${PYTHONPATH:-}" ]; then
-  export PYTHONPATH="$(python3 -c 'import site; print(":".join(site.getsitepackages()))')"
-else
-  export PYTHONPATH="$(python3 -c 'import site; print(":".join(site.getsitepackages()))'):${PYTHONPATH}"
+
+if [ "${TRITON_RHEL:-0}" == "1" ]; then
+  if [ -z "${PYTHONPATH:-}" ]; then
+    export PYTHONPATH="$(python3 -c 'import site; print(":".join(site.getsitepackages()))')"
+  else
+    export PYTHONPATH="$(python3 -c 'import site; print(":".join(site.getsitepackages()))'):${PYTHONPATH}"
+  fi
 fi
 
 # Set the default byte size to 5MBs to avoid going out of shared memory. The
