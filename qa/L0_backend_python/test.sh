@@ -169,7 +169,7 @@ cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
 
 
 if [ "$TEST_JETSON" == "0" ] && [[ ${TEST_WINDOWS} == 0 ]]; then
-  pip3 install torch==2.8.0 --index-url https://download.pytorch.org/whl/cu124
+  pip3 install torch==2.11.0+cu128 --index-url https://download.pytorch.org/whl/cu128
 else
   # GPU tensor tests are disabled on jetson
   pip3 install torch==2.3.1 -f https://download.pytorch.org/whl/torch_stable.html
