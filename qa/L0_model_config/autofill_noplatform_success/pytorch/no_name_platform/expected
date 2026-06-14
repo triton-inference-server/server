@@ -32,7 +32,6 @@ instance_group {
   gpus: 0
   kind: KIND_GPU
 }
-default_model_filename: "model.pt"
 optimization {
   input_pinned_memory {
     enable: true
@@ -42,4 +41,3 @@ optimization {
   }
 }
 backend: "pytorch"
-runtime: ""

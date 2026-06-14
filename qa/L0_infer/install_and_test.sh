@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,9 +44,6 @@ else
         jq \
         curl
 fi
-
-# install client libraries
-pip3 install tritonclient[all]
 
 # Run the actual test
 bash -x test.sh
