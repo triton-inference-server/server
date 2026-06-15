@@ -70,6 +70,22 @@ RUN set -eux; \
   rm -f "/tmp/${DEB}"; \
   rm -rf /var/lib/apt/lists/*
 
+# mysql-connector-odbc registers Driver=/usr/lib/.../odbc/libmyodbc9w.so in
+# /etc/odbcinst.ini, but Ubuntu/Debian often install the .so under
+# /usr/lib/<triplet>/odbc/ only. unixODBC then fails with "Can't open lib
+# '/usr/lib/odbc/libmyodbc9w.so'". Symlink all libmyodbc*.so into /usr/lib/odbc/.
+RUN set -eux; \
+  mkdir -p /usr/lib/odbc; \
+  for f in \
+      /usr/lib/x86_64-linux-gnu/odbc/libmyodbc*.so \
+      /usr/lib/aarch64-linux-gnu/odbc/libmyodbc*.so; \
+  do \
+    if [ -f "${f}" ]; then \
+      ln -sf "${f}" "/usr/lib/odbc/$(basename "${f}")"; \
+    fi; \
+  done; \
+  test -f /usr/lib/odbc/libmyodbc9w.so
+
 # Optional DSN file (only used when databaseIp is empty in triton-dmconfig.json).
 COPY replace-artifacts/odbc.ini /etc/odbc.ini
 RUN chmod 644 /etc/odbc.ini
