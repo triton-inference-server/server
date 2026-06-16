@@ -1675,6 +1675,14 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
                 "-e",
                 f"TRITON_RELEASE_VERSION={os.environ['TRITON_RELEASE_VERSION']}",
             ]
+        # TRI-1118 — forward PEP 427 build-tag and PEP 817 nv-part inputs so
+        # build_wheel.py inside the buildbase container can emit pipeline-correct
+        # wheel filenames. CUDA_VERSION is deliberately NOT forwarded -- the
+        # container's own CUDA base image defines it; host CUDA may differ
+        # (see core/python/build_wheel.py:_detect_cuda_version).
+        for var in ("CI_PIPELINE_ID", "NVIDIA_UPSTREAM_VERSION", "NVIDIA_BUILD_ID"):
+            if os.environ.get(var):
+                runargs += ["-e", f"{var}={os.environ[var]}"]
 
         runargs += ["tritonserver_buildbase"]
 
