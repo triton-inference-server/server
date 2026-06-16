@@ -32,6 +32,7 @@ import os
 import os.path
 import pathlib
 import platform
+import re
 import stat
 import subprocess
 import sys
@@ -1664,10 +1665,16 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
                     ),
                 ]
 
-        # TRI-1118 — propagate the release version into the wheel build
-        # step. build_wheel.py reads TRITON_RELEASE_VERSION (precedence:
-        # --release-version flag > env var > TRITON_VERSION file).
-        runargs += ["-e", f"TRITON_RELEASE_VERSION={FLAGS.release_version}"]
+        # TRI-1118 — propagate TRITON_RELEASE_VERSION into the wheel build
+        # only when it was actually set in main() (release-semantic version
+        # or explicit --release-version). Dev / pre-release builds leave it
+        # unset so build_wheel.py reads the in-tree TRITON_VERSION file and
+        # takes the PEP 817 variant path.
+        if "TRITON_RELEASE_VERSION" in os.environ:
+            runargs += [
+                "-e",
+                f"TRITON_RELEASE_VERSION={os.environ['TRITON_RELEASE_VERSION']}",
+            ]
 
         runargs += ["tritonserver_buildbase"]
 
@@ -2474,8 +2481,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--release-version",
         required=False,
-        default=DEFAULT_TRITON_VERSION_MAP["release_version"],
-        help="This flag sets the release version for Triton Inference Server to be built. Default: the latest released version.",
+        default=None,
+        help="Override the wheel base version (TRI-1118). When set, exported "
+        "as TRITON_RELEASE_VERSION so build_wheel.py uses it as the bare "
+        "PEP 440 version. When unset, build.py falls back to --version when "
+        "it matches X.Y.Z release-semantic, otherwise leaves the env var "
+        "unset and lets the in-tree TRITON_VERSION file rule (PEP 817 path).",
     )
     parser.add_argument(
         "--triton-container-version",
@@ -2604,12 +2615,21 @@ if __name__ == "__main__":
     if FLAGS.version is None:
         FLAGS.version = DEFAULT_TRITON_VERSION_MAP["release_version"]
 
-    # TRI-1118 — export the release version so the wheel build picks it up.
-    # For container builds the value is forwarded into the buildbase via
-    # `docker run -e` (see create_docker_build_script). For host builds
-    # (--no-container-build) the cmake_build subprocess inherits this
-    # process's env, so setting it here covers both paths.
-    os.environ.setdefault("TRITON_RELEASE_VERSION", FLAGS.release_version)
+    # TRI-1118 — choose whether to export TRITON_RELEASE_VERSION based on
+    # the resolved Triton version:
+    #   - --release-version explicitly passed     -> use it (override)
+    #   - FLAGS.version matches X.Y.Z             -> propagate FLAGS.version
+    #   - anything else (dev / pre-release / etc) -> leave unset so the
+    #                                                wheel build reads the
+    #                                                in-tree TRITON_VERSION
+    #                                                file (PEP 817 variant).
+    # The container build forwards this env var via `docker run -e`
+    # (create_docker_build_script). For --no-container-build, the
+    # cmake_build subprocess inherits the host env directly.
+    if FLAGS.release_version is not None:
+        os.environ.setdefault("TRITON_RELEASE_VERSION", FLAGS.release_version)
+    elif re.match(r"^\d+\.\d+\.\d+$", FLAGS.version):
+        os.environ.setdefault("TRITON_RELEASE_VERSION", FLAGS.version)
 
     if FLAGS.build_parallel is None:
         FLAGS.build_parallel = multiprocessing.cpu_count() * 2
