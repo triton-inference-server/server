@@ -10,12 +10,9 @@ test_results.txt
 artifacts
 cprofile
 *.prof
-.venv
-**/.venv
 
 # Test exclusions
 qa/L0_openai/openai
 tensorrtllm_models
-tensorrtllm_mistral_models/
 custom_tokenizer
 replace-artifacts/
