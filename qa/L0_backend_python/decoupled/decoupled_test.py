@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -319,7 +319,7 @@ class DecoupledTest(unittest.TestCase):
     def test_decoupled_execute_cancel(self):
         model_name = "execute_cancel"
         log_path = "decoupled_server.log"
-        execute_delay = 4.0  # seconds
+        execute_delay = 10.0  # seconds
         shape = [1, 1]
         user_data = UserData()
 
