@@ -30,7 +30,9 @@
 #include <rapidjson/error/en.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <rapidjson/document.h>
 #include <vector>
@@ -45,23 +47,23 @@ int FeatureIdxFromJsonValue(const char* feature_name, const rapidjson::Value& v,
   if (v.IsString()) {
     return triton::server::GetFeatureMappingIdx(feature_name, v.GetString(), tables);
   }
+  char num_buf[48];
+  int n = 0;
   if (v.IsInt()) {
-    const std::string tmp = std::to_string(v.GetInt());
-    return triton::server::GetFeatureMappingIdx(feature_name, tmp.c_str(), tables);
+    n = std::snprintf(num_buf, sizeof(num_buf), "%d", v.GetInt());
+  } else if (v.IsUint()) {
+    n = std::snprintf(num_buf, sizeof(num_buf), "%u", v.GetUint());
+  } else if (v.IsInt64()) {
+    n = std::snprintf(num_buf, sizeof(num_buf), "%lld", static_cast<long long>(v.GetInt64()));
+  } else if (v.IsUint64()) {
+    n = std::snprintf(num_buf, sizeof(num_buf), "%llu", static_cast<unsigned long long>(v.GetUint64()));
+  } else {
+    return -1;
   }
-  if (v.IsUint()) {
-    const std::string tmp = std::to_string(v.GetUint());
-    return triton::server::GetFeatureMappingIdx(feature_name, tmp.c_str(), tables);
+  if (n <= 0 || static_cast<size_t>(n) >= sizeof(num_buf)) {
+    return -1;
   }
-  if (v.IsInt64()) {
-    const std::string tmp = std::to_string(v.GetInt64());
-    return triton::server::GetFeatureMappingIdx(feature_name, tmp.c_str(), tables);
-  }
-  if (v.IsUint64()) {
-    const std::string tmp = std::to_string(v.GetUint64());
-    return triton::server::GetFeatureMappingIdx(feature_name, tmp.c_str(), tables);
-  }
-  return -1;
+  return triton::server::GetFeatureMappingIdx(feature_name, num_buf, tables);
 }
 }  // namespace
 
@@ -80,17 +82,20 @@ TRITONSERVER_Error* ParseRequest(const std::string& json, TRITONSERVER_Server* s
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg);
   }
 
-  if (server != nullptr && doc.IsObject() && doc.HasMember("imps") && doc["imps"].IsArray()) {
-    return GenerateInputVectors(doc, server, out_doc);
+  if (server != nullptr && doc.IsObject() && doc.HasMember("imps")) {
+    const rapidjson::Value& imps_member = doc["imps"];
+    if (imps_member.IsArray()) {
+      return GenerateInputVectors(doc, server, out_doc);
+    }
   }
 
   *out_doc = std::move(doc);
   return nullptr;
 }
 
-TRITONSERVER_Error* GetReadyModelNames(TRITONSERVER_Server* server, std::vector<std::string>* out) {
+TRITONSERVER_Error* GetReadyModelNames(TRITONSERVER_Server* server, std::unordered_set<std::string>* out) {
   if (out == nullptr) {
-    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "output vector pointer is null");
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "output set pointer is null");
   }
   out->clear();
 
@@ -120,6 +125,7 @@ TRITONSERVER_Error* GetReadyModelNames(TRITONSERVER_Server* server, std::vector<
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, "model index JSON root is not an array");
   }
 
+  out->reserve(static_cast<size_t>(index_doc.Size()));
   for (rapidjson::SizeType i = 0; i < index_doc.Size(); ++i) {
     const rapidjson::Value& o = index_doc[i];
     if (!o.IsObject() || !o.HasMember("name")) {
@@ -129,7 +135,7 @@ TRITONSERVER_Error* GetReadyModelNames(TRITONSERVER_Server* server, std::vector<
     if (!n.IsString()) {
       continue;
     }
-    out->emplace_back(n.GetString());
+    out->emplace(n.GetString());
   }
 
   return nullptr;
@@ -238,7 +244,7 @@ TRITONSERVER_Error* GenerateInputVectors(const rapidjson::Document& doc, TRITONS
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNAVAILABLE, "campaign feature mappings are not loaded");
   }
 
-  std::vector<std::string> ready_model_names;
+  std::unordered_set<std::string> ready_model_names;
   TRITONSERVER_Error* err = GetReadyModelNames(server, &ready_model_names);
   if (err != nullptr) {
     return err;
@@ -279,7 +285,7 @@ TRITONSERVER_Error* GenerateInputVectors(const rapidjson::Document& doc, TRITONS
       const std::vector<std::string>& feature_sequence = cmap_it->second.feature_sequence;
       const FeatureMappingTables& tables = cmap_it->second.feature_mapping;
 
-      if (std::find(ready_model_names.begin(), ready_model_names.end(), model_name) == ready_model_names.end()) {
+      if (ready_model_names.find(model_name) == ready_model_names.end()) {
         const std::string not_ready = "model " + model_name + " not ready";
         return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, not_ready.c_str());
       }
@@ -298,17 +304,17 @@ TRITONSERVER_Error* GenerateInputVectors(const rapidjson::Document& doc, TRITONS
 
         const rapidjson::Value* src = nullptr;
         if (feature == "cookie" || feature == "rnk") {
-          if (camp.IsObject() && camp.HasMember(fkey)) {
+          if (camp.HasMember(fkey)) {
             src = &camp[fkey];
           }
-        } 
+        }
         else if(feature == "campid") {
-          if (camp.IsObject() && camp.HasMember("cid")) {
+          if (camp.HasMember("cid")) {
             src = &camp["cid"];
           }
         }
         else {
-          if (imp.IsObject() && imp.HasMember(fkey)) {
+          if (imp.HasMember(fkey)) {
             src = &imp[fkey];
           }
         }

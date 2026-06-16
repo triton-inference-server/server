@@ -28,6 +28,7 @@
 #include <rapidjson/document.h>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "triton/core/tritonserver.h"
@@ -40,9 +41,7 @@ namespace triton { namespace server {
 // stores the parsed root in `*out_doc`.
 // Returns nullptr on success, or a TRITONSERVER_Error that the caller must
 // delete with TRITONSERVER_ErrorDelete on failure.
-TRITONSERVER_Error* ParseRequest(
-    const std::string& json, TRITONSERVER_Server* server,
-    rapidjson::Document* out_doc);
+TRITONSERVER_Error* ParseRequest(const std::string& json, TRITONSERVER_Server* server, rapidjson::Document* out_doc);
 
 #ifdef TRITON_ENABLE_MYSQL_ODBC
 
@@ -52,7 +51,7 @@ TRITONSERVER_Error* GenerateInputVectors(
     rapidjson::Document* out_doc);
 
 TRITONSERVER_Error* GetReadyModelNames(
-    TRITONSERVER_Server* server, std::vector<std::string>* out);
+    TRITONSERVER_Server* server, std::unordered_set<std::string>* out);
 
 using NamedDoubleBuffers = std::unordered_map<std::string, std::vector<double>>;
 using ModelNameToFeatureCount = std::unordered_map<std::string, size_t>;
