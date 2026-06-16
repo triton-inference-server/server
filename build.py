@@ -1664,6 +1664,11 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
                     ),
                 ]
 
+        # TRI-1118 — propagate the release version into the wheel build
+        # step. build_wheel.py reads TRITON_RELEASE_VERSION (precedence:
+        # --release-version flag > env var > TRITON_VERSION file).
+        runargs += ["-e", f"TRITON_RELEASE_VERSION={FLAGS.release_version}"]
+
         runargs += ["tritonserver_buildbase"]
 
         runargs += ["./cmake_build"]
@@ -2598,6 +2603,13 @@ if __name__ == "__main__":
     # is not explicitly specified read from TRITON_VERSION file.
     if FLAGS.version is None:
         FLAGS.version = DEFAULT_TRITON_VERSION_MAP["release_version"]
+
+    # TRI-1118 — export the release version so the wheel build picks it up.
+    # For container builds the value is forwarded into the buildbase via
+    # `docker run -e` (see create_docker_build_script). For host builds
+    # (--no-container-build) the cmake_build subprocess inherits this
+    # process's env, so setting it here covers both paths.
+    os.environ.setdefault("TRITON_RELEASE_VERSION", FLAGS.release_version)
 
     if FLAGS.build_parallel is None:
         FLAGS.build_parallel = multiprocessing.cpu_count() * 2
