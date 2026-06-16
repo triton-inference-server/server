@@ -42,11 +42,20 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
+#include <cstdlib>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <memory>
+#include <optional>
 #include <sstream>
 #include <thread>
 
+#include "database_config.h"
+#ifdef TRITON_ENABLE_MYSQL_ODBC
+#include "mysql_odbc_connection_pool.h"
+#endif  // TRITON_ENABLE_MYSQL_ODBC
 #include "triton_signal.h"
 
 #ifdef TRITON_ENABLE_ASAN
@@ -102,6 +111,113 @@ std::unique_ptr<triton::server::HTTPServer> g_vertex_ai_service;
 #endif  // TRITON_ENABLE_VERTEX_AI
 
 triton::server::TritonServerParameters g_triton_params;
+
+// Populated at startup when /etc/triton-dmconfig.json is present.
+std::optional<triton::server::DatabaseConfig> g_triton_dm_database_config;
+
+#ifdef TRITON_ENABLE_MYSQL_ODBC
+// ODBC pool opened after successful config load (same lifetime as the process).
+std::unique_ptr<triton::server::MysqlOdbcConnectionPool> g_triton_dm_odbc_pool;
+
+// Registered with std::atexit after the pool is initialized so connections are
+// released on normal return, exit(), and FAIL_IF_ERR paths.
+extern "C" void TritonDmOdbcPoolAtExit(void)
+{
+  triton::server::SetGlobalMysqlOdbcPool(nullptr);
+  g_triton_dm_odbc_pool.reset();
+}
+
+void TritonModelsRefreshThreadMain()
+{
+  using std::chrono_literals::operator""min;
+  while (!triton::server::signal_exiting_) {
+    if (auto err = triton::server::UpdateTritonModelsData()) {
+#ifdef TRITON_ENABLE_LOGGING
+      LOG_WARNING << "Triton ML models DB refresh failed: " << *err;
+#endif  // TRITON_ENABLE_LOGGING
+    }
+    std::unique_lock<std::mutex> lock(triton::server::signal_exit_mu_);
+    triton::server::signal_exit_cv_.wait_for(lock, 15min, [] { return triton::server::signal_exiting_; });
+  }
+}
+
+std::optional<std::thread> g_triton_models_refresh_thread;
+
+void StartTritonModelsRefreshThread()
+{
+  if (!g_triton_dm_odbc_pool) {
+    return;
+  }
+  g_triton_models_refresh_thread.emplace(TritonModelsRefreshThreadMain);
+}
+
+void JoinTritonModelsRefreshThread()
+{
+  if (!g_triton_models_refresh_thread.has_value()) {
+    return;
+  }
+  if (g_triton_models_refresh_thread->joinable()) {
+    {
+      std::lock_guard<std::mutex> lock(triton::server::signal_exit_mu_);
+      triton::server::signal_exit_cv_.notify_all();
+    }
+    g_triton_models_refresh_thread->join();
+  }
+  g_triton_models_refresh_thread.reset();
+}
+#endif  // TRITON_ENABLE_MYSQL_ODBC
+
+void LoadTritonDmDatabaseConfigAtStartup()
+{
+  namespace fs = std::filesystem;
+  const std::string path(triton::server::kTritonDmConfigJsonPath);
+  if (!fs::exists(path)) {
+#ifdef TRITON_ENABLE_LOGGING
+    LOG_WARNING << "Database config file '" << path << "' not found; continuing without DM database metadata.";
+#else
+    std::cerr << "warning: database config file '" << path << "' not found; continuing without DM database metadata." << std::endl;
+#endif  // TRITON_ENABLE_LOGGING
+    return;
+  }
+
+  triton::server::DatabaseConfig cfg;
+  if (auto err = triton::server::LoadDatabaseConfigFromJsonFile(path, &cfg)) {
+#ifdef TRITON_ENABLE_LOGGING
+    LOG_ERROR << "Failed to load '" << path << "': " << *err;
+#else
+    std::cerr << "Failed to load '" << path << "': " << *err << std::endl;
+#endif  // TRITON_ENABLE_LOGGING
+    exit(1);
+  }
+
+  g_triton_dm_database_config = std::move(cfg);
+
+#ifdef TRITON_ENABLE_LOGGING
+  LOG_INFO << "Loaded database config from '" << path << "' (databaseIp='" << g_triton_dm_database_config->database_ip << "', databasePort=" << g_triton_dm_database_config->database_port << ")";
+#endif  // TRITON_ENABLE_LOGGING
+
+#ifdef TRITON_ENABLE_MYSQL_ODBC
+  g_triton_dm_odbc_pool = std::make_unique<triton::server::MysqlOdbcConnectionPool>(*g_triton_dm_database_config);
+  if (auto err = g_triton_dm_odbc_pool->Initialize()) {
+#ifdef TRITON_ENABLE_LOGGING
+    LOG_ERROR << "Failed to initialize MySQL ODBC connection pool: " << *err;
+#else
+    std::cerr << "Failed to initialize MySQL ODBC connection pool: " << *err << std::endl;
+#endif  // TRITON_ENABLE_LOGGING
+    g_triton_dm_odbc_pool.reset();
+    exit(1);
+  }
+  if (std::atexit(TritonDmOdbcPoolAtExit) != 0) {
+#ifdef TRITON_ENABLE_LOGGING
+    LOG_WARNING << "std::atexit failed; ODBC pool will still be destroyed at static exit";
+#endif  // TRITON_ENABLE_LOGGING
+  }
+  triton::server::SetGlobalMysqlOdbcPool(g_triton_dm_odbc_pool.get());
+#ifdef TRITON_ENABLE_LOGGING
+  LOG_INFO << "MySQL ODBC connection pool started ("<< g_triton_dm_database_config->max_pool_connections << " connections to DSN '" << g_triton_dm_database_config->primary_dsn_name << "')";
+#endif  // TRITON_ENABLE_LOGGING
+#endif  // TRITON_ENABLE_MYSQL_ODBC
+}
 
 #ifdef TRITON_ENABLE_GRPC
 TRITONSERVER_Error*
@@ -469,6 +585,8 @@ main(int argc, char** argv)
   LOG_SET_OUT_FILE(g_triton_params.log_file_);
 #endif  // TRITON_ENABLE_LOGGING
 
+  LoadTritonDmDatabaseConfigAtStartup();
+
   // Trace manager.
   triton::server::TraceManager* trace_manager;
 
@@ -501,6 +619,10 @@ main(int argc, char** argv)
     exit(1);
   }
 
+#ifdef TRITON_ENABLE_MYSQL_ODBC
+  StartTritonModelsRefreshThread();
+#endif  // TRITON_ENABLE_MYSQL_ODBC
+
   // Wait until a signal terminates the server...
   while (!triton::server::signal_exiting_) {
     // If enabled, poll the model repository to see if there have been
@@ -520,6 +642,10 @@ main(int argc, char** argv)
             : g_triton_params.repository_poll_secs_);
     triton::server::signal_exit_cv_.wait_for(lock, wait_timeout);
   }
+
+#ifdef TRITON_ENABLE_MYSQL_ODBC
+  JoinTritonModelsRefreshThread();
+#endif  // TRITON_ENABLE_MYSQL_ODBC
 
   // Stop the HTTP[, gRPC, and metrics] endpoints, and update exit timeout.
   uint32_t exit_timeout_secs = g_triton_params.exit_timeout_secs_;

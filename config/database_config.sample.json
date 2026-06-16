@@ -1,0 +1,13 @@
+{
+        "databaseIp" : "10.0.0.1",
+        "databasePort" : 3306,
+        "odbcDriverName" : "MySQL ODBC 9.7 Unicode Driver",
+        "primaryDSNName" : "PrimaryCentralisedMySQL",
+        "secondaryDSNName" : "SecondaryCentralisedMySQL",
+        "dsnUserName" : "kdbuser",
+        "dsnUserPassword" : "REPLACE_WITH_SECRET",
+        "queryRetryCount": 3,
+        "dcId": 1,
+        "minPoolConnections": 2,
+        "maxPoolConnections": 5
+}

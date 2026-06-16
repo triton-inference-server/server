@@ -53,10 +53,12 @@ class SagemakerAPIServer : public HTTPAPIServer {
         TRITONSERVER_Server* server, evhtp_request_t* req,
         DataCompressor::Type response_compression_type,
         const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
-        const std::shared_ptr<SharedMemoryManager>& shm_manager)
+        const std::shared_ptr<SharedMemoryManager>& shm_manager,
+        bool pause_http_request = true,
+        bool register_fini_cancel_hook = true)
         : InferRequestClass(
               server, req, response_compression_type, triton_request,
-              shm_manager)
+              shm_manager, pause_http_request, register_fini_cancel_hook)
     {
     }
     using InferRequestClass::InferResponseComplete;
@@ -123,12 +125,13 @@ class SagemakerAPIServer : public HTTPAPIServer {
 
   std::unique_ptr<InferRequestClass> CreateInferRequest(
       evhtp_request_t* req,
-      const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
-      override
+      const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
+      bool pause_http_request = true,
+      bool register_fini_cancel_hook = true) override
   {
     return std::unique_ptr<InferRequestClass>(new SagemakeInferRequestClass(
         server_.get(), req, GetResponseCompressionType(req), triton_request,
-        shm_manager_));
+        shm_manager_, pause_http_request, register_fini_cancel_hook));
   }
   TRITONSERVER_Error* GetInferenceHeaderLength(
       evhtp_request_t* req, int32_t content_length,
