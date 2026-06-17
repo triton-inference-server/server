@@ -212,10 +212,7 @@ if __name__ == "__main__":
                 in0 = 16384 * np.ones(shape, dtype="int")
                 in0n = np.array([str(x) for x in in0.reshape(in0.size)], dtype=object)
                 input_data = in0n.reshape(in0.shape)
-            if model_name != "identity_bf16":
-                triton_type = np_to_triton_dtype(input_data.dtype)
-            else:
-                triton_type = "BF16"
+            triton_type = np_to_triton_dtype(input_data.dtype)
             inputs = [client_util.InferInput("INPUT0", input_data.shape, triton_type)]
             inputs[0].set_data_from_numpy(input_data)
 
