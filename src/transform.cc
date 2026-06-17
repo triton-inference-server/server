@@ -70,14 +70,14 @@ int FeatureIdxFromJsonValue(const char* feature_name, const rapidjson::Value& v,
 
 namespace triton { namespace server {
 
-TRITONSERVER_Error* ParseRequest(const std::string& json, TRITONSERVER_Server* server, rapidjson::Document* out_doc) {
+TRITONSERVER_Error* ParseRequest(const char* json, size_t json_len, TRITONSERVER_Server* server, rapidjson::Document* out_doc) {
   if (out_doc == nullptr) {
     return TRITONSERVER_ErrorNew(
     TRITONSERVER_ERROR_INVALID_ARG, "output document pointer is null");
   }
 
   rapidjson::Document doc;
-  doc.Parse(json.data(), json.size());
+  doc.Parse(json, json_len);
   if (doc.HasParseError()) {
     const char* msg = rapidjson::GetParseError_En(doc.GetParseError());
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg);

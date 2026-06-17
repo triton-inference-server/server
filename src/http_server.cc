@@ -3139,8 +3139,13 @@ HTTPAPIServer::DecompressBuffer(
     case DataCompressor::Type::DEFLATE:
     case DataCompressor::Type::GZIP: {
       *decompressed_buffer = evbuffer_new();
-      RETURN_IF_ERR(DataCompressor::DecompressData(
-          compression_type, req->buffer_in, *decompressed_buffer));
+      TRITONSERVER_Error* decompress_err = DataCompressor::DecompressData(
+          compression_type, req->buffer_in, *decompressed_buffer);
+      if (decompress_err != nullptr) {
+        evbuffer_free(*decompressed_buffer);
+        *decompressed_buffer = nullptr;
+        return decompress_err;
+      }
       break;
     }
     case DataCompressor::Type::UNKNOWN: {

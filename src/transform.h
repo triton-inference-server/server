@@ -35,7 +35,7 @@
 
 namespace triton { namespace server {
 
-TRITONSERVER_Error* ParseRequest(const std::string& json, TRITONSERVER_Server* server, rapidjson::Document* out_doc);
+TRITONSERVER_Error* ParseRequest(const char* json, size_t json_len, TRITONSERVER_Server* server, rapidjson::Document* out_doc);
 
 #ifdef TRITON_ENABLE_MYSQL_ODBC
 
