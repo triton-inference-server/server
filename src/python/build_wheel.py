@@ -165,8 +165,13 @@ def _repair_wheel_with_auditwheel(whl_dir, dest_dir):
 
     for wheel_path in wheels:
         print(f"=== Running auditwheel repair on {wheel_path}")
+        # Write the manylinux wheel back into dist_dir so the CMake
+        # install(DIRECTORY WHEEL_OUT_DIR) line picks it up (it copies
+        # from <dest>/wheel/dist/, not from <dest>/). The original
+        # linux_<arch> wheel is removed on success to keep dist_dir
+        # canonical — a single manylinux artifact, no duplicates.
         r = subprocess.run(
-            ["auditwheel", "repair", wheel_path, "--wheel-dir", dest_dir],
+            ["auditwheel", "repair", wheel_path, "--wheel-dir", dist_dir],
             capture_output=True,
             text=True,
         )
@@ -177,8 +182,8 @@ def _repair_wheel_with_auditwheel(whl_dir, dest_dir):
                 f"=== Pure-Python wheel detected; falling back to wheel tags "
                 f"({manylinux_tag})"
             )
-            copied = os.path.join(dest_dir, os.path.basename(wheel_path))
-            shutil.copy(wheel_path, copied)
+            # `wheel tags --remove` retags wheel_path in place: writes a
+            # manylinux-tagged sibling and removes the linux_<arch> input.
             r2 = subprocess.run(
                 [
                     "python3",
@@ -188,13 +193,17 @@ def _repair_wheel_with_auditwheel(whl_dir, dest_dir):
                     "--platform-tag",
                     manylinux_tag,
                     "--remove",
-                    copied,
+                    wheel_path,
                 ]
             )
             fail_if(r2.returncode != 0, "wheel tags fallback failed")
         elif r.returncode != 0:
             sys.stderr.write(r.stderr)
             fail_if(True, "auditwheel repair failed")
+        else:
+            # auditwheel succeeded — drop the pre-repair linux_<arch>
+            # wheel; only the manylinux wheel should ship.
+            os.remove(wheel_path)
 
 
 def main():
@@ -248,8 +257,10 @@ def main():
     # each CI rebuild gets a monotonic, PyPI-uploadable, naturally-sortable
     # version (e.g. 2.70.0.dev0 + CI_PIPELINE_ID=12345 -> 2.70.0.dev12345).
     # Replaces the legacy PEP 427 build-tag scheme which PyPI rejects.
+    # Regex tolerates both 2.70.0.dev0 (canonical PEP 440) and 2.71.0dev
+    # (legacy in-tree shape with no period and no counter).
     _pipeline = os.environ.get("CI_PIPELINE_ID", "")
-    _dev_m = re.match(r"^(\d+\.\d+\.\d+)\.dev\d+$", FLAGS.triton_version)
+    _dev_m = re.match(r"^(\d+\.\d+\.\d+)\.?dev\d*$", FLAGS.triton_version)
     if _dev_m and _pipeline.isdigit():
         _new = f"{_dev_m.group(1)}.dev{_pipeline}"
         print(
