@@ -922,6 +922,7 @@ RUN ccache -p
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
+          auditwheel \\
           build \\
           wheel \\
           setuptools \\
@@ -1035,6 +1036,7 @@ RUN apt-get update \\
       && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade \\
+          auditwheel \\
           build \\
           docker \\
           virtualenv \\
