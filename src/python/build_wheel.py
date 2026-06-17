@@ -32,6 +32,7 @@ import re
 import shutil
 import subprocess
 import sys
+import zipfile
 from tempfile import mkstemp
 
 # ANSI colors for CI log readability (rendered by GitLab CI, harmlessly
@@ -134,29 +135,44 @@ def _compose_variant_label():
     return label
 
 
-def _repair_wheel_with_auditwheel(whl_dir, dest_dir):
-    """Upgrade a linux_<arch> wheel to manylinux_2_X_<arch>.
+def _wheel_has_so(wheel_path):
+    """True if the wheel zip contains a native shared library.
 
-    Ports the pattern established for tritonclient in TRI-286:
-      1. auditwheel repair   — auto-discovers the minimum manylinux tag
-         by inspecting glibc symbol requirements of the embedded .so.
-      2. python -m wheel tags fallback — used when auditwheel reports
-         "no ELF" (the wheel has no native extension, e.g. a downstream
-         build disabled bindings). Mirrors the documented fallback.
-      3. No-op with warning — when auditwheel is not installed in the
-         build image, keep the linux_<arch> wheel as-is so the build
-         does not regress.
+    Detects both unversioned (`libfoo.so`) and versioned (`libfoo.so.1.2`)
+    SONAMEs via filename inspection -- matches what auditwheel and pip
+    both use to classify wheels.
     """
-    if shutil.which("auditwheel") is None:
-        print(
-            "=== WARNING: auditwheel not found on PATH; keeping linux_<arch> "
-            "wheel as-is. Install auditwheel in the build image to produce "
-            "PyPI-acceptable manylinux_2_X_<arch> wheels.",
-            file=sys.stderr,
-        )
-        shutil.copytree(os.path.join(whl_dir, "dist"), dest_dir, dirs_exist_ok=True)
-        return
+    with zipfile.ZipFile(wheel_path) as zf:
+        for name in zf.namelist():
+            base = os.path.basename(name)
+            if base.endswith(".so") or ".so." in base:
+                return True
+    return False
 
+
+def _repair_wheel_with_auditwheel(whl_dir, dest_dir):
+    """Apply the correct PEP 425 platform-compatibility tag to each wheel.
+
+    Routing rules (per the relevant PEPs):
+      - Has native `.so` -> PEP 513 / PEP 599 / PEP 600 `manylinux_<X>_<Y>_<arch>`
+        via `auditwheel repair`. auditwheel inspects the .so's glibc
+        symbol requirements and picks the lowest manylinux policy that
+        covers them, then bundles any non-allowlisted dynamic deps.
+        Original linux_<arch> wheel is removed on success.
+      - No native `.so` -> PEP 425 pure-Python tag `py3-none-any`.
+        The manylinux platform tag is OMITTED -- claiming manylinux on
+        a wheel with no glibc-bound code would be a false compatibility
+        promise.
+
+    Notes:
+      - PEP 656 musllinux is not produced here (build containers are
+        glibc-based; `auditwheel-musl` would be required on musl distros).
+      - PEP 440 version normalization happens upstream in main(), via
+        the dev-counter rewrite, before this function runs.
+      - If a wheel has a `.so` but `auditwheel` is missing from PATH,
+        the linux_<arch> wheel is kept as-is and a warning is logged
+        rather than mis-tagging it as manylinux.
+    """
     dist_dir = os.path.join(whl_dir, "dist")
     wheels = [
         os.path.join(dist_dir, w) for w in os.listdir(dist_dir) if w.endswith(".whl")
@@ -164,46 +180,55 @@ def _repair_wheel_with_auditwheel(whl_dir, dest_dir):
     fail_if(not wheels, "no wheel produced by the build")
 
     for wheel_path in wheels:
-        print(f"=== Running auditwheel repair on {wheel_path}")
-        # Write the manylinux wheel back into dist_dir so the CMake
-        # install(DIRECTORY WHEEL_OUT_DIR) line picks it up (it copies
-        # from <dest>/wheel/dist/, not from <dest>/). The original
-        # linux_<arch> wheel is removed on success to keep dist_dir
-        # canonical — a single manylinux artifact, no duplicates.
-        r = subprocess.run(
-            ["auditwheel", "repair", wheel_path, "--wheel-dir", dist_dir],
-            capture_output=True,
-            text=True,
-        )
-        if r.returncode != 0 and "no ELF" in r.stderr:
-            arch = os.uname().machine
-            manylinux_tag = f"manylinux_2_28_{arch}"
+        if _wheel_has_so(wheel_path):
+            if shutil.which("auditwheel") is None:
+                print(
+                    f"{_RED}=== WARNING: native .so found in "
+                    f"{os.path.basename(wheel_path)} but auditwheel not on "
+                    f"PATH; keeping linux_<arch> wheel as-is. Install "
+                    f"auditwheel in the build image to produce "
+                    f"PyPI-acceptable manylinux wheels (PEP 513/599/600).{_RESET}",
+                    file=sys.stderr,
+                )
+                continue
             print(
-                f"=== Pure-Python wheel detected; falling back to wheel tags "
-                f"({manylinux_tag})"
+                f"{_CYAN}=== Native extension in {os.path.basename(wheel_path)}: "
+                f"auditwheel repair -> PEP 513/599/600 manylinux{_RESET}",
+                file=sys.stderr,
             )
-            # `wheel tags --remove` retags wheel_path in place: writes a
-            # manylinux-tagged sibling and removes the linux_<arch> input.
-            r2 = subprocess.run(
+            r = subprocess.run(
+                ["auditwheel", "repair", wheel_path, "--wheel-dir", dist_dir],
+                capture_output=True,
+                text=True,
+            )
+            if r.returncode != 0:
+                sys.stderr.write(r.stderr)
+                fail_if(True, "auditwheel repair failed")
+            os.remove(wheel_path)
+        else:
+            print(
+                f"{_CYAN}=== No native extension in "
+                f"{os.path.basename(wheel_path)}: retagging as PEP 425 "
+                f"pure-Python (py3-none-any); manylinux tag omitted{_RESET}",
+                file=sys.stderr,
+            )
+            r = subprocess.run(
                 [
                     "python3",
                     "-m",
                     "wheel",
                     "tags",
+                    "--python-tag",
+                    "py3",
+                    "--abi-tag",
+                    "none",
                     "--platform-tag",
-                    manylinux_tag,
+                    "any",
                     "--remove",
                     wheel_path,
                 ]
             )
-            fail_if(r2.returncode != 0, "wheel tags fallback failed")
-        elif r.returncode != 0:
-            sys.stderr.write(r.stderr)
-            fail_if(True, "auditwheel repair failed")
-        else:
-            # auditwheel succeeded — drop the pre-repair linux_<arch>
-            # wheel; only the manylinux wheel should ship.
-            os.remove(wheel_path)
+            fail_if(r.returncode != 0, "wheel tags retag failed for pure-Python wheel")
 
 
 def main():
