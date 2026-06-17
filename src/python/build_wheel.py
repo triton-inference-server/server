@@ -180,6 +180,19 @@ def _repair_wheel_with_auditwheel(whl_dir, dest_dir):
     fail_if(not wheels, "no wheel produced by the build")
 
     for wheel_path in wheels:
+        fname = os.path.basename(wheel_path)
+        # Skip wheels that already carry a manylinux/musllinux platform
+        # tag. Re-running auditwheel on an already-repaired wheel produces
+        # a compressed PEP 425 tag set
+        # (e.g. manylinux_2_27_x86_64.manylinux_2_28_x86_64) -- valid but
+        # noisy. This guards against CMake invoking this custom command
+        # twice (build + install phases) and finding stale wheels in dist/.
+        if "manylinux" in fname or "musllinux" in fname:
+            print(
+                f"{_CYAN}=== Skipping already-tagged wheel: {fname}{_RESET}",
+                file=sys.stderr,
+            )
+            continue
         if _wheel_has_so(wheel_path):
             if shutil.which("auditwheel") is None:
                 print(
@@ -321,6 +334,15 @@ def main():
     shutil.copyfile("setup.py", os.path.join(FLAGS.whl_dir, "setup.py"))
 
     os.chdir(FLAGS.whl_dir)
+    # Clean dist/ to prevent accumulating wheels from prior runs. CMake may
+    # invoke this custom command twice (build + install phases); without
+    # this, dist/ would end up with the linux_<arch> wheel just produced
+    # AND the manylinux_<X>_<Y>_<arch> wheel left over from the previous
+    # run, and _repair_wheel_with_auditwheel would process both, producing
+    # wheels with compressed PEP 425 tag sets.
+    _dist = os.path.join(FLAGS.whl_dir, "dist")
+    if os.path.isdir(_dist):
+        shutil.rmtree(_dist)
     print("=== Building wheel")
     args = ["python3", "setup.py", "bdist_wheel"]
 
