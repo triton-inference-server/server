@@ -36,6 +36,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 #include "common.h"
 #include "data_compressor.h"
@@ -326,6 +327,14 @@ class HTTPAPIServer : public HTTPServer {
     virtual TRITONSERVER_Error* FinalizeResponse(
         TRITONSERVER_InferenceResponse* response,
         evbuffer* json_only_out = nullptr);
+
+    // Reads output tensor 0 from `response` as row-major doubles without going
+    // through JSON. Same constraints as FinalizeResponse(json_only_out) on
+    // output 0: JSON-backed tensor, no classification. `expect_rows` must
+    // divide the total element count (leading batch rows).
+    TRITONSERVER_Error* ExtractFirstJsonOutputAsRowMajorDoubles(
+        TRITONSERVER_InferenceResponse* response, size_t expect_rows,
+        std::vector<std::vector<double>>* rows_out);
 
     // Helper function to set infer response header in the form specified by
     // the endpoint protocol

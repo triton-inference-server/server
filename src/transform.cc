@@ -31,12 +31,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <rapidjson/document.h>
 #include <vector>
-#include <iostream>
 
 namespace {
 
@@ -65,7 +66,7 @@ int FeatureIdxFromJsonValue(const char* feature_name, const rapidjson::Value& v,
   }
   return triton::server::GetFeatureMappingIdx(feature_name, num_buf, tables);
 }
-}  // namespace
+}
 
 namespace triton { namespace server {
 
@@ -82,8 +83,8 @@ TRITONSERVER_Error* ParseRequest(const std::string& json, TRITONSERVER_Server* s
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg);
   }
 
-  if (server != nullptr && doc.IsObject() && doc.HasMember("imps")) {
-    const rapidjson::Value& imps_member = doc["imps"];
+  if (server != nullptr && doc.IsObject() && doc.HasMember(TRITON_BT_JSON_IMPS)) {
+    const rapidjson::Value& imps_member = doc[TRITON_BT_JSON_IMPS];
     if (imps_member.IsArray()) {
       return GenerateInputVectors(doc, server, out_doc);
     }
@@ -231,11 +232,54 @@ TRITONSERVER_Error* BuildMultiInferRequestDocument(const NamedDoubleBuffers& buf
   return nullptr;
 }
 
+namespace {
+
+struct ImpRouteRow {
+  int imp_idx{0};
+  int camp_idx{0};
+  int adsize_idx{0};
+  int32_t cid{0};
+};
+
+void AddImpSlotRoutingMembers(const NamedDoubleBuffers& buffers, const std::unordered_map<std::string, std::vector<ImpRouteRow>>& routes_by_model, int imp_count, rapidjson::Document* out_doc) {
+  std::vector<std::string> names;
+  names.reserve(buffers.size());
+  for (const auto& kv : buffers) {
+    names.push_back(kv.first);
+  }
+  std::sort(names.begin(), names.end());
+
+  auto& alloc = out_doc->GetAllocator();
+  rapidjson::Value routing(rapidjson::kArrayType);
+  routing.Reserve(static_cast<rapidjson::SizeType>(names.size()), alloc);
+  for (const std::string& mn : names) {
+    rapidjson::Value slot(rapidjson::kArrayType);
+    auto it = routes_by_model.find(mn);
+    if (it != routes_by_model.end()) {
+      slot.Reserve(static_cast<rapidjson::SizeType>(it->second.size()), alloc);
+      for (const ImpRouteRow& r : it->second) {
+        rapidjson::Value o(rapidjson::kObjectType);
+        o.AddMember("i", r.imp_idx, alloc);
+        o.AddMember("c", r.camp_idx, alloc);
+        o.AddMember("a", r.adsize_idx, alloc);
+        o.AddMember(TRITON_BT_JSON_CID, r.cid, alloc);
+        o.AddMember("mdl", rapidjson::Value(mn.c_str(), static_cast<rapidjson::SizeType>(mn.size()), alloc).Move(), alloc);
+        slot.PushBack(o, alloc);
+      }
+    }
+    routing.PushBack(slot, alloc);
+  }
+  out_doc->AddMember("imp_slot_routing", routing, alloc);
+  out_doc->AddMember("imp_routing_imp_count", imp_count, alloc);
+}
+
+}
+
 TRITONSERVER_Error* GenerateInputVectors(const rapidjson::Document& doc, TRITONSERVER_Server* server, rapidjson::Document* out_doc) {
   if (out_doc == nullptr || server == nullptr) {
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "invalid argument");
   }
-  if (!doc.IsObject() || !doc.HasMember("imps") || !doc["imps"].IsArray()) {
+  if (!doc.IsObject() || !doc.HasMember(TRITON_BT_JSON_IMPS) || !doc[TRITON_BT_JSON_IMPS].IsArray()) {
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "expected object with imps array");
   }
 
@@ -255,23 +299,24 @@ TRITONSERVER_Error* GenerateInputVectors(const rapidjson::Document& doc, TRITONS
 
   NamedDoubleBuffers buffers;
   ModelNameToFeatureCount counts;
+  std::unordered_map<std::string, std::vector<ImpRouteRow>> routes_by_model;
 
-  const rapidjson::Value& imps = doc["imps"];
+  const rapidjson::Value& imps = doc[TRITON_BT_JSON_IMPS];
   for (rapidjson::SizeType ii = 0; ii < imps.Size(); ++ii) {
     const rapidjson::Value& imp = imps[ii];
     if (!imp.IsObject()) {
       continue;
     }
-    if (!imp.HasMember("camps") || !imp["camps"].IsArray() || imp["camps"].Size() == 0) {
+    if (!imp.HasMember(TRITON_BT_JSON_CAMPS) || !imp[TRITON_BT_JSON_CAMPS].IsArray() || imp[TRITON_BT_JSON_CAMPS].Size() == 0) {
       return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "each impression must include a non-empty camps array");
     }
-    const rapidjson::Value& camps = imp["camps"];
+    const rapidjson::Value& camps = imp[TRITON_BT_JSON_CAMPS];
     for (rapidjson::SizeType ci = 0; ci < camps.Size(); ++ci) {
       const rapidjson::Value& camp = camps[ci];
-      if (!camp.IsObject() || !camp.HasMember("cid") || !camp["cid"].IsInt()) {
+      if (!camp.IsObject() || !camp.HasMember(TRITON_BT_JSON_CID) || !camp[TRITON_BT_JSON_CID].IsInt()) {
         return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "each camp must be an object with integer 'cid'");
       }
-      const int32_t campaign_id = camp["cid"].GetInt();
+      const int32_t campaign_id = camp[TRITON_BT_JSON_CID].GetInt();
 
       auto cmap_it = cmap->find(campaign_id);
       if(cmap_it == cmap->end()) {
@@ -297,20 +342,20 @@ TRITONSERVER_Error* GenerateInputVectors(const rapidjson::Document& doc, TRITONS
         const std::string& feature = feature_sequence[fi];
         const char* fkey = feature.c_str();
 
-        if (feature == "adsize") {
+        if (feature == TRITON_BT_FEATURE_ADSIZE) {
           adsize_idx = static_cast<int>(fi);
           continue;
         }
 
         const rapidjson::Value* src = nullptr;
-        if (feature == "cookie" || feature == "rnk") {
+        if (feature == TRITON_BT_FEATURE_COOKIE || feature == TRITON_BT_FEATURE_RNK) {
           if (camp.HasMember(fkey)) {
             src = &camp[fkey];
           }
         }
-        else if(feature == "campid") {
-          if (camp.HasMember("cid")) {
-            src = &camp["cid"];
+        else if (feature == TRITON_BT_FEATURE_CAMPID) {
+          if (camp.HasMember(TRITON_BT_JSON_CID)) {
+            src = &camp[TRITON_BT_JSON_CID];
           }
         }
         else {
@@ -323,27 +368,56 @@ TRITONSERVER_Error* GenerateInputVectors(const rapidjson::Document& doc, TRITONS
           const std::string missing_field = std::string("missing JSON field for feature '") + feature + "'";
           return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, missing_field.c_str());
         }
-        int idx = FeatureIdxFromJsonValue(feature.c_str(), *src, &tables);
-        row[fi] = static_cast<double>(idx);
-        }
 
-        if (adsize_idx >= 0 && camp.HasMember("adsize") && camp["adsize"].IsArray()) {
-          const rapidjson::Value& adsize = camp["adsize"];
-          for (rapidjson::SizeType ai = 0; ai < adsize.Size(); ++ai) {
-            const rapidjson::Value& adsize_item = adsize[ai];
-            int mapped = FeatureIdxFromJsonValue("adsize", adsize_item, &tables);
-            row[static_cast<size_t>(adsize_idx)] = static_cast<double>(mapped);
-            err = AppendRowToNamedDoubleBuffers(&buffers, &counts, model_name, row, feature_sequence.size());
-            if (err != nullptr) {
-              return err;
-            }
+        const bool use_raw_numeric = (feature == TRITON_BT_FEATURE_UID) ||
+            (feature == TRITON_BT_FEATURE_VIDEO_VPW) || (feature == TRITON_BT_FEATURE_VIDEO_VPH) ||
+            (feature == TRITON_BT_FEATURE_MOBILEID) || (feature == TRITON_BT_FEATURE_VIEW) ||
+            (feature == TRITON_BT_FEATURE_COOKIE) || (feature == TRITON_BT_FEATURE_RNK);
+
+        if (use_raw_numeric) {
+          const rapidjson::Value& v = *src;
+          if (v.IsInt()) {
+            row[fi] = static_cast<double>(v.GetInt());
+          } else if (v.IsUint()) {
+            row[fi] = static_cast<double>(v.GetUint());
+          } else if (v.IsInt64()) {
+            row[fi] = static_cast<double>(v.GetInt64());
+          } else if (v.IsUint64()) {
+            row[fi] = static_cast<double>(v.GetUint64());
+          } else if (v.IsDouble()) {
+            row[fi] = v.GetDouble();
+          } else {
+            const std::string msg = std::string("feature '") + feature + "' must be a JSON number for raw passthrough";
+            return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg.c_str());
           }
+        } else {
+          const int idx = FeatureIdxFromJsonValue(feature.c_str(), *src, &tables);
+          row[fi] = static_cast<double>(idx);
+        }
+      }
+      if (adsize_idx >= 0 && camp.HasMember(TRITON_BT_FEATURE_ADSIZE) &&
+          camp[TRITON_BT_FEATURE_ADSIZE].IsArray()) {
+        const rapidjson::Value& adsize = camp[TRITON_BT_FEATURE_ADSIZE];
+        for (rapidjson::SizeType ai = 0; ai < adsize.Size(); ++ai) {
+          const rapidjson::Value& adsize_item = adsize[ai];
+          int mapped = FeatureIdxFromJsonValue(TRITON_BT_FEATURE_ADSIZE, adsize_item, &tables);
+          row[static_cast<size_t>(adsize_idx)] = static_cast<double>(mapped);
+          err = AppendRowToNamedDoubleBuffers(&buffers, &counts, model_name, row, feature_sequence.size());
+          if (err != nullptr) {
+            return err;
+          }
+          routes_by_model[model_name].push_back(ImpRouteRow{
+          static_cast<int>(ii), static_cast<int>(ci), static_cast<int>(ai), campaign_id});
         }
       }
     }
-    err = BuildMultiInferRequestDocument(buffers, counts, out_doc);
+  }
+  err = BuildMultiInferRequestDocument(buffers, counts, out_doc);
+  if (err != nullptr) {
     return err;
   }
+  AddImpSlotRoutingMembers(buffers, routes_by_model, static_cast<int>(imps.Size()), out_doc);
+  return nullptr;
 }
-} // namespace triton::server
+} }  // namespace triton::server
 #endif  // TRITON_ENABLE_MYSQL_ODBC

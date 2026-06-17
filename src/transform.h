@@ -35,35 +35,33 @@
 
 namespace triton { namespace server {
 
-// Parses `json` into a document. If built with `TRITON_ENABLE_MYSQL_ODBC` and
-// `server` is non-null and the root object contains `"imps"`, replaces
-// `*out_doc` with a multi-infer request built from impressions; otherwise
-// stores the parsed root in `*out_doc`.
-// Returns nullptr on success, or a TRITONSERVER_Error that the caller must
-// delete with TRITONSERVER_ErrorDelete on failure.
 TRITONSERVER_Error* ParseRequest(const std::string& json, TRITONSERVER_Server* server, rapidjson::Document* out_doc);
 
 #ifdef TRITON_ENABLE_MYSQL_ODBC
 
-// Builds `*out_doc` as a `POST /v2/multi_infer` body from `doc` (imps/camps).
-TRITONSERVER_Error* GenerateInputVectors(
-    const rapidjson::Document& doc, TRITONSERVER_Server* server,
-    rapidjson::Document* out_doc);
+#define TRITON_BT_FEATURE_ADSIZE "adsize"
+#define TRITON_BT_FEATURE_COOKIE "cookie"
+#define TRITON_BT_FEATURE_RNK "rnk"
+#define TRITON_BT_FEATURE_CAMPID "campid"
+#define TRITON_BT_JSON_IMPS "imps"
+#define TRITON_BT_JSON_CAMPS "camps"
+#define TRITON_BT_JSON_CID "cid"
+#define TRITON_BT_FEATURE_UID "uid"
+#define TRITON_BT_FEATURE_VIDEO_VPW "video_vpw"
+#define TRITON_BT_FEATURE_VIDEO_VPH "video_vph"
+#define TRITON_BT_FEATURE_MOBILEID "mobileid"
+#define TRITON_BT_FEATURE_VIEW "view"
 
-TRITONSERVER_Error* GetReadyModelNames(
-    TRITONSERVER_Server* server, std::unordered_set<std::string>* out);
+TRITONSERVER_Error* GenerateInputVectors(const rapidjson::Document& doc, TRITONSERVER_Server* server, rapidjson::Document* out_doc);
+
+TRITONSERVER_Error* GetReadyModelNames(TRITONSERVER_Server* server, std::unordered_set<std::string>* out);
 
 using NamedDoubleBuffers = std::unordered_map<std::string, std::vector<double>>;
 using ModelNameToFeatureCount = std::unordered_map<std::string, size_t>;
 
-TRITONSERVER_Error* AppendRowToNamedDoubleBuffers(
-    NamedDoubleBuffers* buffers, ModelNameToFeatureCount* feature_counts,
-    const std::string& vector_name, const std::vector<double>& row,
-    size_t feature_count);
+TRITONSERVER_Error* AppendRowToNamedDoubleBuffers(NamedDoubleBuffers* buffers, ModelNameToFeatureCount* feature_counts, const std::string& vector_name, const std::vector<double>& row, size_t feature_count);
 
-TRITONSERVER_Error* BuildMultiInferRequestDocument(
-    const NamedDoubleBuffers& buffers,
-    const ModelNameToFeatureCount& feature_counts, rapidjson::Document* out_doc);
+TRITONSERVER_Error* BuildMultiInferRequestDocument(const NamedDoubleBuffers& buffers, const ModelNameToFeatureCount& feature_counts, rapidjson::Document* out_doc);
 
 #endif  // TRITON_ENABLE_MYSQL_ODBC
 

@@ -4136,6 +4136,171 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
   return nullptr;  // success
 }
 
+namespace {
+
+TRITONSERVER_Error* CopyTritonTensorPayloadToDoubles(const void* base, TRITONSERVER_DataType dtype, int64_t element_count, std::vector<double>* out)
+{
+  out->resize(static_cast<size_t>(element_count));
+  switch (dtype) {
+    case TRITONSERVER_TYPE_BOOL: {
+      const uint8_t* p = reinterpret_cast<const uint8_t*>(base);
+      for (int64_t i = 0; i < element_count; ++i) {
+        (*out)[static_cast<size_t>(i)] = p[i] ? 1.0 : 0.0;
+      }
+      break;
+    }
+    case TRITONSERVER_TYPE_UINT8: {
+      const uint8_t* p = reinterpret_cast<const uint8_t*>(base);
+      for (int64_t i = 0; i < element_count; ++i) {
+        (*out)[static_cast<size_t>(i)] = static_cast<double>(p[i]);
+      }
+      break;
+    }
+    case TRITONSERVER_TYPE_UINT16: {
+      const uint16_t* p = reinterpret_cast<const uint16_t*>(base);
+      for (int64_t i = 0; i < element_count; ++i) {
+        (*out)[static_cast<size_t>(i)] = static_cast<double>(p[i]);
+      }
+      break;
+    }
+    case TRITONSERVER_TYPE_UINT32: {
+      const uint32_t* p = reinterpret_cast<const uint32_t*>(base);
+      for (int64_t i = 0; i < element_count; ++i) {
+        (*out)[static_cast<size_t>(i)] = static_cast<double>(p[i]);
+      }
+      break;
+    }
+    case TRITONSERVER_TYPE_UINT64: {
+      const uint64_t* p = reinterpret_cast<const uint64_t*>(base);
+      for (int64_t i = 0; i < element_count; ++i) {
+        (*out)[static_cast<size_t>(i)] = static_cast<double>(p[i]);
+      }
+      break;
+    }
+    case TRITONSERVER_TYPE_INT8: {
+      const int8_t* p = reinterpret_cast<const int8_t*>(base);
+      for (int64_t i = 0; i < element_count; ++i) {
+        (*out)[static_cast<size_t>(i)] = static_cast<double>(p[i]);
+      }
+      break;
+    }
+    case TRITONSERVER_TYPE_INT16: {
+      const int16_t* p = reinterpret_cast<const int16_t*>(base);
+      for (int64_t i = 0; i < element_count; ++i) {
+        (*out)[static_cast<size_t>(i)] = static_cast<double>(p[i]);
+      }
+      break;
+    }
+    case TRITONSERVER_TYPE_INT32: {
+      const int32_t* p = reinterpret_cast<const int32_t*>(base);
+      for (int64_t i = 0; i < element_count; ++i) {
+        (*out)[static_cast<size_t>(i)] = static_cast<double>(p[i]);
+      }
+      break;
+    }
+    case TRITONSERVER_TYPE_INT64: {
+      const int64_t* p = reinterpret_cast<const int64_t*>(base);
+      for (int64_t i = 0; i < element_count; ++i) {
+        (*out)[static_cast<size_t>(i)] = static_cast<double>(p[i]);
+      }
+      break;
+    }
+    case TRITONSERVER_TYPE_FP32: {
+      const float* p = reinterpret_cast<const float*>(base);
+      for (int64_t i = 0; i < element_count; ++i) {
+        (*out)[static_cast<size_t>(i)] = static_cast<double>(p[i]);
+      }
+      break;
+    }
+    case TRITONSERVER_TYPE_FP64: {
+      const double* p = reinterpret_cast<const double*>(base);
+      for (int64_t i = 0; i < element_count; ++i) {
+        (*out)[static_cast<size_t>(i)] = p[i];
+      }
+      break;
+    }
+    case TRITONSERVER_TYPE_FP16:
+    case TRITONSERVER_TYPE_BF16:
+    case TRITONSERVER_TYPE_BYTES:
+      return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNSUPPORTED, "tensor datatype not supported for direct multi_infer row extraction");
+    case TRITONSERVER_TYPE_INVALID:
+    default:
+      return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "invalid or unsupported tensor datatype for row extraction");
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+TRITONSERVER_Error* HTTPAPIServer::InferRequestClass::ExtractFirstJsonOutputAsRowMajorDoubles(TRITONSERVER_InferenceResponse* response, size_t expect_rows, std::vector<std::vector<double>>* rows_out)
+{
+  rows_out->clear();
+  if (expect_rows == 0) {
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "expect_rows must be positive");
+  }
+
+  RETURN_IF_ERR(TRITONSERVER_InferenceResponseError(response));
+
+  uint32_t output_count = 0;
+  RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutputCount(response, &output_count));
+  if (output_count == 0) {
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "response has no outputs");
+  }
+
+  constexpr uint32_t kIdx = 0;
+  const char* cname = nullptr;
+  TRITONSERVER_DataType datatype = TRITONSERVER_TYPE_INVALID;
+  const int64_t* shape = nullptr;
+  uint64_t dim_count = 0;
+  const void* base = nullptr;
+  size_t byte_size = 0;
+  TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
+  int64_t memory_type_id = 0;
+  void* userp = nullptr;
+
+  RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutput(response, kIdx, &cname, &datatype, &shape, &dim_count, &base, &byte_size, &memory_type, &memory_type_id, &userp));
+
+  auto* info = reinterpret_cast<AllocPayload::OutputInfo*>(userp);
+  if (info == nullptr || info->kind_ != AllocPayload::OutputInfo::JSON ||
+      info->class_cnt_ > 0) {
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNSUPPORTED, "output 0 must be plain JSON tensor (no shared memory / binary / classification)");
+  }
+
+  int64_t element_count = 1;
+  for (uint64_t j = 0; j < dim_count; ++j) {
+    if (shape[j] < 0) {
+      return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "negative dimension in output shape");
+    }
+    element_count *= shape[j];
+  }
+  if (element_count <= 0) {
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "output has zero elements");
+  }
+  if (element_count % static_cast<int64_t>(expect_rows) != 0) {
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "output element count incompatible with expect_rows");
+  }
+
+  const int64_t elems_per_row = element_count / static_cast<int64_t>(expect_rows);
+  const size_t type_byte = TRITONSERVER_DataTypeByteSize(datatype);
+  const size_t expected_byte_size = static_cast<size_t>(element_count) * type_byte;
+  if (expected_byte_size > byte_size) {
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, "output byte_size too small for datatype/shape");
+  }
+
+  std::vector<double> flat;
+  TRITONSERVER_Error* cerr = CopyTritonTensorPayloadToDoubles(base, datatype, element_count, &flat);
+  if (cerr != nullptr) {
+    return cerr;
+  }
+
+  rows_out->resize(expect_rows);
+  for (size_t r = 0; r < expect_rows; ++r) {
+    const size_t off = r * static_cast<size_t>(elems_per_row);
+    (*rows_out)[r].assign(flat.begin() + static_cast<std::ptrdiff_t>(off), flat.begin() + static_cast<std::ptrdiff_t>(off + static_cast<size_t>(elems_per_row)));
+  }
+  return nullptr;
+}
+
 void
 HTTPAPIServer::InferRequestClass::SetResponseHeader(
     bool has_binary_data, size_t header_length)
