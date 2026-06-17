@@ -135,6 +135,67 @@ def _compose_variant_label():
     return label
 
 
+def _normalize_to_highest_manylinux(dist_dir):
+    """Collapse compressed manylinux tag sets to the highest version.
+
+    auditwheel may emit a wheel whose PEP 425 platform-tag component
+    contains multiple manylinux entries joined by `.`, e.g.
+    `manylinux_2_27_x86_64.manylinux_2_28_x86_64`. Per project policy
+    (TRI-1118), keep only the highest version -- the strictest glibc
+    baseline.
+
+    No-op for wheels already carrying a single platform tag. Other
+    non-manylinux entries in the compressed set are preserved.
+    """
+    manylinux_re = re.compile(r"^manylinux_(\d+)_(\d+)_(.+)$")
+    for fname in os.listdir(dist_dir):
+        if not fname.endswith(".whl"):
+            continue
+        parts = fname[:-4].split("-")
+        if len(parts) < 5:
+            continue
+        plat = parts[-1]
+        if "." not in plat:
+            continue
+        tags = plat.split(".")
+        manylinux_tags = []
+        other_tags = []
+        for t in tags:
+            m = manylinux_re.match(t)
+            if m:
+                manylinux_tags.append(((int(m.group(1)), int(m.group(2))), t))
+            else:
+                other_tags.append(t)
+        if len(manylinux_tags) <= 1 and not other_tags:
+            continue
+        if not manylinux_tags:
+            continue
+        manylinux_tags.sort()
+        highest = manylinux_tags[-1][1]
+        new_plat = ".".join([highest] + other_tags) if other_tags else highest
+        if new_plat == plat:
+            continue
+        wheel_path = os.path.join(dist_dir, fname)
+        print(
+            f"{_CYAN}=== Compressed platform tag in {fname!r}: "
+            f"{plat!r} -> {new_plat!r} (highest manylinux){_RESET}",
+            file=sys.stderr,
+        )
+        r = subprocess.run(
+            [
+                "python3",
+                "-m",
+                "wheel",
+                "tags",
+                "--platform-tag",
+                new_plat,
+                "--remove",
+                wheel_path,
+            ]
+        )
+        fail_if(r.returncode != 0, "wheel tags normalization failed")
+
+
 def _wheel_has_so(wheel_path):
     """True if the wheel zip contains a native shared library.
 
@@ -242,6 +303,10 @@ def _repair_wheel_with_auditwheel(whl_dir, dest_dir):
                 ]
             )
             fail_if(r.returncode != 0, "wheel tags retag failed for pure-Python wheel")
+
+    # Post-process: if any resulting wheel carries a compressed manylinux
+    # tag set, collapse it to the highest version (project policy).
+    _normalize_to_highest_manylinux(dist_dir)
 
 
 def main():
