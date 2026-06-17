@@ -1,4 +1,4 @@
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,6 +36,13 @@ class ConcurrencyTest(unittest.TestCase):
     def setUp(self):
         # Initialize client
         self._triton = grpcclient.InferenceServerClient("localhost:8001")
+
+    def tearDown(self):
+        try:
+            self._triton.stop_stream(cancel_requests=True)
+        except Exception as e:
+            print(f"Exception occurred while stopping stream: {e}")
+        self._triton.close()
 
     def _generate_streaming_callback_and_response_pair(self):
         response = []  # [{"result": result, "error": error}, ...]

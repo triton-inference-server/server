@@ -1,4 +1,4 @@
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -597,7 +597,7 @@ class PBBLSTest(unittest.TestCase):
                 # error
                 self.assertTrue(infer_response.has_error())
                 self.assertIn(
-                    "Failed for execute the inference request. Model 'non_existent_model' is not ready.",
+                    "Error when running inference: Request for unknown model: 'non_existent_model' is not found",
                     infer_response.error().message(),
                 )
 
@@ -611,7 +611,7 @@ class PBBLSTest(unittest.TestCase):
             # error
             self.assertTrue(infer_response.has_error())
             self.assertIn(
-                "Failed for execute the inference request. Model 'non_existent_model' is not ready.",
+                "Error when running inference: Request for unknown model: 'non_existent_model' is not found",
                 infer_response.error().message(),
             )
 

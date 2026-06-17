@@ -1,4 +1,4 @@
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -101,7 +101,12 @@ class TritonPythonModel:
         # The response_sender is used to send response(s) associated with the
         # corresponding request.
 
-        for idx in range(in_input.as_numpy()[0]):
+        if in_input.is_cpu():
+            loop_count = in_input.as_numpy()[0]
+        else:
+            loop_count = from_dlpack(in_input.to_dlpack()).cpu().numpy()[0]
+
+        for idx in range(loop_count):
             if in_input.is_cpu():
                 if (
                     in_input.as_numpy().dtype.type is np.bytes_
@@ -124,7 +129,7 @@ class TritonPythonModel:
             else:
                 in_0_pytorch = from_dlpack(in_input.to_dlpack()).cuda()
                 out_0 = in_0_pytorch
-                out_tensor = pb_utils.Tensor.from_dlpack("OUTPUT0", to_dlpack(out_0))
+                out_tensor = pb_utils.Tensor.from_dlpack("OUT", to_dlpack(out_0))
 
             response = pb_utils.InferenceResponse(output_tensors=[out_tensor])
             response_sender.send(response)
