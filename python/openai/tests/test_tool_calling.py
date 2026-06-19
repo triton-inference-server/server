@@ -23,18 +23,22 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
 import json
-import os
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import openai
 import pytest
+from fastapi.testclient import TestClient
 from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionMessageToolCall,
     ChatCompletionNamedToolChoiceParam,
     ChatCompletionToolParam,
 )
+from tests.utils import setup_fastapi_app, setup_server
 
 # resources for testing the tool callings
 WEATHER_TOOL: ChatCompletionToolParam = {
@@ -592,3 +596,82 @@ class TestAsyncClientToolCalling:
                 tools=[],
                 logprobs=False,
             )
+
+
+class TestStreamingToolParseLimit:
+    """
+    Test the streaming tool-call parse-size limit. Utilizes the
+    tool_parser_models/tool_stream_py model, which streams a Mistral-format
+    tool call in small fragments. A prompt containing "big-tool-args" produces
+    an argument large enough to exceed the configured limit, and any other prompt
+    results in an argument that remains within the limit.
+    """
+
+    MODEL = "tool_stream_py"
+    # Small enough that a single tool call can deterministically exceed it.
+    LIMIT_BYTES = 512
+
+    @pytest.fixture(scope="class")
+    def client(self, tokenizer_model: str):
+        model_repository = str(Path(__file__).parent / "tool_parser_models")
+        server = setup_server(model_repository)
+        app = setup_fastapi_app(
+            tokenizer=tokenizer_model,
+            server=server,
+            backend=None,
+            tool_call_parser="mistral",
+            max_tool_call_parse_bytes=self.LIMIT_BYTES,
+        )
+        with TestClient(app) as test_client:
+            yield test_client
+        server.stop()
+
+    def _stream(self, client, content, with_tools):
+        """Streams a chat completion
+        returns (finish_reasons, streamed_text)."""
+        payload = {
+            "model": self.MODEL,
+            "messages": [{"role": "user", "content": content}],
+            "stream": True,
+            "max_completion_tokens": 4096,
+        }
+        if with_tools:
+            payload["tools"] = [WEATHER_TOOL]
+
+        finish_reasons: List[str] = []
+        text = ""
+        with client.stream("POST", "/v1/chat/completions", json=payload) as response:
+            assert response.status_code == 200
+            for line in response.iter_lines():
+                if not line.startswith("data: "):
+                    continue
+                data = line[len("data: ") :]
+                if data.strip() == "[DONE]":
+                    break
+                choice = json.loads(data)["choices"][0]
+                if choice.get("finish_reason"):
+                    finish_reasons.append(choice["finish_reason"])
+                delta = choice.get("delta") or {}
+                if delta.get("content"):
+                    text += delta["content"]
+                for tool_call in delta.get("tool_calls") or []:
+                    arguments = (tool_call.get("function") or {}).get("arguments")
+                    if arguments:
+                        text += arguments
+        return finish_reasons, text
+
+    def test_truncated_when_tool_call_exceeds_limit(self, client):
+        finish_reasons, _ = self._stream(client, "big-tool-args", with_tools=True)
+        # Once the accumulated tool-call text passes the cap, the stream will be terminated with finish_reason="length".
+        assert finish_reasons[-1] == "length"
+
+    def test_not_truncated_within_limit(self, client):
+        finish_reasons, _ = self._stream(client, "small tool call", with_tools=True)
+        # A short tool call stays under the cap and completes normally.
+        assert "length" not in finish_reasons
+
+    def test_limit_ignored_without_tools(self, client):
+        finish_reasons, text = self._stream(client, "big-tool-args", with_tools=False)
+        # Plain streaming does not enter the tool parser, so the cap never fires.
+        assert "length" not in finish_reasons
+        assert len(text) > self.LIMIT_BYTES

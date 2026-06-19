@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2025-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,6 +33,13 @@ from typing import Any
 
 import partial_json_parser
 from partial_json_parser.core.options import Allow
+
+# Default value for --max-tool-call-parse-bytes CLI flag.
+# Specifies the maximum accumulated output (in bytes) that the
+# streaming tool-call parser processes per request.
+# Since the parser re-parses the entire buffer with each new chunk,
+# this limit helps bound per-request CPU and memory usage.
+DEFAULT_MAX_TOOL_CALL_PARSE_BYTES: int = 128 * 1024  # 128 KiB
 
 
 # partial_json_parser doesn't support extra data and

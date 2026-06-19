@@ -688,6 +688,17 @@ python3 openai_frontend/main.py \
   --tool-call-parser llama3
 ```
 
+During streaming, the tool-call parser re-parses the entire accumulated output with each new chunk. This means that very large tool-call arguments can significantly increase per-request CPU and memory usage. The `--max-tool-call-parse-bytes` flag sets a limit on the maximum number of bytes the streaming tool parser will process per request. If a streamed response exceeds this limit, the stream is truncated with finish_reason="length" and backend inference is cancelled.
+The default limit is 128 KiB (131,072 bytes). Increase this value if you expect larger tool-call payloads.
+Example usage:
+```
+python3 openai_frontend/main.py \
+  --model-repository tests/vllm_models \
+  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
+  --tool-call-parser llama3 \
+  --max-tool-call-parse-bytes 131072
+```
+
 Example for making a tool calling request:
 
 ```python

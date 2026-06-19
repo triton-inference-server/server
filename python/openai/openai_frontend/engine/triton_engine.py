@@ -30,6 +30,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 import time
 import uuid
 from dataclasses import dataclass
@@ -52,6 +53,7 @@ from engine.engine import LLMEngine
 from engine.utils.chat import load_chat_template, parse_chat_messages
 from engine.utils.tokenizer import get_tokenizer
 from engine.utils.tool_call_parsers import ToolCallParser, ToolParserManager
+from engine.utils.tool_call_parsers.utils import DEFAULT_MAX_TOOL_CALL_PARSE_BYTES
 from engine.utils.triton import (
     RequestKind,
     TritonLoraConfig,
@@ -96,6 +98,8 @@ from schemas.openai import (
 )
 from utils.utils import ClientError, ServerError
 
+logger = logging.getLogger(__name__)
+
 
 # TODO: Improve type hints
 @dataclass
@@ -129,6 +133,7 @@ class TritonLLMEngine(LLMEngine):
         lora_separator: Optional[str] = None,
         tool_call_parser: Optional[str] = None,
         chat_template: Optional[str] = None,
+        max_tool_call_parse_bytes: int = DEFAULT_MAX_TOOL_CALL_PARSE_BYTES,
     ):
         # Assume an already configured and started server
         self.server = server
@@ -137,6 +142,7 @@ class TritonLLMEngine(LLMEngine):
         self.backend = backend
         self.lora_separator = lora_separator
         self.default_max_tokens = default_max_tokens
+        self.max_tool_call_parse_bytes = max_tool_call_parse_bytes
 
         self.model_metadata = self._get_model_metadata()
         self._metadata_lock = asyncio.Lock()
@@ -146,6 +152,12 @@ class TritonLLMEngine(LLMEngine):
             else None
         )
         self.chat_template = load_chat_template(chat_template)
+
+        if self.tool_call_parser is not None:
+            print(
+                f"[INFO] Streaming tool-call parse buffer limit set to "
+                f"{self.max_tool_call_parse_bytes} bytes"
+            )
 
     def ready(self) -> bool:
         return self.server.ready()
@@ -658,6 +670,7 @@ class TritonLLMEngine(LLMEngine):
         )
 
         previous_text = ""
+        tool_parse_truncated = False
         include_usage = request.stream_options and request.stream_options.include_usage
         usage_accumulator = _StreamingUsageAccumulator(backend)
 
@@ -670,6 +683,23 @@ class TritonLLMEngine(LLMEngine):
             delta_text = _get_output(response)
             if include_usage:
                 usage_accumulator.update(response)
+
+            # The auto-tool parser re-parses the full accumulated text on
+            # every chunk. Cap the buffer and cancel the backend to bound
+            # per-request CPU and memory.
+            if (
+                tool_choice_auto
+                and len(previous_text) + len(delta_text)
+                > self.max_tool_call_parse_bytes
+            ):
+                print(
+                    f"[WARNING] Streaming tool-call parse buffer exceeded "
+                    f"{self.max_tool_call_parse_bytes} bytes (request "
+                    f"{request_id}); truncating response and cancelling "
+                    f"backend inference."
+                )
+                tool_parse_truncated = True
+                break
 
             (
                 response_delta,
@@ -712,6 +742,31 @@ class TritonLLMEngine(LLMEngine):
                 finish_reason=finish_reason,
             )
 
+            chunk = self._get_streaming_chat_response_chunk(
+                choice, request_id, created, model, usage=None
+            )
+            yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
+
+        # On truncation, cancel the backend to stop it from populating the response
+        # queue. Otherwise, abandoned streams may continue to consume memory.
+        # The final chunk is sent with finish_reason="length" to explicitly
+        # indicate to the client that a cutoff has occurred.
+        if tool_parse_truncated:
+            try:
+                responses.cancel()
+            except Exception:
+                logger.debug(
+                    "Failed to cancel inference after tool-call parse "
+                    "truncation (request %s)",
+                    request_id,
+                    exc_info=True,
+                )
+            choice = ChatCompletionStreamingResponseChoice(
+                index=0,
+                delta=ChatCompletionStreamResponseDelta(content=""),
+                logprobs=None,
+                finish_reason=ChatCompletionFinishReason.length,
+            )
             chunk = self._get_streaming_chat_response_chunk(
                 choice, request_id, created, model, usage=None
             )
