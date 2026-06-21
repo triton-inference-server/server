@@ -48,11 +48,11 @@ class TritonPythonModel:
                 )
             elif self._index == 1:
                 out_tensor_0 = pb_utils.Tensor(
-                    "OUTPUT0", np.array([], dtype=self._dtypes[1])
+                    "OUTPUT0", np.array([], dtype=self._dtypes[0])
                 )
             elif self._index == 2:
                 out_tensor_0 = pb_utils.Tensor(
-                    "OUTPUT0", np.array(["123456"], dtype=self._dtypes[0])
+                    "OUTPUT0", np.array(["123456"], dtype=self._dtypes[1])
                 )
             elif self._index == 3:
                 out_tensor_0 = pb_utils.Tensor(
