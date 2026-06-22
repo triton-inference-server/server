@@ -1809,6 +1809,18 @@ def core_build(
     # [FIXME] Placing the tritonserver and tritonfrontend wheel files in 'python' for now,
     # should be uploaded to pip registry to be able to install directly
     cmake_script.mkdir(os.path.join(install_dir, "python"))
+    # TRI-1118 — tritonfrontend wheel is built by the triton-server
+    # sub-build's `frontend-server-wheel` target, but its CMake
+    # `install(DIRECTORY ${WHEEL_OUT_DIR})` rule doesn't traverse the
+    # outer install pass, so the wheel never lands in
+    # repo_install_dir/python/ alongside the core's tritonserver wheel.
+    # Pull it in from the build tree directly so the subsequent
+    # `triton*.whl` glob picks it up. Safe no-op when the wheel is
+    # absent (e.g. downstream builds that disable the frontend).
+    cmake_script.cmd(
+        f"find {repo_build_dir} -path '*/wheel/dist/tritonfrontend-*.whl' "
+        f"-exec cp {{}} {os.path.join(repo_install_dir, 'python')}/ \\;"
+    )
     cmake_script.cp(
         os.path.join(repo_install_dir, "python", "triton*.whl"),
         os.path.join(install_dir, "python"),
