@@ -428,9 +428,6 @@ class ServerMetadataTest(tu.TestResultCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
 
-EXPECTED_MODEL_STATS: int = 144
-
-
 class ModelMetadataTest(tu.TestResultCollector):
     """
     These tests must be run after the ServerMetadataTest. See test.sh
@@ -718,16 +715,33 @@ class ModelMetadataTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
 
-                # Returns infer stats for ALL models + ready versions
+                # get_inference_statistics with no model returns one entry per
+                # ready model version. Derive the expected count from the model
+                # repository index (the set of currently-ready versions) rather
+                # than hard-coding it, so adding/removing QA models can not
+                # silently break this test.
+                index = triton_client.get_model_repository_index()
                 infer_stats = triton_client.get_inference_statistics()
                 if pair[1] == "http":
                     stats = infer_stats["model_stats"]
+                    expected_model_stats = sum(
+                        1 for model in index if model.get("state") == "READY"
+                    )
                 else:
                     stats = infer_stats.model_stats
+                    expected_model_stats = sum(
+                        1 for model in index.models if model.state == "READY"
+                    )
+                self.assertGreater(
+                    expected_model_stats,
+                    0,
+                    "expected at least one ready model version in the repository index",
+                )
                 self.assertEqual(
                     len(stats),
-                    EXPECTED_MODEL_STATS,
-                    f"expected {EXPECTED_MODEL_STATS} infer stats for all ready versions of all model",
+                    expected_model_stats,
+                    f"expected {expected_model_stats} infer stats (one per ready "
+                    f"model version per the repository index), got {len(stats)}",
                 )
 
         except InferenceServerException as ex:
