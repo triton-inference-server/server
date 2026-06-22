@@ -1174,10 +1174,21 @@ COPY build/install tritonserver
 
 WORKDIR /opt/tritonserver
 COPY NVIDIA_Deep_Learning_Container_License.pdf .
-RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonserver-*.whl" | xargs -I {{}} pip install --upgrade {{}}[{FLAGS.triton_wheels_dependencies_group}] && \\
-    find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonfrontend-*.whl" | xargs -I {{}} pip install --upgrade {{}}[{FLAGS.triton_wheels_dependencies_group}]
+# TRI-1118 — fail fast if either tritonserver or tritonfrontend wheel is
+# missing from /opt/tritonserver/python. The legacy `find | xargs -I` is
+# a silent no-op when find returns zero matches: xargs runs the command
+# zero times and the layer succeeds, masking the gap until something
+# downstream (a wheel publish job, or pip install tritonfrontend)
+# discovers nothing was actually installed. Check existence first.
+RUN set -e; \\
+    for pkg in tritonserver tritonfrontend; do \\
+      wheels=$(find /opt/tritonserver/python -maxdepth 1 -type f -name "${{pkg}}-*.whl"); \\
+      if [ -z "$wheels" ]; then \\
+        echo "ERROR: ${{pkg}}-*.whl missing from /opt/tritonserver/python -- build did not stage the wheel into the image" >&2; \\
+        exit 1; \\
+      fi; \\
+      printf '%s\\n' "$wheels" | xargs -I {{}} pip install --upgrade "{{}}[{FLAGS.triton_wheels_dependencies_group}]"; \\
+    done
 
 RUN pip3 install -r python/openai/requirements.txt
 
