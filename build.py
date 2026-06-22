@@ -32,6 +32,7 @@ import os
 import os.path
 import pathlib
 import platform
+import re
 import stat
 import subprocess
 import sys
@@ -921,6 +922,7 @@ RUN ccache -p
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
+          auditwheel \\
           build \\
           wheel \\
           setuptools \\
@@ -1034,6 +1036,7 @@ RUN apt-get update \\
       && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade \\
+          auditwheel \\
           build \\
           docker \\
           virtualenv \\
@@ -1171,10 +1174,21 @@ COPY build/install tritonserver
 
 WORKDIR /opt/tritonserver
 COPY NVIDIA_Deep_Learning_Container_License.pdf .
-RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonserver-*.whl" | xargs -I {{}} pip install --upgrade {{}}[{FLAGS.triton_wheels_dependencies_group}] && \\
-    find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonfrontend-*.whl" | xargs -I {{}} pip install --upgrade {{}}[{FLAGS.triton_wheels_dependencies_group}]
+# TRI-1118 — fail fast if either tritonserver or tritonfrontend wheel is
+# missing from /opt/tritonserver/python. The legacy `find | xargs -I` is
+# a silent no-op when find returns zero matches: xargs runs the command
+# zero times and the layer succeeds, masking the gap until something
+# downstream (a wheel publish job, or pip install tritonfrontend)
+# discovers nothing was actually installed. Check existence first.
+RUN set -e; \\
+    for pkg in tritonserver tritonfrontend; do \\
+      wheels=$(find /opt/tritonserver/python -maxdepth 1 -type f -name "${{pkg}}-*.whl"); \\
+      if [ -z "$wheels" ]; then \\
+        echo "ERROR: ${{pkg}}-*.whl missing from /opt/tritonserver/python -- build did not stage the wheel into the image" >&2; \\
+        exit 1; \\
+      fi; \\
+      printf '%s\\n' "$wheels" | xargs -I {{}} pip install --upgrade "{{}}[{FLAGS.triton_wheels_dependencies_group}]"; \\
+    done
 
 RUN pip3 install -r python/openai/requirements.txt
 
@@ -1664,6 +1678,25 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
                     ),
                 ]
 
+        # TRI-1118 — propagate TRITON_RELEASE_VERSION into the wheel build
+        # only when it was actually set in main() (release-semantic version
+        # or explicit --release-version). Dev / pre-release builds leave it
+        # unset so build_wheel.py reads the in-tree TRITON_VERSION file and
+        # takes the PEP 817 variant path.
+        if "TRITON_RELEASE_VERSION" in os.environ:
+            runargs += [
+                "-e",
+                f"TRITON_RELEASE_VERSION={os.environ['TRITON_RELEASE_VERSION']}",
+            ]
+        # TRI-1118 — forward PEP 427 build-tag and PEP 817 nv-part inputs so
+        # build_wheel.py inside the buildbase container can emit pipeline-correct
+        # wheel filenames. CUDA_VERSION is deliberately NOT forwarded -- the
+        # container's own CUDA base image defines it; host CUDA may differ
+        # (see core/python/build_wheel.py:_detect_cuda_version).
+        for var in ("CI_PIPELINE_ID", "NVIDIA_UPSTREAM_VERSION", "NVIDIA_BUILD_ID"):
+            if os.environ.get(var):
+                runargs += ["-e", f"{var}={os.environ[var]}"]
+
         runargs += ["tritonserver_buildbase"]
 
         runargs += ["./cmake_build"]
@@ -1787,6 +1820,18 @@ def core_build(
     # [FIXME] Placing the tritonserver and tritonfrontend wheel files in 'python' for now,
     # should be uploaded to pip registry to be able to install directly
     cmake_script.mkdir(os.path.join(install_dir, "python"))
+    # TRI-1118 — tritonfrontend wheel is built by the triton-server
+    # sub-build's `frontend-server-wheel` target, but its CMake
+    # `install(DIRECTORY ${WHEEL_OUT_DIR})` rule doesn't traverse the
+    # outer install pass, so the wheel never lands in
+    # repo_install_dir/python/ alongside the core's tritonserver wheel.
+    # Pull it in from the build tree directly so the subsequent
+    # `triton*.whl` glob picks it up. Safe no-op when the wheel is
+    # absent (e.g. downstream builds that disable the frontend).
+    cmake_script.cmd(
+        f"find {repo_build_dir} -path '*/wheel/dist/tritonfrontend-*.whl' "
+        f"-exec cp {{}} {os.path.join(repo_install_dir, 'python')}/ \\;"
+    )
     cmake_script.cp(
         os.path.join(repo_install_dir, "python", "triton*.whl"),
         os.path.join(install_dir, "python"),
@@ -2469,8 +2514,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--release-version",
         required=False,
-        default=DEFAULT_TRITON_VERSION_MAP["release_version"],
-        help="This flag sets the release version for Triton Inference Server to be built. Default: the latest released version.",
+        default=None,
+        help="Override the wheel base version (TRI-1118). When set, exported "
+        "as TRITON_RELEASE_VERSION so build_wheel.py uses it as the bare "
+        "PEP 440 version. When unset, build.py falls back to --version when "
+        "it matches X.Y.Z release-semantic, otherwise leaves the env var "
+        "unset and lets the in-tree TRITON_VERSION file rule (PEP 817 path).",
     )
     parser.add_argument(
         "--triton-container-version",
@@ -2598,6 +2647,22 @@ if __name__ == "__main__":
     # is not explicitly specified read from TRITON_VERSION file.
     if FLAGS.version is None:
         FLAGS.version = DEFAULT_TRITON_VERSION_MAP["release_version"]
+
+    # TRI-1118 — choose whether to export TRITON_RELEASE_VERSION based on
+    # the resolved Triton version:
+    #   - --release-version explicitly passed     -> use it (override)
+    #   - FLAGS.version matches X.Y.Z             -> propagate FLAGS.version
+    #   - anything else (dev / pre-release / etc) -> leave unset so the
+    #                                                wheel build reads the
+    #                                                in-tree TRITON_VERSION
+    #                                                file (PEP 817 variant).
+    # The container build forwards this env var via `docker run -e`
+    # (create_docker_build_script). For --no-container-build, the
+    # cmake_build subprocess inherits the host env directly.
+    if FLAGS.release_version is not None:
+        os.environ.setdefault("TRITON_RELEASE_VERSION", FLAGS.release_version)
+    elif re.match(r"^\d+\.\d+\.\d+$", FLAGS.version):
+        os.environ.setdefault("TRITON_RELEASE_VERSION", FLAGS.version)
 
     if FLAGS.build_parallel is None:
         FLAGS.build_parallel = multiprocessing.cpu_count() * 2
