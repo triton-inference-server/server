@@ -33,6 +33,8 @@ import pytest
 import requests
 from tests.utils import OpenAIServer
 
+from frontend.fastapi.middleware.api_restriction import RestrictedFeatures
+
 
 def assert_response_success(
     response: requests.Response, expected_status: int = 200, description: str = ""
@@ -256,6 +258,26 @@ class TestRestrictedAPIInvalidArguments:
             malformed_arg,
             expected_error_pattern="restricted api 'inference' can not be specified in multiple config groups",
         )
+
+    def test_restriction_log_view_redacts_secret_values(self):
+        """Restriction secrets are used for auth and must not be printed to logs."""
+        restrictions = RestrictedFeatures(
+            [
+                ["inference", "api-key", "my-secret-key"],
+                ["model-repository", "admin-key", "admin-secret"],
+            ]
+        )
+
+        assert restrictions.RestrictionDict() == {
+            "inference": ("api-key", "my-secret-key"),
+            "model-repository": ("admin-key", "admin-secret"),
+        }
+        assert restrictions.RedactedRestrictionDict() == {
+            "inference": ("api-key", "***"),
+            "model-repository": ("admin-key", "***"),
+        }
+        assert "my-secret-key" not in repr(restrictions.RedactedRestrictionDict())
+        assert "admin-secret" not in repr(restrictions.RedactedRestrictionDict())
 
     @pytest.mark.parametrize(
         "malformed_arg",

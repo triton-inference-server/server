@@ -140,7 +140,7 @@ class FastApiFrontend(OpenAIFrontend):
             APIRestrictionMiddleware, restricted_apis=self.restricted_apis
         )
         print(
-            f"[INFO] API restrictions enabled. Restricted API endpoints: {self.restricted_apis.RestrictionDict()}"
+            f"[INFO] API restrictions enabled. Restricted API endpoints: {self.restricted_apis.RedactedRestrictionDict()}"
         )
 
     def _add_request_size_limit_middleware(self, app: FastAPI):
