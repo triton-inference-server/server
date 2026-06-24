@@ -654,6 +654,17 @@ fi
 unset $SERVER_ERROR_LOG
 set -e
 
+# Triton common log-callback test.
+set +e
+UNIT_TEST_LOG="./logging_test.log"
+./logging_test --gtest_output=xml:logging.report.xml >> $UNIT_TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $UNIT_TEST_LOG
+    echo -e "\n***\n*** Logging Callback Unit Test Failed\n***"
+    RET=1
+fi
+set -e
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
