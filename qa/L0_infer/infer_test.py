@@ -44,8 +44,26 @@ CPU_ONLY = os.environ.get("TRITON_SERVER_CPU_ONLY") is not None
 TEST_VALGRIND = bool(int(os.environ.get("TEST_VALGRIND", 0)))
 VALGRIND_TESTS = bool(int(os.environ.get("VALGRIND_TESTS", 0)))
 
+# Dynamo's KServe gRPC tensor path does not yet cover every Triton/KServe
+# feature, so the cases that exercise an unsupported path are skipped in dynamo
+# mode (see the Dynamo Triton backend "Known limitations"). Gate every such
+# divergence on this flag.
+DYNAMO = os.environ.get("SERVER_LAUNCH_MODE") == "dynamo"
+
+# Reasons the corresponding tests are skipped under Dynamo.
+DYNAMO_SKIP_FP16 = (
+    "FP16/BF16 tensors: Dynamo tensor DataType has no half-precision variant"
+)
+DYNAMO_SKIP_CLASS = (
+    "classification output: Dynamo frontend drops the KServe classification parameter"
+)
+DYNAMO_SKIP_VERSION = "model version selection: Dynamo routes by model name only, serving the default version"
+
 USE_GRPC = os.environ.get("USE_GRPC", 1) != "0"
 USE_HTTP = os.environ.get("USE_HTTP", 1) != "0"
+# The Dynamo frontend exposes only the KServe gRPC endpoint, not HTTP/REST.
+if DYNAMO:
+    USE_HTTP = False
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
 BACKENDS = os.environ.get(
@@ -334,6 +352,7 @@ class InferTest(tu.TestResultCollector):
             np.int64, np.int64, np.int64, output0_raw=True, output1_raw=True, swap=False
         )
 
+    @unittest.skipIf(DYNAMO, DYNAMO_SKIP_FP16)
     def test_raw_hhh(self):
         self._full_exact(
             np.float16,
@@ -354,6 +373,7 @@ class InferTest(tu.TestResultCollector):
             swap=True,
         )
 
+    @unittest.skipIf(DYNAMO, DYNAMO_SKIP_FP16)
     def test_raw_hff(self):
         self._full_exact(
             np.float16,
@@ -399,6 +419,7 @@ class InferTest(tu.TestResultCollector):
             swap=False,
         )
 
+    @unittest.skipIf(DYNAMO, DYNAMO_SKIP_FP16)
     def test_raw_fuh(self):
         self._full_exact(
             np.float32,
@@ -429,6 +450,7 @@ class InferTest(tu.TestResultCollector):
             swap=False,
         )
 
+    @unittest.skipIf(DYNAMO, DYNAMO_SKIP_FP16)
     def test_raw_ihs(self):
         self._full_exact(
             np.int32,
@@ -512,6 +534,7 @@ class InferTest(tu.TestResultCollector):
     # shared memory does not support class output
     if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_class_bbb(self):
             self._full_exact(
                 np.int8,
@@ -522,6 +545,7 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_class_sss(self):
             self._full_exact(
                 np.int16,
@@ -532,6 +556,7 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_class_iii(self):
             self._full_exact(
                 np.int32,
@@ -542,6 +567,7 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_class_lll(self):
             self._full_exact(
                 np.int64,
@@ -552,6 +578,7 @@ class InferTest(tu.TestResultCollector):
                 swap=False,
             )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_class_fff(self):
             self._full_exact(
                 np.float32,
@@ -562,6 +589,7 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_class_iff(self):
             self._full_exact(
                 np.int32,
@@ -572,6 +600,7 @@ class InferTest(tu.TestResultCollector):
                 swap=False,
             )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_mix_bbb(self):
             self._full_exact(
                 np.int8,
@@ -582,6 +611,7 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_mix_sss(self):
             self._full_exact(
                 np.int16,
@@ -592,6 +622,7 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_mix_iii(self):
             self._full_exact(
                 np.int32,
@@ -602,6 +633,7 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_mix_lll(self):
             self._full_exact(
                 np.int64,
@@ -612,6 +644,7 @@ class InferTest(tu.TestResultCollector):
                 swap=False,
             )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_mix_fff(self):
             self._full_exact(
                 np.float32,
@@ -622,6 +655,7 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_mix_iff(self):
             self._full_exact(
                 np.int32,
@@ -634,6 +668,7 @@ class InferTest(tu.TestResultCollector):
 
     if not VALGRIND_TESTS:
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_VERSION)
         def test_raw_version_latest_1(self):
             input_size = 16
             tensor_shape = (1, input_size)
@@ -701,6 +736,7 @@ class InferTest(tu.TestResultCollector):
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                 )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_VERSION)
         def test_raw_version_latest_2(self):
             input_size = 16
             tensor_shape = (1, input_size)
@@ -762,6 +798,7 @@ class InferTest(tu.TestResultCollector):
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                 )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_VERSION)
         def test_raw_version_all(self):
             input_size = 16
             tensor_shape = (1, input_size)
@@ -817,6 +854,7 @@ class InferTest(tu.TestResultCollector):
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                 )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_VERSION)
         def test_raw_version_specific_1(self):
             input_size = 16
             tensor_shape = (1, input_size)
@@ -884,6 +922,7 @@ class InferTest(tu.TestResultCollector):
                         ex.message().startswith("Request for unknown model")
                     )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_VERSION)
         def test_raw_version_specific_1_3(self):
             input_size = 16
 
@@ -1062,6 +1101,7 @@ class InferTest(tu.TestResultCollector):
 
             if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
 
+                @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
                 def test_ensemble_label_lookup(self):
                     if all(x in BACKENDS for x in ["onnx", "libtorch"]):
                         # Ensemble needs to look up label from the actual model
