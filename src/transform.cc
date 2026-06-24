@@ -372,7 +372,7 @@ TRITONSERVER_Error* GenerateInputVectors(const rapidjson::Document& doc, TRITONS
         const bool use_raw_numeric = (feature == TRITON_BT_FEATURE_UID) ||
             (feature == TRITON_BT_FEATURE_VIDEO_VPW) || (feature == TRITON_BT_FEATURE_VIDEO_VPH) ||
             (feature == TRITON_BT_FEATURE_MOBILEID) || (feature == TRITON_BT_FEATURE_VIEW) ||
-            (feature == TRITON_BT_FEATURE_COOKIE) || (feature == TRITON_BT_FEATURE_RNK);
+            (feature == TRITON_BT_FEATURE_COOKIE);
 
         if (use_raw_numeric) {
           const rapidjson::Value& v = *src;
