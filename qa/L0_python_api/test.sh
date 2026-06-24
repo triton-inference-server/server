@@ -58,6 +58,15 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+LOG_CALLBACK_TEST_LOG="./python_logging_callback.log"
+rm -f $LOG_CALLBACK_TEST_LOG
+python -m pytest --junitxml=test_logging_callback_report.xml test_logging_callback.py > $LOG_CALLBACK_TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $LOG_CALLBACK_TEST_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
 set -e
 
 if [ $RET -eq 0 ]; then
