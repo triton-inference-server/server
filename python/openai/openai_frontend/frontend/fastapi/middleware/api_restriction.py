@@ -102,6 +102,18 @@ class RestrictedFeatures:
         """
         return self._restrictions.copy()
 
+    def RestrictionSummary(self) -> dict[str, str]:
+        """
+        Get a log-safe copy of the restrictions dictionary.
+
+        Returns:
+            dict: Mapping of API names to header names without secret values.
+        """
+        return {
+            api: header_name
+            for api, (header_name, _header_value) in self._restrictions.items()
+        }
+
     def Insert(self, api: str, restriction: tuple[str, str]):
         """
         Add a restriction for a specific API.
