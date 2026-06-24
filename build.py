@@ -1315,6 +1315,7 @@ RUN apt-get update \\
               libgoogle-perftools-dev \\
               libjemalloc-dev \\
               libnuma-dev \\
+              libssl-dev \\
               wget \\
               {backend_dependencies} \\
               python3-pip \\
