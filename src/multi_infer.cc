@@ -122,8 +122,11 @@ void AddContentTypeHeader(evhtp_request_t* req, const char* type) {
 
 inline double RoundScore6(double x)
 {
-  constexpr double k = 1e6;
-  return std::floor(x * k) / k;
+  if (!std::isfinite(x)) {
+    return x;
+  }
+  const int64_t scaled = static_cast<int64_t>(std::floor(x * 1e6));
+  return static_cast<double>(scaled) / 1e6;
 }
 
 TRITONSERVER_Error* GetModelVersionStringFromRapidSlot(const rapidjson::Value& slot, std::string* ver_out) {
@@ -232,6 +235,10 @@ inline int32_t ImpIdxFromPackedKey(uint64_t k) {
   return static_cast<int32_t>(static_cast<uint32_t>(k >> 32));
 }
 
+inline int32_t CampIdxFromPackedKey(uint64_t k) {
+  return static_cast<int32_t>(static_cast<uint32_t>(k & 0xffffffffu));
+}
+
 bool TryBuildImpsShapedMultiInferResponse(const std::vector<std::vector<ImpRouteCell>>& routing_slots, const std::vector<std::vector<std::vector<double>>>& slot_rows, const int imp_count, rapidjson::Document* out) {
   if (imp_count <= 0 || routing_slots.empty()) {
     return false;
@@ -272,12 +279,21 @@ bool TryBuildImpsShapedMultiInferResponse(const std::vector<std::vector<ImpRoute
     }
   }
 
-  std::vector<std::vector<const CampAgg*>> camps_ptr_per_imp(static_cast<size_t>(imp_count));
+  struct CampAggEmitRef {
+    int32_t camp_idx{0};
+    const CampAgg* agg{nullptr};
+  };
+  std::vector<std::vector<CampAggEmitRef>> camps_per_imp(static_cast<size_t>(imp_count));
   for (const auto& kv : agg) {
     const int32_t imp = ImpIdxFromPackedKey(kv.first);
     if (imp >= 0 && imp < imp_count) {
-      camps_ptr_per_imp[static_cast<size_t>(imp)].push_back(&kv.second);
+      camps_per_imp[static_cast<size_t>(imp)].push_back(CampAggEmitRef{CampIdxFromPackedKey(kv.first), &kv.second});
     }
+  }
+  for (auto& emits : camps_per_imp) {
+    std::sort(emits.begin(), emits.end(), [](const CampAggEmitRef& a, const CampAggEmitRef& b) {
+      return a.camp_idx < b.camp_idx;
+    });
   }
 
   out->SetObject();
@@ -287,8 +303,8 @@ bool TryBuildImpsShapedMultiInferResponse(const std::vector<std::vector<ImpRoute
 
   for (int ii = 0; ii < imp_count; ++ii) {
     rapidjson::Value camps_out(rapidjson::kArrayType);
-    for (const CampAgg* ca_ptr : camps_ptr_per_imp[static_cast<size_t>(ii)]) {
-      const CampAgg& ca = *ca_ptr;
+    for (const CampAggEmitRef& emit : camps_per_imp[static_cast<size_t>(ii)]) {
+      const CampAgg& ca = *emit.agg;
       rapidjson::Value camp_obj(rapidjson::kObjectType);
       camp_obj.AddMember("cid", ca.cid, alloc);
       camp_obj.AddMember("mdl", rapidjson::Value(ca.mdl.c_str(), static_cast<rapidjson::SizeType>(ca.mdl.size()), alloc).Move(), alloc);
@@ -436,6 +452,7 @@ class MultiInferAggregator : public std::enable_shared_from_this<MultiInferAggre
         if (TryBuildImpsShapedMultiInferResponse(imp_routing_slots_, slot_row_outputs_, imp_routing_imp_count_, &shaped)) {
           rapidjson::StringBuffer sb;
           rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+          writer.SetMaxDecimalPlaces(6);
           shaped.Accept(writer);
           AddContentTypeHeader(req_, "application/json");
           evbuffer_add(req_->buffer_out, sb.GetString(), sb.GetSize());
