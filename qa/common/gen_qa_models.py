@@ -1461,11 +1461,8 @@ def create_torch_aoti_model_file(
             exported_model,
             package_path=package_path,
         )
-        # Verify the package recorded its target device (AOTI_DEVICE_KEY).
-        # These stateless models can intermittently package with no device
-        # key, which imports successfully here but fails at serve time on GPU
-        # with "No device information found". Loading the package now surfaces
-        # that at generation time instead of publishing a broken model.
+        # Load the package back to verify it was generated correctly and
+        # targets a valid device.
         torch._inductor.aoti_load_package(package_path)
     except Exception as e:
         print(
