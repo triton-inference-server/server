@@ -498,6 +498,7 @@ def core_cmake_args(components, backends, cmake_dir, install_dir):
 
     cargs.append(cmake_core_enable("TRITON_ENABLE_ENSEMBLE", "ensemble" in backends))
     cargs.append(cmake_core_enable("TRITON_ENABLE_TENSORRT", "tensorrt" in backends))
+    cargs.append(cmake_core_enable("TRITON_ENABLE_MYSQL_ODBC", FLAGS.enable_mysql_odbc))
 
     cargs += cmake_core_extra_args()
     cargs.append(cmake_dir)
@@ -902,6 +903,12 @@ RUN curl -o /tmp/cuda-keyring.deb \\
 
 
 def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap):
+    buildbase_odbc_layer = ""
+    if FLAGS.enable_mysql_odbc:
+        buildbase_odbc_layer = """
+RUN yum install -y unixODBC-devel
+"""
+
     df = """
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
@@ -959,6 +966,7 @@ RUN yum install -y \\
             xz-devel \\
             zlib-devel
 """
+    df += buildbase_odbc_layer
     if os.getenv("CCACHE_REMOTE_ONLY") and os.getenv("CCACHE_REMOTE_STORAGE"):
         df += """
 RUN curl -k -s -L https://github.com/ccache/ccache/archive/refs/tags/v4.10.2.tar.gz -o /tmp/ccache.tar.gz \\
@@ -1051,6 +1059,9 @@ RUN python3 -m pip install build
 SHELL ["cmd", "/S", "/C"]
 """
     else:
+        mysql_odbc_line = (
+            "            unixodbc-dev \\\n" if FLAGS.enable_mysql_odbc else ""
+        )
         df += """
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
@@ -1101,7 +1112,9 @@ RUN apt-get update \\
             libarchive-dev \\
             libxml2-dev \\
             libnuma-dev \\
-            wget \\
+"""
+        df += mysql_odbc_line
+        df += """            wget \\
       && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade \\
@@ -1904,6 +1917,34 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         docker_script.cwd(THIS_SCRIPT_DIR)
         docker_script.cmd(finalargs, check_exitcode=True)
 
+        if (
+            FLAGS.pubmatic_bt_tritonserver_image
+            and target_platform() != "windows"
+            and target_platform() != "rhel"
+        ):
+            docker_script.blankln()
+            docker_script.commentln(8)
+            docker_script.comment(
+                "Pubmatic BT image: extend tritonserver with MySQL ODBC and config files"
+            )
+            docker_script.comment(
+                "Uses Dockerfile.pubmatic-bt-tritonserver; requires replace-artifacts/"
+            )
+            docker_script.comment()
+            pubmatic_args = [
+                "docker",
+                "build",
+                "-t",
+                "pubmatic-bt-tritonserver",
+                "-f",
+                os.path.join(
+                    THIS_SCRIPT_DIR, "Dockerfile.pubmatic-bt-tritonserver"
+                ),
+                ".",
+            ]
+            docker_script.cwd(THIS_SCRIPT_DIR)
+            docker_script.cmd(pubmatic_args, check_exitcode=True)
+
         #
         # CI base image... tritonserver_cibase
         #
@@ -2615,6 +2656,20 @@ if __name__ == "__main__":
         action="store_true",
         required=False,
         help="Enable ARM MALI GPU support.",
+    )
+    parser.add_argument(
+        "--enable-mysql-odbc",
+        action="store_true",
+        required=False,
+        help="Build tritonserver with MySQL ODBC connection pool. For host builds install unixodbc-dev (Debian/Ubuntu) or unixODBC-devel (RHEL). Container builds add these when this flag is set.",
+    )
+    parser.add_argument(
+        "--pubmatic-bt-tritonserver-image",
+        action="store_true",
+        required=False,
+        help='After building image "tritonserver", also build "pubmatic-bt-tritonserver" '
+        "(Dockerfile.pubmatic-bt-tritonserver: ODBC driver + replace-artifacts/odbc.ini and "
+        "replace-artifacts/triton-dmconfig.json). Ubuntu/Debian-based container builds only.",
     )
     parser.add_argument(
         "--min-compute-capability",

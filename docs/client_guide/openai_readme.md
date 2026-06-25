@@ -1,1 +1,0 @@
-../../python/openai/README.md
