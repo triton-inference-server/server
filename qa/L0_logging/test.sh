@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -656,7 +656,7 @@ set -e
 
 # Triton common log-callback test.
 set +e
-UNIT_TEST_LOG="./logging_test.log"
+UNIT_TEST_LOG="./log_callback_test.log"
 ./logging_test --gtest_output=xml:logging.report.xml >> $UNIT_TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $UNIT_TEST_LOG
