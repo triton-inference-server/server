@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -218,6 +218,11 @@ metrics are used for latencies:
 |Category      |Metric          |Metric Name |Description                |Granularity|Frequency    |
 |--------------|----------------|------------|---------------------------|-----------|-------------|
 |Latency       |Request to First Response Time    |`nv_inference_first_response_histogram_ms` |Histogram of end-to-end inference request to the first response time |Per model  |Per request  |
+|              |Request Time    |`nv_inference_request_duration_histogram_us` |Histogram of end-to-end inference request duration (includes cached requests) |Per model  |Per request  |
+|              |Queue Time      |`nv_inference_queue_duration_histogram_us` |Histogram of time requests spend waiting in the scheduling queue |Per model  |Per request  |
+|              |Compute Input Time|`nv_inference_compute_input_duration_histogram_us` |Histogram of time requests spend processing inference inputs |Per model  |Per request  |
+|              |Compute Time    |`nv_inference_compute_infer_duration_histogram_us` |Histogram of time requests spend executing the inference model |Per model  |Per request  |
+|              |Compute Output Time|`nv_inference_compute_output_duration_histogram_us` |Histogram of time requests spend processing inference outputs |Per model  |Per request  |
 
 To enable these metrics specifically, you can set `--metrics-config histogram_latencies=true`
 
@@ -265,7 +270,12 @@ model_metrics {
 
 Currently, the following histogram families support custom buckets.
 ```
-nv_inference_first_response_histogram_ms  // Time to First Response
+nv_inference_first_response_histogram_ms           // Time to First Response (ms)
+nv_inference_request_duration_histogram_us          // Request Duration (us)
+nv_inference_queue_duration_histogram_us            // Queue Duration (us)
+nv_inference_compute_input_duration_histogram_us    // Compute Input Duration (us)
+nv_inference_compute_infer_duration_histogram_us    // Compute Infer Duration (us)
+nv_inference_compute_output_duration_histogram_us   // Compute Output Duration (us)
 ```
 
 #### Summaries
