@@ -1461,6 +1461,9 @@ def create_torch_aoti_model_file(
             exported_model,
             package_path=package_path,
         )
+        # Load the package back to verify it was generated correctly and
+        # targets a valid device.
+        torch._inductor.aoti_load_package(package_path)
     except Exception as e:
         print(
             f"{_color_red}error: Failed to create model {model_name}{_color_reset}",

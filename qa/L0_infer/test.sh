@@ -37,6 +37,8 @@ fi
 if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
+export SERVER_LAUNCH_MODE=${SERVER_LAUNCH_MODE:="triton"}
+echo "========== SERVER_LAUNCH_MODE=$SERVER_LAUNCH_MODE =========="
 
 ldconfig || true
 
@@ -114,7 +116,14 @@ if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 
 fi
 SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
 SERVER_LOG_BASE="./inference_server"
-source ../common/util.sh
+
+if [ "$SERVER_LAUNCH_MODE" == "dynamo" ]; then
+    # Remove after TRI-1450 is fixed
+    export DYN_DISCOVERY_BACKEND=etcd
+    source ../common/dynamo_util.sh
+else
+    source ../common/util.sh
+fi
 
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
