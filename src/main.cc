@@ -55,6 +55,7 @@
 #include "database_config.h"
 #ifdef TRITON_ENABLE_MYSQL_ODBC
 #include "mysql_odbc_connection_pool.h"
+#include "transform.h"
 #endif  // TRITON_ENABLE_MYSQL_ODBC
 #include "triton_signal.h"
 
@@ -621,6 +622,7 @@ main(int argc, char** argv)
 
 #ifdef TRITON_ENABLE_MYSQL_ODBC
   StartTritonModelsRefreshThread();
+  FAIL_IF_ERR(triton::server::InitializeReadyModelNames(server_ptr), "initializing ready model names");
 #endif  // TRITON_ENABLE_MYSQL_ODBC
 
   // Wait until a signal terminates the server...

@@ -4,7 +4,8 @@
 // and are not "in" a namespace; this header is included from within
 // triton::server for consistency with http_server.cc.
 //
-// Prerequisites at expansion sites: HttpCodeFromError, EVBufferAddErrorJson,
+// Prerequisites at expansion sites: HttpCodeFromError, EVBufferAddErrorJson
+// (from http_error_json.h),
 // and (for RETURN_AND_RESPOND_IF_RESTRICTED) RespondIfRestricted must be
 // visible — typically from the same translation unit's anonymous namespace and
 // HTTPAPIServer member functions respectively.

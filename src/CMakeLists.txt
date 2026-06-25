@@ -370,6 +370,7 @@ if(${TRITON_ENABLE_HTTP}
   list(APPEND
     HTTP_ENDPOINT_HDRS
     http_server.h
+    http_error_json.h
     http_server_macros.h
     orca_http.h
   )

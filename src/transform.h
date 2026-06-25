@@ -35,8 +35,6 @@
 
 namespace triton { namespace server {
 
-TRITONSERVER_Error* ParseRequest(const char* json, size_t json_len, TRITONSERVER_Server* server, rapidjson::Document* out_doc);
-
 #ifdef TRITON_ENABLE_MYSQL_ODBC
 
 #define TRITON_BT_FEATURE_ADSIZE "adsize"
@@ -52,16 +50,45 @@ TRITONSERVER_Error* ParseRequest(const char* json, size_t json_len, TRITONSERVER
 #define TRITON_BT_FEATURE_MOBILEID "mobileid"
 #define TRITON_BT_FEATURE_VIEW "view"
 
-TRITONSERVER_Error* GenerateInputVectors(const rapidjson::Document& doc, TRITONSERVER_Server* server, rapidjson::Document* out_doc);
+// Per batched infer row when folding multi_infer results back to imps/camps.
+struct ImpRouteRow {
+  int imp_idx{0};
+  int camp_idx{0};
+  int adsize_idx{0};
+  int32_t cid{0};
+};
 
-TRITONSERVER_Error* GetReadyModelNames(TRITONSERVER_Server* server, std::unordered_set<std::string>* out);
+// In-memory routing for imps-shaped requests (not serialized into multi_infer JSON).
+struct ImpRoutingTable {
+  int imp_count{0};
+  // One vector per multi_infer request slot (sorted model name order).
+  std::vector<std::vector<ImpRouteRow>> slots;
+};
 
-using NamedDoubleBuffers = std::unordered_map<std::string, std::vector<double>>;
-using ModelNameToFeatureCount = std::unordered_map<std::string, size_t>;
+// Native FP32 tensor per multi_infer slot (imps transform path; no JSON tensor).
+struct MultiInferNativeSlot {
+  std::string model_name;
+  size_t feature_count{0};
+  // Row-major FP32 tensor bytes (feature_count * batch_rows * sizeof(float)).
+  std::vector<char> input_tensor;
+};
 
-TRITONSERVER_Error* AppendRowToNamedDoubleBuffers(NamedDoubleBuffers* buffers, ModelNameToFeatureCount* feature_counts, const std::string& vector_name, const std::vector<double>& row, size_t feature_count);
+TRITONSERVER_Error* ParseRequest(
+    const char* json, size_t json_len, TRITONSERVER_Server* server,
+    rapidjson::Document* out_doc,
+    ImpRoutingTable* imp_routing_out = nullptr,
+    std::vector<MultiInferNativeSlot>* native_slots_out = nullptr);
 
-TRITONSERVER_Error* BuildMultiInferRequestDocument(const NamedDoubleBuffers& buffers, const ModelNameToFeatureCount& feature_counts, rapidjson::Document* out_doc);
+TRITONSERVER_Error* GenerateInputVectors(
+    const rapidjson::Document& doc, TRITONSERVER_Server* server,
+    rapidjson::Document* out_doc, ImpRoutingTable* imp_routing_out,
+    std::vector<MultiInferNativeSlot>* native_slots_out);
+
+// Populate the ready-model snapshot once at process startup (after models are loaded).
+TRITONSERVER_Error* InitializeReadyModelNames(TRITONSERVER_Server* server);
+
+// Lock-free read of the snapshot initialized by InitializeReadyModelNames.
+const std::unordered_set<std::string>* ActiveReadyModelNames();
 
 #endif  // TRITON_ENABLE_MYSQL_ODBC
 

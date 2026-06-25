@@ -24,9 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// POST /v2/multi_infer: full implementation (imps expansion, routing, and
-// response folding) is compiled only when TRITON_ENABLE_MYSQL_ODBC is defined.
-// Otherwise HandleMultiInfer responds with TRITONSERVER_ERROR_UNAVAILABLE.
+// POST /v2/multi_infer: imps-only path (feature transform, native tensors,
+// response folding). Compiled only when TRITON_ENABLE_MYSQL_ODBC is defined.
 
 #include "http_server.h"
 
@@ -46,12 +45,13 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
-#include <map>
 #include <memory>
 #include <unordered_map>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "http_error_json.h"
 
 namespace triton { namespace server {
 
@@ -64,14 +64,7 @@ namespace {
 constexpr size_t kMaxMultiInferRequests = 16;
 
 // Per batched infer row when folding multi_infer back to imps/camps (see
-// imp_slot_routing in transform.cc).
-struct ImpRouteCell {
-  int imp_idx{0};
-  int camp_idx{0};
-  int adsize_idx{0};
-  int32_t cid{0};
-  std::string mdl;
-};
+// ImpRouteRow in transform.h).
 
 int HttpCodeFromError(TRITONSERVER_Error* error) {
   if (error == nullptr) {
@@ -96,32 +89,15 @@ int HttpCodeFromError(TRITONSERVER_Error* error) {
   return EVHTP_RES_BADREQ;
 }
 
-void EVBufferAddErrorJson(evbuffer* buffer, const char* message) {
-  triton::common::TritonJson::Value response(triton::common::TritonJson::ValueType::OBJECT);
-  response.AddStringRef("error", message, strlen(message));
-
-  triton::common::TritonJson::WriteBuffer buffer_json;
-  response.Write(&buffer_json);
-
-  evbuffer_add(buffer, buffer_json.Base(), buffer_json.Size());
-}
-
-void EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err) {
-  const char* message = TRITONSERVER_ErrorMessage(err);
-  EVBufferAddErrorJson(buffer, message);
-}
-
 void AddContentTypeHeader(evhtp_request_t* req, const char* type) {
   auto content_header = evhtp_headers_find_header(req->headers_out, kContentTypeHeader);
   if (content_header) {
     evhtp_header_rm_and_free(req->headers_out, content_header);
   }
-
   evhtp_headers_add_header(req->headers_out, evhtp_header_new(kContentTypeHeader, type, 1, 1));
 }
 
-inline double RoundScore6(double x)
-{
+inline double RoundScore6(double x) {
   if (!std::isfinite(x)) {
     return x;
   }
@@ -129,106 +105,38 @@ inline double RoundScore6(double x)
   return static_cast<double>(scaled) / 1e6;
 }
 
-TRITONSERVER_Error* GetModelVersionStringFromRapidSlot(const rapidjson::Value& slot, std::string* ver_out) {
-  ver_out->clear();
-  const auto it = slot.FindMember("model_version");
-  if (it == slot.MemberEnd()) {
-    return nullptr;
+TRITONSERVER_Error* PopulateInferenceRequestFromNativeSlot(MultiInferNativeSlot slot, TRITONSERVER_InferenceRequest* irequest, HTTPAPIServer::InferRequestClass* infer_req) {
+  if (slot.feature_count == 0 || slot.input_tensor.empty()) {
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "native slot has empty input tensor");
   }
-  const rapidjson::Value& mv = it->value;
-  if (mv.IsString()) {
-    ver_out->assign(mv.GetString(), mv.GetStringLength());
-    return nullptr;
+  if (slot.input_tensor.size() % (slot.feature_count * sizeof(float)) != 0) {
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "native slot input size is not a multiple of feature_count");
   }
-  if (mv.IsInt()) {
-    *ver_out = std::to_string(mv.GetInt());
-    return nullptr;
-  }
-  if (mv.IsUint()) {
-    *ver_out = std::to_string(mv.GetUint());
-    return nullptr;
-  }
-  if (mv.IsInt64()) {
-    *ver_out = std::to_string(mv.GetInt64());
-    return nullptr;
-  }
-  if (mv.IsUint64()) {
-    *ver_out = std::to_string(mv.GetUint64());
-    return nullptr;
-  }
-  return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "'model_version' must be a string or integer");
-}
 
-TRITONSERVER_Error* SerializeInferSlotBodyJsonFromRapid(const rapidjson::Value& slot, std::string* out_json) {
-  if (!slot.IsObject()) {
-    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "Each entry in 'requests' must be a JSON object");
-  }
-  rapidjson::Document infer(rapidjson::kObjectType);
-  auto& alloc = infer.GetAllocator();
-  if (const auto id_it = slot.FindMember("id"); id_it != slot.MemberEnd()) {
-    rapidjson::Value id_copy;
-    id_copy.CopyFrom(id_it->value, alloc);
-    infer.AddMember(rapidjson::StringRef("id"), id_copy, alloc);
-  }
-  const auto in_it = slot.FindMember("inputs");
-  if (in_it == slot.MemberEnd() || !in_it->value.IsArray()) {
-    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "Each entry in 'requests' must contain an 'inputs' array");
-  }
-  rapidjson::Value inputs_copy;
-  inputs_copy.CopyFrom(in_it->value, alloc);
-  infer.AddMember(rapidjson::StringRef("inputs"), inputs_copy, alloc);
-  if (const auto out_it = slot.FindMember("outputs"); out_it != slot.MemberEnd()) {
-    rapidjson::Value outputs_copy;
-    outputs_copy.CopyFrom(out_it->value, alloc);
-    infer.AddMember(rapidjson::StringRef("outputs"), outputs_copy, alloc);
-  }
-  if (const auto p_it = slot.FindMember("parameters"); p_it != slot.MemberEnd()) {
-    rapidjson::Value params_copy;
-    params_copy.CopyFrom(p_it->value, alloc);
-    infer.AddMember(rapidjson::StringRef("parameters"), params_copy, alloc);
-  }
-  rapidjson::StringBuffer sb;
-  rapidjson::Writer<rapidjson::StringBuffer> w(sb);
-  infer.Accept(w);
-  out_json->assign(sb.GetString(), sb.GetSize());
+  infer_req->alloc_payload_.default_output_kind_ = HTTPAPIServer::AllocPayload::OutputInfo::JSON;
+
+  const size_t row_bytes = slot.feature_count * sizeof(float);
+  const int64_t rows = static_cast<int64_t>(slot.input_tensor.size() / row_bytes);
+  const int64_t shape[2] = {rows, static_cast<int64_t>(slot.feature_count)};
+
+  constexpr const char* kInputName = "input__0";
+  constexpr const char* kOutputName = "output__0";
+
+  RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(irequest, kInputName, TRITONSERVER_TYPE_FP32, shape, 2));
+
+  infer_req->serialized_data_.emplace_back(std::move(slot.input_tensor));
+  std::vector<char>& serialized = infer_req->serialized_data_.back();
+
+  RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(irequest, kInputName, serialized.data(), serialized.size(), TRITONSERVER_MEMORY_CPU, 0));
+
+  RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, kOutputName));
+  infer_req->alloc_payload_.output_map_.emplace(std::piecewise_construct, std::forward_as_tuple(kOutputName), std::forward_as_tuple(new HTTPAPIServer::AllocPayload::OutputInfo(HTTPAPIServer::AllocPayload::OutputInfo::JSON, 0)));
+
   return nullptr;
 }
 
-bool ParseImpSlotRoutingTableFromValue(const rapidjson::Value& arr, const size_t expect_slots, std::vector<std::vector<ImpRouteCell>>* out) {
-  out->clear();
-  if (!arr.IsArray() || arr.Size() != expect_slots || expect_slots == 0) {
-    return false;
-  }
-  out->resize(arr.Size());
-  for (rapidjson::SizeType si = 0; si < arr.Size(); ++si) {
-    const rapidjson::Value& slot = arr[si];
-    if (!slot.IsArray()) {
-      return false;
-    }
-    (*out)[si].reserve(slot.Size());
-    for (rapidjson::SizeType ri = 0; ri < slot.Size(); ++ri) {
-      const rapidjson::Value& cell = slot[ri];
-      if (!cell.IsObject() || !cell.HasMember("i") || !cell["i"].IsInt() ||
-          !cell.HasMember("c") || !cell["c"].IsInt() || !cell.HasMember("a") ||
-          !cell["a"].IsInt() || !cell.HasMember("cid") || !cell["cid"].IsInt() ||
-          !cell.HasMember("mdl") || !cell["mdl"].IsString()) {
-        return false;
-      }
-      ImpRouteCell rc;
-      rc.imp_idx = cell["i"].GetInt();
-      rc.camp_idx = cell["c"].GetInt();
-      rc.adsize_idx = cell["a"].GetInt();
-      rc.cid = static_cast<int32_t>(cell["cid"].GetInt());
-      rc.mdl.assign(cell["mdl"].GetString(), cell["mdl"].GetStringLength());
-      (*out)[si].push_back(std::move(rc));
-    }
-  }
-  return true;
-}
-
 inline uint64_t PackImpCampKey(int imp_idx, int camp_idx) {
-  return (static_cast<uint64_t>(static_cast<uint32_t>(imp_idx)) << 32) |
-         static_cast<uint64_t>(static_cast<uint32_t>(camp_idx));
+  return (static_cast<uint64_t>(static_cast<uint32_t>(imp_idx)) << 32) | static_cast<uint64_t>(static_cast<uint32_t>(camp_idx));
 }
 
 inline int32_t ImpIdxFromPackedKey(uint64_t k) {
@@ -239,50 +147,52 @@ inline int32_t CampIdxFromPackedKey(uint64_t k) {
   return static_cast<int32_t>(static_cast<uint32_t>(k & 0xffffffffu));
 }
 
-bool TryBuildImpsShapedMultiInferResponse(const std::vector<std::vector<ImpRouteCell>>& routing_slots, const std::vector<std::vector<std::vector<double>>>& slot_rows, const int imp_count, rapidjson::Document* out) {
-  if (imp_count <= 0 || routing_slots.empty()) {
+bool WriteImpsShapedMultiInferResponse(const std::vector<std::vector<ImpRouteRow>>& routing_slots, const std::vector<std::string>& slot_model_names, std::vector<std::vector<std::vector<double>>>& slot_rows, const int imp_count, rapidjson::StringBuffer* sb) {
+  if (imp_count <= 0 || routing_slots.empty() || sb == nullptr) {
     return false;
   }
-  if (slot_rows.size() != routing_slots.size()) {
+  if (slot_rows.size() != routing_slots.size() || slot_model_names.size() != routing_slots.size()) {
     return false;
   }
 
-  struct CampAgg {
-    int32_t cid{0};
-    std::string mdl;
-    std::map<int, std::vector<double>> by_adsize;
-  };
+  struct CampAgg {int32_t cid{0}; const std::string* mdl{nullptr}; std::vector<std::vector<double>> by_adsize;};
   std::unordered_map<uint64_t, CampAgg> agg;
-  agg.reserve(routing_slots.size() * 8);
+  size_t total_rows = 0;
+  for (size_t si = 0; si < routing_slots.size(); ++si) {
+    total_rows += routing_slots[si].size();
+  }
+  agg.reserve(total_rows);
 
   for (size_t si = 0; si < routing_slots.size(); ++si) {
     const auto& slot_r = routing_slots[si];
+    const std::string& slot_mdl = slot_model_names[si];
     const size_t R = slot_r.size();
     if (si >= slot_rows.size()) {
       return false;
     }
-    const auto& row_vecs = slot_rows[si];
+    auto& row_vecs = slot_rows[si];
     if (row_vecs.size() != R) {
       return false;
     }
     for (size_t ri = 0; ri < R; ++ri) {
-      const ImpRouteCell& rc = slot_r[ri];
+      const ImpRouteRow& rc = slot_r[ri];
       const uint64_t pkey = PackImpCampKey(rc.imp_idx, rc.camp_idx);
       CampAgg& ca = agg[pkey];
-      if (ca.mdl.empty()) {
+      if (ca.mdl == nullptr) {
         ca.cid = rc.cid;
-        ca.mdl = rc.mdl;
-      } else if (ca.cid != rc.cid || ca.mdl != rc.mdl) {
+        ca.mdl = &slot_mdl;
+      } else if (ca.cid != rc.cid || *ca.mdl != slot_mdl) {
         return false;
       }
-      ca.by_adsize[rc.adsize_idx] = row_vecs[ri];
+      const size_t ad_idx = static_cast<size_t>(rc.adsize_idx);
+      if (ad_idx >= ca.by_adsize.size()) {
+        ca.by_adsize.resize(ad_idx + 1);
+      }
+      ca.by_adsize[ad_idx] = std::move(row_vecs[ri]);
     }
   }
 
-  struct CampAggEmitRef {
-    int32_t camp_idx{0};
-    const CampAgg* agg{nullptr};
-  };
+  struct CampAggEmitRef {int32_t camp_idx{0};const CampAgg* agg{nullptr};};
   std::vector<std::vector<CampAggEmitRef>> camps_per_imp(static_cast<size_t>(imp_count));
   for (const auto& kv : agg) {
     const int32_t imp = ImpIdxFromPackedKey(kv.first);
@@ -296,42 +206,49 @@ bool TryBuildImpsShapedMultiInferResponse(const std::vector<std::vector<ImpRoute
     });
   }
 
-  out->SetObject();
-  auto& alloc = out->GetAllocator();
-  rapidjson::Value imps_arr(rapidjson::kArrayType);
-  imps_arr.Reserve(static_cast<rapidjson::SizeType>(imp_count), alloc);
+  sb->Clear();
+  sb->Reserve(static_cast<rapidjson::SizeType>(128 + total_rows * 96));
+  rapidjson::Writer<rapidjson::StringBuffer> writer(*sb);
+  writer.SetMaxDecimalPlaces(6);
 
+  writer.StartObject();
+  writer.Key("imps");
+  writer.StartArray();
   for (int ii = 0; ii < imp_count; ++ii) {
-    rapidjson::Value camps_out(rapidjson::kArrayType);
+    writer.StartObject();
+    writer.Key("camps");
+    writer.StartArray();
     for (const CampAggEmitRef& emit : camps_per_imp[static_cast<size_t>(ii)]) {
       const CampAgg& ca = *emit.agg;
-      rapidjson::Value camp_obj(rapidjson::kObjectType);
-      camp_obj.AddMember("cid", ca.cid, alloc);
-      camp_obj.AddMember("mdl", rapidjson::Value(ca.mdl.c_str(), static_cast<rapidjson::SizeType>(ca.mdl.size()), alloc).Move(), alloc);
-      rapidjson::Value score_arr(rapidjson::kArrayType);
-      for (const auto& ad_kv : ca.by_adsize) {
-        const std::vector<double>& vec = ad_kv.second;
+      writer.StartObject();
+      writer.Key("cid");
+      writer.Int(ca.cid);
+      writer.Key("mdl");
+      writer.String(ca.mdl->c_str(), static_cast<rapidjson::SizeType>(ca.mdl->size()));
+      writer.Key("score");
+      writer.StartArray();
+      for (const std::vector<double>& vec : ca.by_adsize) {
+        if (vec.empty()) {
+          continue;
+        }
         if (vec.size() == 1) {
-          score_arr.PushBack(RoundScore6(vec[0]), alloc);
+          writer.Double(RoundScore6(vec[0]));
         } else {
-          rapidjson::Value inner(rapidjson::kArrayType);
-          inner.Reserve(static_cast<rapidjson::SizeType>(vec.size()), alloc);
+          writer.StartArray();
           for (double d : vec) {
-            inner.PushBack(RoundScore6(d), alloc);
+            writer.Double(RoundScore6(d));
           }
-          score_arr.PushBack(inner, alloc);
+          writer.EndArray();
         }
       }
-      camp_obj.AddMember("score", score_arr, alloc);
-      camps_out.PushBack(camp_obj, alloc);
+      writer.EndArray();
+      writer.EndObject();
     }
-
-    rapidjson::Value imp_wrap(rapidjson::kObjectType);
-    imp_wrap.AddMember("camps", camps_out, alloc);
-    imps_arr.PushBack(imp_wrap, alloc);
+    writer.EndArray();
+    writer.EndObject();
   }
-
-  out->AddMember("imps", imps_arr, alloc);
+  writer.EndArray();
+  writer.EndObject();
   return true;
 }
 
@@ -344,12 +261,14 @@ class MultiInferAggregator : public std::enable_shared_from_this<MultiInferAggre
  public:
   MultiInferAggregator(evhtp_request_t* req, size_t slot_count, evthr_t* reply_thread,
       std::vector<std::shared_ptr<TRITONSERVER_InferenceRequest>> irequests,
-      std::vector<std::vector<ImpRouteCell>> imp_routing_slots = {},
+      std::vector<std::vector<ImpRouteRow>> imp_routing_slots = {},
+      std::vector<std::string> slot_model_names = {},
       int imp_routing_imp_count = 0)
       : req_(req), n_(slot_count), reply_thread_(reply_thread),
         irequests_(std::move(irequests)), success_json_(slot_count),
         error_text_(slot_count), have_error_(slot_count, 0),
         imp_routing_slots_(std::move(imp_routing_slots)),
+        slot_model_names_(std::move(slot_model_names)),
         imp_routing_imp_count_(imp_routing_imp_count)
   {
     slot_row_outputs_.assign(n_, {});
@@ -370,25 +289,6 @@ class MultiInferAggregator : public std::enable_shared_from_this<MultiInferAggre
     return (slot < imp_routing_slots_.size()) ? imp_routing_slots_[slot].size() : 0;
   }
 
-  // When imps folding is enabled, successful tensor extraction may omit per-shard
-  // JSON (see InferResponseComplete). Legacy merge needs non-empty success_json_
-  // for every successful slot that did not record an error.
-  bool LegacyMultiInferResponsesAvailable() const
-  {
-    for (size_t i = 0; i < n_; ++i) {
-      if (have_error_[i]) {
-        continue;
-      }
-      if (!success_json_[i].empty()) {
-        continue;
-      }
-      if (WantsShardParsedRows() && ExpectedRowsForSlot(i) > 0) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   void CancelAllSubRequests()
   {
     if (cancel_sent_.exchange(true, std::memory_order_acq_rel)) {
@@ -401,14 +301,19 @@ class MultiInferAggregator : public std::enable_shared_from_this<MultiInferAggre
     }
   }
 
-  void OnShardDone(size_t slot, TRITONSERVER_Error* finalize_err, const std::string& response_json, std::vector<std::vector<double>> parsed_first_output = {}) {
+  void OnShardDone(size_t slot, TRITONSERVER_Error* finalize_err, const std::string& response_json, std::vector<std::vector<double>> parsed_first_output = {}, std::vector<float> parsed_scalar_output = {}) {
     if (finalize_err != nullptr) {
       have_error_[slot] = 1;
       error_text_[slot] = TRITONSERVER_ErrorMessage(finalize_err);
       TRITONSERVER_ErrorDelete(finalize_err);
     } else {
       success_json_[slot] = response_json;
-      if (!parsed_first_output.empty() && slot < slot_row_outputs_.size()) {
+      if (!parsed_scalar_output.empty() && slot < slot_row_outputs_.size()) {
+        slot_row_outputs_[slot].resize(parsed_scalar_output.size());
+        for (size_t r = 0; r < parsed_scalar_output.size(); ++r) {
+          slot_row_outputs_[slot][r] = {static_cast<double>(parsed_scalar_output[r])};
+        }
+      } else if (!parsed_first_output.empty() && slot < slot_row_outputs_.size()) {
         slot_row_outputs_[slot] = std::move(parsed_first_output);
       }
     }
@@ -448,28 +353,20 @@ class MultiInferAggregator : public std::enable_shared_from_this<MultiInferAggre
         }
       }
       if (!any_err) {
-        rapidjson::Document shaped;
-        if (TryBuildImpsShapedMultiInferResponse(imp_routing_slots_, slot_row_outputs_, imp_routing_imp_count_, &shaped)) {
-          rapidjson::StringBuffer sb;
-          rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
-          writer.SetMaxDecimalPlaces(6);
-          shaped.Accept(writer);
+        rapidjson::StringBuffer sb;
+        if (WriteImpsShapedMultiInferResponse(imp_routing_slots_, slot_model_names_, slot_row_outputs_, imp_routing_imp_count_, &sb)) {
           AddContentTypeHeader(req_, "application/json");
           evbuffer_add(req_->buffer_out, sb.GetString(), sb.GetSize());
           evhtp_send_reply(req_, EVHTP_RES_OK);
           evhtp_request_resume(req_);
           return;
         }
-        // Folding failed after tensor-only shard path omitted per-shard JSON; do not
-        // fall through to legacy merge with empty fragments.
-        if (!LegacyMultiInferResponsesAvailable()) {
-          static const char kFoldErr[] = "{\"error\":{\"message\":\"failed to fold imps response; per-shard JSON was not retained for this request\"}}";
-          AddContentTypeHeader(req_, "application/json");
-          evbuffer_add(req_->buffer_out, kFoldErr, sizeof(kFoldErr) - 1);
-          evhtp_send_reply(req_, EVHTP_RES_BADREQ);
-          evhtp_request_resume(req_);
-          return;
-        }
+        static const char kFoldErr[] = "{\"error\":\"failed to fold imps response\"}";
+        AddContentTypeHeader(req_, "application/json");
+        evbuffer_add(req_->buffer_out, kFoldErr, sizeof(kFoldErr) - 1);
+        evhtp_send_reply(req_, EVHTP_RES_BADREQ);
+        evhtp_request_resume(req_);
+        return;
       }
     }
 
@@ -521,60 +418,10 @@ class MultiInferAggregator : public std::enable_shared_from_this<MultiInferAggre
       return;
     }
 
-    triton::common::TritonJson::Value root(triton::common::TritonJson::ValueType::OBJECT);
-    triton::common::TritonJson::Value responses(root, triton::common::TritonJson::ValueType::ARRAY);
-    for (size_t i = 0; i < n_; ++i) {
-      triton::common::TritonJson::Value item;
-      TRITONSERVER_Error* perr = item.Parse(success_json_[i].c_str(), success_json_[i].size());
-      if (perr != nullptr) {
-        triton::common::TritonJson::Value wrap(root, triton::common::TritonJson::ValueType::OBJECT);
-        triton::common::TritonJson::Value err_part(root, triton::common::TritonJson::ValueType::OBJECT);
-        TRITONSERVER_Error* ae = err_part.AddString("message", TRITONSERVER_ErrorMessage(perr));
-        TRITONSERVER_ErrorDelete(perr);
-        if (ae != nullptr) {
-          TRITONSERVER_ErrorDelete(ae);
-        }
-        TRITONSERVER_Error* be = wrap.Add("error", std::move(err_part));
-        if (be != nullptr) {
-          TRITONSERVER_ErrorDelete(be);
-        }
-        TRITONSERVER_Error* ce = responses.Append(std::move(wrap));
-        if (ce != nullptr) {
-          TRITONSERVER_ErrorDelete(ce);
-        }
-      } else {
-        TRITONSERVER_Error* ce = responses.Append(std::move(item));
-        if (ce != nullptr) {
-          LOG_TRITONSERVER_ERROR(ce, "multi_infer: appending response");
-          TRITONSERVER_ErrorDelete(ce);
-        }
-      }
-    }
-
-    TRITONSERVER_Error* re = root.Add("errors", std::move(responses));
-    if (re != nullptr) {
-      LOG_TRITONSERVER_ERROR(re, "multi_infer: building root JSON");
-      AddContentTypeHeader(req_, "application/json");
-      EVBufferAddErrorJson(req_->buffer_out, re);
-      evhtp_send_reply(req_, HttpCodeFromError(re));
-      TRITONSERVER_ErrorDelete(re);
-      evhtp_request_resume(req_);
-      return;
-    }
-
-    triton::common::TritonJson::WriteBuffer wb;
-    TRITONSERVER_Error* we = root.Write(&wb);
-    if (we != nullptr) {
-      AddContentTypeHeader(req_, "application/json");
-      EVBufferAddErrorJson(req_->buffer_out, we);
-      evhtp_send_reply(req_, HttpCodeFromError(we));
-      TRITONSERVER_ErrorDelete(we);
-    } 
-    else {
-      AddContentTypeHeader(req_, "application/json");
-      evbuffer_add(req_->buffer_out, wb.Base(), wb.Size());
-      evhtp_send_reply(req_, EVHTP_RES_OK);
-    }
+    static const char kInternalErr[] = "{\"error\":\"unexpected multi_infer success path\"}";
+    AddContentTypeHeader(req_, "application/json");
+    evbuffer_add(req_->buffer_out, kInternalErr, sizeof(kInternalErr) - 1);
+    evhtp_send_reply(req_, EVHTP_RES_SERVERR);
     evhtp_request_resume(req_);
   }
 
@@ -589,7 +436,8 @@ class MultiInferAggregator : public std::enable_shared_from_this<MultiInferAggre
   std::vector<char> have_error_;
   std::atomic<bool> cancel_sent_{false};
   std::atomic<bool> reply_scheduled_{false};
-  std::vector<std::vector<ImpRouteCell>> imp_routing_slots_;
+  std::vector<std::vector<ImpRouteRow>> imp_routing_slots_;
+  std::vector<std::string> slot_model_names_;
   std::vector<std::vector<std::vector<double>>> slot_row_outputs_;
   int imp_routing_imp_count_{0};
 };
@@ -613,6 +461,7 @@ class MultiInferShardRequest : public HTTPAPIServer::InferRequestClass {
     TRITONSERVER_Error* err = nullptr;
     evbuffer* shard_json = nullptr;
     std::vector<std::vector<double>> pre_parsed_rows;
+    std::vector<float> pre_parsed_scalars;
     if (infer_request->response_count_ != 1) {
       const std::string msg = std::string("expected a single response, got ") + std::to_string(infer_request->response_count_);
       err = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, msg.c_str());
@@ -621,13 +470,19 @@ class MultiInferShardRequest : public HTTPAPIServer::InferRequestClass {
       if (infer_request->aggregator_->WantsShardParsedRows()) {
         const size_t nrows = infer_request->aggregator_->ExpectedRowsForSlot(infer_request->slot_);
         if (nrows > 0u) {
-          TRITONSERVER_Error* ex_err =
-              infer_request->ExtractFirstJsonOutputAsRowMajorDoubles(response, nrows, &pre_parsed_rows);
+          TRITONSERVER_Error* ex_err = infer_request->ExtractFirstJsonOutputAsScalars(response, nrows, &pre_parsed_scalars);
           if (ex_err == nullptr) {
             skip_shard_json = true;
           } else {
             TRITONSERVER_ErrorDelete(ex_err);
-            pre_parsed_rows.clear();
+            pre_parsed_scalars.clear();
+            ex_err = infer_request->ExtractFirstJsonOutputAsRowMajorDoubles(response, nrows, &pre_parsed_rows);
+            if (ex_err == nullptr) {
+              skip_shard_json = true;
+            } else {
+              TRITONSERVER_ErrorDelete(ex_err);
+              pre_parsed_rows.clear();
+            }
           }
         }
       }
@@ -661,7 +516,7 @@ class MultiInferShardRequest : public HTTPAPIServer::InferRequestClass {
     if (err != nullptr) {
       infer_request->aggregator_->OnShardDone(infer_request->slot_, err, "");
     } else {
-      infer_request->aggregator_->OnShardDone(infer_request->slot_, nullptr, json_fragment, std::move(pre_parsed_rows));
+      infer_request->aggregator_->OnShardDone(infer_request->slot_, nullptr, json_fragment, std::move(pre_parsed_rows), std::move(pre_parsed_scalars));
     }
 
     if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
@@ -704,7 +559,8 @@ void HTTPAPIServer::HandleMultiInfer(evhtp_request_t* req) {
   evbuffer* body_buf = (decompressed_buffer != nullptr) ? decompressed_buffer : req->buffer_in;
 
   rapidjson::Document parsed;
-  int imp_routing_imp_count = 0;
+  ImpRoutingTable imp_routing;
+  std::vector<MultiInferNativeSlot> native_slots;
   TRITONSERVER_Error* err = nullptr;
   const size_t body_len = evbuffer_get_length(body_buf);
   const char* body_ptr = "";
@@ -723,7 +579,7 @@ void HTTPAPIServer::HandleMultiInfer(evhtp_request_t* req) {
     }
   }
   if (err == nullptr) {
-    err = triton::server::ParseRequest(body_ptr, body_len, server_.get(), &parsed);
+    err = triton::server::ParseRequest(body_ptr, body_len, server_.get(), &parsed, &imp_routing, &native_slots);
   }
   if (decompressed_buffer != nullptr) {
     evbuffer_free(decompressed_buffer);
@@ -738,20 +594,9 @@ void HTTPAPIServer::HandleMultiInfer(evhtp_request_t* req) {
     return;
   }
 
-  if (!parsed.IsObject() || !parsed.HasMember("requests") || !parsed["requests"].IsArray()) {
-    err = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "Request body must include a JSON array field 'requests'");
-    AddContentTypeHeader(req, "application/json");
-    EVBufferAddErrorJson(req->buffer_out, err);
-    evhtp_send_reply(req, HttpCodeFromError(err));
-    TRITONSERVER_ErrorDelete(err);
-    evhtp_request_resume(req);
-    return;
-  }
-
-  const rapidjson::Value& requests = parsed["requests"];
-  const size_t n = requests.Size();
+  const size_t n = native_slots.size();
   if (n == 0) {
-    err = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "'requests' array must be non-empty");
+    err = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "imps transform produced no model inference slots");
     AddContentTypeHeader(req, "application/json");
     EVBufferAddErrorJson(req->buffer_out, err);
     evhtp_send_reply(req, HttpCodeFromError(err));
@@ -770,96 +615,24 @@ void HTTPAPIServer::HandleMultiInfer(evhtp_request_t* req) {
     return;
   }
 
-  if (parsed.IsObject() && parsed.HasMember("imp_routing_imp_count")) {
-    const rapidjson::Value& ic = parsed["imp_routing_imp_count"];
-    if (ic.IsInt()) {
-      imp_routing_imp_count = ic.GetInt();
-    } else if (ic.IsUint()) {
-      imp_routing_imp_count = static_cast<int>(ic.GetUint());
-    }
-  }
-
-  std::vector<std::vector<ImpRouteCell>> imp_routing_table;
-  const bool have_routing_array =
-      parsed.IsObject() && parsed.HasMember("imp_slot_routing") && parsed["imp_slot_routing"].IsArray();
-  if (have_routing_array && imp_routing_imp_count > 0) {
-    if (!ParseImpSlotRoutingTableFromValue(parsed["imp_slot_routing"], n, &imp_routing_table)) {
-      imp_routing_table.clear();
-      imp_routing_imp_count = 0;
-    }
-  } else {
-    imp_routing_imp_count = 0;
-  }
-
-  if (parsed.IsObject()) {
-    if (parsed.HasMember("imp_slot_routing")) {
-      parsed.RemoveMember("imp_slot_routing");
-    }
-    if (parsed.HasMember("imp_routing_imp_count")) {
-      parsed.RemoveMember("imp_routing_imp_count");
-    }
+  std::vector<std::vector<ImpRouteRow>> imp_routing_table;
+  int imp_routing_imp_count = 0;
+  if (imp_routing.imp_count > 0 && imp_routing.slots.size() == n) {
+    imp_routing_table = std::move(imp_routing.slots);
+    imp_routing_imp_count = imp_routing.imp_count;
   }
 
   struct SlotPrep {
     std::string model_name;
-    int64_t model_version{0};
-    std::string infer_body_json;
+    int64_t model_version{-1};
   };
   std::vector<SlotPrep> slots;
   slots.reserve(n);
 
-  for (rapidjson::SizeType i = 0; i < static_cast<rapidjson::SizeType>(n); ++i) {
-    const rapidjson::Value& slot = requests[i];
-    if (!slot.IsObject()) {
-      err = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "Each entry in 'requests' must be a JSON object");
-      AddContentTypeHeader(req, "application/json");
-      EVBufferAddErrorJson(req->buffer_out, err);
-      evhtp_send_reply(req, HttpCodeFromError(err));
-      TRITONSERVER_ErrorDelete(err);
-      evhtp_request_resume(req);
-      return;
-    }
-    const auto mn_it = slot.FindMember("model_name");
-    if (mn_it == slot.MemberEnd() || !mn_it->value.IsString()) {
-      err = TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "Each entry in 'requests' must specify string 'model_name'");
-      AddContentTypeHeader(req, "application/json");
-      EVBufferAddErrorJson(req->buffer_out, err);
-      evhtp_send_reply(req, HttpCodeFromError(err));
-      TRITONSERVER_ErrorDelete(err);
-      evhtp_request_resume(req);
-      return;
-    }
+  for (size_t i = 0; i < n; ++i) {
     SlotPrep prep;
-    prep.model_name.assign(mn_it->value.GetString(), mn_it->value.GetStringLength());
-    std::string ver_str;
-    err = GetModelVersionStringFromRapidSlot(slot, &ver_str);
-    if (err != nullptr) {
-      AddContentTypeHeader(req, "application/json");
-      EVBufferAddErrorJson(req->buffer_out, err);
-      evhtp_send_reply(req, HttpCodeFromError(err));
-      TRITONSERVER_ErrorDelete(err);
-      evhtp_request_resume(req);
-      return;
-    }
-    err = GetModelVersionFromString(ver_str, &prep.model_version);
-    if (err != nullptr) {
-      AddContentTypeHeader(req, "application/json");
-      EVBufferAddErrorJson(req->buffer_out, err);
-      evhtp_send_reply(req, HttpCodeFromError(err));
-      TRITONSERVER_ErrorDelete(err);
-      evhtp_request_resume(req);
-      return;
-    }
+    prep.model_name = native_slots[i].model_name;
     err = CheckTransactionPolicy(req, prep.model_name, prep.model_version);
-    if (err != nullptr) {
-      AddContentTypeHeader(req, "application/json");
-      EVBufferAddErrorJson(req->buffer_out, err);
-      evhtp_send_reply(req, HttpCodeFromError(err));
-      TRITONSERVER_ErrorDelete(err);
-      evhtp_request_resume(req);
-      return;
-    }
-    err = SerializeInferSlotBodyJsonFromRapid(slot, &prep.infer_body_json);
     if (err != nullptr) {
       AddContentTypeHeader(req, "application/json");
       EVBufferAddErrorJson(req->buffer_out, err);
@@ -895,35 +668,24 @@ void HTTPAPIServer::HandleMultiInfer(evhtp_request_t* req) {
     });
   }
 
-  std::shared_ptr<MultiInferAggregator> aggregator = std::make_shared<MultiInferAggregator>(req, n, reply_thread, irequests, std::move(imp_routing_table), imp_routing_imp_count);
+  std::vector<std::string> slot_model_names;
+  slot_model_names.reserve(n);
+  for (const auto& slot : slots) {
+    slot_model_names.push_back(slot.model_name);
+  }
+
+  std::shared_ptr<MultiInferAggregator> aggregator = std::make_shared<MultiInferAggregator>(req, n, reply_thread, irequests, std::move(imp_routing_table),std::move(slot_model_names), imp_routing_imp_count);
   std::vector<std::unique_ptr<MultiInferShardRequest>> shard_holders;
   std::vector<std::unique_ptr<HTTPAPIServer::RequestReleasePayload>> release_holders;
   shard_holders.reserve(n);
   release_holders.reserve(n);
 
   for (size_t i = 0; i < n; ++i) {
-    evbuffer* body_i = evbuffer_new();
-    evbuffer_add(body_i, slots[i].infer_body_json.data(), slots[i].infer_body_json.size());
-    const int32_t content_length = static_cast<int32_t>(evbuffer_get_length(body_i));
-    size_t header_length = 0;
-    err = GetInferenceHeaderLength(req, content_length, &header_length);
-    if (err != nullptr) {
-      aggregator->CancelAllSubRequests();
-      evbuffer_free(body_i);
-      AddContentTypeHeader(req, "application/json");
-      EVBufferAddErrorJson(req->buffer_out, err);
-      evhtp_send_reply(req, HttpCodeFromError(err));
-      TRITONSERVER_ErrorDelete(err);
-      evhtp_request_resume(req);
-      return;
-    }
-
     auto shard = std::make_unique<MultiInferShardRequest>(server_.get(), req, GetResponseCompressionType(req), irequests[i], shm_manager_, aggregator, i);
 
-    err = EVRequestToTritonRequest(req, slots[i].model_name, irequests[i].get(), body_i, shard.get(), header_length);
+    err = PopulateInferenceRequestFromNativeSlot(std::move(native_slots[i]), irequests[i].get(), shard.get());
     if (err != nullptr) {
       aggregator->CancelAllSubRequests();
-      evbuffer_free(body_i);
       AddContentTypeHeader(req, "application/json");
       EVBufferAddErrorJson(req->buffer_out, err);
       evhtp_send_reply(req, HttpCodeFromError(err));
@@ -932,7 +694,7 @@ void HTTPAPIServer::HandleMultiInfer(evhtp_request_t* req) {
       return;
     }
 
-    auto rel = std::make_unique<HTTPAPIServer::RequestReleasePayload>(irequests[i], body_i);
+    auto rel = std::make_unique<HTTPAPIServer::RequestReleasePayload>(irequests[i], nullptr);
     err = ScheduleInferAsync(req, irequests[i].get(), shard.get(), rel.get(), nullptr, MultiInferShardRequest::InferResponseComplete);
     if (err != nullptr) {
       aggregator->CancelAllSubRequests();

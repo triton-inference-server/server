@@ -336,6 +336,12 @@ class HTTPAPIServer : public HTTPServer {
         TRITONSERVER_InferenceResponse* response, size_t expect_rows,
         std::vector<std::vector<double>>* rows_out);
 
+    // Like ExtractFirstJsonOutputAsRowMajorDoubles but returns one scalar per
+    // row when output 0 has a single element per batch row (common bt7 path).
+    TRITONSERVER_Error* ExtractFirstJsonOutputAsScalars(
+        TRITONSERVER_InferenceResponse* response, size_t expect_rows,
+        std::vector<float>* scores_out);
+
     // Helper function to set infer response header in the form specified by
     // the endpoint protocol
     virtual void SetResponseHeader(
