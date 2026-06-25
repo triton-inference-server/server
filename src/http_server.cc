@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <list>
 #include <regex>
 #include <thread>
@@ -3002,9 +3003,15 @@ HTTPAPIServer::EVRequestToJsonImpl(
   }
 
   *buffer_len = evbuffer_get_length(req->buffer_in);
-  if (allows_empty_body || *buffer_len > 0) {
-    RETURN_IF_ERR(EVBufferToJson(request_json, v, &v_idx, *buffer_len, n));
+  if (*buffer_len == 0) {
+    if (!allows_empty_body) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG, "request JSON body is empty");
+    }
+    return nullptr;
   }
+
+  RETURN_IF_ERR(EVBufferToJson(request_json, v, &v_idx, *buffer_len, n));
 
   return nullptr;  // success
 }
@@ -3213,7 +3220,18 @@ HTTPAPIServer::EVBufferToJson(
             .c_str());
   }
 
-  RETURN_IF_ERR(document->Parse(json_base, length));
+  TRITONSERVER_Error* parse_err = document->Parse(json_base, length);
+  if (parse_err != nullptr) {
+    if (TRITONSERVER_ErrorCode(parse_err) == TRITONSERVER_ERROR_INTERNAL) {
+      const char* msg = TRITONSERVER_ErrorMessage(parse_err);
+      if (std::strstr(msg, "failed to parse the request JSON buffer") !=
+          nullptr) {
+        TRITONSERVER_ErrorDelete(parse_err);
+        return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg);
+      }
+    }
+    return parse_err;
+  }
 
   return nullptr;  // success
 }
