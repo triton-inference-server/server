@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <limits>
 #include <list>
 #include <regex>
 #include <thread>
@@ -476,6 +477,37 @@ AllocEVBuffer(const size_t byte_size, evbuffer** evb, void** base)
   return nullptr;  // success
 }
 
+template <typename T>
+TRITONSERVER_Error*
+ValidateJsonUIntRange(const uint64_t value, const char* datatype)
+{
+  if (value > static_cast<uint64_t>(std::numeric_limits<T>::max())) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string(datatype) + " data value " + std::to_string(value) +
+         " is out of range")
+            .c_str());
+  }
+
+  return nullptr;
+}
+
+template <typename T>
+TRITONSERVER_Error*
+ValidateJsonIntRange(const int64_t value, const char* datatype)
+{
+  if ((value < static_cast<int64_t>(std::numeric_limits<T>::min())) ||
+      (value > static_cast<int64_t>(std::numeric_limits<T>::max()))) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string(datatype) + " data value " + std::to_string(value) +
+         " is out of range")
+            .c_str());
+  }
+
+  return nullptr;
+}
+
 // Recursively adds to byte_size from multi dimensional data input
 TRITONSERVER_Error*
 JsonBytesArrayByteSize(
@@ -563,34 +595,34 @@ ReadDataFromJsonHelper(
         bool b = false;
         RETURN_IF_ERR(tensor_data.AsBool(&b));
         uint8_t* data_vec = reinterpret_cast<uint8_t*>(base);
-        // FIXME for unsigned should bounds check and raise error
-        // since otherwise the actually used value will be
-        // unexpected.
-        data_vec[*counter] = (uint8_t)(b ? 1 : 0);
+        data_vec[*counter] = static_cast<uint8_t>(b ? 1 : 0);
         *counter += 1;
         break;
       }
       case TRITONSERVER_TYPE_UINT8: {
         uint64_t ui = 0;
         RETURN_IF_ERR(tensor_data.AsUInt(&ui));
+        RETURN_IF_ERR(ValidateJsonUIntRange<uint8_t>(ui, "UINT8"));
         uint8_t* data_vec = reinterpret_cast<uint8_t*>(base);
-        data_vec[*counter] = (uint8_t)ui;
+        data_vec[*counter] = static_cast<uint8_t>(ui);
         *counter += 1;
         break;
       }
       case TRITONSERVER_TYPE_UINT16: {
         uint64_t ui = 0;
         RETURN_IF_ERR(tensor_data.AsUInt(&ui));
+        RETURN_IF_ERR(ValidateJsonUIntRange<uint16_t>(ui, "UINT16"));
         uint16_t* data_vec = reinterpret_cast<uint16_t*>(base);
-        data_vec[*counter] = (uint16_t)ui;
+        data_vec[*counter] = static_cast<uint16_t>(ui);
         *counter += 1;
         break;
       }
       case TRITONSERVER_TYPE_UINT32: {
         uint64_t ui = 0;
         RETURN_IF_ERR(tensor_data.AsUInt(&ui));
+        RETURN_IF_ERR(ValidateJsonUIntRange<uint32_t>(ui, "UINT32"));
         uint32_t* data_vec = reinterpret_cast<uint32_t*>(base);
-        data_vec[*counter] = (uint32_t)ui;
+        data_vec[*counter] = static_cast<uint32_t>(ui);
         *counter += 1;
         break;
       }
@@ -603,29 +635,29 @@ ReadDataFromJsonHelper(
         break;
       }
       case TRITONSERVER_TYPE_INT8: {
-        // FIXME for signed type just assigning to smaller type is
-        // "implementation defined" and so really need to bounds
-        // check.
         int64_t si = 0;
         RETURN_IF_ERR(tensor_data.AsInt(&si));
+        RETURN_IF_ERR(ValidateJsonIntRange<int8_t>(si, "INT8"));
         int8_t* data_vec = reinterpret_cast<int8_t*>(base);
-        data_vec[*counter] = (int8_t)si;
+        data_vec[*counter] = static_cast<int8_t>(si);
         *counter += 1;
         break;
       }
       case TRITONSERVER_TYPE_INT16: {
         int64_t si = 0;
         RETURN_IF_ERR(tensor_data.AsInt(&si));
+        RETURN_IF_ERR(ValidateJsonIntRange<int16_t>(si, "INT16"));
         int16_t* data_vec = reinterpret_cast<int16_t*>(base);
-        data_vec[*counter] = (int16_t)si;
+        data_vec[*counter] = static_cast<int16_t>(si);
         *counter += 1;
         break;
       }
       case TRITONSERVER_TYPE_INT32: {
         int64_t si = 0;
         RETURN_IF_ERR(tensor_data.AsInt(&si));
+        RETURN_IF_ERR(ValidateJsonIntRange<int32_t>(si, "INT32"));
         int32_t* data_vec = reinterpret_cast<int32_t*>(base);
-        data_vec[*counter] = (int32_t)si;
+        data_vec[*counter] = static_cast<int32_t>(si);
         *counter += 1;
         break;
       }
