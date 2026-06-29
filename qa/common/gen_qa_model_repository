@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -66,7 +66,7 @@ log_message.status "Changing working directory to the script directory to: " "${
 cd ${TRITON_MDLS_BASE_SCRIPT_DIR}
 
 log_message.status "define: default values"
-TRITON_VERSION=${TRITON_VERSION:=26.05}
+TRITON_VERSION=${TRITON_VERSION:=26.06}
 ONNX_VERSION=1.20.1
 ONNX_OPSET=0
 OPENVINO_VERSION=2024.5.0
@@ -284,7 +284,7 @@ chmod -R 777 $TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 if [ -z "$MODEL_TYPE" ] || [ "$MODEL_TYPE" != "igpu" ]; then
-  nvidia-smi --query-gpu=compute_cap | grep -qz 12.1 && echo -e '${COLOR_WARNING}[WARNING]${COLOR_RESET} Skipping model generation for Torch TensorRT${COLOR_RESET}' || python3 $TRITON_MDLS_SRC_DIR/gen_qa_torchtrt_models.py --models_dir=$TRITON_MDLS_QA_TORCHTRT_MODEL
+  python3 $TRITON_MDLS_SRC_DIR/gen_qa_torchtrt_models.py --models_dir=$TRITON_MDLS_QA_TORCHTRT_MODEL
   chmod -R 777 $TRITON_MDLS_QA_TORCHTRT_MODEL
 fi
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_ragged_models.py --libtorch --models_dir=$TRITON_MDLS_QA_RAGGED_MODEL
@@ -628,7 +628,7 @@ elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
     log_message.status "enroot create: openvino.ubuntu.$CI_JOB_ID"
     enroot create --name openvino.ubuntu.$CI_JOB_ID /tmp/ubuntu.$CI_JOB_ID.enroot.sqsh
     log_message.info "enroot start: openvino.ubuntu.$CI_JOB_ID"
-    enroot start --root --rw -m /tmp:/tmp openvino.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
+    enroot start --root --rw -m /tmp:/tmp -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR openvino.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
     if [ $? -ne 0 ]; then
         log_message.error "enroot start: ${OPENVINOSCRIPT} failed"
         exit 1
@@ -638,7 +638,7 @@ elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
     log_message.status "enroot create: onnxruntime.ubuntu.$CI_JOB_ID"
     enroot create --name onnxruntime.ubuntu.$CI_JOB_ID /tmp/ubuntu.$CI_JOB_ID.enroot.sqsh
     log_message.info "enroot start: onnxruntime.ubuntu.$CI_JOB_ID"
-    enroot start --root --rw -m /tmp:/tmp onnxruntime.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
+    enroot start --root --rw -m /tmp:/tmp -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR onnxruntime.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
     if [ $? -ne 0 ]; then
         log_message.error "enroot start: ${ONNXSCRIPT} failed"
         exit 1
@@ -655,7 +655,7 @@ elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
     log_message.status "enroot create: pytorch.$CI_JOB_ID"
     enroot create --name pytorch.$CI_JOB_ID /tmp/pytorch.$CI_JOB_ID.enroot.sqsh
     log_message.info "enroot start: pytorch.$CI_JOB_ID"
-    enroot start --rw -m /tmp:/tmp pytorch.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
+    enroot start --rw -m /tmp:/tmp -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR pytorch.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
     if [ $? -ne 0 ]; then
         log_message.error "enroot start: ${TORCHSCRIPT} failed"
         exit 1
@@ -666,7 +666,7 @@ elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
     log_message.status "enroot create: tensorrt.$CI_JOB_ID"
     enroot create --name tensorrt.$CI_JOB_ID /tmp/tensorrt.$CI_JOB_ID.enroot.sqsh
     log_message.info "enroot start: tensorrt.$CI_JOB_ID"
-    enroot start --rw -m /tmp:/tmp tensorrt.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
+    enroot start --rw -m /tmp:/tmp -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR tensorrt.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
     if [ $? -ne 0 ]; then
         log_message.error "enroot start: ${TRTSCRIPT} failed"
         exit 1

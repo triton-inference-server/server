@@ -1,4 +1,5 @@
-# Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/bin/bash
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,43 +25,43 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-initReplicaCount: 1
-minReplicaCount: 1
-maxReplicaCount: 3
-# choice from gRPC and HTTP
-tritonProtocol: HTTP
-# HPA GPU utilization autoscaling target
-HPATargetAverageValue: 85
-modelRepositoryPath: gs://triton_sample_models/26.06
-publishedVersion: '2.70.0'
-gcpMarketplace: true
+export CUDA_VISIBLE_DEVICES=0
 
-image:
-  registry: gcr.io
-  repository: nvidia-ngc-public/tritonserver
-  tag: 26.06-py3
-  pullPolicy: IfNotPresent
-  # modify the model repository here to match your GCP storage bucket
-  numGpus: 1
-  strictModelConfig: False
-  # add in custom library which could include custom ops in the model
-  ldPreloadPath: ''
-  logVerboseLevel: 0
-  allowGPUMetrics: True
+SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./server.log"
+CLIENT_LOG="./test.log"
+source ../common/util.sh
 
-service:
-  type: NodePort
+rm -f *.log
 
-deployment:
-  livenessProbe:
-    failureThreshold: 60
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    successThreshold: 1
-    timeoutSeconds: 1
-  readinessProbe:
-    failureThreshold: 60
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    successThreshold: 1
-    timeoutSeconds: 1
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+RET=0
+
+set +e
+
+python test.py >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+exit $RET

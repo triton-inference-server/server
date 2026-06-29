@@ -137,6 +137,12 @@ def validate_for_trt_model(
     # FIXME: Remove this check when jetson supports TRT 8.5 (DLIS-4256)
     if not support_trt_uint8():
         supported_datatypes.remove(np.uint8)
+    # TRT 11+ removed the implicit-precision INT8 path (BuilderFlag.INT8
+    # + dynamic_range); strongly-typed networks require explicit QDQ which
+    # the QA generators don't emit. Exclude int8 plan models on TRT 11+.
+    if not support_trt_int8_implicit_precision():
+        if np.int8 in supported_datatypes:
+            supported_datatypes.remove(np.int8)
     if not input_dtype in supported_datatypes:
         return False
     if not output0_dtype in supported_datatypes:
@@ -353,6 +359,17 @@ def support_trt_uint8():
         return not bool(int(os.environ.get("TEST_JETSON", 0)))
     # tensorrt library is found, return if uint8 is defined
     return hasattr(trt, "uint8")
+
+
+def support_trt_int8_implicit_precision():
+    """Return True if the installed TensorRT supports the implicit-precision
+    INT8 path (BuilderFlag.INT8 + per-tensor dynamic_range). Removed in
+    TensorRT 11+ where strongly-typed networks are mandatory."""
+    try:
+        import tensorrt as trt
+    except ImportError:
+        return False
+    return hasattr(trt.BuilderFlag, "INT8")
 
 
 def check_gpus_compute_capability(min_capability):

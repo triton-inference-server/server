@@ -38,6 +38,7 @@
 
 | Triton release version	 | NGC Tag	 | Python version	 | Torch version | TensorRT version | TensorRT-LLM version | CUDA version | CUDA Driver version | Size |
 | --- | ---  | --- | --- | --- | --- | --- | --- | --- |
+| 26.06 | nvcr.io/nvidia/tritonserver:26.06-trtllm-python-py3 | Python 3.12.3  | 2.10.0a0+b4e4ee81d3.nv25.12 | 10.14.1.48 | 1.2.1 | 13.1.0.036 | 590.44.01 | 14.24 GB |
 | 26.05 | nvcr.io/nvidia/tritonserver:26.05-trtllm-python-py3 | Python 3.12.3  | 2.10.0a0+b4e4ee81d3.nv25.12 | 10.14.1.48 | 1.2.1 | 13.1.0.036 | 590.44.01 | 14.22 GB |
 | 26.04 | nvcr.io/nvidia/tritonserver:26.04-trtllm-python-py3 | Python 3.12.3  | 2.10.0a0+b4e4ee81d3.nv25.12 | 10.14.1.48 | 1.2.1 | 13.1.0.036 | 590.44.01 | 14.22 GB |
 | 26.03 | nvcr.io/nvidia/tritonserver:26.03-trtllm-python-py3 | Python 3.12.3  | 2.10.0a0+b4e4ee81d3.nv25.12 | 10.14.1.48 | 1.2.0 | 13.1.0.036 | 590.44.01 | 14.18 GB |
@@ -69,6 +70,7 @@
 
 | Triton release version	 | NGC Tag	 | Python version	 | vLLM version | CUDA version | CUDA Driver version | Size |
 | --- | --- | --- | --- | --- | --- | --- |
+| 26.06 | nvcr.io/nvidia/tritonserver:26.06-vllm-python-py3 | Python 3.12.3  | 0.22.1+7b9cb5b7.nv26.6.55098374 | 13.3.0.035 | 610.43.02 | 10.21 GB |
 | 26.05 | nvcr.io/nvidia/tritonserver:26.05-vllm-python-py3 | Python 3.12.3  | 0.19.0+6bc3197f.nv26.04.48761268 | 13.2.1.009 | 595.58.03 | 9.3G |
 | 26.04 | nvcr.io/nvidia/tritonserver:26.04-vllm-python-py3 | Python 3.12.3  | 0.19.0+6bc3197f.nv26.04.48761268 | 13.2.1.009 | 595.58.03 | 9.09G |
 | 26.03 | nvcr.io/nvidia/tritonserver:26.03-vllm-python-py3 | Python 3.12.3  | 0.17.1+fb2e3ab6.nv26.3.46332470.cu132 | 13.2.0.046 | 595.45.04 | 9.22G |
@@ -100,6 +102,7 @@
 
 | Triton release version	 | ONNX Runtime	 |
 | --- | --- |
+| 26.06 | 1.24.4 |
 | 26.05 | 1.24.4 |
 | 26.04 | 1.24.4 |
 | 26.03 | 1.24.2 |

@@ -1,4 +1,5 @@
-# Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+<!--
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,44 +24,10 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
 
-initReplicaCount: 1
-minReplicaCount: 1
-maxReplicaCount: 3
-# choice from gRPC and HTTP
-tritonProtocol: HTTP
-# HPA GPU utilization autoscaling target
-HPATargetAverageValue: 85
-modelRepositoryPath: gs://triton_sample_models/26.06
-publishedVersion: '2.70.0'
-gcpMarketplace: true
-
-image:
-  registry: gcr.io
-  repository: nvidia-ngc-public/tritonserver
-  tag: 26.06-py3
-  pullPolicy: IfNotPresent
-  # modify the model repository here to match your GCP storage bucket
-  numGpus: 1
-  strictModelConfig: False
-  # add in custom library which could include custom ops in the model
-  ldPreloadPath: ''
-  logVerboseLevel: 0
-  allowGPUMetrics: True
-
-service:
-  type: NodePort
-
-deployment:
-  livenessProbe:
-    failureThreshold: 60
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    successThreshold: 1
-    timeoutSeconds: 1
-  readinessProbe:
-    failureThreshold: 60
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    successThreshold: 1
-    timeoutSeconds: 1
+This test is originated in "onnxruntime_backend" repository to better
+represent the scope of the test, however, this test utilizes Triton utilities
+and assumes that the test is located under "qa" directory in "server" repository
+for accessing those utilities. Please make sure the test environment is properly
+set before running the test.

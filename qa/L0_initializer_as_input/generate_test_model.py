@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,43 +24,33 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-initReplicaCount: 1
-minReplicaCount: 1
-maxReplicaCount: 3
-# choice from gRPC and HTTP
-tritonProtocol: HTTP
-# HPA GPU utilization autoscaling target
-HPATargetAverageValue: 85
-modelRepositoryPath: gs://triton_sample_models/26.06
-publishedVersion: '2.70.0'
-gcpMarketplace: true
+import numpy as np
+import onnx
 
-image:
-  registry: gcr.io
-  repository: nvidia-ngc-public/tritonserver
-  tag: 26.06-py3
-  pullPolicy: IfNotPresent
-  # modify the model repository here to match your GCP storage bucket
-  numGpus: 1
-  strictModelConfig: False
-  # add in custom library which could include custom ops in the model
-  ldPreloadPath: ''
-  logVerboseLevel: 0
-  allowGPUMetrics: True
+# Reference script on how the model used in this test is created
+if __name__ == "__main__":
+    values = np.ones((5, 5)).astype(np.float32)
+    onnx_dtype = onnx.TensorProto.FLOAT
+    initialized_input = onnx.helper.make_tensor(
+        name="INITIALIZER",
+        data_type=onnx_dtype,
+        dims=values.shape,
+        vals=values.flatten().astype(float),
+    )
+    add = onnx.helper.make_node("Add", ["INPUT", "INITIALIZER"], ["OUTPUT"])
 
-service:
-  type: NodePort
+    input = onnx.helper.make_tensor_value_info("INPUT", onnx_dtype, values.shape)
+    initializer = onnx.helper.make_tensor_value_info(
+        "INITIALIZER", onnx_dtype, values.shape
+    )
+    output = onnx.helper.make_tensor_value_info("OUTPUT", onnx_dtype, values.shape)
 
-deployment:
-  livenessProbe:
-    failureThreshold: 60
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    successThreshold: 1
-    timeoutSeconds: 1
-  readinessProbe:
-    failureThreshold: 60
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    successThreshold: 1
-    timeoutSeconds: 1
+    graph_proto = onnx.helper.make_graph(
+        [add],
+        "init_input",
+        [input, initializer],
+        [output],
+        initializer=[initialized_input],
+    )
+    model_def = onnx.helper.make_model(graph_proto, producer_name="triton")
+    onnx.save(model_def, "model.onnx")
