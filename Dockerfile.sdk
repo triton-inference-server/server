@@ -121,10 +121,12 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_JAVA_HTTP=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
-RUN cmake --build . -v --parallel --target cc-clients java-clients python-clients
+RUN --mount=type=secret,id=maven_settings,target=/root/.m2/settings.xml,required=false \
+    cmake --build . -v --parallel --target cc-clients java-clients python-clients
 
 # Install Java API Bindings
-RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+RUN --mount=type=secret,id=maven_settings,target=/root/.m2/settings.xml,required=false \
+    if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         source /workspace/client/src/java-api-bindings/scripts/install_dependencies_and_build.sh \
         --maven-version ${JAVA_BINDINGS_MAVEN_VERSION} \
         --core-tag ${TRITON_CORE_REPO_TAG} \
