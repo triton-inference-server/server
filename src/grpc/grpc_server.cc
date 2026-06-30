@@ -2386,7 +2386,14 @@ Server::Server(
   }
 
   common_cq_ = builder_.AddCompletionQueue();
-  model_infer_cq_ = builder_.AddCompletionQueue();
+
+  int cq_count = (options.infer_cq_count_ > 0)
+      ? std::min(options.infer_cq_count_, options.infer_thread_count_)
+      : options.infer_thread_count_;
+  for (int i = 0; i < cq_count; ++i) {
+    model_infer_cqs_.emplace_back(builder_.AddCompletionQueue());
+  }
+
   model_stream_infer_cq_ = builder_.AddCompletionQueue();
 
   // For testing purposes only, add artificial delay in grpc responses.
@@ -2408,7 +2415,7 @@ Server::Server(
   for (int i = 0; i < options.infer_thread_count_; ++i) {
     model_infer_handlers_.emplace_back(new ModelInferHandler(
         "ModelInferHandler", tritonserver_, trace_manager_, shm_manager_,
-        &service_, model_infer_cq_.get(),
+        &service_, model_infer_cqs_[i % cq_count].get(),
         options.infer_allocation_pool_size_ /* max_state_bucket_count */,
         options.max_response_pool_size_, options.infer_compression_level_,
         restricted_kv, options.forward_header_pattern_, &conn_mtx_, &conn_cnt_,
@@ -2488,6 +2495,8 @@ Server::GetOptions(Options& options, UnorderedMapType& options_map)
 
   RETURN_IF_ERR(GetValue(
       options_map, "infer_thread_count", &options.infer_thread_count_));
+  RETURN_IF_ERR(GetValue(
+      options_map, "infer_cq_count", &options.infer_cq_count_));
   RETURN_IF_ERR(GetValue(
       options_map, "infer_allocation_pool_size",
       &options.infer_allocation_pool_size_));
@@ -2622,7 +2631,9 @@ Server::Stop()
 
   // Shutdown completion queues
   common_cq_->Shutdown();
-  model_infer_cq_->Shutdown();
+  for (auto& cq : model_infer_cqs_) {
+    cq->Shutdown();
+  }
   model_stream_infer_cq_->Shutdown();
 
   // Must stop all handlers explicitly to wait for all the handler
