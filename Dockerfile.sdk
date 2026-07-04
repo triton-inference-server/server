@@ -38,7 +38,7 @@ ARG TRITON_CORE_REPO_TAG=main
 ARG TRITON_CLIENT_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_ENABLE_GPU=ON
-ARG JAVA_BINDINGS_MAVEN_VERSION=3.8.4
+ARG JAVA_BINDINGS_MAVEN_VERSION=3.9.9
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
 # DCGM version to install for Model Analyzer
 ARG DCGM_VERSION=4.5.3-1
@@ -71,7 +71,6 @@ RUN apt-get update && \
             libopencv-dev \
             libssl-dev \
             libtool \
-            maven \
             openjdk-11-jdk \
             pkg-config \
             python3 \
@@ -87,6 +86,16 @@ RUN apt-get update && \
     pip3 install --upgrade "grpcio-tools<1.68" cmake==4.0.3 auditwheel
 
 ENV CMAKE_POLICY_MINIMUM_REQUIRED=3.5
+
+# Install Maven 3.9+ manually -- the distro-provided maven is too old to
+# honor the MAVEN_ARGS environment variable (added in Maven 3.9.0, MNG-7038).
+ARG JAVA_BINDINGS_MAVEN_VERSION
+RUN wget -nv -O /tmp/maven.tar.gz \
+        https://archive.apache.org/dist/maven/maven-3/${JAVA_BINDINGS_MAVEN_VERSION}/binaries/apache-maven-${JAVA_BINDINGS_MAVEN_VERSION}-bin.tar.gz && \
+    tar -xzf /tmp/maven.tar.gz -C /opt && \
+    ln -s /opt/apache-maven-${JAVA_BINDINGS_MAVEN_VERSION} /opt/maven && \
+    rm /tmp/maven.tar.gz
+ENV PATH="/opt/maven/bin:${PATH}"
 
 # Build expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \
@@ -121,10 +130,14 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_JAVA_HTTP=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
-RUN cmake --build . -v --parallel --target cc-clients java-clients python-clients
+RUN --mount=type=secret,id=maven_settings,target=/run/secrets/maven_settings,required=false \
+    if [ -f /run/secrets/maven_settings ]; then export MAVEN_ARGS="--settings /run/secrets/maven_settings"; fi && \
+    cmake --build . -v --parallel --target cc-clients java-clients python-clients
 
 # Install Java API Bindings
-RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+RUN --mount=type=secret,id=maven_settings,target=/run/secrets/maven_settings,required=false \
+    if [ -f /run/secrets/maven_settings ]; then export MAVEN_ARGS="--settings /run/secrets/maven_settings"; fi && \
+    if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         source /workspace/client/src/java-api-bindings/scripts/install_dependencies_and_build.sh \
         --maven-version ${JAVA_BINDINGS_MAVEN_VERSION} \
         --core-tag ${TRITON_CORE_REPO_TAG} \
