@@ -536,6 +536,9 @@ main(int argc, char** argv)
     exit(1);
   }
 
+  // My first Triton change: a startup log message.
+  LOG_INFO << "Hello from Triton! First build by asaraswathi.";
+
   // Wait until a signal terminates the server...
   while (!triton::server::signal_exiting_) {
     // If enabled, poll the model repository to see if there have been
