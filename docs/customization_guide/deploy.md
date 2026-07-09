@@ -38,7 +38,7 @@ standalone process.  This guide is intended to provide some key points
 and best practices that users deploying Triton based solutions should
 consider.
 
-| [Deploying Behind a Secure Gateway or Proxy](#deploying-behind-a-secure-proxy-or-gateway) | [Running with Least Privilege](#running-with-least-privilege) |
+| [Deploying Behind a Secure Gateway or Proxy](#deploying-behind-a-secure-proxy-or-gateway) | [Running with Least Privilege](#running-with-least-privilege) | [Securing Model and Backend Code](#securing-model-and-backend-code) |
 
 > [!IMPORTANT]
 > Ultimately the security of a solution based on Triton
@@ -83,6 +83,29 @@ as an "Application" or "Service" within the trusted internal network.
 * [https://istio.io/latest/docs/concepts/security/]
 * [https://konghq.com/blog/enterprise/envoy-service-mesh]
 * [https://www.solo.io/topics/envoy-proxy/]
+
+## Securing Model and Backend Code
+
+> [!WARNING]
+> Some Triton backends execute code loaded from the model repository.
+> Depending on the backend, this code may run in the Triton process or
+> in a backend worker process and can inherit the deployment's
+> operating-system privileges, filesystem access, available
+> credentials, and network access. Triton does not provide a security
+> sandbox for arbitrary model or backend code.
+
+Treat executable model and backend code as trusted deployment
+artifacts. Restrict write access to model repositories and backend
+directories, restrict access to model-control APIs, and review this
+code before deployment.
+
+Caller authentication and authorization do not make inference inputs
+safe for arbitrary use. Treat request-derived values as untrusted
+unless they have been validated for their intended use. Before using
+these values in network requests, file paths, subprocesses,
+deserialization, or media decoding, validate them against an explicit
+policy and enforce limits on size, execution time, concurrency, and
+other resource consumption.
 
 ## Running with Least Privilege
 
