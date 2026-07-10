@@ -432,7 +432,7 @@ TRITONSERVER_Error* GenerateImpsInferSlots(const rapidjson::Document& doc, TRITO
 
     ImpsInferSlot slot;
     slot.model_name = model_name;
-    slot.model_version = 0;
+    slot.model_version = -1;
     slot.feature_count = built.feature_count;
     slot.rows = built.tensor.size() / (built.feature_count * sizeof(float));
     slot.input_tensor = std::move(built.tensor);
