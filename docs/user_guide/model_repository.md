@@ -167,7 +167,7 @@ export TRITON_AWS_MOUNT_DIRECTORY=/path/to/your/local/directory
 
 **Make sure, that `TRITON_AWS_MOUNT_DIRECTORY` exists on your local machine and it is empty.**
 
-#### S3-compatible object stores
+##### S3-compatible object stores
 
 The S3 backend also works with any endpoint that implements the S3-compatible API, such as Backblaze B2, Cloudflare R2, and MinIO. The repository path uses the private-instance form described above, with the provider's endpoint as the host, and the credentials and region are passed through the same environment variables as Amazon S3.
 
@@ -175,7 +175,7 @@ The S3 backend also works with any endpoint that implements the S3-compatible AP
 $ tritonserver --model-repository=s3://https://s3.us-west-2.amazonaws.com:443/bucket/path/to/model/repository ...
 ```
 
-Replace `s3.us-west-2.amazonaws.com` with the S3-compatible endpoint for your provider and region.
+Replace `s3.us-west-2.amazonaws.com:443` with the S3-compatible endpoint and port for your provider and region.
 
 ```bash
 $ export AWS_ACCESS_KEY_ID="<access_key_id>"
