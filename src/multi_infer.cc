@@ -26,8 +26,8 @@
 
 #include "http_server.h"
 
-#include "classification.h"
 #include "common.h"
+#include "http_error_json.h"
 #ifdef TRITON_ENABLE_MYSQL_ODBC
 #include "transform.h"
 #include <rapidjson/document.h>
@@ -39,9 +39,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdio>
-#include <cstring>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -75,21 +73,6 @@ int HttpCodeFromError(TRITONSERVER_Error* error) {
   }
 
   return EVHTP_RES_BADREQ;
-}
-
-void EVBufferAddErrorJson(evbuffer* buffer, const char* message) {
-  triton::common::TritonJson::Value response(triton::common::TritonJson::ValueType::OBJECT);
-  response.AddStringRef("error", message, strlen(message));
-
-  triton::common::TritonJson::WriteBuffer buffer_json;
-  response.Write(&buffer_json);
-
-  evbuffer_add(buffer, buffer_json.Base(), buffer_json.Size());
-}
-
-void EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err) {
-  const char* message = TRITONSERVER_ErrorMessage(err);
-  EVBufferAddErrorJson(buffer, message);
 }
 
 void AddContentTypeHeader(evhtp_request_t* req, const char* type) {
