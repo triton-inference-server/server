@@ -49,6 +49,10 @@
 
 namespace triton { namespace server {
 
+#ifdef TRITON_ENABLE_MYSQL_ODBC
+struct ImpsInferSlot;
+#endif
+
 class MappingSchema {
  public:
   enum class Kind {
@@ -328,16 +332,10 @@ class HTTPAPIServer : public HTTPServer {
         TRITONSERVER_InferenceResponse* response,
         evbuffer* json_only_out = nullptr);
 
-    // Reads output tensor 0 from `response` as row-major doubles without going
-    // through JSON. Same constraints as FinalizeResponse(json_only_out) on
-    // output 0: JSON-backed tensor, no classification. `expect_rows` must
-    // divide the total element count (leading batch rows).
+    // Direct tensor read for multi_infer imps folding (skips infer JSON build).
     TRITONSERVER_Error* ExtractFirstJsonOutputAsRowMajorDoubles(
         TRITONSERVER_InferenceResponse* response, size_t expect_rows,
         std::vector<std::vector<double>>* rows_out);
-
-    // Like ExtractFirstJsonOutputAsRowMajorDoubles but returns one scalar per
-    // row when output 0 has a single element per batch row (common bt7 path).
     TRITONSERVER_Error* ExtractFirstJsonOutputAsScalars(
         TRITONSERVER_InferenceResponse* response, size_t expect_rows,
         std::vector<float>* scores_out);
@@ -675,6 +673,23 @@ class HTTPAPIServer : public HTTPServer {
   TRITONSERVER_Error* ParseJsonTritonRequestID(
       triton::common::TritonJson::Value& request_json,
       TRITONSERVER_InferenceRequest* irequest);
+
+  // Fills irequest from a multi_infer slot object (inputs/outputs/id/parameters).
+  // JSON tensor data only; no trailing binary block (v/n/header_length unused).
+  TRITONSERVER_Error* FillMultiInferSlotTritonRequest(
+      const std::string& model_name,
+      triton::common::TritonJson::Value& infer_json,
+      TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req);
+
+#ifdef TRITON_ENABLE_MYSQL_ODBC
+  static TRITONSERVER_Error* AddJsonRequestedOutput(
+      TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req,
+      const char* output_name, uint32_t class_cnt = 0);
+
+  static TRITONSERVER_Error* FillImpsTritonRequest(
+      TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req,
+      ImpsInferSlot&& slot);
+#endif  // TRITON_ENABLE_MYSQL_ODBC
 
   std::shared_ptr<TRITONSERVER_Server> server_;
 

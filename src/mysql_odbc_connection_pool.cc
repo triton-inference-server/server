@@ -218,7 +218,7 @@ namespace {
 
 
 constexpr const char kSqlBtModelsMaxTs[] = "SELECT UNIX_TIMESTAMP(MAX(update_timestamp)) FROM MLBasedThrottling.lightgbm_bt_models WHERE on_off = 1";
-constexpr const char kSqlBtModelsForDc[] = "SELECT campaign_id, LOWER(model_name), feature_mapping, feature_sequence, applicable_campaigns FROM MLBasedThrottling.lightgbm_bt_models WHERE on_off = 1 AND dc_id = ?";
+constexpr const char kSqlBtModelsForDc[] = "SELECT campaign_id, model_name, feature_mapping, feature_sequence, applicable_campaigns FROM MLBasedThrottling.lightgbm_bt_models WHERE on_off = 1 AND dc_id = ? ORDER BY update_timestamp DESC";
 constexpr size_t kModelNameBuf = kMaxModelNameLen + 1;
 constexpr size_t kFeatureMappingBuf = kMaxFeatureMappingJsonLen + 1;
 constexpr size_t kFeatureSequenceBuf = kMaxFeatureSequenceLen + 1;
@@ -297,6 +297,22 @@ std::string JsonScalarToString(const rapidjson::Value& v)
     return {};
   }
   return {};
+}
+
+bool TryParseMappingInt64(const std::string& s, int64_t* out)
+{
+  if (out == nullptr || s.empty()) {
+    return false;
+  }
+  const char* begin = s.c_str();
+  char* end = nullptr;
+  errno = 0;
+  const long long v = std::strtoll(begin, &end, 10);
+  if (errno != 0 || end != begin + static_cast<std::ptrdiff_t>(s.size())) {
+    return false;
+  }
+  *out = static_cast<int64_t>(v);
+  return true;
 }
 
 std::optional<std::string> FetchMaxUnixTimestampFromDbc(SQLHDBC dbc, const char* sql, int64_t* out_ts)
@@ -394,6 +410,21 @@ int GetFeatureMappingIdx(const char* feature_name, const char* feature, const Fe
   return inner->second;
 }
 
+int GetFeatureMappingIdxForInt64(const char* feature_name, int64_t feature_value, const FeatureMappingTables* feature_mapping) {
+  if (feature_mapping == nullptr || feature_name == nullptr) {
+    return -1;
+  }
+  const auto outer = feature_mapping->find(feature_name);
+  if (outer == feature_mapping->end()) {
+    return -1;
+  }
+  const auto inner = outer->second.int_value_to_index.find(feature_value);
+  if (inner == outer->second.int_value_to_index.end()) {
+    return -1;
+  }
+  return inner->second;
+}
+
 bool ParseFeatureMappingJson(const std::string& json, FeatureMappingTables* out, std::string* parse_error)
 {
   out->clear();
@@ -445,6 +476,10 @@ bool ParseFeatureMappingJson(const std::string& json, FeatureMappingTables* out,
       }
       table.values.push_back(cell);
       table.value_to_index[cell] = static_cast<int>(i);
+      int64_t as_int = 0;
+      if (TryParseMappingInt64(cell, &as_int)) {
+        table.int_value_to_index[as_int] = static_cast<int>(i);
+      }
     }
     (*out)[feature_name] = std::move(table);
   }

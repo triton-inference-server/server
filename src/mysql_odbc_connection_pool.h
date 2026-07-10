@@ -120,6 +120,8 @@ MysqlOdbcConnectionPool* GlobalMysqlOdbcPool();
 struct FeatureValueIndexMap {
   std::vector<std::string> values;
   std::unordered_map<std::string, int> value_to_index;
+  // Fast path for JSON numeric features (avoids snprintf per request row).
+  std::unordered_map<int64_t, int> int_value_to_index;
 };
 
 using FeatureMappingTables = std::unordered_map<std::string, FeatureValueIndexMap>;
@@ -129,6 +131,11 @@ using FeatureMappingTables = std::unordered_map<std::string, FeatureValueIndexMa
 // missing, or if `feature_name` / `feature` / `feature_mapping` is null.
 int GetFeatureMappingIdx(
     const char* feature_name, const char* feature,
+    const FeatureMappingTables* feature_mapping);
+
+// Look up categorical index when the request feature value is already numeric.
+int GetFeatureMappingIdxForInt64(
+    const char* feature_name, int64_t feature_value,
     const FeatureMappingTables* feature_mapping);
 
 // Loaded from `lightgbm_bt_models` per campaign_id (after merge rules).

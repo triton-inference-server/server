@@ -27,7 +27,6 @@
 
 #include <rapidjson/document.h>
 #include <string>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -65,30 +64,34 @@ struct ImpRoutingTable {
   std::vector<std::vector<ImpRouteRow>> slots;
 };
 
-// Native FP32 tensor per multi_infer slot (imps transform path; no JSON tensor).
-struct MultiInferNativeSlot {
+// One model's imps feature matrix ready for direct TRITONSERVER_InferenceRequest
+// fill (replaces per-slot infer JSON for the imps fast path).
+struct ImpsInferSlot {
   std::string model_name;
-  size_t feature_count{0};
-  // Row-major FP32 tensor bytes (feature_count * batch_rows * sizeof(float)).
+  int64_t model_version{0};
+  // Row-major FP32 tensor bytes (rows * feature_count * sizeof(float)).
   std::vector<char> input_tensor;
+  size_t rows{0};
+  size_t feature_count{0};
 };
 
-TRITONSERVER_Error* ParseRequest(
-    const char* json, size_t json_len, TRITONSERVER_Server* server,
-    rapidjson::Document* out_doc,
-    ImpRoutingTable* imp_routing_out = nullptr,
-    std::vector<MultiInferNativeSlot>* native_slots_out = nullptr);
-
-TRITONSERVER_Error* GenerateInputVectors(
-    const rapidjson::Document& doc, TRITONSERVER_Server* server,
-    rapidjson::Document* out_doc, ImpRoutingTable* imp_routing_out,
-    std::vector<MultiInferNativeSlot>* native_slots_out);
+constexpr const char* kImpsInputTensorName = "input__0";
+constexpr const char* kImpsOutputTensorName = "output__0";
 
 // Populate the ready-model snapshot once at process startup (after models are loaded).
 TRITONSERVER_Error* InitializeReadyModelNames(TRITONSERVER_Server* server);
 
 // Lock-free read of the snapshot initialized by InitializeReadyModelNames.
 const std::unordered_set<std::string>* ActiveReadyModelNames();
+
+// Feature mapping + FP32 tensor build for POST /v2/multi_infer imps requests.
+TRITONSERVER_Error* GenerateImpsInferSlots(
+    const rapidjson::Document& doc, TRITONSERVER_Server* server,
+    std::vector<ImpsInferSlot>* out_slots,
+    ImpRoutingTable* out_routing = nullptr);
+
+// Populates TRITONSERVER_InferenceRequest from a slot: HTTPAPIServer::FillImpsTritonRequest
+// in http_server.cc (requires InferRequestClass for input lifetime and output alloc).
 
 #endif  // TRITON_ENABLE_MYSQL_ODBC
 

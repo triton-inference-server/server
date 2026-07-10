@@ -44,6 +44,10 @@
 #include "classification.h"
 #include "http_error_json.h"
 #include "http_server_macros.h"
+#ifdef TRITON_ENABLE_MYSQL_ODBC
+#include "transform.h"
+#include <cstring>
+#endif
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \
@@ -3206,6 +3210,36 @@ HTTPAPIServer::ScheduleInferAsync(
   return TRITONSERVER_ServerInferAsync(server_.get(), irequest, triton_trace);
 }
 
+TRITONSERVER_Error* HTTPAPIServer::FillMultiInferSlotTritonRequest(const std::string& model_name, triton::common::TritonJson::Value& infer_json, TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req) {
+  RETURN_IF_ERR(ParseJsonTritonRequestID(infer_json, irequest));
+  RETURN_IF_ERR(ParseJsonTritonParams(infer_json, irequest, infer_req));
+  int v_idx = 0;
+  RETURN_IF_ERR(ParseJsonTritonIO(infer_json, irequest, infer_req, model_name, nullptr, &v_idx, 0, 0));
+  return nullptr;  // success
+}
+
+#ifdef TRITON_ENABLE_MYSQL_ODBC
+TRITONSERVER_Error* HTTPAPIServer::AddJsonRequestedOutput(TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req, const char* output_name, uint32_t class_cnt) {
+  RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output_name));
+  infer_req->alloc_payload_.output_map_.emplace(std::piecewise_construct, std::forward_as_tuple(output_name), std::forward_as_tuple(new AllocPayload::OutputInfo(AllocPayload::OutputInfo::JSON, class_cnt)));
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error* HTTPAPIServer::FillImpsTritonRequest(TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req, ImpsInferSlot&& slot) {
+  const int64_t shape[] = {static_cast<int64_t>(slot.rows), static_cast<int64_t>(slot.feature_count)};
+  RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(irequest, kImpsInputTensorName, TRITONSERVER_TYPE_FP32, shape, 2));
+
+  infer_req->serialized_data_.emplace_back(std::move(slot.input_tensor));
+  std::vector<char>& storage = infer_req->serialized_data_.back();
+  const size_t byte_size = storage.size();
+
+  RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(irequest, kImpsInputTensorName, (byte_size > 0) ? static_cast<void*>(storage.data()) : nullptr, byte_size, TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+
+  RETURN_IF_ERR(AddJsonRequestedOutput(irequest, infer_req, kImpsOutputTensorName, 0));
+  return nullptr;  // success
+}
+#endif  // TRITON_ENABLE_MYSQL_ODBC
+
 void
 HTTPAPIServer::HandleGenerate(
     evhtp_request_t* req, const std::string& model_name,
@@ -4063,11 +4097,27 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
 
   RETURN_IF_ERR(response_json.Add("outputs", std::move(response_outputs)));
 
+  triton::common::TritonJson::WriteBuffer json_wb;
+  RETURN_IF_ERR(response_json.Write(&json_wb));
+  const size_t json_byte_size = json_wb.Size();
+
+  if (json_only_out != nullptr) {
+    if (!ordered_buffers.empty()) {
+      return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNSUPPORTED, "multi_infer sub-request: binary outputs are not supported");
+    }
+    evbuffer_add(json_only_out, json_wb.Base(), json_byte_size);
+    return nullptr;  // success
+  }
+
+  const bool use_identity_compression = (response_compression_type_ == DataCompressor::Type::IDENTITY) || (response_compression_type_ == DataCompressor::Type::UNKNOWN);
+  if (ordered_buffers.empty() && use_identity_compression) {
+    SetResponseHeader(false, json_byte_size);
+    evbuffer_add(req_->buffer_out, json_wb.Base(), json_byte_size);
+    return nullptr;  // success
+  }
+
   evbuffer* response_placeholder = evbuffer_new();
-  // Write json metadata into response evbuffer
-  triton::common::TritonJson::WriteBuffer buffer;
-  RETURN_IF_ERR(response_json.Write(&buffer));
-  evbuffer_add(response_placeholder, buffer.Base(), buffer.Size());
+  evbuffer_add(response_placeholder, json_wb.Base(), json_byte_size);
 
   // If there is binary data write it next in the appropriate
   // order... also need the HTTP header when returning binary data.
@@ -4078,45 +4128,28 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
   }
 
   evbuffer* response_body = response_placeholder;
-  if (json_only_out == nullptr) {
-    switch (response_compression_type_) {
-      case DataCompressor::Type::DEFLATE:
-      case DataCompressor::Type::GZIP: {
-        auto compressed_buffer = evbuffer_new();
-        auto err = DataCompressor::CompressData(
-            response_compression_type_, response_placeholder,
-            compressed_buffer);
-        if (err == nullptr) {
-          response_body = compressed_buffer;
-          evbuffer_free(response_placeholder);
-        } else {
-          // just log the compression error and return the uncompressed data
-          LOG_VERBOSE(1) << "unable to compress response: "
-                         << TRITONSERVER_ErrorMessage(err);
-          TRITONSERVER_ErrorDelete(err);
-          evbuffer_free(compressed_buffer);
-          response_compression_type_ = DataCompressor::Type::IDENTITY;
-        }
-        break;
+  switch (response_compression_type_) {
+    case DataCompressor::Type::DEFLATE:
+    case DataCompressor::Type::GZIP: {
+      auto compressed_buffer = evbuffer_new();
+      auto err = DataCompressor::CompressData(response_compression_type_, response_placeholder, compressed_buffer);
+      if (err == nullptr) {
+        response_body = compressed_buffer;
+        evbuffer_free(response_placeholder);
+      } else {
+        LOG_VERBOSE(1) << "unable to compress response: " << TRITONSERVER_ErrorMessage(err);
+        TRITONSERVER_ErrorDelete(err);
+        evbuffer_free(compressed_buffer);
+        response_compression_type_ = DataCompressor::Type::IDENTITY;
       }
-      case DataCompressor::Type::IDENTITY:
-      case DataCompressor::Type::UNKNOWN:
-        // Do nothing for other cases
-        break;
+      break;
     }
-    SetResponseHeader(!ordered_buffers.empty(), buffer.Size());
-    evbuffer_add_buffer(req_->buffer_out, response_body);
-  } else {
-    if (!ordered_buffers.empty()) {
-      evbuffer_free(response_placeholder);
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_UNSUPPORTED,
-          "multi_infer sub-request: binary outputs are not supported");
-    }
-    evbuffer_add_buffer(json_only_out, response_body);
+    case DataCompressor::Type::IDENTITY:
+    case DataCompressor::Type::UNKNOWN:
+      break;
   }
-  // Destroy the evbuffer object as the data has been moved
-  // to HTTP response buffer (or json_only_out)
+  SetResponseHeader(!ordered_buffers.empty(), json_byte_size);
+  evbuffer_add_buffer(req_->buffer_out, response_body);
   evbuffer_free(response_body);
 
   return nullptr;  // success
@@ -4124,8 +4157,7 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
 
 namespace {
 
-TRITONSERVER_Error* CopyTritonTensorPayloadToDoubles(const void* base, TRITONSERVER_DataType dtype, int64_t element_count, std::vector<double>* out)
-{
+TRITONSERVER_Error* CopyTritonTensorPayloadToDoubles(const void* base, TRITONSERVER_DataType dtype, int64_t element_count, std::vector<double>* out) {
   out->resize(static_cast<size_t>(element_count));
   switch (dtype) {
     case TRITONSERVER_TYPE_BOOL: {
@@ -4218,8 +4250,7 @@ TRITONSERVER_Error* CopyTritonTensorPayloadToDoubles(const void* base, TRITONSER
 
 }  // namespace
 
-TRITONSERVER_Error* HTTPAPIServer::InferRequestClass::ExtractFirstJsonOutputAsRowMajorDoubles(TRITONSERVER_InferenceResponse* response, size_t expect_rows, std::vector<std::vector<double>>* rows_out)
-{
+TRITONSERVER_Error* HTTPAPIServer::InferRequestClass::ExtractFirstJsonOutputAsRowMajorDoubles(TRITONSERVER_InferenceResponse* response, size_t expect_rows, std::vector<std::vector<double>>* rows_out) {
   rows_out->clear();
   if (expect_rows == 0) {
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "expect_rows must be positive");
@@ -4332,10 +4363,7 @@ TRITONSERVER_Error* HTTPAPIServer::InferRequestClass::ExtractFirstJsonOutputAsRo
   return nullptr;
 }
 
-TRITONSERVER_Error* HTTPAPIServer::InferRequestClass::ExtractFirstJsonOutputAsScalars(
-    TRITONSERVER_InferenceResponse* response, size_t expect_rows,
-    std::vector<float>* scores_out)
-{
+TRITONSERVER_Error* HTTPAPIServer::InferRequestClass::ExtractFirstJsonOutputAsScalars(TRITONSERVER_InferenceResponse* response, size_t expect_rows, std::vector<float>* scores_out) {
   scores_out->clear();
   if (expect_rows == 0) {
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "expect_rows must be positive");
@@ -4360,16 +4388,12 @@ TRITONSERVER_Error* HTTPAPIServer::InferRequestClass::ExtractFirstJsonOutputAsSc
   int64_t memory_type_id = 0;
   void* userp = nullptr;
 
-  RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutput(
-      response, kIdx, &cname, &datatype, &shape, &dim_count, &base, &byte_size,
-      &memory_type, &memory_type_id, &userp));
+  RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutput(response, kIdx, &cname, &datatype, &shape, &dim_count, &base, &byte_size, &memory_type, &memory_type_id, &userp));
 
   auto* info = reinterpret_cast<AllocPayload::OutputInfo*>(userp);
   if (info == nullptr || info->kind_ != AllocPayload::OutputInfo::JSON ||
       info->class_cnt_ > 0) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNSUPPORTED,
-        "output 0 must be plain JSON tensor (no shared memory / binary / classification)");
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNSUPPORTED, "output 0 must be plain JSON tensor (no shared memory / binary / classification)");
   }
 
   int64_t element_count = 1;
@@ -4383,9 +4407,7 @@ TRITONSERVER_Error* HTTPAPIServer::InferRequestClass::ExtractFirstJsonOutputAsSc
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "output has zero elements");
   }
   if (static_cast<size_t>(element_count) != expect_rows) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNSUPPORTED,
-        "scalar extract requires one output element per batch row");
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNSUPPORTED, "scalar extract requires one output element per batch row");
   }
 
   const size_t type_byte = TRITONSERVER_DataTypeByteSize(datatype);
@@ -4413,8 +4435,7 @@ TRITONSERVER_Error* HTTPAPIServer::InferRequestClass::ExtractFirstJsonOutputAsSc
   }
 
   std::vector<double> flat;
-  TRITONSERVER_Error* cerr =
-      CopyTritonTensorPayloadToDoubles(base, datatype, element_count, &flat);
+  TRITONSERVER_Error* cerr = CopyTritonTensorPayloadToDoubles(base, datatype, element_count, &flat);
   if (cerr != nullptr) {
     return cerr;
   }

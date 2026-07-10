@@ -13,6 +13,7 @@
 //    from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
 // PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
 // CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
@@ -29,7 +30,8 @@
 #include <rapidjson/error/en.h>
 #include <algorithm>
 #include <atomic>
-#include <cmath>
+#include <cerrno>
+#include <climits>
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
@@ -52,23 +54,28 @@ int FeatureIdxFromJsonValue(const char* feature_name, const rapidjson::Value& v,
   if (v.IsString()) {
     return triton::server::GetFeatureMappingIdx(feature_name, v.GetString(), tables);
   }
-  char num_buf[48];
-  int n = 0;
   if (v.IsInt()) {
-    n = std::snprintf(num_buf, sizeof(num_buf), "%d", v.GetInt());
-  } else if (v.IsUint()) {
-    n = std::snprintf(num_buf, sizeof(num_buf), "%u", v.GetUint());
-  } else if (v.IsInt64()) {
-    n = std::snprintf(num_buf, sizeof(num_buf), "%lld", static_cast<long long>(v.GetInt64()));
-  } else if (v.IsUint64()) {
-    n = std::snprintf(num_buf, sizeof(num_buf), "%llu", static_cast<unsigned long long>(v.GetUint64()));
-  } else {
-    return -1;
+    return triton::server::GetFeatureMappingIdxForInt64(feature_name, static_cast<int64_t>(v.GetInt()), tables);
   }
-  if (n <= 0 || static_cast<size_t>(n) >= sizeof(num_buf)) {
-    return -1;
+  if (v.IsUint()) {
+    return triton::server::GetFeatureMappingIdxForInt64(feature_name, static_cast<int64_t>(v.GetUint()), tables);
   }
-  return triton::server::GetFeatureMappingIdx(feature_name, num_buf, tables);
+  if (v.IsInt64()) {
+    return triton::server::GetFeatureMappingIdxForInt64(feature_name, v.GetInt64(), tables);
+  }
+  if (v.IsUint64()) {
+    const uint64_t uv = v.GetUint64();
+    if (uv > static_cast<uint64_t>(INT64_MAX)) {
+      char num_buf[32];
+      const int n = std::snprintf(num_buf, sizeof(num_buf), "%llu", static_cast<unsigned long long>(uv));
+      if (n <= 0 || static_cast<size_t>(n) >= sizeof(num_buf)) {
+        return -1;
+      }
+      return triton::server::GetFeatureMappingIdx(feature_name, num_buf, tables);
+    }
+    return triton::server::GetFeatureMappingIdxForInt64(feature_name, static_cast<int64_t>(uv), tables);
+  }
+  return -1;
 }
 
 bool IsCampLevelFeature(const std::string& feature) {
@@ -158,18 +165,6 @@ TRITONSERVER_Error* FillCampFeaturesInRow(const rapidjson::Value& camp, int32_t 
   return nullptr;
 }
 
-void AppendFloatRowToTensor(std::vector<char>* tensor, const std::vector<float>& row) {
-  const size_t offset = tensor->size();
-  tensor->resize(offset + row.size() * sizeof(float));
-  std::memcpy(tensor->data() + offset, row.data(), row.size() * sizeof(float));
-}
-
-struct ModelSlotBuild {
-  size_t feature_count{0};
-  std::vector<char> tensor;
-  std::vector<triton::server::ImpRouteRow> routes;
-};
-
 TRITONSERVER_Error* RefreshReadyModelNamesInto(std::unordered_set<std::string>* out, TRITONSERVER_Server* server) {
   if (out == nullptr) {
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "output set pointer is null");
@@ -217,9 +212,53 @@ TRITONSERVER_Error* RefreshReadyModelNamesInto(std::unordered_set<std::string>* 
 
   return nullptr;
 }
-}
+
+}  // namespace
 
 namespace triton { namespace server {
+
+namespace {
+
+struct ModelSlotBuild {
+  size_t feature_count{0};
+  std::vector<char> tensor;
+  std::vector<ImpRouteRow> routes;
+};
+
+void AppendFloatRowToTensor(std::vector<char>* tensor, const std::vector<float>& row)
+{
+  const size_t nbytes = row.size() * sizeof(float);
+  if (nbytes == 0) {
+    return;
+  }
+  const char* bytes = reinterpret_cast<const char*>(row.data());
+  tensor->insert(tensor->end(), bytes, bytes + nbytes);
+}
+
+TRITONSERVER_Error* CheckModelReadyCached(TRITONSERVER_Server* server, const std::string& model_name, std::unordered_map<std::string, bool>* ready_cache) {
+  auto it = ready_cache->find(model_name);
+  if (it != ready_cache->end()) {
+    if (!it->second) {
+      const std::string not_ready = "model " + model_name + " not ready";
+      return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, not_ready.c_str());
+    }
+    return nullptr;
+  }
+
+  bool ready = false;
+  TRITONSERVER_Error* err = TRITONSERVER_ServerModelIsReady(server, model_name.c_str(), -1 /* latest version */, &ready);
+  if (err != nullptr) {
+    return err;
+  }
+  (*ready_cache)[model_name] = ready;
+  if (!ready) {
+    const std::string not_ready = "model " + model_name + " not ready";
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, not_ready.c_str());
+  }
+  return nullptr;
+}
+
+}  // namespace
 
 TRITONSERVER_Error* InitializeReadyModelNames(TRITONSERVER_Server* server) {
   if (server == nullptr) {
@@ -243,47 +282,8 @@ const std::unordered_set<std::string>* ActiveReadyModelNames() {
   return &g_ready_model_names;
 }
 
-TRITONSERVER_Error* ParseRequest(const char* json, size_t json_len, TRITONSERVER_Server* server, rapidjson::Document* out_doc, ImpRoutingTable* imp_routing_out, std::vector<MultiInferNativeSlot>* native_slots_out) {
-  if (out_doc == nullptr) {
-    return TRITONSERVER_ErrorNew(
-    TRITONSERVER_ERROR_INVALID_ARG, "output document pointer is null");
-  }
-
-  if (imp_routing_out != nullptr) {
-    imp_routing_out->imp_count = 0;
-    imp_routing_out->slots.clear();
-  }
-  if (native_slots_out != nullptr) {
-    native_slots_out->clear();
-  }
-
-  rapidjson::Document doc;
-  doc.Parse(json, json_len);
-  if (doc.HasParseError()) {
-    const char* msg = rapidjson::GetParseError_En(doc.GetParseError());
-    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, msg);
-  }
-
-  if (server != nullptr && doc.IsObject() && doc.HasMember(TRITON_BT_JSON_IMPS)) {
-    const rapidjson::Value& imps_member = doc[TRITON_BT_JSON_IMPS];
-    if (imps_member.IsArray()) {
-      if (native_slots_out == nullptr) {
-        return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "native_slots_out is required for imps transform");
-      }
-      return GenerateInputVectors(doc, server, out_doc, imp_routing_out, native_slots_out);
-    }
-  }
-
-  if (native_slots_out != nullptr) {
-    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "multi_infer expects a JSON object with an 'imps' array");
-  }
-
-  *out_doc = std::move(doc);
-  return nullptr;
-}
-
-TRITONSERVER_Error* GenerateInputVectors( const rapidjson::Document& doc, TRITONSERVER_Server* server, rapidjson::Document* out_doc, ImpRoutingTable* imp_routing_out, std::vector<MultiInferNativeSlot>* native_slots_out) {
-  if (out_doc == nullptr || server == nullptr || native_slots_out == nullptr) {
+TRITONSERVER_Error* GenerateImpsInferSlots(const rapidjson::Document& doc, TRITONSERVER_Server* server, std::vector<ImpsInferSlot>* out_slots, ImpRoutingTable* out_routing) {
+  if (out_slots == nullptr || server == nullptr) {
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "invalid argument");
   }
   if (!doc.IsObject() || !doc.HasMember(TRITON_BT_JSON_IMPS) || !doc[TRITON_BT_JSON_IMPS].IsArray()) {
@@ -295,20 +295,21 @@ TRITONSERVER_Error* GenerateInputVectors( const rapidjson::Document& doc, TRITON
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNAVAILABLE, "campaign feature mappings are not loaded");
   }
 
-  const std::unordered_set<std::string>* ready_model_names = ActiveReadyModelNames();
-  if (ready_model_names == nullptr) {
-    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNAVAILABLE, "ready model names are not initialized");
-  }
-  if (ready_model_names->empty()) {
-    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "no ready models reported by server");
-  }
-
+  std::unordered_map<std::string, bool> ready_cache;
   std::unordered_map<std::string, ModelSlotBuild> slots_by_model;
+  const std::string* cached_slot_model_name = nullptr;
+  ModelSlotBuild* cached_slot_build = nullptr;
+  TRITONSERVER_Error* err = nullptr;
+
+  out_slots->clear();
+  if (out_routing != nullptr) {
+    out_routing->imp_count = 0;
+    out_routing->slots.clear();
+  }
 
   const rapidjson::Value& imps = doc[TRITON_BT_JSON_IMPS];
   std::vector<float> row;
   std::unordered_map<std::string, std::vector<float>> imp_base_by_model;
-  TRITONSERVER_Error* err = nullptr;
 
   for (rapidjson::SizeType ii = 0; ii < imps.Size(); ++ii) {
     const rapidjson::Value& imp = imps[ii];
@@ -329,7 +330,7 @@ TRITONSERVER_Error* GenerateInputVectors( const rapidjson::Document& doc, TRITON
       const int32_t campaign_id = camp[TRITON_BT_JSON_CID].GetInt();
 
       auto cmap_it = cmap->find(campaign_id);
-      if(cmap_it == cmap->end()) {
+      if (cmap_it == cmap->end()) {
         cmap_it = cmap->find(0);
       }
       if (cmap_it == cmap->end()) {
@@ -340,17 +341,28 @@ TRITONSERVER_Error* GenerateInputVectors( const rapidjson::Document& doc, TRITON
       const std::vector<std::string>& feature_sequence = cmap_it->second.feature_sequence;
       const FeatureMappingTables& tables = cmap_it->second.feature_mapping;
 
-      if (ready_model_names->find(model_name) == ready_model_names->end()) {
-        const std::string not_ready = "model " + model_name + " not ready";
-        return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, not_ready.c_str());
+      err = CheckModelReadyCached(server, model_name, &ready_cache);
+      if (err != nullptr) {
+        return err;
       }
 
-      ModelSlotBuild& slot = slots_by_model[model_name];
+      ModelSlotBuild* slot_build = nullptr;
+      if (cached_slot_model_name != nullptr && model_name == *cached_slot_model_name) {
+        slot_build = cached_slot_build;
+      } else {
+        auto slot_it = slots_by_model.find(model_name);
+        if (slot_it == slots_by_model.end()) {
+          slot_it = slots_by_model.emplace(model_name, ModelSlotBuild{}).first;
+        }
+        cached_slot_model_name = &slot_it->first;
+        cached_slot_build = &slot_it->second;
+        slot_build = cached_slot_build;
+      }
       const size_t feature_count = feature_sequence.size();
-      if (slot.feature_count == 0) {
-        slot.feature_count = feature_count;
-        slot.tensor.reserve(camps.Size() * feature_count * sizeof(float));
-      } else if (slot.feature_count != feature_count) {
+      if (slot_build->feature_count == 0) {
+        slot_build->feature_count = feature_count;
+      } 
+      else if (slot_build->feature_count != feature_count) {
         return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "inconsistent feature_count for model buffer");
       }
 
@@ -383,8 +395,10 @@ TRITONSERVER_Error* GenerateInputVectors( const rapidjson::Document& doc, TRITON
         for (rapidjson::SizeType ai = 0; ai < adsize.Size(); ++ai) {
           const rapidjson::Value& adsize_item = adsize[ai];
           row[static_cast<size_t>(adsize_idx)] = static_cast<float>(FeatureIdxFromJsonValue(TRITON_BT_FEATURE_ADSIZE, adsize_item, &tables));
-          AppendFloatRowToTensor(&slot.tensor, row);
-          slot.routes.push_back(ImpRouteRow{static_cast<int>(ii), static_cast<int>(ci), static_cast<int>(ai), campaign_id});
+          AppendFloatRowToTensor(&slot_build->tensor, row);
+          if (out_routing != nullptr) {
+            slot_build->routes.push_back(ImpRouteRow{static_cast<int>(ii), static_cast<int>(ci), static_cast<int>(ai), campaign_id});
+          }
         }
       }
     }
@@ -397,11 +411,10 @@ TRITONSERVER_Error* GenerateInputVectors( const rapidjson::Document& doc, TRITON
   }
   std::sort(model_names.begin(), model_names.end());
 
-  native_slots_out->reserve(model_names.size());
-  if (imp_routing_out != nullptr) {
-    imp_routing_out->imp_count = static_cast<int>(imps.Size());
-    imp_routing_out->slots.clear();
-    imp_routing_out->slots.reserve(model_names.size());
+  out_slots->reserve(model_names.size());
+  if (out_routing != nullptr) {
+    out_routing->imp_count = static_cast<int>(imps.Size());
+    out_routing->slots.reserve(model_names.size());
   }
 
   for (const std::string& model_name : model_names) {
@@ -417,19 +430,21 @@ TRITONSERVER_Error* GenerateInputVectors( const rapidjson::Document& doc, TRITON
       return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, "buffer length is not a multiple of feature_count");
     }
 
-    MultiInferNativeSlot slot;
+    ImpsInferSlot slot;
     slot.model_name = model_name;
+    slot.model_version = 0;
     slot.feature_count = built.feature_count;
+    slot.rows = built.tensor.size() / (built.feature_count * sizeof(float));
     slot.input_tensor = std::move(built.tensor);
-    native_slots_out->push_back(std::move(slot));
+    out_slots->push_back(std::move(slot));
 
-    if (imp_routing_out != nullptr) {
-      imp_routing_out->slots.push_back(std::move(built.routes));
+    if (out_routing != nullptr) {
+      out_routing->slots.push_back(std::move(built.routes));
     }
   }
 
-  out_doc->SetObject();
   return nullptr;
 }
-} }  // namespace triton::server
+
+}}  // namespace triton::server
 #endif  // TRITON_ENABLE_MYSQL_ODBC
