@@ -184,7 +184,7 @@ $ export AWS_DEFAULT_REGION="us-west-2"
 $ tritonserver --model-repository=s3://https://s3.us-west-2.amazonaws.com:443/my-bucket/models ...
 ```
 
-The credential file described [above](#cloud-storage-with-credential-file-beta) can also be used for an S3-compatible endpoint by adding an `s3://` entry keyed by the full bucket path.
+The credential file described in [Cloud Storage with Credential file (Beta)](#cloud-storage-with-credential-file-beta) can also be used for an S3-compatible endpoint by adding an `s3` entry keyed by the bucket URI, including the custom endpoint when used.
 
 ```json
 {
