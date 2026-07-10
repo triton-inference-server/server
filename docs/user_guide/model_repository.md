@@ -169,19 +169,19 @@ export TRITON_AWS_MOUNT_DIRECTORY=/path/to/your/local/directory
 
 #### S3-compatible object stores
 
-The S3 backend also works with S3-compatible object stores such as Backblaze B2, Cloudflare R2, and MinIO. The repository path uses the private-instance form described above, with the provider's endpoint as the host, and the credentials and region are passed through the same environment variables as Amazon S3.
+The S3 backend also works with any endpoint that implements the S3-compatible API, such as Backblaze B2, Cloudflare R2, and MinIO. The repository path uses the private-instance form described above, with the provider's endpoint as the host, and the credentials and region are passed through the same environment variables as Amazon S3.
 
 ```bash
-$ tritonserver --model-repository=s3://https://s3.us-west-004.backblazeb2.com:443/bucket/path/to/model/repository ...
+$ tritonserver --model-repository=s3://https://s3.us-west-2.amazonaws.com:443/bucket/path/to/model/repository ...
 ```
 
-Replace `s3.us-west-004.backblazeb2.com` with the endpoint for your provider and region.
+Replace `s3.us-west-2.amazonaws.com` with the S3-compatible endpoint for your provider and region.
 
 ```bash
 $ export AWS_ACCESS_KEY_ID="<access_key_id>"
 $ export AWS_SECRET_ACCESS_KEY="<secret_access_key>"
-$ export AWS_DEFAULT_REGION="us-west-004"
-$ tritonserver --model-repository=s3://https://s3.us-west-004.backblazeb2.com:443/my-bucket/models ...
+$ export AWS_DEFAULT_REGION="us-west-2"
+$ tritonserver --model-repository=s3://https://s3.us-west-2.amazonaws.com:443/my-bucket/models ...
 ```
 
 The credential file described [above](#cloud-storage-with-credential-file-beta) can also be used for an S3-compatible endpoint by adding an `s3://` entry keyed by the full bucket path.
@@ -189,10 +189,10 @@ The credential file described [above](#cloud-storage-with-credential-file-beta) 
 ```json
 {
   "s3": {
-    "s3://https://s3.us-west-004.backblazeb2.com:443/my-bucket": {
+    "s3://https://s3.us-west-2.amazonaws.com:443/my-bucket": {
       "secret_key": "<secret_access_key>",
       "key_id": "<access_key_id>",
-      "region": "us-west-004",
+      "region": "us-west-2",
       "session_token": "",
       "profile": ""
     }
