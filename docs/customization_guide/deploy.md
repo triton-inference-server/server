@@ -293,7 +293,11 @@ Specifies the maximum number of states (inference request/response queues) that 
 Specifies the maximum number of inference response objects that can remain allocated in each response queue at any given time. This option is particularly useful in decoupled mode, where multiple responses are generated for a single request. By default, this value is set to `INT_MAX`.
 
 > [!Warning]
+> Operators exposing decoupled gRPC streaming to untrusted clients should
+> explicitly configure `--grpc-max-response-pool-size` to a bounded value
+> appropriate for their workload, rather than relying on the default
+> `INT_MAX`. Choose a value based on model behavior (decoupled vs
+> non-decoupled), expected concurrency, and available memory.
+
+> [!Warning]
 > Setting this value too low may negatively impact performance.
-
-
-
