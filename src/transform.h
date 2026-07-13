@@ -68,6 +68,7 @@ struct ImpRoutingTable {
 // fill (replaces per-slot infer JSON for the imps fast path).
 struct ImpsInferSlot {
   std::string model_name;
+  std::string original_model_name;
   int64_t model_version{0};
   // Row-major FP32 tensor bytes (rows * feature_count * sizeof(float)).
   std::vector<char> input_tensor;

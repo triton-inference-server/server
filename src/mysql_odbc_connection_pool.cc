@@ -258,6 +258,16 @@ void Trim(std::string* s)
   }
 }
 
+void ToLowerInPlace(std::string* s)
+{
+  if (s == nullptr) {
+    return;
+  }
+  std::transform(s->begin(), s->end(), s->begin(), [](unsigned char c) { 
+    return static_cast<char>(std::tolower(c)); 
+  });
+}
+
 std::string SqlCharBufferToString(const std::vector<SQLCHAR>& buf, SQLLEN cb)
 {
   if (cb == SQL_NULL_DATA) {
@@ -503,7 +513,7 @@ namespace {
 
 bool TryMergeRowIntoCampaignMap(const LightgbmBtModelRow& row, CampaignToFeatureMappings& out)
 {
-  const CampaignBtModelBundle bundle{row.model_name, row.feature_mapping, row.feature_sequence};
+  const CampaignBtModelBundle bundle{row.model_name, row.model_name_lower, row.feature_mapping, row.feature_sequence};
 
   if (row.campaign_id != 0) {
     if (out.find(row.campaign_id) != out.end()) {
@@ -628,6 +638,8 @@ std::optional<std::string> FetchLightgbmBtModelsForDc(CampaignToFeatureMappings&
     if (cb_model_name != SQL_NULL_DATA) {
       row.model_name = SqlCharBufferToString(model_buf, cb_model_name);
       Trim(&row.model_name);
+      row.model_name_lower = row.model_name;
+      ToLowerInPlace(&row.model_name_lower);
     }
 
     std::string mapping_json;

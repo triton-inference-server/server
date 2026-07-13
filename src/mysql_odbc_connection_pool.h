@@ -141,6 +141,7 @@ int GetFeatureMappingIdxForInt64(
 // Loaded from `lightgbm_bt_models` per campaign_id (after merge rules).
 struct CampaignBtModelBundle {
   std::string model_name;
+  std::string model_name_lower;
   FeatureMappingTables feature_mapping;
   std::vector<std::string> feature_sequence;
 };
@@ -150,6 +151,7 @@ using CampaignToFeatureMappings = std::unordered_map<int32_t, CampaignBtModelBun
 struct LightgbmBtModelRow {
   int32_t campaign_id{0};
   std::string model_name;
+  std::string model_name_lower;
   FeatureMappingTables feature_mapping;
   std::vector<std::string> feature_sequence;
   std::vector<int32_t> applicable_campaigns;

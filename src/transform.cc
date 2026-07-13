@@ -223,6 +223,7 @@ struct ModelSlotBuild {
   size_t feature_count{0};
   std::vector<char> tensor;
   std::vector<ImpRouteRow> routes;
+  std::string original_model_name;
 };
 
 void AppendFloatRowToTensor(std::vector<char>* tensor, const std::vector<float>& row)
@@ -337,7 +338,8 @@ TRITONSERVER_Error* GenerateImpsInferSlots(const rapidjson::Document& doc, TRITO
         const std::string unknown_campaign = std::string("unknown campaign_id ") + std::to_string(campaign_id);
         return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, unknown_campaign.c_str());
       }
-      const std::string& model_name = cmap_it->second.model_name;
+      const std::string& model_name = cmap_it->second.model_name_lower;
+      const std::string& original_model_name = cmap_it->second.model_name;
       const std::vector<std::string>& feature_sequence = cmap_it->second.feature_sequence;
       const FeatureMappingTables& tables = cmap_it->second.feature_mapping;
 
@@ -353,6 +355,7 @@ TRITONSERVER_Error* GenerateImpsInferSlots(const rapidjson::Document& doc, TRITO
         auto slot_it = slots_by_model.find(model_name);
         if (slot_it == slots_by_model.end()) {
           slot_it = slots_by_model.emplace(model_name, ModelSlotBuild{}).first;
+          slot_it->second.original_model_name = original_model_name;
         }
         cached_slot_model_name = &slot_it->first;
         cached_slot_build = &slot_it->second;
@@ -432,6 +435,7 @@ TRITONSERVER_Error* GenerateImpsInferSlots(const rapidjson::Document& doc, TRITO
 
     ImpsInferSlot slot;
     slot.model_name = model_name;
+    slot.original_model_name = built.original_model_name.empty() ? model_name : built.original_model_name;
     slot.model_version = -1;
     slot.feature_count = built.feature_count;
     slot.rows = built.tensor.size() / (built.feature_count * sizeof(float));

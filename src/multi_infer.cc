@@ -768,7 +768,7 @@ void HTTPAPIServer::HandleMultiInfer(evhtp_request_t* req) {
         std::vector<std::string> slot_model_names;
         slot_model_names.reserve(n);
         for (const auto& slot : imps_slots) {
-          slot_model_names.push_back(slot.model_name);
+          slot_model_names.push_back(slot.original_model_name.empty() ? slot.model_name : slot.original_model_name);
         }
 
         std::shared_ptr<MultiInferAggregator> aggregator = std::make_shared<MultiInferAggregator>(req, n, reply_thread, irequests, std::move(imp_routing.slots), std::move(slot_model_names), imp_routing.imp_count);
