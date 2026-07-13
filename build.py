@@ -72,10 +72,10 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.71.0dev",
-    "triton_container_version": "26.07dev",
-    "upstream_container_version": "26.05",
-    "ort_version": "1.24.4",
+    "release_version": "2.72.0dev",
+    "triton_container_version": "26.08dev",
+    "upstream_container_version": "26.06",
+    "ort_version": "1.27.0",
     "ort_openvino_version": "2026.2.0",
     "standalone_openvino_version": "2026.2.0",
     "dcgm_version": "4.5.3-1",
@@ -104,6 +104,51 @@ def log(msg, force=False):
 def log_verbose(msg):
     if FLAGS.verbose:
         log(msg, force=True)
+
+
+def usable_cpu_count():
+    # Honor CPU affinity / cgroup pinning where available (Linux); fall back to
+    # the logical core count on platforms without sched_getaffinity.
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:
+        return multiprocessing.cpu_count() or 1
+
+
+def available_memory_gb():
+    # Best-effort available RAM in GiB, or None if it cannot be determined.
+    # Reads MemAvailable from /proc/meminfo (Linux); returns None elsewhere so
+    # callers fall back to a CPU-only parallelism default.
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) / (1024 * 1024)
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
+def default_build_parallel():
+    # Triton is memory-heavy C++/CUDA: template-dense translation units routinely
+    # peak at 1-2+ GB RAM per compiler process, so blindly using N (or 2*N) cores
+    # can invoke the OOM killer. Cap parallelism so each job has ~2 GB headroom.
+    mem_gb_per_job = 2.0
+    jobs = usable_cpu_count()
+
+    mem_gb = available_memory_gb()
+    if mem_gb is not None:
+        mem_cap = max(1, int(mem_gb // mem_gb_per_job))
+        if mem_cap < jobs:
+            log(
+                "Limiting build parallelism to {} (from {} usable cores) so each "
+                "compile job has ~{:.0f} GB of RAM; {:.1f} GB available.".format(
+                    mem_cap, jobs, mem_gb_per_job, mem_gb
+                )
+            )
+        jobs = min(jobs, mem_cap)
+
+    return max(1, jobs)
 
 
 def fail(msg):
@@ -2340,7 +2385,9 @@ if __name__ == "__main__":
         type=int,
         required=False,
         default=None,
-        help="Build parallelism. Defaults to 2 * number-of-cores.",
+        help="Build parallelism. Defaults to the usable core count, "
+        "capped so each parallel compile job has ~2 GB of RAM headroom "
+        "to avoid out-of-memory build failures.",
     )
 
     parser.add_argument(
@@ -2663,7 +2710,7 @@ if __name__ == "__main__":
         os.environ.setdefault("TRITON_RELEASE_VERSION", FLAGS.version)
 
     if FLAGS.build_parallel is None:
-        FLAGS.build_parallel = multiprocessing.cpu_count() * 2
+        FLAGS.build_parallel = default_build_parallel()
 
     log("Building Triton Inference Server")
     log("platform {}".format(target_platform()))
