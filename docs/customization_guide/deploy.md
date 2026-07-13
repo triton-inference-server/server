@@ -38,7 +38,9 @@ standalone process.  This guide is intended to provide some key points
 and best practices that users deploying Triton based solutions should
 consider.
 
-| [Deploying Behind a Secure Proxy or Gateway](#deploying-behind-a-secure-proxy-or-gateway) | [Securing Model and Backend Code](#securing-model-and-backend-code) | [Running with Least Privilege](#running-with-least-privilege) |
+| [Secure Proxy or Gateway](#deploying-behind-a-secure-proxy-or-gateway) |
+[Model and Backend Code](#securing-model-and-backend-code) |
+[Least Privilege](#running-with-least-privilege) |
 
 > [!IMPORTANT]
 > Ultimately the security of a solution based on Triton
