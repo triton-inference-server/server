@@ -38,7 +38,7 @@ standalone process.  This guide is intended to provide some key points
 and best practices that users deploying Triton based solutions should
 consider.
 
-| [Deploying Behind a Secure Gateway or Proxy](#deploying-behind-a-secure-proxy-or-gateway) | [Running with Least Privilege](#running-with-least-privilege) | [Securing Model and Backend Code](#securing-model-and-backend-code) |
+| [Deploying Behind a Secure Proxy or Gateway](#deploying-behind-a-secure-proxy-or-gateway) | [Securing Model and Backend Code](#securing-model-and-backend-code) | [Running with Least Privilege](#running-with-least-privilege) |
 
 > [!IMPORTANT]
 > Ultimately the security of a solution based on Triton
@@ -88,24 +88,26 @@ as an "Application" or "Service" within the trusted internal network.
 
 > [!WARNING]
 > Some Triton backends execute code loaded from the model repository.
-> Depending on the backend, this code may run in the Triton process or
-> in a backend worker process and can inherit the deployment's
-> operating-system privileges, filesystem access, available
-> credentials, and network access. Triton does not provide a security
-> sandbox for arbitrary model or backend code.
+> Depending on the backend, this code may run in the Triton server
+> process or in a separate process managed by the backend. It can
+> exercise the operating-system privileges and access available to that
+> process, including filesystem access, available credentials, and
+> network access. Triton does not provide a security sandbox for
+> arbitrary model or backend code.
 
-Treat executable model and backend code as trusted deployment
-artifacts. Restrict write access to model repositories and backend
-directories, restrict access to model-control APIs, and review this
-code before deployment.
+Only deploy executable model and backend code from trusted sources.
+Restrict write access to model repositories and backend directories,
+restrict model control APIs to trusted operators when they are enabled,
+and review executable code before deployment.
 
-Caller authentication and authorization do not make inference inputs
-safe for arbitrary use. Treat request-derived values as untrusted
-unless they have been validated for their intended use. Before using
-these values in network requests, file paths, subprocesses,
+Even when a caller is authenticated and authorized, treat
+request-derived values as untrusted until they have been validated for
+their intended use. Before using these values in outbound network
+requests, filesystem operations, subprocess invocations,
 deserialization, or media decoding, validate them against an explicit
-policy and enforce limits on size, execution time, concurrency, and
-other resource consumption.
+policy and enforce limits on input size, execution time, concurrency,
+and other resource use. Use deployment-level controls, such as outbound
+network restrictions, to limit the impact of validation failures.
 
 ## Running with Least Privilege
 
