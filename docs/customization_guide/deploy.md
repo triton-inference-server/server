@@ -79,10 +79,10 @@ an untrusted network.
 In the following references, Triton Inference Server would be deployed
 as an "Application" or "Service" within the trusted internal network.
 
-* [https://www.nginx.com/blog/architecting-zero-trust-security-for-kubernetes-apps-with-nginx/]
-* [https://istio.io/latest/docs/concepts/security/]
-* [https://konghq.com/blog/enterprise/envoy-service-mesh]
-* [https://www.solo.io/topics/envoy-proxy/]
+* [https://www.nginx.com/blog/architecting-zero-trust-security-for-kubernetes-apps-with-nginx/](https://www.nginx.com/blog/architecting-zero-trust-security-for-kubernetes-apps-with-nginx/)
+* [https://istio.io/latest/docs/concepts/security/](https://istio.io/latest/docs/concepts/security/)
+* [https://konghq.com/blog/enterprise/envoy-service-mesh](https://konghq.com/blog/enterprise/envoy-service-mesh)
+* [https://www.solo.io/topics/envoy-proxy/](https://www.solo.io/topics/envoy-proxy/)
 
 ## Running with Least Privilege
 
