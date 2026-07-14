@@ -61,7 +61,7 @@ if [ -n "$SAGEMAKER_MULTI_MODEL" ]; then
 fi
 
 SAGEMAKER_ARGS="--model-repository=${SAGEMAKER_MODEL_REPO}"
-#Set model namespacing to true, but allow disabling if required
+# Set model namespacing to true, but allow disabling if required
 if [ -n "$SAGEMAKER_TRITON_DISABLE_MODEL_NAMESPACING" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --model-namespacing=${SAGEMAKER_TRITON_DISABLE_MODEL_NAMESPACING}"
 else
