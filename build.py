@@ -2562,11 +2562,13 @@ if __name__ == "__main__":
         required=False,
         default=None,
         help="(EXPERIMENTAL; requires TRITON_BUILD_EXPERIMENTAL=1) Path to a build "
-        "preset JSON file that overrides per-backend properties (tag, org, "
-        "library_path, extra_cmake_args, override_cmake_args). Command-line flags "
-        "take precedence over the file. With --dryrun, the fully-resolved preset "
-        "(defaults + CLI options + this file) is written to the build directory. "
-        "See tools/build/build_presets.py for the schema.",
+        "presets JSON file that pins per-component cmake flags (tag, cmake_args, "
+        "extra_cmake_args, library_path) for core/backends/repoagents/caches. "
+        "Command-line flags take precedence over the file. With --dryrun, a "
+        "provenance-annotated snapshot of every resolved cmake flag (labeled "
+        "cli/preset/default) is written to build_presets.json in the build "
+        "directory; that file can be loaded back with this flag. See "
+        "tools/build/build_presets.py for the schema.",
     )
     parser.add_argument(
         "--release-version",
@@ -2883,14 +2885,21 @@ if __name__ == "__main__":
         OVERRIDE_BACKEND_CMAKE_FLAGS[be][parts[0]] = parts[1]
 
     # Per-backend clone-organization overrides. Empty unless the experimental
-    # --build-presets-file file supplies an "org" for a backend, in which case the
-    # backend build loop below clones that backend from the given organization.
+    # --build-presets-file supplies a TRITON_REPO_ORGANIZATION for a backend, in
+    # which case the backend build loop below clones from that organization.
     backend_org_overrides = {}
 
-    # Experimental: apply per-backend overrides from a user-supplied build preset
-    # JSON file. All load/validation/precedence logic lives in
-    # tools/build/build_presets.py so this integration stays minimal.
-    # Command-line flags win over the file.
+    # Snapshots captured BEFORE applying a preset, so the --dryrun dump can tell
+    # which values came from the CLI vs the preset file vs build.py defaults.
+    _bp_before_backends = dict(backends)
+    _bp_before_repoagents = dict(repoagents)
+    _bp_before_caches = dict(caches)
+    _bp_cli_extra_be = {be: set(m) for be, m in EXTRA_BACKEND_CMAKE_FLAGS.items()}
+    _bp_cli_override_be = {be: set(m) for be, m in OVERRIDE_BACKEND_CMAKE_FLAGS.items()}
+    _bp_cli_core = set(EXTRA_CORE_CMAKE_FLAGS) | set(OVERRIDE_CORE_CMAKE_FLAGS)
+
+    # Experimental: apply a build preset (all load/validate/precedence logic lives
+    # in tools/build/build_presets.py). Command-line flags win over the file.
     if FLAGS.build_presets_file is not None:
         from tools.build import build_presets
 
@@ -2898,10 +2907,16 @@ if __name__ == "__main__":
             for msg in build_presets.apply(
                 FLAGS.build_presets_file,
                 backends=backends,
+                repoagents=repoagents,
+                caches=caches,
                 cli_backend_specs=FLAGS.backend,
+                cli_repoagent_specs=FLAGS.repoagent,
+                cli_cache_specs=FLAGS.cache,
                 library_paths=library_paths,
-                extra_flags=EXTRA_BACKEND_CMAKE_FLAGS,
-                override_flags=OVERRIDE_BACKEND_CMAKE_FLAGS,
+                extra_backend_flags=EXTRA_BACKEND_CMAKE_FLAGS,
+                override_backend_flags=OVERRIDE_BACKEND_CMAKE_FLAGS,
+                extra_core_flags=EXTRA_CORE_CMAKE_FLAGS,
+                override_core_flags=OVERRIDE_CORE_CMAKE_FLAGS,
                 backend_org_overrides=backend_org_overrides,
             ):
                 log(msg)
@@ -2946,22 +2961,55 @@ if __name__ == "__main__":
     # Write the build script that invokes cmake for the core, backends, repo-agents, and caches.
     pathlib.Path(FLAGS.build_dir).mkdir(parents=True, exist_ok=True)
 
-    # Experimental: on a --dryrun, emit the fully-resolved build preset (defaults
-    # + CLI options + any --build-presets-file overrides) to the build directory so the
-    # effective per-backend configuration can be inspected and reused as a
-    # --build-presets-file input. Gated behind TRITON_BUILD_EXPERIMENTAL=1.
+    # Experimental: on a --dryrun, emit a provenance-annotated snapshot of the
+    # fully-resolved cmake configuration -- every -D each component receives, as
+    # in cmake_build -- to <build-dir>/build_presets.json, labeling each value's
+    # source (cli / preset / default). The file can be loaded back with
+    # --build-presets-file to pin every flag. Gated behind
+    # TRITON_BUILD_EXPERIMENTAL=1.
     if FLAGS.dryrun and os.getenv("TRITON_BUILD_EXPERIMENTAL") == "1":
         from tools.build import build_presets
 
+        _bp_be = [b for b in backends if b not in CORE_BACKENDS]
         try:
-            for msg in build_presets.dump(
+            for msg in build_presets.write_snapshot(
                 os.path.join(FLAGS.build_dir, "build_presets.json"),
+                parser=parser,
+                argv=sys.argv,
+                core_args=core_cmake_args(
+                    components, backends, script_cmake_dir, script_install_dir
+                ),
+                backend_args={
+                    be: backend_cmake_args(
+                        images, components, be, script_install_dir, library_paths
+                    )
+                    for be in _bp_be
+                },
+                repoagent_args={
+                    ra: repoagent_cmake_args(images, components, ra, script_install_dir)
+                    for ra in repoagents
+                },
+                cache_args={
+                    ca: cache_cmake_args(images, components, ca, script_install_dir)
+                    for ca in caches
+                },
                 backends=backends,
+                repoagents=repoagents,
+                caches=caches,
+                before_backends=_bp_before_backends,
+                before_repoagents=_bp_before_repoagents,
+                before_caches=_bp_before_caches,
+                cli_backend_specs=FLAGS.backend,
+                cli_repoagent_specs=FLAGS.repoagent,
+                cli_cache_specs=FLAGS.cache,
+                cli_extra_be=_bp_cli_extra_be,
+                cli_override_be=_bp_cli_override_be,
+                cli_core=_bp_cli_core,
+                extra_backend_flags=EXTRA_BACKEND_CMAKE_FLAGS,
+                override_backend_flags=OVERRIDE_BACKEND_CMAKE_FLAGS,
+                extra_core_flags=EXTRA_CORE_CMAKE_FLAGS,
+                override_core_flags=OVERRIDE_CORE_CMAKE_FLAGS,
                 library_paths=library_paths,
-                extra_flags=EXTRA_BACKEND_CMAKE_FLAGS,
-                override_flags=OVERRIDE_BACKEND_CMAKE_FLAGS,
-                backend_org_overrides=backend_org_overrides,
-                default_org=FLAGS.github_organization,
             ):
                 log(msg)
         except build_presets.BuildPresetError as e:

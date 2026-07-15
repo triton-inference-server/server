@@ -2,14 +2,13 @@
   "backends": {
     "onnxruntime": {
       "tag": "r25.08_fix",
-      "org": "https://github.com/triton-inference-server",
-      "override_cmake_args": {
+      "cmake_args": {
+        "TRITON_REPO_ORGANIZATION": "https://github.com/triton-inference-server",
         "TRITON_ENABLE_ONNXRUNTIME_OPENVINO": "OFF"
       }
     },
     "pytorch": {
-      "tag": "protect_thread_set",
-      "org": "https://github.com/triton-inference-server"
+      "tag": "protect_thread_set"
     },
     "python": {
       "extra_cmake_args": {
