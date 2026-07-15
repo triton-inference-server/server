@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -381,6 +381,29 @@ class SageMakerTest(tu.TestResultCollector):
                 400, r.status_code
             ),
         )
+
+    def test_empty_json_body_returns_400(self):
+        headers = {"Content-Type": "application/json"}
+        r = requests.post(self.url_, data=b"", headers=headers)
+        self.assertEqual(
+            400,
+            r.status_code,
+            "Expected error code {} returned for empty body; got: {}".format(
+                400, r.status_code
+            ),
+        )
+
+    def test_invalid_json_body_returns_400(self):
+        headers = {"Content-Type": "application/json"}
+        for body in (b"\x00", b" "):
+            r = requests.post(self.url_, data=body, headers=headers)
+            self.assertEqual(
+                400,
+                r.status_code,
+                "Expected error code {} for invalid JSON body {!r}; got: {}".format(
+                    400, body, r.status_code
+                ),
+            )
 
 
 if __name__ == "__main__":
