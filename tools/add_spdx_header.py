@@ -66,6 +66,7 @@ def _license_start_year():
         if match:
             return match.group(1)
     except OSError:
+        # LICENSE not readable here; fall through to the current-year default.
         pass
     return CURRENT_YEAR
 

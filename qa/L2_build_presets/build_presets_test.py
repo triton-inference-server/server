@@ -78,7 +78,9 @@ def _resolve_server_dir():
     return dest
 
 
-_SERVER_DIR_CACHE = None
+# Session cache for the resolved server dir: {"dir": Path} on success or
+# {"error": Exception} on failure (mutated in place -- no reassignment).
+_SERVER_DIR_CACHE = {}
 
 
 def server_dir():
@@ -87,16 +89,15 @@ def server_dir():
     ``SERVER_BRANCH_NAME``. The resolution (success OR failure) is cached, so a
     failed clone is attempted once and then re-raised fast for the remaining
     tests instead of re-cloning per test."""
-    global _SERVER_DIR_CACHE
-    if isinstance(_SERVER_DIR_CACHE, BaseException):
-        raise _SERVER_DIR_CACHE
-    if _SERVER_DIR_CACHE is None:
+    if "error" in _SERVER_DIR_CACHE:
+        raise _SERVER_DIR_CACHE["error"]
+    if "dir" not in _SERVER_DIR_CACHE:
         try:
-            _SERVER_DIR_CACHE = _resolve_server_dir()
+            _SERVER_DIR_CACHE["dir"] = _resolve_server_dir()
         except Exception as exc:
-            _SERVER_DIR_CACHE = exc
+            _SERVER_DIR_CACHE["error"] = exc
             raise
-    return _SERVER_DIR_CACHE
+    return _SERVER_DIR_CACHE["dir"]
 
 
 def build_py():
