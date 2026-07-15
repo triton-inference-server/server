@@ -2557,6 +2557,18 @@ if __name__ == "__main__":
         help="Override specified backend CMake argument in the build as <backend>:<name>=<value>. The argument is passed to CMake as -D<name>=<value>. This flag only impacts CMake arguments that are used by build.py. To unconditionally add a CMake argument to the backend build use --extra-backend-cmake-arg.",
     )
     parser.add_argument(
+        "--build-presets-file",
+        type=str,
+        required=False,
+        default=None,
+        help="(EXPERIMENTAL; requires TRITON_BUILD_EXPERIMENTAL=1) Path to a build "
+        "preset JSON file that overrides per-backend properties (tag, org, "
+        "library_path, extra_cmake_args, override_cmake_args). Command-line flags "
+        "take precedence over the file. With --dryrun, the fully-resolved preset "
+        "(defaults + CLI options + this file) is written to the build directory. "
+        "See tools/build/build_presets.py for the schema.",
+    )
+    parser.add_argument(
         "--release-version",
         required=False,
         default=None,
@@ -2870,6 +2882,32 @@ if __name__ == "__main__":
             OVERRIDE_BACKEND_CMAKE_FLAGS[be] = {}
         OVERRIDE_BACKEND_CMAKE_FLAGS[be][parts[0]] = parts[1]
 
+    # Per-backend clone-organization overrides. Empty unless the experimental
+    # --build-presets-file file supplies an "org" for a backend, in which case the
+    # backend build loop below clones that backend from the given organization.
+    backend_org_overrides = {}
+
+    # Experimental: apply per-backend overrides from a user-supplied build preset
+    # JSON file. All load/validation/precedence logic lives in
+    # tools/build/build_presets.py so this integration stays minimal.
+    # Command-line flags win over the file.
+    if FLAGS.build_presets_file is not None:
+        from tools.build import build_presets
+
+        try:
+            for msg in build_presets.apply(
+                FLAGS.build_presets_file,
+                backends=backends,
+                cli_backend_specs=FLAGS.backend,
+                library_paths=library_paths,
+                extra_flags=EXTRA_BACKEND_CMAKE_FLAGS,
+                override_flags=OVERRIDE_BACKEND_CMAKE_FLAGS,
+                backend_org_overrides=backend_org_overrides,
+            ):
+                log(msg)
+        except build_presets.BuildPresetError as e:
+            fail(str(e))
+
     # Initialize map of common components and repo-tag for each.
     components = {
         "common": default_repo_tag,
@@ -2907,6 +2945,28 @@ if __name__ == "__main__":
 
     # Write the build script that invokes cmake for the core, backends, repo-agents, and caches.
     pathlib.Path(FLAGS.build_dir).mkdir(parents=True, exist_ok=True)
+
+    # Experimental: on a --dryrun, emit the fully-resolved build preset (defaults
+    # + CLI options + any --build-presets-file overrides) to the build directory so the
+    # effective per-backend configuration can be inspected and reused as a
+    # --build-presets-file input. Gated behind TRITON_BUILD_EXPERIMENTAL=1.
+    if FLAGS.dryrun and os.getenv("TRITON_BUILD_EXPERIMENTAL") == "1":
+        from tools.build import build_presets
+
+        try:
+            for msg in build_presets.dump(
+                os.path.join(FLAGS.build_dir, "build_presets.json"),
+                backends=backends,
+                library_paths=library_paths,
+                extra_flags=EXTRA_BACKEND_CMAKE_FLAGS,
+                override_flags=OVERRIDE_BACKEND_CMAKE_FLAGS,
+                backend_org_overrides=backend_org_overrides,
+                default_org=FLAGS.github_organization,
+            ):
+                log(msg)
+        except build_presets.BuildPresetError as e:
+            fail(str(e))
+
     with BuildScript(
         os.path.join(FLAGS.build_dir, script_name),
         verbose=FLAGS.verbose,
@@ -2940,7 +3000,9 @@ if __name__ == "__main__":
             if be == "armnn_tflite":
                 github_organization = "https://gitlab.com/arm-research/smarter/"
             else:
-                github_organization = FLAGS.github_organization
+                github_organization = backend_org_overrides.get(
+                    be, FLAGS.github_organization
+                )
 
             if be == "vllm":
                 backend_clone(

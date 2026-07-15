@@ -1,0 +1,20 @@
+{
+  "backends": {
+    "onnxruntime": {
+      "tag": "r25.08_fix",
+      "org": "https://github.com/triton-inference-server",
+      "override_cmake_args": {
+        "TRITON_ENABLE_ONNXRUNTIME_OPENVINO": "OFF"
+      }
+    },
+    "pytorch": {
+      "tag": "protect_thread_set",
+      "org": "https://github.com/triton-inference-server"
+    },
+    "python": {
+      "extra_cmake_args": {
+        "TRITON_BOOST_URL": "https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz"
+      }
+    }
+  }
+}

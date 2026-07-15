@@ -180,6 +180,45 @@ you have a branch called "mybranch" in the
 repo that you want to use in the build, you would specify
 --backend=onnxruntime:mybranch.
 
+#### Experimental: Per-Backend Build Presets
+
+> **Experimental.** This feature is gated behind the
+> `TRITON_BUILD_EXPERIMENTAL=1` environment variable; without it the
+> `--build-presets-file` flag is rejected.
+
+Instead of repeating several per-backend command-line flags, you can supply a
+single JSON *build presets* file with `--build-presets-file <path>`. It can
+override, per backend, the git tag, the clone organization, the library path,
+and extra/override CMake arguments:
+
+```json
+{
+  "backends": {
+    "onnxruntime": {
+      "tag": "r25.08_fix",
+      "org": "https://github.com/triton-inference-server",
+      "override_cmake_args": { "TRITON_ENABLE_ONNXRUNTIME_OPENVINO": "OFF" }
+    },
+    "python": {
+      "extra_cmake_args": { "TRITON_BOOST_URL": "https://.../boost_1_80_0.tar.gz" }
+    }
+  }
+}
+```
+
+A backend named in the file must also be included in the build (via `--backend`
+or `--enable-all`). Command-line flags always take precedence over the file, so
+the file acts as a reusable base. Unlike the global `--github-organization`
+flag, `org` sets the clone organization *per backend* (both the `git clone` URL
+and `-DTRITON_REPO_ORGANIZATION`). A ready-to-copy example lives at
+[`tools/build/build_presets.example.json`](../../tools/build/build_presets.example.json);
+the full schema is documented in `tools/build/build_presets.py`.
+
+When run with `--dryrun`, build.py also writes the fully-resolved presets
+(defaults + command-line options + this file) to `build_presets.json` in the
+build directory, which you can inspect and reuse as a `--build-presets-file`
+input.
+
 #### CPU-Only Build
 
 If you want to build without GPU support you must specify individual
