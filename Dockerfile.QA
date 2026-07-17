@@ -352,8 +352,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-RUN pip3 install --upgrade "numpy<2" pillow attrdict future "grpcio<1.68" requests gsutil \
-                           "awscli<=1.36.40" six "grpcio-channelz<1.68" prettytable virtualenv \
+RUN pip3 install --upgrade "numpy<2" pillow attrdict future "grpcio>=1.81.1" requests gsutil \
+                           "awscli<=1.36.40" six grpcio-channelz prettytable virtualenv \
                            check-jsonschema
 
 # go needed for example go client test.

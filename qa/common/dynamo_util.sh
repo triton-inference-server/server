@@ -34,7 +34,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/util.sh"
 SERVER_LAUNCH_MODE=${SERVER_LAUNCH_MODE:=dynamo}
 DYN_FRONTEND_LOG=${DYN_FRONTEND_LOG:=./frontend.log}
 DYN_FRONTEND_ARGS=${DYN_FRONTEND_ARGS:="--kserve-grpc-server"}
-DYN_WORKER_PY=${DYN_WORKER_PY:=/workspace/examples/backends/tritonserver/src/tritonworker.py}
+DYN_WORKER_PY=${DYN_WORKER_PY:=/workspace/components/src/dynamo/triton/tritonworker.py}
 DYN_WORKER_ARGS=${DYN_WORKER_ARGS:=""}
 DYN_DISCOVERY_BACKEND=${DYN_DISCOVERY_BACKEND:=file}
 # The Dynamo frontend binds KServe gRPC to --http-port; serve it on 8001.
