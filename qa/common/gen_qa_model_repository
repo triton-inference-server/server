@@ -470,30 +470,28 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
     log_message.status "docker container: copy script to container"
     docker cp . $DOCKER_VOLUME_CONTAINER:/mnt/$CI_JOB_ID/gen_srcdir
 
-    if [[ "aarch64" != $(uname -m) ]] ; then
 
-        log_message.status "docker run: $OPENVINOSCRIPT"
-        log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $UBUNTU_IMAGE bash -e $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT"
-        docker run \
-            --rm \
-            -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR \
-            --label RUNNER_ID=$RUNNER_ID \
-            --label PROJECT_NAME=$PROJECT_NAME \
-            $DOCKER_GPU_ARGS \
-            -v $DOCKER_VOLUME:/mnt \
-            -t \
-            $UBUNTU_IMAGE \
-            bash -e $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
+    log_message.status "docker run: $OPENVINOSCRIPT"
+    log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $UBUNTU_IMAGE bash -e $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT"
+    docker run \
+        --rm \
+        -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR \
+        --label RUNNER_ID=$RUNNER_ID \
+        --label PROJECT_NAME=$PROJECT_NAME \
+        $DOCKER_GPU_ARGS \
+        -v $DOCKER_VOLUME:/mnt \
+        -t \
+        $UBUNTU_IMAGE \
+        bash -e $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
 
-        exit_code=$?
+    exit_code=$?
 
-        if [ $exit_code -ne 0 ]; then
-            log_message.error "docker run: ${OPENVINOSCRIPT} failed"
-            exit 1
-        fi
+    if [ $exit_code -ne 0 ]; then
+        log_message.error "docker run: ${OPENVINOSCRIPT} failed"
+        exit 1
+    fi
 
-        rm $OPENVINOSCRIPT
-    fi # [[ "aarch64" != $(uname -m) ]]
+    rm $OPENVINOSCRIPT
 
     log_message.status "docker run: $ONNXSCRIPT"
     log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $UBUNTU_IMAGE bash -e $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT"
