@@ -1,8 +1,3 @@
-<!--
-SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-SPDX-License-Identifier: BSD-3-Clause
--->
-
 #### What does the PR do?
 <!-- Describe the change and the motivation behind it. -->
 
