@@ -50,15 +50,12 @@ repos:
   - id: requirements-txt-fixer
   - id: trailing-whitespace
 
-- repo: local
+- repo: https://github.com/triton-inference-server/developer_tools
+  rev: v0.1.0
   hooks:
   - id: add-license
-    name: Add License
-    entry: python tools/add_copyright.py
-    language: python
-    stages: [pre-commit]
-    verbose: true
-    require_serial: true
+- repo: local
+  hooks:
   # Incremental SPDX-header adoption: migrate each source file to the two-line
   # SPDX header the first time it is touched. pre-commit runs hooks only on the
   # files staged in a commit, so scoping by file type (below) -- not by directory
