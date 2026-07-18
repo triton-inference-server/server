@@ -85,6 +85,6 @@ repos:
   - id: trailing-whitespace
 
 - repo: https://github.com/triton-inference-server/developer_tools
-  rev: v0.2.0
+  rev: v0.2.1
   hooks:
   - id: add-license
