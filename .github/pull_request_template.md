@@ -1,13 +1,23 @@
-Thanks for submitting a PR to Triton!
-Please go the the `Preview` tab above this description box and select the appropriate sub-template:
+<!--
+SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: BSD-3-Clause
+-->
 
-* [PR description template for Triton Engineers](?expand=1&template=pull_request_template_internal_contrib.md)
-* [PR description template for External Contributors](?expand=1&template=pull_request_template_external_contrib.md)
+#### What does the PR do?
+<!-- Describe the change and the motivation behind it. -->
 
-If you already created the PR, please replace this message with one of
-* [External contribution template](https://raw.githubusercontent.com/triton-inference-server/server/main/.github/PULL_REQUEST_TEMPLATE/pull_request_template_external_contrib.md)
-* [Internal contribution template](https://raw.githubusercontent.com/triton-inference-server/server/main/.github/PULL_REQUEST_TEMPLATE/pull_request_template_internal_contrib.md)
+#### Related Issues / PRs
+<!-- Use "Closes #xxx" / "Fixes #xxx" / "Resolves #xxx" for issues.
+     Link related PRs from other triton-inference-server repositories. -->
 
-and fill it out.
+#### Test plan
+<!-- How was this change verified? List steps, tests added, or CI evidence. -->
 
+#### Caveats
+<!-- Optional: known limitations or follow-ups. -->
 
+#### Checklist
+- [ ] PR title follows `<commit_type>: <Title>` (conventional commit — enforced by the `conventional-pre-commit` hook)
+- [ ] I ran `pre-commit install && pre-commit run --all-files` locally and it passes
+- [ ] Copyright header is correct on all changed files
+- [ ] External contributors: I have read the [Contribution guidelines](../CONTRIBUTING.md) and signed the [Contributor License Agreement](https://github.com/NVIDIA/triton-inference-server/blob/master/Triton-CCLA-v1.pdf)
