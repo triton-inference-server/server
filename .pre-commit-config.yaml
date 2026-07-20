@@ -57,8 +57,8 @@ repos:
     args: ["--toml", "pyproject.toml"]
     exclude: (?x)^(.*stemmer.*|.*stop_words.*|^CHANGELOG.md$)
 # Validates commit messages against the Conventional Commits format
-# (<commit_type>: <title>). Replaces the manual commit-type checklist that
-# used to live in the PR template.
+# (<commit_type>: <title>); PR titles are validated org-wide by the
+# conventional-pr reusable workflow.
 - repo: https://github.com/compilerla/conventional-pre-commit
   rev: v4.4.0
   hooks:
@@ -84,7 +84,7 @@ repos:
   - id: requirements-txt-fixer
   - id: trailing-whitespace
 
-- repo: https://github.com/triton-inference-server/developer_tools
-  rev: v0.2.1
+- repo: https://github.com/triton-inference-server/.github
+  rev: v1.0.0
   hooks:
   - id: add-license
