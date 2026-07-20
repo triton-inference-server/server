@@ -83,7 +83,7 @@ RUN apt-get update && \
             software-properties-common \
             vim \
             wget && \
-    pip3 install --upgrade grpcio-tools cmake==4.0.3 auditwheel
+    pip3 install --upgrade "grpcio-tools<1.68" cmake==4.0.3 auditwheel
 
 ENV CMAKE_POLICY_MINIMUM_REQUIRED=3.5
 
@@ -182,7 +182,7 @@ RUN apt-get update && \
             python3-wheel \
             vim \
             wget && \
-    pip3 install "grpcio>=1.81.1" grpcio-tools && \
+    pip3 install "grpcio<1.68" "grpcio-tools<1.68" && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*;
 
