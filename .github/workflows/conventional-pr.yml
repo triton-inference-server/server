@@ -33,10 +33,22 @@ name: conventional-pr
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
 
 jobs:
   conventional-pr:
+    # Same-repo PRs run on the safe pull_request event; fork PRs run on
+    # pull_request_target so the labeling job gets a writable token (safe
+    # here: the reusable workflow never checks out PR code - it only reads
+    # PR metadata via the API and manages labels).
+    if: >-
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'pull_request_target' &&
+       github.event.pull_request.head.repo.full_name != github.repository)
     permissions:
       pull-requests: write
       issues: write
-    uses: triton-inference-server/.github/.github/workflows/conventional-pr.yml@v1.4.2
+      contents: read
+    uses: triton-inference-server/.github/.github/workflows/conventional-pr.yml@v1.4.3
