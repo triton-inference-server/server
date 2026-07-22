@@ -26,6 +26,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Local test modules are imported after adjusting sys.path for ../common.
+# flake8: noqa: E402
 import sys
 
 sys.path.append("../common")
@@ -308,7 +310,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
 
-                md = triton_client.get_model_metadata(model_name, "1")
+                triton_client.get_model_metadata(model_name, "1")
                 self.assertTrue(
                     False,
                     "expected model '"
@@ -2256,7 +2258,6 @@ class LifeCycleTest(tu.TestResultCollector):
     def test_model_repository_index(self):
         # use model control EXPLICIT and --load-model to load a subset of models
         # in model repository
-        tensor_shape = (1, 16)
         model_bases = ["plan", "libtorch", "simple_libtorch"]
 
         # Sanity check on loaded models
@@ -2578,8 +2579,8 @@ class LifeCycleTest(tu.TestResultCollector):
         self.assertTrue(os.path.exists(os.path.join(model_basepath, existing_file_rel)))
 
         # Symlinks
-        ## No easy way to inject symlink into generated temp model dir, so for
-        ## testing sake, make a fixed symlink path in /tmp.
+        # No easy way to inject symlink into generated temp model dir, so for
+        # testing sake, make a fixed symlink path in /tmp.
         escape_dir_symlink_rel = os.path.join("..", "escape_symlink")
         escape_dir_symlink_full = "/tmp/escape_symlink"
         self.assertEqual(
@@ -2682,7 +2683,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Previous requests should succeed
         for result in async_results:
-            if type(result) == InferenceServerException:
+            if isinstance(result, InferenceServerException):
                 raise result
             output_data = result.as_numpy("OUTPUT0")
             np.testing.assert_allclose(
@@ -2764,7 +2765,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Previous requests should succeed
         for result in async_results:
-            if type(result) == InferenceServerException:
+            if isinstance(result, InferenceServerException):
                 raise result
             output_data = result.as_numpy("OUTPUT")
             np.testing.assert_allclose(
@@ -2827,7 +2828,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Previous requests should succeed
         for result in async_results:
-            if type(result) == InferenceServerException:
+            if isinstance(result, InferenceServerException):
                 raise result
             output_data = result.as_numpy("OUTPUT0")
             np.testing.assert_allclose(
@@ -3073,7 +3074,7 @@ class LifeCycleTest(tu.TestResultCollector):
         # This test can replicate a load while async unloading on machines with
         # sufficient concurrency. Regardless on whether it is replicated or not,
         # the server must not crash.
-        if load_before_unload_finish[0] == False:
+        if load_before_unload_finish[0] is False:
             # Track non-replication on test printout via statistics.
             warning_msg = "Cannot replicate a load while async unloading. CPU count: {}. num_threads: {}.".format(
                 multiprocessing.cpu_count(), num_threads
@@ -3299,7 +3300,9 @@ class LifeCycleTest(tu.TestResultCollector):
 """
 
         # Ensure the model has been loaded w/ the expected (different from override) config.
-        self.assertTrue(original_config != None and original_config != override_config)
+        self.assertTrue(
+            original_config is not None and original_config != override_config
+        )
 
         # Reload the model with the overriding configuration value.
         triton_client.load_model(model_name, config=override_config)
@@ -3362,7 +3365,6 @@ class LifeCycleTest(tu.TestResultCollector):
     def test_shutdown_with_live_connection(self):
         model_name = "add_sub"
         model_shape = (16,)
-        from geventhttpclient.response import HTTPConnectionClosed
 
         input_data = np.ones(shape=model_shape, dtype=np.float32)
         inputs = [
