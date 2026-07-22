@@ -1,5 +1,28 @@
-# SPDX-FileCopyrightText: Copyright (c) 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: BSD-3-Clause
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 repos:
 - repo: https://github.com/PyCQA/isort
@@ -16,7 +39,7 @@ repos:
   rev: 7.3.0
   hooks:
   - id: flake8
-    args: [--max-line-length=88, --select=C,E,F,W,B,B950, --extend-ignore = E203,E501]
+    args: ["--max-line-length=88", "--select=C,E,F,W,B,B950", "--extend-ignore=E203,E501,W503"]
     types_or: [python, cython]
 - repo: https://github.com/pre-commit/mirrors-clang-format
   rev: v16.0.5
@@ -50,24 +73,15 @@ repos:
   - id: requirements-txt-fixer
   - id: trailing-whitespace
 
-- repo: https://github.com/triton-inference-server/developer_tools
-  rev: v0.1.0
-  hooks:
-  - id: add-license
 - repo: local
   hooks:
-  # Incremental SPDX-header adoption: migrate each source file to the two-line
-  # SPDX header the first time it is touched. pre-commit runs hooks only on the
-  # files staged in a commit, so scoping by file type (below) -- not by directory
-  # -- rolls SPDX out gradually as files change. The hook maintains an existing
-  # SPDX header, replaces a legacy long-form NVIDIA BSD header in place, or
-  # inserts one. It runs after add-license above, which only maintains the
-  # copyright year on the string both headers share.
-  - id: add-spdx-license
-    name: Add SPDX License Header
-    entry: python tools/add_spdx_header.py
+  - id: add-license
+    name: Add License
+    entry: python tools/add_copyright.py
     language: python
-    files: \.(py|pyi|sh|bash|yaml|yml|cc|cpp|cxx|h|hpp|cu|cuh)$
     stages: [pre-commit]
     verbose: true
     require_serial: true
+    # GitHub issue/PR templates must start with YAML frontmatter; keep
+    # license headers out of them. Workflows ARE processed.
+    exclude: ^\.github/(ISSUE_TEMPLATE/|PULL_REQUEST_TEMPLATE|pull_request_template)
