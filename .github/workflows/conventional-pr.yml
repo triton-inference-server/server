@@ -38,4 +38,5 @@ jobs:
   conventional-pr:
     permissions:
       pull-requests: write
-    uses: triton-inference-server/.github/.github/workflows/conventional-pr.yml@v1.4.1
+      issues: write
+    uses: triton-inference-server/.github/.github/workflows/conventional-pr.yml@v1.4.2
