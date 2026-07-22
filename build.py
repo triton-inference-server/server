@@ -1,29 +1,6 @@
 #!/usr/bin/env python3
-# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions
-# are met:
-#  * Redistributions of source code must retain the above copyright
-#    notice, this list of conditions and the following disclaimer.
-#  * Redistributions in binary form must reproduce the above copyright
-#    notice, this list of conditions and the following disclaimer in the
-#    documentation and/or other materials provided with the distribution.
-#  * Neither the name of NVIDIA CORPORATION nor the names of its
-#    contributors may be used to endorse or promote products derived
-#    from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
-# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 
 import argparse
 import importlib.util
@@ -2557,6 +2534,20 @@ if __name__ == "__main__":
         help="Override specified backend CMake argument in the build as <backend>:<name>=<value>. The argument is passed to CMake as -D<name>=<value>. This flag only impacts CMake arguments that are used by build.py. To unconditionally add a CMake argument to the backend build use --extra-backend-cmake-arg.",
     )
     parser.add_argument(
+        "--build-presets-file",
+        type=str,
+        required=False,
+        default=None,
+        help="(EXPERIMENTAL; requires TRITON_BUILD_EXPERIMENTAL=1) Path to a build "
+        "presets JSON file that pins per-component cmake flags (tag, cmake_args, "
+        "extra_cmake_args, library_path) for core/backends/repoagents/caches. "
+        "Command-line flags take precedence over the file. With --dryrun, a "
+        "provenance-annotated snapshot of every resolved cmake flag (labeled "
+        "cli/preset/default) is written to build_presets.json in the build "
+        "directory; that file can be loaded back with this flag. See "
+        "tools/build/build_presets.py for the schema.",
+    )
+    parser.add_argument(
         "--release-version",
         required=False,
         default=None,
@@ -2870,6 +2861,45 @@ if __name__ == "__main__":
             OVERRIDE_BACKEND_CMAKE_FLAGS[be] = {}
         OVERRIDE_BACKEND_CMAKE_FLAGS[be][parts[0]] = parts[1]
 
+    # Per-backend clone-organization overrides. Empty unless the experimental
+    # --build-presets-file supplies a TRITON_REPO_ORGANIZATION for a backend, in
+    # which case the backend build loop below clones from that organization.
+    backend_org_overrides = {}
+
+    # Snapshots captured BEFORE applying a preset, so the --dryrun dump can tell
+    # which values came from the CLI vs the preset file vs build.py defaults.
+    _bp_before_backends = dict(backends)
+    _bp_before_repoagents = dict(repoagents)
+    _bp_before_caches = dict(caches)
+    _bp_cli_extra_be = {be: set(m) for be, m in EXTRA_BACKEND_CMAKE_FLAGS.items()}
+    _bp_cli_override_be = {be: set(m) for be, m in OVERRIDE_BACKEND_CMAKE_FLAGS.items()}
+    _bp_cli_core = set(EXTRA_CORE_CMAKE_FLAGS) | set(OVERRIDE_CORE_CMAKE_FLAGS)
+
+    # Experimental: apply a build preset (all load/validate/precedence logic lives
+    # in tools/build/build_presets.py). Command-line flags win over the file.
+    if FLAGS.build_presets_file is not None:
+        from tools.build import build_presets
+
+        try:
+            for msg in build_presets.apply(
+                FLAGS.build_presets_file,
+                backends=backends,
+                repoagents=repoagents,
+                caches=caches,
+                cli_backend_specs=FLAGS.backend,
+                cli_repoagent_specs=FLAGS.repoagent,
+                cli_cache_specs=FLAGS.cache,
+                library_paths=library_paths,
+                extra_backend_flags=EXTRA_BACKEND_CMAKE_FLAGS,
+                override_backend_flags=OVERRIDE_BACKEND_CMAKE_FLAGS,
+                extra_core_flags=EXTRA_CORE_CMAKE_FLAGS,
+                override_core_flags=OVERRIDE_CORE_CMAKE_FLAGS,
+                backend_org_overrides=backend_org_overrides,
+            ):
+                log(msg)
+        except build_presets.BuildPresetError as e:
+            fail(str(e))
+
     # Initialize map of common components and repo-tag for each.
     components = {
         "common": default_repo_tag,
@@ -2907,6 +2937,61 @@ if __name__ == "__main__":
 
     # Write the build script that invokes cmake for the core, backends, repo-agents, and caches.
     pathlib.Path(FLAGS.build_dir).mkdir(parents=True, exist_ok=True)
+
+    # Experimental: on a --dryrun, emit a provenance-annotated snapshot of the
+    # fully-resolved cmake configuration -- every -D each component receives, as
+    # in cmake_build -- to <build-dir>/build_presets.json, labeling each value's
+    # source (cli / preset / default). The file can be loaded back with
+    # --build-presets-file to pin every flag. Gated behind
+    # TRITON_BUILD_EXPERIMENTAL=1.
+    if FLAGS.dryrun and os.getenv("TRITON_BUILD_EXPERIMENTAL") == "1":
+        from tools.build import build_presets
+
+        _bp_be = [b for b in backends if b not in CORE_BACKENDS]
+        try:
+            for msg in build_presets.write_snapshot(
+                os.path.join(FLAGS.build_dir, "build_presets.json"),
+                parser=parser,
+                argv=sys.argv,
+                core_args=core_cmake_args(
+                    components, backends, script_cmake_dir, script_install_dir
+                ),
+                backend_args={
+                    be: backend_cmake_args(
+                        images, components, be, script_install_dir, library_paths
+                    )
+                    for be in _bp_be
+                },
+                repoagent_args={
+                    ra: repoagent_cmake_args(images, components, ra, script_install_dir)
+                    for ra in repoagents
+                },
+                cache_args={
+                    ca: cache_cmake_args(images, components, ca, script_install_dir)
+                    for ca in caches
+                },
+                backends=backends,
+                repoagents=repoagents,
+                caches=caches,
+                before_backends=_bp_before_backends,
+                before_repoagents=_bp_before_repoagents,
+                before_caches=_bp_before_caches,
+                cli_backend_specs=FLAGS.backend,
+                cli_repoagent_specs=FLAGS.repoagent,
+                cli_cache_specs=FLAGS.cache,
+                cli_extra_be=_bp_cli_extra_be,
+                cli_override_be=_bp_cli_override_be,
+                cli_core=_bp_cli_core,
+                extra_backend_flags=EXTRA_BACKEND_CMAKE_FLAGS,
+                override_backend_flags=OVERRIDE_BACKEND_CMAKE_FLAGS,
+                extra_core_flags=EXTRA_CORE_CMAKE_FLAGS,
+                override_core_flags=OVERRIDE_CORE_CMAKE_FLAGS,
+                library_paths=library_paths,
+            ):
+                log(msg)
+        except build_presets.BuildPresetError as e:
+            fail(str(e))
+
     with BuildScript(
         os.path.join(FLAGS.build_dir, script_name),
         verbose=FLAGS.verbose,
@@ -2940,7 +3025,9 @@ if __name__ == "__main__":
             if be == "armnn_tflite":
                 github_organization = "https://gitlab.com/arm-research/smarter/"
             else:
-                github_organization = FLAGS.github_organization
+                github_organization = backend_org_overrides.get(
+                    be, FLAGS.github_organization
+                )
 
             if be == "vllm":
                 backend_clone(
