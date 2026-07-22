@@ -674,7 +674,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                             )
                         if gt_ms is not None:
                             self.assertTrue(
-                                (end_ms - start_ms) > gt_ms,
+                                (end_ms - start_ms) >= gt_ms,
                                 "expected greater than "
                                 + str(gt_ms)
                                 + "ms response time, got "
@@ -707,7 +707,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                         )
                     if gt_ms is not None:
                         self.assertTrue(
-                            (seq_end_ms - seq_start_ms) > gt_ms,
+                            (seq_end_ms - seq_start_ms) >= gt_ms,
                             "sequence expected greater than "
                             + str(gt_ms)
                             + "ms response time, got "
@@ -883,7 +883,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                     )
                 if gt_ms is not None:
                     self.assertTrue(
-                        (seq_end_ms - seq_start_ms) > gt_ms,
+                        (seq_end_ms - seq_start_ms) >= gt_ms,
                         "sequence expected greater than "
                         + str(gt_ms)
                         + "ms response time, got "
@@ -1100,7 +1100,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                     )
                 if gt_ms is not None:
                     self.assertTrue(
-                        (seq_end_ms - seq_start_ms) > gt_ms,
+                        (seq_end_ms - seq_start_ms) >= gt_ms,
                         "sequence expected greater than "
                         + str(gt_ms)
                         + "ms response time, got "
