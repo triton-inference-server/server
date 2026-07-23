@@ -119,3 +119,18 @@ practices, and more. Need enterprise support? NVIDIA global support is available
 for Triton Inference Server with the [NVIDIA AI Enterprise software suite](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/).
 
 See the [Latest Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/) for updates on the newest features and bug fixes.
+## Validating a TensorRT Model Before Deployment
+
+Model Navigator provides a simple workflow for validating TensorRT `.plan`
+models before packaging them into a Triton model repository. This helps ensure
+that exported models load correctly, run with the expected shapes, and match
+runtime requirements.
+
+Example:
+
+```bash
+model-navigator validate \
+  --model-path ./model.plan \
+  --model-format tensorrt \
+  --input-shapes "x:[1,3,224,224]" \
+  --verbose
