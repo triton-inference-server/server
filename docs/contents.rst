@@ -40,6 +40,7 @@
    LLM With TensorRT-LLM <getting_started/trtllm_user_guide.md>
    Multimodal model <../tutorials/Popular_Models_Guide/Llava1.5/llava_trtllm_guide.md>
    Stable diffusion <../tutorials/Popular_Models_Guide/StableDiffusion/README.md>
+   HSTU (Generative Recommenders) <../tutorials/Popular_Models_Guide/HSTU/README.md>
 
 .. toctree::
    :hidden:
