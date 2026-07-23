@@ -131,7 +131,7 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
 RUN --mount=type=secret,id=maven_settings,target=/run/secrets/maven_settings,required=false \
     if [ -f /run/secrets/maven_settings ]; then export MAVEN_ARGS="--settings /run/secrets/maven_settings"; fi && \
-    cmake --build . -v --parallel --target cc-clients java-clients python-clients
+    cmake --build . -v --parallel 16 --target cc-clients java-clients python-clients
 
 # Install Java API Bindings
 RUN --mount=type=secret,id=maven_settings,target=/run/secrets/maven_settings,required=false \
