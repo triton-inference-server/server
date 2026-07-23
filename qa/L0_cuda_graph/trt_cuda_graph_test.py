@@ -27,15 +27,15 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+import unittest
+
+import numpy as np
+from tritonclient.utils import InferenceServerException
 
 sys.path.append("../common")
 
-import unittest
-
 import infer_util as iu
-import numpy as np
 import test_util as tu
-from tritonclient.utils import *
 
 
 class TrtCudaGraphTest(tu.TestResultCollector):
