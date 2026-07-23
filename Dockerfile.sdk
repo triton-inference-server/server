@@ -90,7 +90,9 @@ ENV CMAKE_POLICY_MINIMUM_REQUIRED=3.5
 # Install Maven 3.9+ manually -- the distro-provided maven is too old to
 # honor the MAVEN_ARGS environment variable (added in Maven 3.9.0, MNG-7038).
 ARG JAVA_BINDINGS_MAVEN_URL
-RUN curl -fSLk --retry 3 -o /tmp/maven.tar.gz ${JAVA_BINDINGS_MAVEN_URL} && \
+RUN --mount=type=secret,id=maven_url,env=MAVEN_URL,required=false \
+    test -v MAVEN_URL || MAVEN_URL="${JAVA_BINDINGS_MAVEN_URL}" && \
+    curl -fSLk --retry 3 -o /tmp/maven.tar.gz "${MAVEN_URL}" && \
     tar -xzf /tmp/maven.tar.gz -C /opt && \
     find /opt -maxdepth 1 -name "apache-maven-*" -type d -exec ln -s {} /opt/maven \; && \
     rm /tmp/maven.tar.gz && /opt/maven/bin/mvn --version
