@@ -39,6 +39,7 @@ ARG TRITON_CLIENT_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_ENABLE_GPU=ON
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
+ARG JAVA_BINDINGS_MAVEN_URL=https://archive.apache.org/dist/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz
 # DCGM version to install for Model Analyzer
 ARG DCGM_VERSION=4.5.3-1
 
@@ -88,7 +89,7 @@ ENV CMAKE_POLICY_MINIMUM_REQUIRED=3.5
 
 # Install Maven 3.9+ manually -- the distro-provided maven is too old to
 # honor the MAVEN_ARGS environment variable (added in Maven 3.9.0, MNG-7038).
-ARG JAVA_BINDINGS_MAVEN_URL=https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz
+ARG JAVA_BINDINGS_MAVEN_URL
 RUN curl -fSLk --retry 3 -o /tmp/maven.tar.gz ${JAVA_BINDINGS_MAVEN_URL} && \
     tar -xzf /tmp/maven.tar.gz -C /opt && \
     find /opt -maxdepth 1 -name "apache-maven-*" -type d -exec ln -s {} /opt/maven \; && \
