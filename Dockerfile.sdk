@@ -46,6 +46,11 @@ ARG DCGM_VERSION=4.5.3-1
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown
 
+# Parallelism for the client/gRPC compile. gRPC C++ translation units peak at
+# 1-2+ GB RAM each, so keep this low to avoid the OOM killer on memory-limited
+# builders. Override with --build-arg TRITON_CLIENT_BUILD_PARALLEL=N.
+ARG TRITON_CLIENT_BUILD_PARALLEL=4
+
 ############################################################################
 ##  Build image
 ############################################################################
@@ -113,6 +118,7 @@ ARG TRITON_ENABLE_GPU
 ARG JAVA_BINDINGS_MAVEN_VERSION
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG
 ARG TARGETPLATFORM
+ARG TRITON_CLIENT_BUILD_PARALLEL
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
@@ -133,7 +139,7 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
 RUN --mount=type=secret,id=maven_settings,target=/run/secrets/maven_settings,required=false \
     if [ -f /run/secrets/maven_settings ]; then export MAVEN_ARGS="--settings /run/secrets/maven_settings"; fi && \
-    cmake --build . -v --parallel 16 --target cc-clients java-clients python-clients
+    cmake --build . -v --parallel ${TRITON_CLIENT_BUILD_PARALLEL} --target cc-clients java-clients python-clients
 
 # Install Java API Bindings
 RUN --mount=type=secret,id=maven_settings,target=/run/secrets/maven_settings,required=false \
