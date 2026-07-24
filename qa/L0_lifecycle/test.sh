@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1563,7 +1563,7 @@ cp -r ../custom_models/custom_zero_1_float32 models/. && \
         echo "{ key: \"execute_delay_ms\"; value: { string_value: \"5000\" }}" >> config.pbtxt && \
         echo "]" >> config.pbtxt)
 
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --exit-timeout-secs=${SERVER_TIMEOUT}"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -1585,7 +1585,7 @@ if [ `grep -c "Found 1 gRPC service connections and inference handlers" $SERVER_
 fi
 
 kill $SERVER_PID || true
-wait $SERVER_PID
+wait $SERVER_PID || true
 
 rm -f $CLIENT_LOG
 
