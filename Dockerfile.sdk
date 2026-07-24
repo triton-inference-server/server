@@ -38,13 +38,18 @@ ARG TRITON_CORE_REPO_TAG=main
 ARG TRITON_CLIENT_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_ENABLE_GPU=ON
-ARG JAVA_BINDINGS_MAVEN_VERSION=3.9.9
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
+ARG JAVA_BINDINGS_MAVEN_URL=https://archive.apache.org/dist/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz
 # DCGM version to install for Model Analyzer
 ARG DCGM_VERSION=4.5.3-1
 
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown
+
+# Parallelism for the client/gRPC compile. gRPC C++ translation units peak at
+# 1-2+ GB RAM each, so keep this low to avoid the OOM killer on memory-limited
+# builders. Override with --build-arg TRITON_CLIENT_BUILD_PARALLEL=N.
+ARG TRITON_CLIENT_BUILD_PARALLEL=4
 
 ############################################################################
 ##  Build image
@@ -89,12 +94,13 @@ ENV CMAKE_POLICY_MINIMUM_REQUIRED=3.5
 
 # Install Maven 3.9+ manually -- the distro-provided maven is too old to
 # honor the MAVEN_ARGS environment variable (added in Maven 3.9.0, MNG-7038).
-ARG JAVA_BINDINGS_MAVEN_VERSION
-RUN wget -nv -O /tmp/maven.tar.gz \
-        https://archive.apache.org/dist/maven/maven-3/${JAVA_BINDINGS_MAVEN_VERSION}/binaries/apache-maven-${JAVA_BINDINGS_MAVEN_VERSION}-bin.tar.gz && \
+ARG JAVA_BINDINGS_MAVEN_URL
+RUN --mount=type=secret,id=maven_url,env=MAVEN_URL,required=false \
+    [ -n "${MAVEN_URL}" ] || MAVEN_URL="${JAVA_BINDINGS_MAVEN_URL}"; \
+    curl -fSLk --retry 3 -o /tmp/maven.tar.gz "${MAVEN_URL}" && \
     tar -xzf /tmp/maven.tar.gz -C /opt && \
-    ln -s /opt/apache-maven-${JAVA_BINDINGS_MAVEN_VERSION} /opt/maven && \
-    rm /tmp/maven.tar.gz
+    find /opt -maxdepth 1 -name "apache-maven-*" -type d -exec ln -s {} /opt/maven \; && \
+    rm /tmp/maven.tar.gz && /opt/maven/bin/mvn --version
 ENV PATH="/opt/maven/bin:${PATH}"
 
 # Build expects "python" executable (not python3).
@@ -112,6 +118,7 @@ ARG TRITON_ENABLE_GPU
 ARG JAVA_BINDINGS_MAVEN_VERSION
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG
 ARG TARGETPLATFORM
+ARG TRITON_CLIENT_BUILD_PARALLEL
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
@@ -132,7 +139,7 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
 RUN --mount=type=secret,id=maven_settings,target=/run/secrets/maven_settings,required=false \
     if [ -f /run/secrets/maven_settings ]; then export MAVEN_ARGS="--settings /run/secrets/maven_settings"; fi && \
-    cmake --build . -v --parallel --target cc-clients java-clients python-clients
+    cmake --build . -v --parallel ${TRITON_CLIENT_BUILD_PARALLEL} --target cc-clients java-clients python-clients
 
 # Install Java API Bindings
 RUN --mount=type=secret,id=maven_settings,target=/run/secrets/maven_settings,required=false \
