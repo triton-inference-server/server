@@ -29,12 +29,13 @@
 import sys
 import unittest
 
-import infer_util as iu
 import numpy as np
-import test_util as tu
 from tritonclient.utils import InferenceServerException
 
 sys.path.append("../common")
+
+import infer_util as iu  # noqa: E402
+import test_util as tu  # noqa: E402
 
 
 class TrtCudaGraphTest(tu.TestResultCollector):
@@ -158,6 +159,8 @@ class TrtCudaGraphTest(tu.TestResultCollector):
         # Non-batching model with a dynamic shape. The captured graph must be
         # launched when the request shape matches the graph_spec.
         self._check_infer((16,), 0)
+        # A different request shape must use regular execution.
+        self._check_infer((20,), 0)
 
 
 if __name__ == "__main__":

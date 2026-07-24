@@ -383,13 +383,13 @@ fi
 set -e
 
 set +e
-if [ `grep -c "is launching CUDA graph " $SERVER_LOG` != "1" ]; then
+if [ `grep -c "Context with profile 6 \[6\] is launching CUDA graph " $SERVER_LOG` != "1" ]; then
     echo -e "\n***\n*** Failed. Expected 1 execution with CUDA graph\n***"
     RET=1
 fi
 
-if [ `grep -c "is being executed for " $SERVER_LOG` != "0" ]; then
-    echo -e "\n***\n*** Failed. Expected 0 execution without CUDA graph\n***"
+if [ `grep -c "Context with profile 6 \[6\] is being executed for " $SERVER_LOG` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected 1 execution without CUDA graph\n***"
     RET=1
 fi
 
