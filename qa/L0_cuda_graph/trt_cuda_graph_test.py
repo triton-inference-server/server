@@ -26,7 +26,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
 import sys
 import unittest
 
@@ -35,7 +34,7 @@ import numpy as np
 import test_util as tu
 from tritonclient.utils import InferenceServerException
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../common"))
+sys.path.append("../common")
 
 
 class TrtCudaGraphTest(tu.TestResultCollector):
