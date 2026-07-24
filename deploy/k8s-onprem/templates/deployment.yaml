@@ -52,24 +52,28 @@ spec:
 
     spec:
       serviceAccountName: {{ template "triton-inference-server.fullname" . }}
+      {{- with .Values.volumes }}
       volumes:
-        - name: models
-          nfs:
-            server: {{ .Values.image.modelRepositoryServer }}
-            path: {{ .Values.image.modelRepositoryPath }}
-            readOnly: false
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.imageName }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.volumeMounts }}
           volumeMounts:
-            - mountPath: /models
-              name: models
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
 
+          {{- with .Values.envFrom }}
+          envFrom:
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          {{- with .Values.resources }}
           resources:
-            limits:
-              nvidia.com/gpu: {{ .Values.image.numGpus }}
-
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
           args:
             - tritonserver
             {{- range .Values.serverArgs }}
