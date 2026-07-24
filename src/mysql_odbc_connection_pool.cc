@@ -54,8 +54,6 @@ std::string BuildMySqlDriverConnectString(const DatabaseConfig& c)
   std::string driver = c.odbc_driver_name;
   if (driver.empty()) {
     driver = "MySQL ODBC 9.7 Unicode Driver";
-  } else if (driver == "MySQL ODBC 8.0 Unicode Driver") {
-    driver = "MySQL ODBC 9.7 Unicode Driver";
   }
   std::ostringstream conn;
   conn << "DRIVER={" << driver << "};" << "SERVER=" << c.database_ip << ";" << "PORT=" << c.database_port << ";" << "UID={" << c.dsn_user_name << "};" << "PWD={" << c.dsn_user_password << "};";

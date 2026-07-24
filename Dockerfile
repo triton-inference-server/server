@@ -37,7 +37,6 @@
 # Run (mount model repo; mount configs directly to /etc):
 #   docker run --name triton1 -d --net=host \
 #     -v "/tmp/models:/models" \
-#     -v "/etc/odbc.ini:/etc/odbc.ini:ro" \
 #     -v "/etc/triton-dmconfig.json:/etc/triton-dmconfig.json:ro" \
 #     tritonserver:25.03-custom \
 #     tritonserver \
