@@ -1,0 +1,52 @@
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Extend the image produced by build.py (`docker build -t tritonserver`) with
+# MySQL ODBC runtime, driver path symlinks for unixODBC, and config files.
+# Build context: repository root (same as build.py final docker build).
+#
+# Prerequisites:
+#   - Image `tritonserver` must exist.
+#   - replace-artifacts/odbc.ini
+#   - replace-artifacts/triton-dmconfig.json
+#
+# Example:
+#   docker build -f Dockerfile.pubmatic-bt-tritonserver -t pubmatic-bt-tritonserver .
+
+FROM tritonserver
+
+ARG MYSQL_ODBC_DEB_VERSION=9.7.0-1ubuntu22.04
+ARG MYSQL_ODBC_DEB_ARCH=amd64
+
+USER root
+
+RUN set -eux; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    unixodbc \
+    odbcinst; \
+  DEB="mysql-connector-odbc_${MYSQL_ODBC_DEB_VERSION}_${MYSQL_ODBC_DEB_ARCH}.deb"; \
+  curl -fsSL -o "/tmp/${DEB}" \
+    "https://repo.mysql.com/apt/ubuntu/pool/mysql-tools/m/mysql-connector-odbc/${DEB}"; \
+  apt-get install -y "/tmp/${DEB}" || apt-get -fy install; \
+  rm -f "/tmp/${DEB}"; \
+  rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+  mkdir -p /usr/lib/odbc; \
+  for f in \
+      /usr/lib/x86_64-linux-gnu/odbc/libmyodbc*.so \
+      /usr/lib/aarch64-linux-gnu/odbc/libmyodbc*.so; \
+  do \
+    if [ -f "${f}" ]; then \
+      ln -sf "${f}" "/usr/lib/odbc/$(basename "${f}")"; \
+    fi; \
+  done; \
+  test -f /usr/lib/odbc/libmyodbc9w.so
+
+COPY replace-artifacts/odbc.ini /etc/odbc.ini
+RUN chmod 644 /etc/odbc.ini
+
+COPY replace-artifacts/triton-dmconfig.json /etc/triton-dmconfig.json
+RUN chmod 644 /etc/triton-dmconfig.json

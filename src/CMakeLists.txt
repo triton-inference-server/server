@@ -90,6 +90,19 @@ endif()
 #
 find_package(re2 REQUIRED)
 
+option(TRITON_ENABLE_MYSQL_ODBC "Build tritonserver with MySQL ODBC connection pool (requires ODBC::ODBC / unixODBC)" OFF)
+if(TRITON_ENABLE_MYSQL_ODBC)
+  if(UNIX AND NOT APPLE AND NOT WIN32)
+    message(
+      STATUS
+        "TRITON_ENABLE_MYSQL_ODBC: ensure unixODBC development packages are installed "
+        "(e.g. Debian/Ubuntu: unixodbc-dev; RHEL: unixODBC-devel) so CMake can find ODBC."
+    )
+  endif()
+  find_package(ODBC REQUIRED)
+  message(STATUS "Using ODBC ${ODBC_VERSION}")
+endif()
+
 #
 # tritonserver executable
 #
@@ -101,8 +114,10 @@ add_executable(
   main.cc
   shared_memory_manager.cc
   triton_signal.cc
+  database_config.cc
   classification.h
   common.h
+  database_config.h
   shared_memory_manager.h
   triton_signal.h
 )
@@ -155,6 +170,17 @@ else()
   )
   endif()
 
+if(TRITON_ENABLE_MYSQL_ODBC)
+  target_sources(
+    main
+    PRIVATE
+      mysql_odbc_connection_pool.cc
+      mysql_odbc_connection_pool.h
+  )
+  target_link_libraries(main PRIVATE ODBC::ODBC)
+  target_compile_definitions(main PRIVATE TRITON_ENABLE_MYSQL_ODBC=1)
+endif()
+
 set(LIB_DIR "lib")
 if(LINUX)
   file(STRINGS "/etc/os-release" DISTRO_ID_LIKE REGEX "ID_LIKE")
@@ -180,6 +206,7 @@ target_link_libraries(
     triton-common-async-work-queue  # from repo-common
     triton-common-error             # from repo-common
     triton-common-logging           # from repo-common
+    triton-common-json              # from repo-common (RapidJSON)
     triton-core-serverapi           # from repo-core
     triton-core-serverstub          # from repo-core
 )
@@ -337,11 +364,14 @@ if(${TRITON_ENABLE_HTTP}
   list(APPEND
     HTTP_ENDPOINT_SRCS
     http_server.cc
+    multi_infer.cc
     orca_http.cc
   )
   list(APPEND
     HTTP_ENDPOINT_HDRS
     http_server.h
+    http_error_json.h
+    http_server_macros.h
     orca_http.h
   )
 
@@ -738,6 +768,61 @@ if (NOT WIN32)
     TARGETS multi_server
     RUNTIME DESTINATION bin
   )
+
+  #
+  # transform (JSON -> RapidJSON, TRITONSERVER_Error reporting)
+  #
+  add_library(transform STATIC transform.cc transform.h)
+
+  # Required when transform is linked into shared objects (e.g. py-bindings ->
+  # http-endpoint-library -> transform); otherwise relocations fail at link time.
+  set_target_properties(
+    transform
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+  )
+
+  target_compile_features(transform PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    target_compile_options(
+      transform
+      PRIVATE
+        /W1 /D_WIN32_WINNT=0x0A00 /EHsc /Zc:preprocessor
+    )
+  else()
+    target_compile_options(
+      transform
+      PRIVATE
+        -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+    )
+  endif()
+
+  target_link_libraries(
+    transform
+    PRIVATE
+      triton-common-async-work-queue  # from repo-common
+      triton-common-error             # from repo-common
+      triton-common-json              # RapidJSON from repo-common
+      triton-core-serverapi           # from repo-core
+      triton-core-serverstub          # from repo-core
+  )
+
+  if(TRITON_ENABLE_MYSQL_ODBC)
+    target_compile_definitions(transform PRIVATE TRITON_ENABLE_MYSQL_ODBC=1)
+    target_link_libraries(transform PRIVATE ODBC::ODBC)
+  endif()
+
+  if((${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
+      ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI}) AND
+      TARGET http-endpoint-library AND TARGET transform)
+    target_link_libraries(http-endpoint-library PRIVATE transform)
+    if(TRITON_ENABLE_MYSQL_ODBC)
+      target_compile_definitions(
+        http-endpoint-library
+        PRIVATE TRITON_ENABLE_MYSQL_ODBC=1
+      )
+    endif()
+  endif()
 
   if(${TRITON_ENABLE_GPU})
     #
