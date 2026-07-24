@@ -31,8 +31,8 @@ import sys
 import unittest
 
 import infer_util as iu
-import test_util as tu
 import numpy as np
+import test_util as tu
 from tritonclient.utils import InferenceServerException
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../common"))
