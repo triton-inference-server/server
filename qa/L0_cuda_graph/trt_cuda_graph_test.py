@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2020-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,15 +27,15 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+import unittest
+
+import numpy as np
+from tritonclient.utils import InferenceServerException
 
 sys.path.append("../common")
 
-import unittest
-
-import infer_util as iu
-import numpy as np
-import test_util as tu
-from tritonclient.utils import *
+import infer_util as iu  # noqa: E402
+import test_util as tu  # noqa: E402
 
 
 class TrtCudaGraphTest(tu.TestResultCollector):
@@ -154,6 +154,13 @@ class TrtCudaGraphTest(tu.TestResultCollector):
 
     def test_nobatch_fixed_shape(self):
         self._check_infer((16,), 0)
+
+    def test_nobatch_dynamic_shape(self):
+        # Non-batching model with a dynamic shape. The captured graph must be
+        # launched when the request shape matches the graph_spec.
+        self._check_infer((16,), 0)
+        # A different request shape must use regular execution.
+        self._check_infer((20,), 0)
 
 
 if __name__ == "__main__":
