@@ -37,7 +37,7 @@ add_library(
   stream_infer_handler.cc
 )
 
-target_compile_features(grpc-endpoint-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+target_compile_features(grpc-endpoint-library PRIVATE cxx_std_${CMAKE_CXX_STANDARD})
 target_compile_options(
   grpc-endpoint-library
   PRIVATE

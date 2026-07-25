@@ -120,7 +120,7 @@ add_executable(
 
 set_property(TARGET main PROPERTY OUTPUT_NAME tritonserver)
 
-target_compile_features(main PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+target_compile_features(main PRIVATE cxx_std_${CMAKE_CXX_STANDARD})
 target_compile_options(
   main
   PRIVATE
@@ -341,7 +341,7 @@ if(${TRITON_ENABLE_HTTP}
     ${HTTP_ENDPOINT_SRCS} ${HTTP_ENDPOINT_HDRS}
   )
 
-  target_compile_features(http-endpoint-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+  target_compile_features(http-endpoint-library PRIVATE cxx_std_${CMAKE_CXX_STANDARD})
   target_compile_options(
     http-endpoint-library
     PRIVATE
@@ -473,7 +473,7 @@ if(${TRITON_ENABLE_TRACING})
     tracer.cc tracer.h
   )
 
-  target_compile_features(tracing-library PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+  target_compile_features(tracing-library PRIVATE cxx_std_${CMAKE_CXX_STANDARD})
   target_include_directories(
     tracing-library
     PUBLIC ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
@@ -561,7 +561,7 @@ add_executable(
   simple.cc
 )
 
-target_compile_features(simple PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+target_compile_features(simple PRIVATE cxx_std_${CMAKE_CXX_STANDARD})
 target_compile_options(
   simple
   PRIVATE
@@ -614,7 +614,7 @@ add_executable(
   multi_server.cc
 )
 
-target_compile_features(multi_server PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+target_compile_features(multi_server PRIVATE cxx_std_${CMAKE_CXX_STANDARD})
 target_compile_options(
   multi_server
   PRIVATE
@@ -668,7 +668,7 @@ if(${TRITON_ENABLE_GPU})
     memory_alloc.cc
   )
 
-  target_compile_features(memory_alloc PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
+  target_compile_features(memory_alloc PRIVATE cxx_std_${CMAKE_CXX_STANDARD})
   target_compile_options(
     memory_alloc
     PRIVATE
