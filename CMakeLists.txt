@@ -21,7 +21,7 @@ set_property(CACHE CMAKE_CXX_STANDARD PROPERTY STRINGS 17 20 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-triton_server_enable_compiler_cache()
+triton_server_cache_enable_compiler()
 
 # Conan's CMakeDeps configs call check_build_type_defined() and abort when no
 # build type is set, so single-config generators need a default here.
@@ -65,8 +65,8 @@ set(TRITON_LIBEVENT_VERSION "2.1.12" CACHE STRING "libevent version resolved via
 set(TRITON_LIBEVHTP_VERSION "1.2.18" CACHE STRING "libevhtp version resolved via Conan")
 set(TRITON_GRPC_VERSION "1.81.1" CACHE STRING "gRPC version resolved via Conan")
 
-triton_server_provide_package(NAME re2      REF re2/${TRITON_RE2_VERSION})
-triton_server_provide_package(NAME Protobuf REF protobuf/${TRITON_PROTOBUF_VERSION} CONFIG)
+triton_server_conan_provide_package(NAME re2      REF re2/${TRITON_RE2_VERSION})
+triton_server_conan_provide_package(NAME Protobuf REF protobuf/${TRITON_PROTOBUF_VERSION} CONFIG)
 
 if(TRITON_ENABLE_GPU)
   find_package(CUDAToolkit REQUIRED)
@@ -76,8 +76,8 @@ if(TRITON_ENABLE_HTTP
     OR TRITON_ENABLE_METRICS
     OR TRITON_ENABLE_SAGEMAKER
     OR TRITON_ENABLE_VERTEX_AI)
-  triton_server_provide_package(NAME Libevent REF libevent/${TRITON_LIBEVENT_VERSION} CONFIG)
-  triton_server_provide_package(NAME libevhtp REF libevhtp/${TRITON_LIBEVHTP_VERSION} CONFIG)
+  triton_server_conan_provide_package(NAME Libevent REF libevent/${TRITON_LIBEVENT_VERSION} CONFIG)
+  triton_server_conan_provide_package(NAME libevhtp REF libevhtp/${TRITON_LIBEVHTP_VERSION} CONFIG)
 endif()
 
 if(TRITON_ENABLE_TRACING)
@@ -88,9 +88,9 @@ if(TRITON_ENABLE_TRACING)
 endif()
 
 if(TRITON_ENABLE_GRPC)
-  triton_server_provide_package(NAME gRPC REF grpc/${TRITON_GRPC_VERSION} CONFIG)
+  triton_server_conan_provide_package(NAME gRPC REF grpc/${TRITON_GRPC_VERSION} CONFIG)
 endif()
 
-triton_server_report_dependencies()
+triton_server_dependency_report()
 
 add_subdirectory(src)

@@ -97,7 +97,7 @@ function(_triton_server_conan_export_recipe recipe_name out_ok)
   endif()
 endfunction()
 
-# triton_server_provide_package(NAME <pkg> [REF <ref>] [RECIPE <dir>] [CONFIG])
+# triton_server_conan_provide_package(NAME <pkg> [REF <ref>] [RECIPE <dir>] [CONFIG])
 #
 # Run the cascade for one package. Declared as a macro rather than a function so
 # that find_package()'s many result variables (<pkg>_FOUND, _VERSION, _DIR, ...)
@@ -105,14 +105,14 @@ endfunction()
 #
 # Because it is a macro, CMAKE_CURRENT_FUNCTION is unavailable and the log tag is
 # written literally.
-macro(triton_server_provide_package)
+macro(triton_server_conan_provide_package)
   cmake_parse_arguments(_tsp "CONFIG;QUIET" "NAME;REF;RECIPE" "" ${ARGN})
 
   if(NOT _tsp_NAME)
-    message(FATAL_ERROR "triton_server_provide_package requires NAME")
+    message(FATAL_ERROR "triton_server_conan_provide_package requires NAME")
   endif()
 
-  set(_tsp_tag "triton_server_provide_package")
+  set(_tsp_tag "triton_server_conan_provide_package")
   set(_tsp_cfg "")
   if(_tsp_CONFIG)
     set(_tsp_cfg CONFIG)
@@ -159,17 +159,17 @@ macro(triton_server_provide_package)
       message(STATUS "[${_tsp_tag}] done: ${_tsp_NAME} resolved (source=conan)")
     else()
       message(STATUS "[${_tsp_tag}] step 4/4: deferring ${_tsp_NAME} to a source build")
-      triton_server_defer_source_build(${_tsp_NAME})
+      triton_server_dependency_defer_source(${_tsp_NAME})
     endif()
   endif()
 endmacro()
 
-# triton_server_defer_source_build(<pkg>)
+# triton_server_dependency_defer_source(<pkg>)
 #
 # Record that <pkg> must come from third_party's source build. When gRPC is
 # deferred, the five packages it vendors are recorded too: they are produced by
 # that single build and must be taken from it rather than resolved separately.
-function(triton_server_defer_source_build pkg)
+function(triton_server_dependency_defer_source pkg)
   message(STATUS "[${CMAKE_CURRENT_FUNCTION}] entered: pkg='${pkg}'")
 
   get_property(_pending GLOBAL PROPERTY TRITON_SERVER_SOURCE_BUILD_PACKAGES)
@@ -190,11 +190,11 @@ function(triton_server_defer_source_build pkg)
   message(STATUS "[${CMAKE_CURRENT_FUNCTION}] done: pending source builds = ${_pending}")
 endfunction()
 
-# triton_server_report_dependencies()
+# triton_server_dependency_report()
 #
 # Summarise how each dependency was resolved. Printed once after the cascade so a
 # CI log shows the whole picture without reading every step line.
-function(triton_server_report_dependencies)
+function(triton_server_dependency_report)
   message(STATUS "[${CMAKE_CURRENT_FUNCTION}] entered")
 
   get_property(_pending GLOBAL PROPERTY TRITON_SERVER_SOURCE_BUILD_PACKAGES)
