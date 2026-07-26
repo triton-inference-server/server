@@ -75,6 +75,50 @@ function(triton_server_conan_add_remote)
   message(STATUS "[${CMAKE_CURRENT_FUNCTION}] done: remote '${_name}' ready")
 endfunction()
 
+# triton_server_conan_publish_targets([<out_var>])
+#
+# Publish every package CMakeDeps generated into the CMake cache as <Pkg>_DIR.
+#
+# A Conan resolve produces config files for the whole transitive closure, not just
+# the reference asked for: resolving gRPC also yields protobuf, abseil, re2 and
+# c-ares at the versions gRPC was built against. Exporting each as a cache entry
+# means every later find_package() -- including the ones inside common/, core/ and
+# backend/, which run in their own directory scope -- binds to that same set
+# rather than resolving independently and risking a second, mismatched copy.
+#
+# The cache entries are FORCEd because find_package() writes <Pkg>_DIR-NOTFOUND on
+# a failed probe, and a plain cache set will not displace an existing entry.
+# Optionally sets <out_var> to the list of published package names.
+function(triton_server_conan_publish_targets)
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] entered: dir='${TRITON_SERVER_CONAN_OUTPUT_DIR}'")
+
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 1/3: scanning for generated configs")
+  file(GLOB _configs
+       "${TRITON_SERVER_CONAN_OUTPUT_DIR}/*-config.cmake"
+       "${TRITON_SERVER_CONAN_OUTPUT_DIR}/*Config.cmake")
+
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 2/3: publishing <Pkg>_DIR entries")
+  set(_published "")
+  foreach(_cfg IN LISTS _configs)
+    get_filename_component(_file "${_cfg}" NAME)
+    # Conan emits both <pkg>-config.cmake and <Pkg>Config.cmake spellings.
+    string(REGEX REPLACE "(-config|Config)\\.cmake$" "" _pkg "${_file}")
+    if(_pkg AND NOT _pkg IN_LIST _published)
+      set(${_pkg}_DIR "${TRITON_SERVER_CONAN_OUTPUT_DIR}" CACHE PATH
+          "Conan-provided ${_pkg}" FORCE)
+      list(APPEND _published "${_pkg}")
+    endif()
+  endforeach()
+
+  list(SORT _published)
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 3/3: published ${_published}")
+
+  if(ARGC GREATER 0)
+    set(${ARGV0} "${_published}" PARENT_SCOPE)
+  endif()
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] done")
+endfunction()
+
 # triton_server_conan_install_package(<ref> [<ref>...])
 #
 # Resolve one or more Conan references (e.g. re2/20230301) and make them findable
