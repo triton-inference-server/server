@@ -300,7 +300,15 @@ endif()
 
 if(TRITON_ENABLE_GCS)
   # Triton's recipe preserves upstream's per-component layout, so this is the
-  # storage client's own config rather than a consolidated one.
+  # storage client's own config rather than a consolidated one. Like the gRPC
+  # recipe it sets cmake_find_mode=none, meaning CMakeDeps generates nothing and
+  # the configs ship inside the package -- so the package tree has to be on
+  # CMAKE_PREFIX_PATH for find_package to see them.
+  _triton_server_conan_package_folder(
+    "google-cloud-cpp/${TRITON_GOOGLE_CLOUD_VERSION}" _triton_gcp_root)
+  if(_triton_gcp_root)
+    list(PREPEND CMAKE_PREFIX_PATH "${_triton_gcp_root}")
+  endif()
   find_package(google_cloud_cpp_storage REQUIRED)
   find_package(Crc32c CONFIG REQUIRED)
 endif()
