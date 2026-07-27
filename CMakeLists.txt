@@ -103,6 +103,7 @@ set(TRITON_GRPC_USER_CHANNEL "@tritonserver/stable" CACHE STRING
 set(TRITON_GRPC_REF "grpc/${TRITON_GRPC_VERSION}${TRITON_GRPC_USER_CHANNEL}")
 
 set(TRITON_RAPIDJSON_VERSION "cci.20230929" CACHE STRING "RapidJSON version")
+set(TRITON_BOOST_VERSION "1.85.0" CACHE STRING "Boost version")
 set(TRITON_LIBEVENT_VERSION "2.1.12" CACHE STRING "libevent version")
 set(TRITON_LIBEVHTP_VERSION "1.2.18" CACHE STRING "libevhtp version")
 set(TRITON_CURL_VERSION "8.18.0" CACHE STRING "libcurl version")
@@ -123,6 +124,12 @@ find_package(Threads REQUIRED)
 
 # common/CMakeLists.txt:48 requires RapidJSON.
 triton_server_dependency_provider(NAME RapidJSON REF rapidjson/${TRITON_RAPIDJSON_VERSION} CONFIG)
+# core/src/CMakeLists.txt:66 requires Boost 1.78 or newer. Only header-only
+# libraries are used -- algorithm/string, core/span, functional/hash and
+# interprocess -- which is why its COMPONENTS list is empty. header_only=True
+# therefore costs nothing to resolve and avoids compiling Boost.
+triton_server_dependency_provider(NAME Boost REF boost/${TRITON_BOOST_VERSION} CONFIG
+                                  OPTIONS "boost/*:header_only=True")
 
 if(TRITON_ENABLE_GRPC)
   # gRPC plus the abseil/protobuf/re2/c-ares it vendors, from one package.
@@ -138,6 +145,17 @@ if(TRITON_ENABLE_GPU)
   # Tied to the host driver; no Conan reference exists.
   triton_server_dependency_provider(NAME CUDAToolkit ALLOW_SYSTEM)
   triton_server_dependency_provider(NAME cnmem REF cnmem/${TRITON_CNMEM_VERSION} CONFIG)
+
+  # core/src and core/src/test locate cnmem the old third_party way:
+  #   find_library(CNMEM_LIBRARY NAMES cnmem PATHS ${CNMEM_PATH}/lib)
+  #   target_include_directories(... ${CNMEM_PATH}/include)
+  # CNMEM_PATH pointed into the third_party install prefix. Point it at the Conan
+  # package instead, so those lookups resolve without editing core.
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" _triton_cfg)
+  if(cnmem_PACKAGE_FOLDER_${_triton_cfg})
+    set(CNMEM_PATH "${cnmem_PACKAGE_FOLDER_${_triton_cfg}}" CACHE PATH "cnmem root" FORCE)
+    message(STATUS "cnmem: CNMEM_PATH=${CNMEM_PATH}")
+  endif()
 endif()
 
 if(TRITON_ENABLE_METRICS)
@@ -229,6 +247,12 @@ triton_server_dependency_report()
 # repo-common, repo-core and repo-backend, and needs these variables set first.
 #
 include(TritonRepos)
+
+# core defaults TRITON_CORE_HEADERS_ONLY to ON, which builds only the stub
+# (core/CMakeLists.txt:34). The old root file set this explicitly
+# (CMakeLists.txt.bkp:135); without it libtritonserver.so is a stub and core/src
+# -- with its own Boost/Protobuf/AWS/Azure dependencies -- is never configured.
+set(TRITON_CORE_HEADERS_ONLY OFF)
 
 triton_server_fetchcontent_declare_repos()
 

@@ -60,6 +60,8 @@ set_property(GLOBAL PROPERTY TRITON_SERVER_SOURCE_BUILD_PACKAGES "")
 # down the cascade. triton_server_conan_install_package() is fatal by design; this
 # is the tolerant variant used while probing.
 function(_triton_server_conan_try_install ref out_ok out_mode)
+  # Extra `conan install -o` settings, if the caller supplied any.
+  set(_opts ${ARGN})
   find_program(TRITON_SERVER_CONAN_EXECUTABLE NAMES conan)
   if(NOT TRITON_SERVER_CONAN_EXECUTABLE)
     set(${out_ok} FALSE PARENT_SCOPE)
@@ -68,6 +70,9 @@ function(_triton_server_conan_try_install ref out_ok out_mode)
   endif()
 
   set(_args "--requires=${ref}")
+  foreach(_opt IN LISTS _opts)
+    list(APPEND _args "-o" "${_opt}")
+  endforeach()
   if(CMAKE_BUILD_TYPE)
     list(APPEND _args "-s" "build_type=${CMAKE_BUILD_TYPE}")
   endif()
@@ -203,7 +208,7 @@ endmacro()
 # caller's scope. CMAKE_CURRENT_FUNCTION does not work in a macro, so the log tag
 # is a literal that gains a ":<provider>" suffix once the provider is known.
 macro(triton_server_dependency_provider)
-  cmake_parse_arguments(_tsp "CONFIG;QUIET;ALLOW_SYSTEM;REQUIRED" "NAME;REF;RECIPE;VERSION" "" ${ARGN})
+  cmake_parse_arguments(_tsp "CONFIG;QUIET;ALLOW_SYSTEM;REQUIRED" "NAME;REF;RECIPE;VERSION" "OPTIONS" ${ARGN})
 
   if(NOT _tsp_NAME)
     message(FATAL_ERROR "triton_server_dependency_provider requires NAME")
@@ -227,13 +232,13 @@ macro(triton_server_dependency_provider)
   # ---- step 1: Conan ---------------------------------------------------------
   if(TRITON_ENABLE_CONAN AND _tsp_REF)
     message(STATUS "[${_tsp_tag}] step 1/3: resolving ${_tsp_REF} via Conan")
-    _triton_server_conan_try_install("${_tsp_REF}" _tsp_ok _tsp_mode)
+    _triton_server_conan_try_install("${_tsp_REF}" _tsp_ok _tsp_mode ${_tsp_OPTIONS})
 
     if(NOT _tsp_ok)
       message(STATUS "[${_tsp_tag}] step 1/3: no remote binary, trying a local recipe for ${_tsp_RECIPE}")
       _triton_server_conan_export_recipe("${_tsp_RECIPE}" _tsp_exported)
       if(_tsp_exported)
-        _triton_server_conan_try_install("${_tsp_REF}" _tsp_ok _tsp_mode)
+        _triton_server_conan_try_install("${_tsp_REF}" _tsp_ok _tsp_mode ${_tsp_OPTIONS})
         if(_tsp_ok)
           set(_tsp_provider "conan-recipe")
         endif()
