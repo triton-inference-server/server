@@ -75,6 +75,29 @@ function(triton_server_conan_add_remote)
   message(STATUS "[${CMAKE_CURRENT_FUNCTION}] done: remote '${_name}' ready")
 endfunction()
 
+
+# _triton_server_conan_output_dir(<ref> <out_var>)
+#
+# Give every reference its own generators folder.
+#
+# A single shared folder does not work: each triton_server_dependency_provider()
+# call runs its own `conan install`, and CMakeDeps rewrites a config for every
+# package in that graph -- including transitive ones. Enabling GCS, whose
+# google-cloud-cpp depends on re2 and gRPC, regenerated re2-Target-release.cmake
+# and gRPC-Target-release.cmake over the versions the gRPC bundle had already
+# published, leaving targets pointing at libraries that resolve did not contain:
+#
+#   The link interface of target "re2::re2" contains: CONAN_LIB::re2_re2_RELEASE
+#   but the target was not found.
+#
+# Per-reference folders keep each resolve self-consistent; CMAKE_PREFIX_PATH is
+# extended with each one in turn, and find_package() caches <Pkg>_DIR on first
+# success, so the earliest resolve of a shared package wins.
+function(_triton_server_conan_output_dir ref out_var)
+  string(REGEX REPLACE "[/@]" "_" _slug "${ref}")
+  set(${out_var} "${TRITON_SERVER_CONAN_OUTPUT_DIR}/${_slug}" PARENT_SCOPE)
+endfunction()
+
 # triton_server_conan_publish_targets([<out_var>])
 #
 # Publish every package CMakeDeps generated into the CMake cache as <Pkg>_DIR.
@@ -93,7 +116,8 @@ function(triton_server_conan_publish_targets)
   message(STATUS "[${CMAKE_CURRENT_FUNCTION}] entered: dir='${TRITON_SERVER_CONAN_OUTPUT_DIR}'")
 
   message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 1/3: scanning for generated configs")
-  file(GLOB _configs
+  # Reference subfolders as well as the root, since each resolve writes its own.
+  file(GLOB_RECURSE _configs
        "${TRITON_SERVER_CONAN_OUTPUT_DIR}/*-config.cmake"
        "${TRITON_SERVER_CONAN_OUTPUT_DIR}/*Config.cmake")
 
@@ -104,8 +128,8 @@ function(triton_server_conan_publish_targets)
     # Conan emits both <pkg>-config.cmake and <Pkg>Config.cmake spellings.
     string(REGEX REPLACE "(-config|Config)\\.cmake$" "" _pkg "${_file}")
     if(_pkg AND NOT _pkg IN_LIST _published)
-      set(${_pkg}_DIR "${TRITON_SERVER_CONAN_OUTPUT_DIR}" CACHE PATH
-          "Conan-provided ${_pkg}" FORCE)
+      get_filename_component(_cfg_dir "${_cfg}" DIRECTORY)
+      set(${_pkg}_DIR "${_cfg_dir}" CACHE PATH "Conan-provided ${_pkg}" FORCE)
       list(APPEND _published "${_pkg}")
     endif()
   endforeach()

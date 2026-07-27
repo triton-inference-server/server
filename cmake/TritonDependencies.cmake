@@ -69,6 +69,7 @@ function(_triton_server_conan_try_install ref out_ok out_mode)
     return()
   endif()
 
+  _triton_server_conan_output_dir("${ref}" _outdir)
   set(_args "--requires=${ref}")
   foreach(_opt IN LISTS _opts)
     list(APPEND _args "-o" "${_opt}")
@@ -85,7 +86,7 @@ function(_triton_server_conan_try_install ref out_ok out_mode)
     COMMAND "${TRITON_SERVER_CONAN_EXECUTABLE}" install
             ${_args}
             --generator=CMakeDeps
-            --output-folder=${TRITON_SERVER_CONAN_OUTPUT_DIR}
+            --output-folder=${_outdir}
             --build=missing
     RESULT_VARIABLE _result
     OUTPUT_VARIABLE _stdout
@@ -249,7 +250,19 @@ macro(triton_server_dependency_provider)
       if(_tsp_provider STREQUAL "unresolved")
         set(_tsp_provider "conan-${_tsp_mode}")
       endif()
-      list(PREPEND CMAKE_PREFIX_PATH "${TRITON_SERVER_CONAN_OUTPUT_DIR}")
+      _triton_server_conan_output_dir("${_tsp_REF}" _tsp_outdir)
+      list(PREPEND CMAKE_PREFIX_PATH "${_tsp_outdir}")
+
+      # Packages built with cmake_find_mode=none generate no CMakeDeps config;
+      # they ship their own under <package>/lib/cmake and expect the package
+      # root on CMAKE_PREFIX_PATH. That is how Triton's gRPC and
+      # google-cloud-cpp recipes preserve the upstream layout their consumers
+      # already look for, so add the package folder as well.
+      _triton_server_conan_package_folder("${_tsp_REF}" _tsp_pkgdir)
+      if(_tsp_pkgdir)
+        list(PREPEND CMAKE_PREFIX_PATH "${_tsp_pkgdir}")
+      endif()
+
       list(REMOVE_DUPLICATES CMAKE_PREFIX_PATH)
       find_package(${_tsp_NAME} QUIET ${_tsp_cfg})
     endif()
@@ -402,34 +415,22 @@ macro(triton_server_grpc_provide_bundle)
   set(_tsg_tag "triton_server_grpc_provide_bundle")
   message(STATUS "[${_tsg_tag}] entered: ref='${TRITON_GRPC_REF}'")
 
-  message(STATUS "[${_tsg_tag}] step 1/3: resolving ${TRITON_GRPC_REF} via Conan")
-  _triton_server_conan_try_install("${TRITON_GRPC_REF}" _tsg_ok _tsg_mode)
-  if(NOT _tsg_ok)
-    _triton_server_conan_export_recipe("grpc" _tsg_exported)
-    if(_tsg_exported)
-      _triton_server_conan_try_install("${TRITON_GRPC_REF}" _tsg_ok _tsg_mode)
-      set(_tsg_mode "recipe")
-    endif()
-  endif()
-
-  if(NOT _tsg_ok)
-    message(FATAL_ERROR
-      "Could not resolve ${TRITON_GRPC_REF}. Build it with\n"
-      "  conan create conan/recipes/grpc --user=tritonserver --channel=stable --build=missing")
-  endif()
-
-  message(STATUS "[${_tsg_tag}] step 2/3: locating the package tree")
+  message(STATUS "[${_tsg_tag}] step 1/2: locating the package tree")
   _triton_server_conan_package_folder("${TRITON_GRPC_REF}" _tsg_root)
   if(NOT _tsg_root)
-    message(FATAL_ERROR "Resolved ${TRITON_GRPC_REF} but could not locate its package folder")
+    message(FATAL_ERROR
+      "${TRITON_GRPC_REF} was resolved but its package folder could not be located")
   endif()
   list(PREPEND CMAKE_PREFIX_PATH "${_tsg_root}")
   list(REMOVE_DUPLICATES CMAKE_PREFIX_PATH)
   set(TRITON_SERVER_GRPC_PACKAGE_ROOT "${_tsg_root}" CACHE PATH
       "Package tree supplying gRPC and its vendored dependencies" FORCE)
 
-  message(STATUS "[${_tsg_tag}] step 3/3: adopting the vendored dependencies")
-  # Dependency order: each is referenced by the next.
+  message(STATUS "[${_tsg_tag}] step 2/2: adopting the vendored dependencies")
+  # Order matters: gRPCConfig.cmake references protobuf::libprotobuf and
+  # protobuf::libprotoc as imported targets, so protobuf -- and abseil and
+  # utf8_range beneath it -- must be found before gRPC, or gRPC sets
+  # gRPC_FOUND=FALSE.
   foreach(_tsg_pkg absl utf8_range Protobuf re2 c-ares)
     find_package(${_tsg_pkg} CONFIG REQUIRED)
     message(STATUS "[triton_server_dependency_provider:grpc-bundled] done: ${_tsg_pkg} "
@@ -437,8 +438,7 @@ macro(triton_server_grpc_provide_bundle)
   endforeach()
 
   find_package(gRPC CONFIG REQUIRED)
-  message(STATUS "[triton_server_dependency_provider:conan-${_tsg_mode}] done: gRPC "
-                 "${gRPC_VERSION} at ${_tsg_root}")
+  message(STATUS "[triton_server_dependency_provider:conan] done: gRPC ${gRPC_VERSION} at ${_tsg_root}")
 endmacro()
 
 # triton_server_dependency_report()

@@ -88,6 +88,7 @@ triton_server_forbid_option(TRITON_ENABLE_ASAN TRITON_ENABLE_GPU)
 # descending. Guards must stay in sync with the copies in src/.
 #
 include(TritonDependencies)
+include(TritonConanGraph)
 
 triton_server_conan_add_remote()
 
@@ -98,8 +99,16 @@ triton_server_conan_add_remote()
 # them here would express a version that nothing reads. See
 # triton_server_grpc_provide_bundle().
 set(TRITON_GRPC_VERSION "1.81.1" CACHE STRING "gRPC version")
-set(TRITON_GRPC_USER_CHANNEL "@tritonserver/stable" CACHE STRING
-    "Conan user/channel for the Triton gRPC build; empty uses ConanCenter")
+# Published without a user/channel, deliberately shadowing ConanCenter's
+# grpc/1.81.1 -- which is the one that does not compile, since it pairs this gRPC
+# with abseil/20240116.2.
+#
+# The shadowing is not merely cosmetic. Recipes that depend on gRPC pin it by
+# plain reference (google-cloud-cpp requires grpc/1.54.3), and Conan treats
+# grpc/<v>@user/channel as a different package entirely, so an override cannot
+# redirect them. Only a plain reference can be reconciled with force=True.
+set(TRITON_GRPC_USER_CHANNEL "" CACHE STRING
+    "Conan user/channel suffix for the gRPC reference; empty is the Triton build")
 set(TRITON_GRPC_REF "grpc/${TRITON_GRPC_VERSION}${TRITON_GRPC_USER_CHANNEL}")
 
 set(TRITON_RAPIDJSON_VERSION "cci.20230929" CACHE STRING "RapidJSON version")
@@ -118,75 +127,136 @@ set(TRITON_AZURE_IOT_VERSION "lts_03_2024_ref02" CACHE STRING "azure-iot-sdk-c v
 set(TRITON_CNMEM_VERSION "1.0.0" CACHE STRING "cnmem version")
 set(TRITON_GTEST_VERSION "1.14.0" CACHE STRING "GoogleTest version")
 
-# Threads is provided by the toolchain, not by Conan; common/CMakeLists.txt:53
-# requires it.
-find_package(Threads REQUIRED)
+# Dependencies are declared first and resolved in a single Conan graph.
+#
+# One `conan install` per package produced one graph per package, and anything
+# appearing in several of them was resolved independently. Two graphs then
+# claimed the same CMake targets in one scope -- re2::re2 and libevhtp::evhtp
+# both failed with "CONAN_LIB::... but the target was not found" once GCS was
+# enabled and google-cloud-cpp brought its own gRPC and re2. Separate output
+# folders stopped the files overwriting each other but could not stop the target
+# collision. Only one graph can, because only then does Conan reconcile shared
+# packages to a single version.
+#
+# See cmake/TritonConanGraph.cmake.
 
-# common/CMakeLists.txt:48 requires RapidJSON.
-triton_server_dependency_provider(NAME RapidJSON REF rapidjson/${TRITON_RAPIDJSON_VERSION} CONFIG)
-# core/src/CMakeLists.txt:66 requires Boost 1.78 or newer. Only header-only
-# libraries are used -- algorithm/string, core/span, functional/hash and
-# interprocess -- which is why its COMPONENTS list is empty. header_only=True
-# therefore costs nothing to resolve and avoids compiling Boost.
-triton_server_dependency_provider(NAME Boost REF boost/${TRITON_BOOST_VERSION} CONFIG
+triton_server_conan_graph_require(REF ${TRITON_GRPC_REF} OVERRIDE)
+triton_server_conan_graph_require(REF rapidjson/${TRITON_RAPIDJSON_VERSION})
+triton_server_conan_graph_require(REF boost/${TRITON_BOOST_VERSION}
                                   OPTIONS "boost/*:header_only=True")
+triton_server_conan_graph_require(REF gtest/${TRITON_GTEST_VERSION})
 
-if(TRITON_ENABLE_GRPC)
-  # gRPC plus the abseil/protobuf/re2/c-ares it vendors, from one package.
-  triton_server_grpc_provide_bundle()
-else()
-  # Without gRPC nothing bundles these, so resolve them on their own.
-  triton_server_dependency_provider(NAME re2      REF re2/20230301)
-  triton_server_dependency_provider(NAME Protobuf REF protobuf/6.33.5 CONFIG)
-  triton_server_dependency_provider(NAME absl     REF abseil/20250512.1 CONFIG)
+if(TRITON_ENABLE_GPU)
+  triton_server_conan_graph_require(REF cnmem/${TRITON_CNMEM_VERSION})
 endif()
+
+if(TRITON_ENABLE_METRICS)
+  triton_server_conan_graph_require(REF prometheus-cpp/${TRITON_PROMETHEUS_VERSION})
+endif()
+
+if(TRITON_ENABLE_HTTP OR TRITON_ENABLE_METRICS
+    OR TRITON_ENABLE_SAGEMAKER OR TRITON_ENABLE_VERTEX_AI)
+  triton_server_conan_graph_require(REF libevent/${TRITON_LIBEVENT_VERSION})
+  triton_server_conan_graph_require(REF libevhtp/${TRITON_LIBEVHTP_VERSION})
+endif()
+
+if(TRITON_ENABLE_TRACING)
+  triton_server_conan_graph_require(REF libcurl/${TRITON_CURL_VERSION})
+  triton_server_conan_graph_require(REF nlohmann_json/${TRITON_NLOHMANN_JSON_VERSION})
+  triton_server_conan_graph_require(REF opentelemetry-cpp/${TRITON_OPENTELEMETRY_VERSION})
+endif()
+
+if(TRITON_ENABLE_GCS)
+  triton_server_conan_graph_require(REF google-cloud-cpp/${TRITON_GOOGLE_CLOUD_VERSION})
+  triton_server_conan_graph_require(REF crc32c/${TRITON_CRC32C_VERSION})
+endif()
+
+if(TRITON_ENABLE_S3)
+  # Mirrors third_party/CMakeLists.txt:529 (-DBUILD_ONLY=s3 -DMINIMIZE_SIZE=ON).
+  # Leaving text-to-speech on pulls audio playback and, through it, X11:
+  # aws-sdk-cpp -> pulseaudio -> libalsa -> xorg/system -> 43 X11 -dev packages.
+  triton_server_conan_graph_require(REF aws-sdk-cpp/${TRITON_AWS_SDK_VERSION}
+                                    OPTIONS "aws-sdk-cpp/*:s3=True"
+                                            "aws-sdk-cpp/*:text-to-speech=False"
+                                            "aws-sdk-cpp/*:min_size=True")
+endif()
+
+if(TRITON_ENABLE_AZURE_STORAGE)
+  triton_server_conan_graph_require(REF azure-sdk-for-cpp/${TRITON_AZURE_SDK_VERSION})
+endif()
+
+triton_server_conan_graph_resolve(TRITON_CONAN_DIR)
+
+#
+# Now bind the packages, in dependency order.
+#
+# Threads comes from the toolchain, not Conan; common/CMakeLists.txt:53 needs it.
+find_package(Threads REQUIRED)
 
 if(TRITON_ENABLE_GPU)
   # Tied to the host driver; no Conan reference exists.
   triton_server_dependency_provider(NAME CUDAToolkit ALLOW_SYSTEM)
-  triton_server_dependency_provider(NAME cnmem REF cnmem/${TRITON_CNMEM_VERSION} CONFIG)
-
-  # core/src and core/src/test locate cnmem the old third_party way:
-  #   find_library(CNMEM_LIBRARY NAMES cnmem PATHS ${CNMEM_PATH}/lib)
-  #   target_include_directories(... ${CNMEM_PATH}/include)
-  # CNMEM_PATH pointed into the third_party install prefix. Point it at the Conan
-  # package instead, so those lookups resolve without editing core.
-  string(TOUPPER "${CMAKE_BUILD_TYPE}" _triton_cfg)
-  if(cnmem_PACKAGE_FOLDER_${_triton_cfg})
-    set(CNMEM_PATH "${cnmem_PACKAGE_FOLDER_${_triton_cfg}}" CACHE PATH "cnmem root" FORCE)
-    message(STATUS "cnmem: CNMEM_PATH=${CNMEM_PATH}")
-  endif()
-endif()
-
-if(TRITON_ENABLE_METRICS)
-  triton_server_dependency_provider(NAME prometheus-cpp REF prometheus-cpp/${TRITON_PROMETHEUS_VERSION} CONFIG)
 endif()
 
 if(TRITON_ENABLE_METRICS_GPU)
   # Ships with the datacenter GPU manager and is tied to the host driver, so
-  # whatever is installed is the right version. Note the capitalisation: the
-  # config it ships is DCGMConfig.cmake and find_package() is case-sensitive.
-  # REQUIRED because no third_party fallback could build it.
+  # whatever is installed is the right version. Note the capitalisation: its
+  # config is DCGMConfig.cmake and find_package() is case-sensitive. REQUIRED
+  # because no third_party fallback could build it.
   triton_server_dependency_provider(NAME DCGM CONFIG ALLOW_SYSTEM REQUIRED)
 endif()
 
-if(TRITON_ENABLE_HTTP
-    OR TRITON_ENABLE_METRICS
-    OR TRITON_ENABLE_SAGEMAKER
-    OR TRITON_ENABLE_VERTEX_AI)
-  triton_server_dependency_provider(NAME Libevent REF libevent/${TRITON_LIBEVENT_VERSION} CONFIG)
-  triton_server_dependency_provider(NAME libevhtp REF libevhtp/${TRITON_LIBEVHTP_VERSION} CONFIG)
+# ZLIB and OpenSSL are bound before the gRPC bundle, not after.
+#
+# The gRPC package ships its own lib/cmake/OpenSSL, produced by the BoringSSL
+# module build, and the bundle prepends that package root to CMAKE_PREFIX_PATH.
+# Whichever OpenSSL is found first wins, and gRPC's copy does not define the
+# package-level openssl::openssl that libevent's config references -- so binding
+# afterwards silently gets the wrong one, and the failure only appears at
+# generate time:
+#
+#   The link interface of target "libevent_libevent_openssl_DEPS_TARGET"
+#   contains: openssl::openssl   but the target was not found.
+find_package(ZLIB CONFIG REQUIRED)
+find_package(OpenSSL CONFIG REQUIRED)
 
-  # src/CMakeLists.txt:197,364 and src/test/CMakeLists.txt:60,70 consume libevent
-  # through the module-style LIBEVENT_INCLUDE_DIRS / LIBEVENT_LIBRARIES that
-  # FindLibEvent.cmake would define. Conan's config package exports the
-  # libevent::libevent target instead, leaving those variables empty -- which
-  # surfaces as "event2/buffer.h: No such file or directory" at compile time
-  # rather than as a configure error. Bridge them once here instead of editing
-  # four call sites.
+# gRPC and the packages it vendors, from the one package that carries them.
+if(TRITON_ENABLE_GRPC)
+  triton_server_grpc_provide_bundle()
+else()
+  find_package(absl CONFIG REQUIRED)
+  find_package(Protobuf CONFIG REQUIRED)
+  find_package(re2 REQUIRED)
+endif()
+
+find_package(RapidJSON CONFIG REQUIRED)
+find_package(Boost REQUIRED)
+find_package(GTest CONFIG REQUIRED)
+
+if(TRITON_ENABLE_GPU)
+  find_package(cnmem CONFIG REQUIRED)
+  # core locates cnmem the old third_party way:
+  #   find_library(CNMEM_LIBRARY NAMES cnmem PATHS ${CNMEM_PATH}/lib)
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" _triton_cfg)
+  if(cnmem_PACKAGE_FOLDER_${_triton_cfg})
+    set(CNMEM_PATH "${cnmem_PACKAGE_FOLDER_${_triton_cfg}}" CACHE PATH "cnmem root" FORCE)
+  endif()
+endif()
+
+if(TRITON_ENABLE_METRICS)
+  find_package(prometheus-cpp CONFIG REQUIRED)
+endif()
+
+if(TRITON_ENABLE_HTTP OR TRITON_ENABLE_METRICS
+    OR TRITON_ENABLE_SAGEMAKER OR TRITON_ENABLE_VERTEX_AI)
+  find_package(Libevent CONFIG REQUIRED)
+  find_package(libevhtp CONFIG REQUIRED)
+
+  # src/ and src/test/ consume libevent through the module-style
+  # LIBEVENT_INCLUDE_DIRS / LIBEVENT_LIBRARIES in four places; Conan exports the
+  # libevent::libevent target instead, and the empty variables surface only as
+  # "event2/buffer.h: No such file or directory" at compile time.
   if(TARGET libevent::libevent AND NOT LIBEVENT_LIBRARIES)
-    # The imported target carries no INTERFACE_INCLUDE_DIRECTORIES at this point;
-    # CMakeDeps records the paths in its data file variables instead.
     string(TOUPPER "${CMAKE_BUILD_TYPE}" _triton_cfg)
     if(libevent_INCLUDE_DIRS_${_triton_cfg})
       set(LIBEVENT_INCLUDE_DIRS "${libevent_INCLUDE_DIRS_${_triton_cfg}}")
@@ -194,45 +264,37 @@ if(TRITON_ENABLE_HTTP
       set(LIBEVENT_INCLUDE_DIRS "${libevent_PACKAGE_FOLDER_${_triton_cfg}}/include")
     endif()
     set(LIBEVENT_LIBRARIES libevent::libevent)
-    message(STATUS "libevent: bridged LIBEVENT_INCLUDE_DIRS=${LIBEVENT_INCLUDE_DIRS}")
   endif()
 endif()
 
 if(TRITON_ENABLE_TRACING)
-  triton_server_dependency_provider(NAME CURL              REF libcurl/${TRITON_CURL_VERSION} CONFIG)
-  triton_server_dependency_provider(NAME nlohmann_json     REF nlohmann_json/${TRITON_NLOHMANN_JSON_VERSION} CONFIG)
-  triton_server_dependency_provider(NAME opentelemetry-cpp REF opentelemetry-cpp/${TRITON_OPENTELEMETRY_VERSION} CONFIG)
+  find_package(CURL CONFIG REQUIRED)
+  find_package(nlohmann_json CONFIG REQUIRED)
+  find_package(opentelemetry-cpp CONFIG REQUIRED)
 endif()
 
 if(TRITON_ENABLE_GCS)
-  triton_server_dependency_provider(NAME google_cloud_cpp_storage REF google-cloud-cpp/${TRITON_GOOGLE_CLOUD_VERSION} CONFIG)
-  triton_server_dependency_provider(NAME Crc32c REF crc32c/${TRITON_CRC32C_VERSION} CONFIG)
+  # Triton's recipe preserves upstream's per-component layout, so this is the
+  # storage client's own config rather than a consolidated one.
+  find_package(google_cloud_cpp_storage REQUIRED)
+  find_package(Crc32c CONFIG REQUIRED)
 endif()
 
 if(TRITON_ENABLE_S3)
-  triton_server_dependency_provider(NAME AWSSDK REF aws-sdk-cpp/${TRITON_AWS_SDK_VERSION} CONFIG)
+  find_package(AWSSDK REQUIRED COMPONENTS s3)
 endif()
 
 if(TRITON_ENABLE_AZURE_STORAGE)
-  triton_server_dependency_provider(NAME azure-storage-blobs-cpp REF azure-sdk-for-cpp/${TRITON_AZURE_SDK_VERSION} CONFIG)
-  # No recipe on any remote; comes from conan/recipes/azure-iot-sdk-c.
-  triton_server_dependency_provider(NAME azure_iot_sdks REF azure-iot-sdk-c/${TRITON_AZURE_IOT_VERSION}
-                                    RECIPE azure-iot-sdk-c CONFIG)
+  # One package covers blobs and identity: it exports AzureSDKConfig.cmake, not
+  # the per-repo azure-storage-blobs-cpp / azure-identity-cpp configs.
+  find_package(AzureSDK CONFIG REQUIRED)
 endif()
 
-# GoogleTest is not optional in practice: src/CMakeLists.txt:713 adds test/
-# unconditionally, and src/test/CMakeLists.txt:32 calls find_package(GTest
-# REQUIRED). TRITON_ENABLE_TESTS therefore only selects whether the tests are
-# built, not whether GoogleTest must be resolvable.
-triton_server_dependency_provider(NAME GTest REF gtest/${TRITON_GTEST_VERSION} CONFIG)
-
-# src/test asks for GTest in module mode, and CMake's FindGTest looks for
-# GTEST_LIBRARY / GTEST_INCLUDE_DIR / GTEST_MAIN_LIBRARY rather than the Conan
-# config. Point GTEST_ROOT at the package so the module finds them -- the old
-# root file did the same thing (CMakeLists.txt.bkp:207).
-_triton_server_conan_package_folder("gtest/${TRITON_GTEST_VERSION}" TRITON_GTEST_ROOT)
-if(TRITON_GTEST_ROOT)
-  set(GTEST_ROOT "${TRITON_GTEST_ROOT}" CACHE PATH "GoogleTest root for FindGTest" FORCE)
+# src/test asks for GTest in module mode, which looks for GTEST_LIBRARY /
+# GTEST_INCLUDE_DIR rather than the config; the old root file did the same
+# (CMakeLists.txt.bkp:207).
+if(GTest_DIR)
+  set(GTEST_ROOT "${GTest_DIR}" CACHE PATH "GoogleTest root for FindGTest" FORCE)
 endif()
 
 triton_server_conan_publish_targets(TRITON_CONAN_PUBLISHED)
