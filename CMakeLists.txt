@@ -117,6 +117,7 @@ set(TRITON_GRPC_USER_CHANNEL "" CACHE STRING
 set(TRITON_GRPC_REF "grpc/${TRITON_GRPC_VERSION}${TRITON_GRPC_USER_CHANNEL}")
 
 set(TRITON_RAPIDJSON_VERSION "cci.20230929" CACHE STRING "RapidJSON version")
+set(TRITON_B64_VERSION "2.0.0.1" CACHE STRING "libb64 version")
 set(TRITON_BOOST_VERSION "1.85.0" CACHE STRING "Boost version")
 set(TRITON_LIBEVENT_VERSION "2.1.12" CACHE STRING "libevent version")
 set(TRITON_LIBEVHTP_VERSION "1.2.18" CACHE STRING "libevhtp version")
@@ -162,6 +163,9 @@ triton_server_conan_graph_require(REF protobuf/${TRITON_PROTOBUF_VERSION} OVERRI
 triton_server_conan_graph_require(REF re2/${TRITON_RE2_VERSION})
 triton_server_conan_graph_require(REF c-ares/${TRITON_CARES_VERSION})
 triton_server_conan_graph_require(REF rapidjson/${TRITON_RAPIDJSON_VERSION})
+# src/common.cc includes <b64/cdecode.h>. third_party built libb64 into its
+# shared install prefix and src/CMakeLists.txt linked the bare name `b64`.
+triton_server_conan_graph_require(REF b64/${TRITON_B64_VERSION})
 triton_server_conan_graph_require(REF boost/${TRITON_BOOST_VERSION}
                                   OPTIONS "boost/*:header_only=True")
 triton_server_conan_graph_require(REF gtest/${TRITON_GTEST_VERSION})
@@ -177,7 +181,19 @@ endif()
 if(TRITON_ENABLE_HTTP OR TRITON_ENABLE_METRICS
     OR TRITON_ENABLE_SAGEMAKER OR TRITON_ENABLE_VERTEX_AI)
   triton_server_conan_graph_require(REF libevent/${TRITON_LIBEVENT_VERSION})
-  triton_server_conan_graph_require(REF libevhtp/${TRITON_LIBEVHTP_VERSION})
+  # The request timing fields http_server.cc reads (recv_start_ns and friends)
+  # sit behind EVHTP_TRITON_ENABLE_TRACING in evhtp.h, and that macro reaches
+  # consumers through the installed evhtp/config.h -- so it has to be baked into
+  # the package at build time, exactly as third_party/CMakeLists.txt:331 passed
+  # -DEVHTP_TRITON_ENABLE_TRACING=${TRITON_ENABLE_TRACING}. Getting this wrong
+  # is not a link error: the fields simply are not declared.
+  if(TRITON_ENABLE_TRACING)
+    set(_triton_evhtp_tracing True)
+  else()
+    set(_triton_evhtp_tracing False)
+  endif()
+  triton_server_conan_graph_require(REF libevhtp/${TRITON_LIBEVHTP_VERSION}
+                                    OPTIONS "libevhtp/*:enable_tracing=${_triton_evhtp_tracing}")
 endif()
 
 if(TRITON_ENABLE_TRACING)
@@ -255,6 +271,14 @@ if(TRITON_ENABLE_GRPC)
 endif()
 
 find_package(RapidJSON CONFIG REQUIRED)
+# RapidJSON's own config exports the all-caps RAPIDJSON_INCLUDE_DIRS; ConanCenter
+# generates its config from the package name and exports RapidJSON_INCLUDE_DIRS
+# instead. Normalize so consumers can spell it one way -- common/CMakeLists.txt
+# does the same for its own subtree.
+if(NOT RAPIDJSON_INCLUDE_DIRS)
+  set(RAPIDJSON_INCLUDE_DIRS ${RapidJSON_INCLUDE_DIRS})
+endif()
+find_package(b64 CONFIG REQUIRED)
 find_package(Boost REQUIRED)
 find_package(GTest CONFIG REQUIRED)
 

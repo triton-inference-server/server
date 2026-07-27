@@ -131,8 +131,11 @@ target_compile_options(
 target_link_libraries(
   main
   PRIVATE
-    b64
+    b64::b64
 )
+
+# triton_signal.cc includes <boost/stacktrace.hpp>.
+target_include_directories(main PRIVATE ${Boost_INCLUDE_DIRS})
 
 set(LIB_DIR "lib")
 if(LINUX)
@@ -451,7 +454,7 @@ if(${TRITON_ENABLE_HTTP}
   target_link_libraries(
     http-endpoint-library
     PUBLIC
-      b64
+      b64::b64
       z
   )
 
@@ -562,6 +565,12 @@ add_executable(
 )
 
 target_compile_features(simple PRIVATE cxx_std_${CMAKE_CXX_STANDARD})
+
+# simple.cc includes <rapidjson/document.h>. None of the libraries linked below
+# carry that include path, so it has to be named here -- the third_party build
+# only got away without it because every dependency shared one install prefix.
+target_include_directories(simple PRIVATE ${RAPIDJSON_INCLUDE_DIRS})
+
 target_compile_options(
   simple
   PRIVATE
@@ -615,6 +624,7 @@ add_executable(
 )
 
 target_compile_features(multi_server PRIVATE cxx_std_${CMAKE_CXX_STANDARD})
+target_include_directories(multi_server PRIVATE ${RAPIDJSON_INCLUDE_DIRS})
 target_compile_options(
   multi_server
   PRIVATE
@@ -669,6 +679,7 @@ if(${TRITON_ENABLE_GPU})
   )
 
   target_compile_features(memory_alloc PRIVATE cxx_std_${CMAKE_CXX_STANDARD})
+  target_include_directories(memory_alloc PRIVATE ${RAPIDJSON_INCLUDE_DIRS})
   target_compile_options(
     memory_alloc
     PRIVATE
