@@ -44,9 +44,16 @@ function(triton_server_conan_add_remote)
 
   find_program(TRITON_SERVER_CONAN_EXECUTABLE NAMES conan REQUIRED)
 
-  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 3/4: registering remote '${_name}'")
+  # --index 0 is load-bearing. Conan searches remotes in list order and takes the
+  # first hit, so with conancenter ahead of this one an empty cache resolves
+  # grpc/1.81.1 to ConanCenter's recipe rather than Triton's. ConanCenter's pairs
+  # gRPC with re2/[>=20251105] while Triton pins re2/20230301, and the graph dies
+  # on "Version conflict ... originates from grpc/1.81.1". A warm cache hides
+  # this completely -- the cached recipe wins and no remote is ever consulted --
+  # so it only ever reproduces on a clean machine, which is to say on CI.
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 3/4: registering remote '${_name}' ahead of the others")
   execute_process(
-    COMMAND "${TRITON_SERVER_CONAN_EXECUTABLE}" remote add "${_name}" "${_url}" --force
+    COMMAND "${TRITON_SERVER_CONAN_EXECUTABLE}" remote add "${_name}" "${_url}" --index 0 --force
     RESULT_VARIABLE _result
     OUTPUT_QUIET
     ERROR_VARIABLE _stderr)
