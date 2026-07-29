@@ -148,7 +148,7 @@ RUN mkdir -p qa/common && \
     cp bin/backend_output_detail_test qa/L0_backend_output_detail/. && \
     cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/. && \
     cp bin/input_byte_size_test qa/L0_input_validation/. && \
-    cp bin/instance_queue_test qa/L0_instance_queue/.
+    cp bin/instance_queue_test qa/L0_batcher/.
 
 RUN mkdir -p qa/pkgs && \
     cp python/triton*.whl qa/pkgs/. && \
