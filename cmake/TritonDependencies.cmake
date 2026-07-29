@@ -48,8 +48,8 @@ set(TRITON_SERVER_GRPC_BUNDLED_PACKAGES absl protobuf re2 googletest c-ares
     CACHE STRING "Packages provided by a gRPC source build")
 mark_as_advanced(TRITON_SERVER_GRPC_BUNDLED_PACKAGES)
 
-set(TRITON_SERVER_CONAN_RECIPE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/conan/recipes"
-    CACHE PATH "Directory holding local Conan recipes")
+# TRITON_SERVER_CONAN_RECIPE_DIR and _triton_server_conan_export_recipe() live in
+# TritonConan.cmake, which TritonConanGraph.cmake also includes.
 
 # Accumulates packages that reached step 4, for the source-build stage to consume.
 set_property(GLOBAL PROPERTY TRITON_SERVER_SOURCE_BUILD_PACKAGES "")
@@ -77,10 +77,13 @@ function(_triton_server_conan_try_install ref out_ok out_mode)
   if(CMAKE_BUILD_TYPE)
     list(APPEND _args "-s" "build_type=${CMAKE_BUILD_TYPE}")
   endif()
-  if(TRITON_SERVER_CONAN_PROFILE)
-    list(APPEND _args "-pr:h" "${TRITON_SERVER_CONAN_PROFILE}"
-                      "-pr:b" "${TRITON_SERVER_CONAN_PROFILE}")
-  endif()
+  _triton_server_conan_profile_args(_profile_args)
+  list(APPEND _args ${_profile_args})
+
+  # ECHO_*_VARIABLE still captures, so the "Building from source" probe below is
+  # unaffected by streaming.
+  _triton_server_conan_verbosity_args(_verbosity_args _verbosity_echo)
+  list(APPEND _args ${_verbosity_args})
 
   execute_process(
     COMMAND "${TRITON_SERVER_CONAN_EXECUTABLE}" install
@@ -90,7 +93,8 @@ function(_triton_server_conan_try_install ref out_ok out_mode)
             --build=missing
     RESULT_VARIABLE _result
     OUTPUT_VARIABLE _stdout
-    ERROR_VARIABLE _stderr)
+    ERROR_VARIABLE _stderr
+    ${_verbosity_echo})
 
   if(_result EQUAL 0)
     set(${out_ok} TRUE PARENT_SCOPE)
@@ -106,50 +110,6 @@ function(_triton_server_conan_try_install ref out_ok out_mode)
     set(${out_ok} FALSE PARENT_SCOPE)
     set(${out_mode} "" PARENT_SCOPE)
     set(_TRITON_CONAN_LAST_ERROR "${_stderr}" PARENT_SCOPE)
-  endif()
-endfunction()
-
-# _triton_server_conan_export_recipe(<recipe_name> <out_ok>)
-#
-# Export a local recipe from conan/recipes/<recipe_name> into the Conan cache so
-# a subsequent install can resolve it. Used for packages with no ConanCenter or
-# Artifactory recipe (cnmem, dcgm, libevhtp).
-function(_triton_server_conan_export_recipe recipe_name out_ok)
-  # Probed in order:
-  #   1. conan/recipes/<name>/          recipes owned by this repo
-  #   2. ../<name>/                     the package's own checkout
-  #
-  # cnmem and libevhtp each carry a maintained conanfile.py at the root of their
-  # own repository. Those are the authoritative recipes, so they are used in
-  # place rather than copied here -- #8734 vendored its own copies and they had
-  # already drifted from the originals (a different pinned commit for cnmem, and
-  # 26 differing lines for libevhtp).
-  set(_dir "")
-  foreach(_candidate "${TRITON_SERVER_CONAN_RECIPE_DIR}/${recipe_name}"
-                     "${CMAKE_CURRENT_SOURCE_DIR}/../${recipe_name}")
-    get_filename_component(_abs "${_candidate}" ABSOLUTE)
-    if(EXISTS "${_abs}/conanfile.py")
-      set(_dir "${_abs}")
-      break()
-    endif()
-  endforeach()
-
-  if(NOT _dir)
-    set(${out_ok} FALSE PARENT_SCOPE)
-    return()
-  endif()
-
-  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] exporting recipe from ${_dir}")
-  execute_process(
-    COMMAND "${TRITON_SERVER_CONAN_EXECUTABLE}" export "${_dir}"
-    RESULT_VARIABLE _result
-    OUTPUT_QUIET
-    ERROR_QUIET)
-
-  if(_result EQUAL 0)
-    set(${out_ok} TRUE PARENT_SCOPE)
-  else()
-    set(${out_ok} FALSE PARENT_SCOPE)
   endif()
 endfunction()
 

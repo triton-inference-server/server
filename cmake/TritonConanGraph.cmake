@@ -2,6 +2,8 @@
 
 include_guard(GLOBAL)
 
+include(TritonConan)
+
 # Single-graph Conan resolution.
 #
 # Resolving one reference per `conan install` produces one dependency graph per
@@ -83,7 +85,7 @@ function(triton_server_conan_graph_resolve)
     return()
   endif()
 
-  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 1/4: generating conanfile for ${_reqs}")
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 1/5: generating conanfile for ${_reqs}")
   set(_dir "${TRITON_SERVER_CONAN_OUTPUT_DIR}")
   file(MAKE_DIRECTORY "${_dir}")
 
@@ -107,7 +109,38 @@ function(triton_server_conan_graph_resolve)
   endforeach()
   file(WRITE "${_dir}/conanfile.py" "${_body}")
 
-  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 2/4: assembling arguments")
+  # Export before resolving, not as a fallback after a failed resolve.
+  #
+  # Conan resolves an unrevisioned reference from the cache and only consults
+  # remotes when it is absent, so an exported recipe is authoritative no matter
+  # how the remotes are ordered. Doing it up front is what makes Triton's
+  # grpc/1.81.1 -- which pins re2/20230301 -- win over ConanCenter's, whose
+  # re2/[>=20251105] is unsatisfiable against that pin. Left to remote order
+  # alone, a cold cache resolves ConanCenter's and dies during graph computation
+  # with "Version conflict ... originates from grpc/1.81.1", before --build=missing
+  # is ever consulted.
+  #
+  # It is also the only way cnmem and libevhtp resolve at all: neither exists on
+  # ConanCenter, so without their sibling-checkout recipes in the cache the graph
+  # has nowhere to get them.
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 2/5: exporting local recipes")
+  set(_exported "")
+  foreach(_r IN LISTS _reqs)
+    # <name>/<version>[@<user>/<channel>] -- the package name is all that selects
+    # a recipe directory.
+    string(REGEX REPLACE "/.*$" "" _pkg_name "${_r}")
+    _triton_server_conan_export_recipe("${_pkg_name}" _export_ok)
+    if(_export_ok)
+      list(APPEND _exported "${_pkg_name}")
+    endif()
+  endforeach()
+  if(_exported)
+    message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 2/5: exported ${_exported}")
+  else()
+    message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 2/5: no local recipes matched")
+  endif()
+
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 3/5: assembling arguments")
   set(_args "")
   foreach(_o IN LISTS _opts)
     list(APPEND _args "-o" "${_o}")
@@ -115,19 +148,22 @@ function(triton_server_conan_graph_resolve)
   if(CMAKE_BUILD_TYPE)
     list(APPEND _args "-s" "build_type=${CMAKE_BUILD_TYPE}")
   endif()
-  if(TRITON_SERVER_CONAN_PROFILE)
-    list(APPEND _args "-pr:h" "${TRITON_SERVER_CONAN_PROFILE}"
-                      "-pr:b" "${TRITON_SERVER_CONAN_PROFILE}")
-  endif()
+  _triton_server_conan_check_profile()
+  _triton_server_conan_profile_args(_profile_args)
+  list(APPEND _args ${_profile_args})
 
-  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 3/4: resolving all references in one graph")
+  _triton_server_conan_verbosity_args(_verbosity_args _verbosity_echo)
+  list(APPEND _args ${_verbosity_args})
+
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 4/5: resolving all references in one graph")
   find_program(TRITON_SERVER_CONAN_EXECUTABLE NAMES conan REQUIRED)
   execute_process(
     COMMAND "${TRITON_SERVER_CONAN_EXECUTABLE}" install "${_dir}/conanfile.py"
             ${_args} --output-folder=${_dir} --build=missing
     RESULT_VARIABLE _rc
     OUTPUT_VARIABLE _out
-    ERROR_VARIABLE _err)
+    ERROR_VARIABLE _err
+    ${_verbosity_echo})
 
   if(NOT _rc EQUAL 0)
     message(FATAL_ERROR
@@ -136,7 +172,7 @@ function(triton_server_conan_graph_resolve)
       "--- stderr ---\n${_err}")
   endif()
 
-  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 4/4: extending CMAKE_PREFIX_PATH and CMAKE_MODULE_PATH")
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 5/5: extending CMAKE_PREFIX_PATH and CMAKE_MODULE_PATH")
   list(PREPEND CMAKE_PREFIX_PATH "${_dir}")
   list(REMOVE_DUPLICATES CMAKE_PREFIX_PATH)
   set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}" PARENT_SCOPE)
