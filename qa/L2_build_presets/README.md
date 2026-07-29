@@ -59,7 +59,7 @@ cd server/
 docker run --rm -v "$PWD":/workspace -w /workspace \
   -e TRITON_SERVER_BRANCH_NAME=<remote-branch> \
   -w /workspace/qa/L2_build_presets \
-  nvcr.io/nvidia/tritonserver:26.06-py3 python3 build_presets_test.py
+  nvcr.io/nvidia/tritonserver:26.07-py3 python3 build_presets_test.py
 ```
 
 ## Output
