@@ -74,6 +74,10 @@ option(TRITON_ENABLE_AZURE_STORAGE "Include Azure Storage Filesystem support in 
 option(TRITON_IDENTITY_BACKEND "Build the identity_backend repository as part of the server" OFF)
 option(TRITON_REPEAT_BACKEND   "Build the repeat_backend repository as part of the server" OFF)
 option(TRITON_TENSORRT_BACKEND "Build the tensorrt_backend repository as part of the server" OFF)
+option(TRITON_PYTHON_BACKEND   "Build the python_backend repository as part of the server" OFF)
+option(TRITON_DALI_BACKEND     "Build the dali_backend repository as part of the server" OFF)
+option(TRITON_FIL_BACKEND      "Build the fil_backend repository as part of the server" OFF)
+option(TRITON_ONNXRUNTIME_BACKEND "Build the onnxruntime_backend repository as part of the server" OFF)
 
 # Repository names, which are also the sibling checkout directories. This drives
 # declaration and add_subdirectory in TritonRepos.cmake; the rest is derived from
@@ -82,7 +86,8 @@ option(TRITON_TENSORRT_BACKEND "Build the tensorrt_backend repository as part of
 # underscores hyphenated (repo-identity-backend), and organisation/tag/local-path
 # overrides are generated. INTERNAL because it must stay in step with the options
 # above -- adding a backend means one line in each.
-set(TRITON_OPTIONAL_BACKENDS identity_backend repeat_backend tensorrt_backend
+set(TRITON_OPTIONAL_BACKENDS identity_backend repeat_backend tensorrt_backend python_backend
+                             dali_backend fil_backend onnxruntime_backend
     CACHE INTERNAL "Backend repositories that can be built as part of the server")
 
 # Note these backends link triton-backend-utils from repo-backend, whose
@@ -168,6 +173,7 @@ set(TRITON_AZURE_SDK_VERSION "1.16.1" CACHE STRING "azure-sdk-for-cpp version")
 set(TRITON_AZURE_IOT_VERSION "lts_03_2024_ref02" CACHE STRING "azure-iot-sdk-c version")
 set(TRITON_CNMEM_VERSION "1.0.0" CACHE STRING "cnmem version")
 set(TRITON_GTEST_VERSION "1.14.0" CACHE STRING "GoogleTest version")
+set(TRITON_LIBARCHIVE_VERSION "3.7.6" CACHE STRING "libarchive version")
 
 # Dependencies are declared first and resolved in a single Conan graph.
 #
@@ -199,6 +205,14 @@ triton_server_conan_graph_require(REF b64/${TRITON_B64_VERSION})
 triton_server_conan_graph_require(REF boost/${TRITON_BOOST_VERSION}
                                   OPTIONS "boost/*:header_only=True")
 triton_server_conan_graph_require(REF gtest/${TRITON_GTEST_VERSION})
+
+# python_backend's src/pb_env.cc needs libarchive to unpack conda environments.
+# Only requested when that backend is being built, so a server without it does
+# not pay for the package. Default options pull in just libiconv and zlib, and
+# zlib is already in this graph.
+if(TRITON_PYTHON_BACKEND)
+  triton_server_conan_graph_require(REF libarchive/${TRITON_LIBARCHIVE_VERSION})
+endif()
 
 if(TRITON_ENABLE_GPU)
   triton_server_conan_graph_require(REF cnmem/${TRITON_CNMEM_VERSION})
