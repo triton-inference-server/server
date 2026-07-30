@@ -199,24 +199,42 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
         if (action == "/invoke") {
           LOG_VERBOSE(1) << "SageMaker request: INVOKE MODEL";
 
+          std::string target_model;
           {
             std::lock_guard<std::mutex> lock(models_list_mutex_);
-            if (sagemaker_models_list_.find(multi_model_name.c_str()) ==
-                sagemaker_models_list_.end()) {
+            auto model_it = sagemaker_models_list_.find(multi_model_name);
+            if (model_it == sagemaker_models_list_.end()) {
               evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
               return;
             }
+            /* Act on the model registered under this URL hash at load time,
+             * not on a name supplied in the request header. */
+            target_model = model_it->second.target_model;
           }
           LOG_VERBOSE(1) << "SageMaker MME Custom Invoke Model Path";
 
-          /* Extract targetModel to log the associated archive */
-          const char* target_model =
+          /* The X-Amzn-SageMaker-Target-Model header, when present, must name
+           * the same model that was registered under this URL hash. Honoring a
+           * mismatched header would let a request authorized for one model run
+           * inference against another loaded model (TRI-1563, confused deputy /
+           * CWE-863). Reject rather than silently switching models. */
+          const char* target_model_header =
               evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
-
-          /* If target_model is not available (e.g., in local testing) use
-           * model_name_hash as target_model) */
-          if (target_model == nullptr) {
-            target_model = multi_model_name.c_str();
+          if ((target_model_header != nullptr) &&
+              (target_model != target_model_header)) {
+            LOG_ERROR
+                << "SageMaker INVOKE rejected: X-Amzn-SageMaker-Target-Model '"
+                << target_model_header
+                << "' does not match the model registered under URL hash '"
+                << multi_model_name << "'";
+            TRITONSERVER_Error* err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "X-Amzn-SageMaker-Target-Model header does not match the model "
+                "requested in the URL");
+            EVBufferAddErrorJson(req->buffer_out, err);
+            evhtp_send_reply(req, EVHTP_RES_BADREQ); /* 400 */
+            TRITONSERVER_ErrorDelete(err);
+            return;
           }
 
           LOG_INFO << "Invoking SageMaker TargetModel: " << target_model;
@@ -682,22 +700,41 @@ void
 SagemakerAPIServer::SageMakerMMEUnloadModel(
     evhtp_request_t* req, const char* model_name_hash)
 {
-  /* Extract targetModel to log the associated archive */
-  const char* target_model =
+  /* Extract the target model named in the request header, if any, to validate
+   * it against the model registered under this hash. */
+  const char* target_model_header =
       evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
 
-  /* If target_model is not available (e.g., in local testing) use
-   * model_name_hash as target_model) */
-  if (target_model == nullptr) {
-    target_model = model_name_hash;
+  std::lock_guard<std::mutex> lock(models_list_mutex_);
+  auto model_it = sagemaker_models_list_.find(model_name_hash);
+  if (model_it == sagemaker_models_list_.end()) {
+    LOG_VERBOSE(1) << "Model with model hash " << model_name_hash
+                   << " is not loaded." << std::endl;
+    evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
+    return;
   }
 
-  std::lock_guard<std::mutex> lock(models_list_mutex_);
-  if (sagemaker_models_list_.find(model_name_hash) ==
-      sagemaker_models_list_.end()) {
-    LOG_VERBOSE(1) << "Model " << target_model << " with model hash "
-                   << model_name_hash << " is not loaded." << std::endl;
-    evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
+  /* Always act on the model registered under this hash at load time, never on a
+   * name supplied with the unload request. If a header is present it must
+   * match; otherwise a request authorized for one model could unload a
+   * different loaded model and corrupt the registry (TRI-1563, confused deputy
+   * / CWE-863). */
+  const std::string target_model = model_it->second.target_model;
+  const std::string repo_parent_path = model_it->second.repo_path;
+
+  if ((target_model_header != nullptr) &&
+      (target_model != target_model_header)) {
+    LOG_ERROR << "SageMaker UNLOAD rejected: X-Amzn-SageMaker-Target-Model '"
+              << target_model_header
+              << "' does not match the model registered under URL hash '"
+              << model_name_hash << "'";
+    TRITONSERVER_Error* err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        "X-Amzn-SageMaker-Target-Model header does not match the model "
+        "requested in the URL");
+    EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ); /* 400 */
+    TRITONSERVER_ErrorDelete(err);
     return;
   }
 
@@ -708,8 +745,8 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
   /* Always unload dependents as well - this is required to unload dependents in
    * ensemble */
   TRITONSERVER_Error* unload_err = nullptr;
-  unload_err =
-      TRITONSERVER_ServerUnloadModelAndDependents(server_.get(), target_model);
+  unload_err = TRITONSERVER_ServerUnloadModelAndDependents(
+      server_.get(), target_model.c_str());
 
   if (unload_err != nullptr) {
     EVBufferAddErrorJson(req->buffer_out, unload_err);
@@ -740,7 +777,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
            unload_time_in_secs < UNLOAD_TIMEOUT_SECS_) {
       LOG_VERBOSE(1) << "In the loop to wait for model to be unavailable";
       unload_err = SageMakerMMECheckUnloadedModelIsUnavailable(
-          target_model, &is_model_unavailable);
+          target_model.c_str(), &is_model_unavailable);
       if (unload_err != nullptr) {
         LOG_ERROR << "Error: Received non-zero exit code on checking for "
                      "model unavailability. "
@@ -768,8 +805,6 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
               << " seconds. This may "
                  "result in SageMaker UNLOAD timeout.";
   }
-
-  std::string repo_parent_path = sagemaker_models_list_.at(model_name_hash);
 
   TRITONSERVER_Error* unregister_err = nullptr;
 
@@ -806,7 +841,7 @@ SagemakerAPIServer::SageMakerMMEGetModel(
 
   sagemaker_get_json.AddString("modelName", model_name);
   sagemaker_get_json.AddString(
-      "modelUrl", sagemaker_models_list_.at(model_name));
+      "modelUrl", sagemaker_models_list_.at(model_name).repo_path);
 
   const char* buffer;
   size_t byte_size;
@@ -845,7 +880,7 @@ SagemakerAPIServer::SageMakerMMEListModel(evhtp_request_t* req)
     /* Add to return list only if model is ready to be served */
     if (ready) {
       model_url_pair.AddString("modelName", it->first);
-      model_url_pair.AddString("modelUrl", it->second);
+      model_url_pair.AddString("modelUrl", it->second.repo_path);
     }
 
     models_array.Append(std::move(model_url_pair));
@@ -1106,8 +1141,12 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   } else {
     std::lock_guard<std::mutex> lock(models_list_mutex_);
 
-    /* Use model name hash as expected in SageMaker MME contract */
-    sagemaker_models_list_.emplace(model_name_hash, repo_parent_path);
+    /* Use model name hash as the key, as expected in the SageMaker MME
+     * contract, and remember the target_model the repository was actually
+     * loaded under so invoke/unload can validate the request header against it
+     * (TRI-1563). */
+    sagemaker_models_list_.emplace(
+        model_name_hash, SageMakerModelInfo{repo_parent_path, target_model});
     evhtp_send_reply(req, EVHTP_RES_OK);
   }
 
