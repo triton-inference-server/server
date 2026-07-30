@@ -837,6 +837,19 @@ set -e
 
 kill_server
 
+# instance_queue_test: unit test for waiting_consumer_count_ merge accounting
+# (core dynamic-batcher / InstanceQueue path).
+INSTANCE_QUEUE_TEST_LOG="./instance_queue_test.log"
+INSTANCE_QUEUE_TEST_EXEC=./instance_queue_test
+set +e
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $INSTANCE_QUEUE_TEST_EXEC >>$INSTANCE_QUEUE_TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $INSTANCE_QUEUE_TEST_LOG
+    echo -e "\n***\n*** Instance Queue Unit Test Failed\n***"
+    RET=1
+fi
+set -e
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
