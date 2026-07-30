@@ -180,6 +180,75 @@ you have a branch called "mybranch" in the
 repo that you want to use in the build, you would specify
 --backend=onnxruntime:mybranch.
 
+#### Experimental: Build Presets
+
+> **Experimental.** This feature is gated behind the
+> `TRITON_BUILD_EXPERIMENTAL=1` environment variable; without it the
+> `--build-presets-file` flag is rejected.
+
+Build presets let you (a) inspect exactly which cmake flags each component
+receives, and (b) pin those flags via a single JSON file with
+`--build-presets-file <path>`.
+
+**Snapshot (dump).** When run with `--dryrun`, build.py writes a
+provenance-annotated snapshot of the fully-resolved cmake configuration to
+`build_presets.json` in the build directory. It records, for `core`, each
+`backend`, `repoagent`, and `cache`, every `-D` flag that lands in `cmake_build`,
+each labeled with its `source`: `cli` (explicit command line), `preset` (from a
+loaded presets file), or `default` (build.py default/derived):
+
+```json
+{
+  "backends": {
+    "onnxruntime": {
+      "tag": { "value": "main", "source": "default" },
+      "cmake_args": {
+        "TRITON_ENABLE_GPU": { "value": "ON", "source": "cli" },
+        "TRITON_BUILD_ONNXRUNTIME_VERSION": { "value": "1.27.0", "source": "default" }
+      }
+    }
+  }
+}
+```
+
+**Reload.** That same file can be fed back with `--build-presets-file` to pin its
+flags (the `source` field is informational on load). A hand-written preset may
+use bare scalars instead of `{value, source}` objects:
+
+```json
+{
+  "backends": {
+    "onnxruntime": {
+      "tag": "r25.08_fix",
+      "cmake_args": { "TRITON_ENABLE_ONNXRUNTIME_OPENVINO": "OFF" }
+    },
+    "python": {
+      "extra_cmake_args": { "TRITON_BOOST_URL": "https://.../boost_1_80_0.tar.gz" }
+    }
+  }
+}
+```
+
+Notes:
+- A component named in the file must also be included in the build (via
+  `--backend`/`--repoagent`/`--cache` or `--enable-all`).
+- Command-line flags always take precedence over the file.
+- `cmake_args` are flags build.py emits natively (applied via the override
+  channel); `extra_cmake_args` are user-added flags build.py does not emit
+  (applied via the append channel). Setting `TRITON_REPO_ORGANIZATION` in a
+  backend's `cmake_args` sets that backend's clone organization *per backend*
+  (both the `git clone` URL and the `-D`), which the global
+  `--github-organization` cannot do.
+- `CMAKE_INSTALL_PREFIX` is omitted from snapshots (it is an absolute build-dir
+  path). Repoagent/cache `cmake_args` are shown for visibility but only their
+  `tag` is re-pinned on load. Reloading pins `-D` values but does not re-derive
+  conditionally-emitted flags, so reload alongside the same top-level flags (or
+  `--enable-all`) for exact reproduction.
+
+A ready-to-copy example lives at
+[`tools/build/build_presets.example.json`](../../tools/build/build_presets.example.json);
+the full schema is documented in `tools/build/build_presets.py`.
+
 #### CPU-Only Build
 
 If you want to build without GPU support you must specify individual

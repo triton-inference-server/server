@@ -1,4 +1,4 @@
-# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -39,7 +39,7 @@ repos:
   rev: 7.3.0
   hooks:
   - id: flake8
-    args: [--max-line-length=88, --select=C,E,F,W,B,B950, --extend-ignore = E203,E501]
+    args: ["--max-line-length=88", "--select=C,E,F,W,B,B950", "--extend-ignore=E203,E501,W503"]
     types_or: [python, cython]
 - repo: https://github.com/pre-commit/mirrors-clang-format
   rev: v16.0.5
@@ -82,3 +82,6 @@ repos:
     stages: [pre-commit]
     verbose: true
     require_serial: true
+    # GitHub issue/PR templates must start with YAML frontmatter; keep
+    # license headers out of them. Workflows ARE processed.
+    exclude: ^\.github/(ISSUE_TEMPLATE/|PULL_REQUEST_TEMPLATE|pull_request_template)

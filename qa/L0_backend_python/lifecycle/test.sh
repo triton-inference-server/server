@@ -31,6 +31,9 @@ source ../common.sh
 source ../../common/util.sh
 
 SERVER_ARGS="--model-repository=${MODELDIR}/lifecycle/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+if [ "${TEST_JETSON}" == "1" ]; then
+    SERVER_ARGS="${SERVER_ARGS} --exit-timeout-secs=${SERVER_TIMEOUT} --backend-config=python,stub-timeout-seconds=${SERVER_TIMEOUT}"
+fi
 SERVER_LOG="./lifecycle_server.log"
 
 RET=0

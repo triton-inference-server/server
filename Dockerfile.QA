@@ -144,9 +144,11 @@ RUN mkdir -p qa/common && \
     cp bin/response_cache_test qa/L0_response_cache/. && \
     cp bin/request_cancellation_test qa/L0_request_cancellation/. && \
     cp bin/triton_json_test qa/L0_json/. && \
+    cp bin/logging_test qa/L0_logging/. && \
     cp bin/backend_output_detail_test qa/L0_backend_output_detail/. && \
     cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/. && \
-    cp bin/input_byte_size_test qa/L0_input_validation/.
+    cp bin/input_byte_size_test qa/L0_input_validation/. && \
+    cp bin/instance_queue_test qa/L0_batcher/.
 
 RUN mkdir -p qa/pkgs && \
     cp python/triton*.whl qa/pkgs/. && \
@@ -352,8 +354,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-RUN pip3 install --upgrade "numpy<2" pillow attrdict future "grpcio<1.68" requests gsutil \
-                           "awscli<=1.36.40" six "grpcio-channelz<1.68" prettytable virtualenv \
+RUN pip3 install --upgrade "numpy<2" pillow attrdict future "grpcio==1.81.1" requests gsutil \
+                           "awscli<=1.36.40" six "grpcio-channelz==1.81.1" prettytable virtualenv \
                            check-jsonschema
 
 # go needed for example go client test.
