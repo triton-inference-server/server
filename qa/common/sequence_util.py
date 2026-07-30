@@ -40,6 +40,11 @@ import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
+# QA-suite convention: tritonclient.utils is imported via `*` here and in 20+
+# other QA files. Silence flake8's star-import warnings (F403/F405) for this
+# file only; proper cleanup is tracked separately.
+# flake8: noqa: F403,F405
+
 if sys.version_info >= (3, 0):
     import queue
 else:
@@ -93,7 +98,6 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
             _deferred_exceptions = []
 
     def add_deferred_exception(self, ex):
-        global _deferred_exceptions
         with _deferred_exceptions_lock:
             _deferred_exceptions.append(ex)
 
