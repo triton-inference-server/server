@@ -47,6 +47,20 @@ set(TRITON_COMMON_REPO_LOCAL_DIR "" CACHE PATH "Local checkout of the common rep
 set(TRITON_CORE_REPO_LOCAL_DIR "" CACHE PATH "Local checkout of the core repo")
 set(TRITON_BACKEND_REPO_LOCAL_DIR "" CACHE PATH "Local checkout of the backend repo")
 
+# Per-backend equivalents of the three blocks above, generated from
+# TRITON_OPTIONAL_BACKENDS so adding a backend needs no edit here. The names
+# match what _triton_server_repo_find_local() derives from the repo directory:
+# identity_backend uppercases to TRITON_IDENTITY_BACKEND_REPO_LOCAL_DIR.
+foreach(_triton_backend IN LISTS TRITON_OPTIONAL_BACKENDS)
+  string(TOUPPER "${_triton_backend}" _uc)
+  set(TRITON_${_uc}_REPO_ORGANIZATION "" CACHE STRING
+      "Organisation override for the ${_triton_backend} repo")
+  set(TRITON_${_uc}_REPO_TAG "main" CACHE STRING
+      "Tag for the ${_triton_backend} repo")
+  set(TRITON_${_uc}_REPO_LOCAL_DIR "" CACHE PATH
+      "Local checkout of the ${_triton_backend} repo")
+endforeach()
+
 # _triton_server_repo_find_local(<repo_name> <out_dir>)
 #
 # Resolve the local checkout for <repo_name>, preferring an explicit
@@ -123,10 +137,61 @@ endfunction()
 function(triton_server_fetchcontent_declare_repos)
   message(STATUS "[${CMAKE_CURRENT_FUNCTION}] entered: TRITON_DEVELOPMENT_LOCAL=${TRITON_DEVELOPMENT_LOCAL}")
 
-  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 1/1: declaring common, core and backend")
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 1/2: declaring common, core and backend")
   triton_server_fetchcontent_declare_repo(repo-common common)
   triton_server_fetchcontent_declare_repo(repo-core core)
   triton_server_fetchcontent_declare_repo(repo-backend backend)
 
-  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] done")
+  # Declared only when a backend is wanted: with TRITON_DEVELOPMENT_LOCAL=ON a
+  # missing checkout is fatal, and a server build that never asked for a backend
+  # must not require its directory to be present.
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] step 2/2: optional in-tree backends")
+  set(_requested "")
+  foreach(_b IN LISTS TRITON_OPTIONAL_BACKENDS)
+    string(TOUPPER "${_b}" _uc)
+    if(TRITON_${_uc})
+      string(REPLACE "_" "-" _slug "${_b}")
+      triton_server_fetchcontent_declare_repo(repo-${_slug} ${_b})
+      list(APPEND _requested "${_b}")
+    endif()
+  endforeach()
+  if(NOT _requested)
+    set(_requested "none")
+  endif()
+
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] done: backends requested = ${_requested}")
+endfunction()
+
+# triton_server_add_optional_backends()
+#
+# Populate and add_subdirectory() every requested in-tree backend.
+#
+# Must be called after add_subdirectory(src), which is what makes repo-common,
+# repo-core and repo-backend available. Each backend's own CMakeLists declares
+# and FetchContent_MakeAvailable()s those same three; running after src means
+# they are already populated and those calls are no-ops, so every backend shares
+# the server's copies instead of cloning and compiling its own set.
+function(triton_server_add_optional_backends)
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] entered")
+
+  set(_added "")
+  foreach(_b IN LISTS TRITON_OPTIONAL_BACKENDS)
+    string(TOUPPER "${_b}" _uc)
+    if(NOT TRITON_${_uc})
+      continue()
+    endif()
+    string(REPLACE "_" "-" _slug "${_b}")
+    # Each repo installs to backends/<name> with the _backend suffix dropped,
+    # which is the backend's own choice -- reported here, not imposed.
+    string(REGEX REPLACE "_backend$" "" _short "${_b}")
+    message(STATUS "[${CMAKE_CURRENT_FUNCTION}] adding ${_b} -> ${CMAKE_INSTALL_PREFIX}/backends/${_short}")
+    FetchContent_MakeAvailable(repo-${_slug})
+    list(APPEND _added "${_b}")
+  endforeach()
+
+  if(NOT _added)
+    message(STATUS "[${CMAKE_CURRENT_FUNCTION}] done: no optional backends requested")
+    return()
+  endif()
+  message(STATUS "[${CMAKE_CURRENT_FUNCTION}] done: added ${_added}")
 endfunction()

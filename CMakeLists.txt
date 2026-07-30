@@ -60,6 +60,36 @@ option(TRITON_ENABLE_GCS "Include GCS Filesystem support in server" OFF)
 option(TRITON_ENABLE_S3 "Include S3 Filesystem support in server" OFF)
 option(TRITON_ENABLE_AZURE_STORAGE "Include Azure Storage Filesystem support in server" OFF)
 
+# Backends built in-tree
+#
+# CI builds each backend as its own CMake project against its own clones of
+# common/core/backend, then copies the result into the shared install tree (the
+# per-backend sections of issues/TRI-1611/59624282.374114906.cmake_build.sh --
+# every one passes the same flags). Building them here instead shares
+# repo-common/core/backend with the server and installs straight to
+# ${CMAKE_INSTALL_PREFIX}/backends/<name>, so no copy step is needed.
+#
+# One option per backend, spelled out so they are greppable and appear in
+# cmake -LH alongside every other option rather than being conjured by a loop.
+option(TRITON_IDENTITY_BACKEND "Build the identity_backend repository as part of the server" OFF)
+option(TRITON_REPEAT_BACKEND   "Build the repeat_backend repository as part of the server" OFF)
+option(TRITON_TENSORRT_BACKEND "Build the tensorrt_backend repository as part of the server" OFF)
+
+# Repository names, which are also the sibling checkout directories. This drives
+# declaration and add_subdirectory in TritonRepos.cmake; the rest is derived from
+# each name: the option is TRITON_<REPO> uppercased (identity_backend ->
+# TRITON_IDENTITY_BACKEND), the FetchContent content name is repo-<repo> with
+# underscores hyphenated (repo-identity-backend), and organisation/tag/local-path
+# overrides are generated. INTERNAL because it must stay in step with the options
+# above -- adding a backend means one line in each.
+set(TRITON_OPTIONAL_BACKENDS identity_backend repeat_backend tensorrt_backend
+    CACHE INTERNAL "Backend repositories that can be built as part of the server")
+
+# Note these backends link triton-backend-utils from repo-backend, whose
+# TRITON_ENABLE_MEMORY_TRACKER option defaults to OFF while CI passes it ON.
+# Pass -DTRITON_ENABLE_MEMORY_TRACKER=ON to match; it reaches repo-backend
+# directly and needs no forwarding here.
+
 # Testing and diagnostics
 option(TRITON_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
 option(TRITON_ENABLE_TESTS "Build unit tests, which require GoogleTest" OFF)
@@ -376,3 +406,7 @@ set(TRITON_CORE_HEADERS_ONLY OFF)
 triton_server_fetchcontent_declare_repos()
 
 add_subdirectory(src)
+
+# After add_subdirectory(src), which populates repo-common/core/backend that the
+# backends link against.
+triton_server_add_optional_backends()
