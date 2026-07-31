@@ -283,7 +283,11 @@ python3 $TRITON_MDLS_SRC_DIR/gen_qa_implicit_models.py --libtorch --variable --m
 chmod -R 777 $TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
-if [ -z "$MODEL_TYPE" ] || [ "$MODEL_TYPE" != "igpu" ]; then
+# TRI-1625: exclude Torch-TensorRT model generation on 10.7 compute resources.
+COMPUTE_CAP=\$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1 | tr -d '[:space:]')
+if [[ "\$COMPUTE_CAP" == "10.7" ]]; then
+  echo "Skipping Torch-TensorRT model generation (compute capability '\$COMPUTE_CAP')"
+else
   python3 $TRITON_MDLS_SRC_DIR/gen_qa_torchtrt_models.py --models_dir=$TRITON_MDLS_QA_TORCHTRT_MODEL
   chmod -R 777 $TRITON_MDLS_QA_TORCHTRT_MODEL
 fi
