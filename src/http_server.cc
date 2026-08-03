@@ -3524,6 +3524,11 @@ HTTPAPIServer::HandleGenerate(
           input_metadata, generate_request->RequestSchema(), request),
       error_callback);
 
+  // Forward HTTP headers matching --http-header-forward-pattern as request
+  // parameters, consistent with the /infer endpoint. Without this the pattern
+  // has no effect on /generate and headers are silently dropped.
+  RETURN_AND_CALLBACK_IF_ERR(ForwardHeaders(req, irequest), error_callback);
+
   auto request_release_payload =
       std::make_unique<RequestReleasePayload>(irequest_shared, nullptr);
   // [FIXME] decompression..
