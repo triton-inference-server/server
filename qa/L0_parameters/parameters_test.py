@@ -246,17 +246,15 @@ class InferenceParametersTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200, msg=response.text[:2000])
         body = response.json()
         # We always forward multiple matching headers, so `key`/`value` come
-        # back as JSON arrays (the /generate endpoint only strips single-element
-        # tensors to scalars).
+        # back as parallel JSON arrays (the /generate endpoint only strips
+        # single-element tensors to scalars). Reconstruct the mapping so we
+        # verify each header keeps its correct value, not just that the sets
+        # of keys and values match independently.
+        forwarded = dict(zip(body["key"], body["value"]))
         self.assertEqual(
-            set(body["key"]),
-            set(expected_headers.keys()),
-            msg=f"model={model_name} keys={body['key']}",
-        )
-        self.assertEqual(
-            set(body["value"]),
-            set(expected_headers.values()),
-            msg=f"model={model_name} values={body['value']}",
+            forwarded,
+            expected_headers,
+            msg=f"model={model_name} forwarded={forwarded}",
         )
 
     async def _run_client_infer_suite(self, parameters, headers, expected_headers):
