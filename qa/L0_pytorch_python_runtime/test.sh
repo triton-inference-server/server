@@ -132,8 +132,10 @@ else
         RET=1
     fi
 
-    NEURALNET_DEFAULT_FILENAME=$(curl -s localhost:8000/v2/models/neuralnet/config | python3 -c "import json,sys; print(json.load(sys.stdin).get('default_model_filename', ''))")
-    if [ "$NEURALNET_DEFAULT_FILENAME" != "" ]; then
+    if ! NEURALNET_DEFAULT_FILENAME=$(curl -sf localhost:8000/v2/models/neuralnet/config | python3 -c "import json,sys; c=json.load(sys.stdin); assert c.get('name')=='neuralnet', c; print(c.get('default_model_filename', ''))"); then
+        echo -e "\n***\n*** Failed to retrieve or parse the configuration for 'neuralnet'. \n***"
+        RET=1
+    elif [ "$NEURALNET_DEFAULT_FILENAME" != "" ]; then
         echo -e "\n***\n*** Expected empty default_model_filename for 'neuralnet', got \"$NEURALNET_DEFAULT_FILENAME\". \n***"
         RET=1
     fi
