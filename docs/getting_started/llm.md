@@ -42,18 +42,11 @@ supported Hugging Face models directly — no TensorRT engine compilation requir
 
 This guide uses
 [`nvidia/DeepSeek-R1-0528-FP4-V2`](https://huggingface.co/nvidia/DeepSeek-R1-0528-FP4-V2)
-as the example model — a 671B-parameter Mixture-of-Experts model quantized to
-NVFP4 with an FP8 KV cache, served across one 8x B200 node. For a quick
-single-GPU trial, use a smaller model such as
-[`Qwen/Qwen3-8B`](https://huggingface.co/Qwen/Qwen3-8B) with
-`tensor_parallel_size: 1`. You can serve any model listed in the TensorRT-LLM
-[support matrix](https://nvidia.github.io/TensorRT-LLM/models/supported-models.html)
-by changing a single line in `model.yaml`.
+as the example model.
 
 - [Serve the model with Triton](#serve-the-model-with-triton)
 - [Send an inference request](#send-an-inference-request)
 - [Streaming responses](#streaming-responses)
-- [Multi-GPU models](#multi-gpu-models)
 - [Benchmark](#benchmark)
 - [References](#references)
 
@@ -72,39 +65,19 @@ Check [NGC](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver/t
 for the latest `-trtllm-python-py3` tag. For gated models, set your token first:
 `export HF_TOKEN=hf_...`
 
-> [!IMPORTANT]
-> The `26.03` and `26.07` containers (verified; the tags in between are likely
-> affected too) ship `openai==1.107.3`, which is too old for the bundled
-> `tensorrt_llm` package — TensorRT-LLM declares `openai` as a dependency with no
-> lower bound. Without the fix below, loading the model fails with:
->
-> ```
-> ImportError: cannot import name 'PartReasoningText' from
-> 'openai.types.responses.response_content_part_added_event'
-> ```
->
-> Upgrade the package inside the container before starting the server:
->
-> ```bash
-> pip install -U openai
-> ```
+If the server later fails with `ImportError: cannot import name
+'PartReasoningText'`, the container's `openai` package is too old — run
+`pip install -U openai` and try again.
 
 ### 2. Get the model repository
 
 The Triton model repository for the LLM API backend lives in the TensorRT-LLM
-repo. Clone the tag that matches the `tensorrt_llm` version inside your
-container, so that the `model.py` you run matches the library it imports:
+repo. Clone the tag matching the `tensorrt_llm` version in your container:
 
 ```bash
 python3 -c "import tensorrt_llm; print(tensorrt_llm.__version__)"   # e.g. 1.2.1
 git clone --depth 1 --branch v1.2.1 https://github.com/NVIDIA/TensorRT-LLM.git
 ```
-
-> [!NOTE]
-> Prefer the matching tag over the default branch. `main` tracks the next release
-> (currently `1.3.0rc*`); it happens to work against a `1.2.1` container today,
-> but nothing guarantees that, since its `model.py` is developed against the
-> unreleased library. Pinning keeps the guide reproducible.
 
 ### 3. Configure your model
 
@@ -130,23 +103,6 @@ All keys outside `triton_config` map directly to the
 [`LLM()` constructor arguments](https://nvidia.github.io/TensorRT-LLM/llm-api/).
 This is where you configure KV cache, quantization, and parallelism.
 
-The NVFP4 quantization format is read from `hf_quant_config.json` in the
-checkpoint (`quant_algo: NVFP4`, `kv_cache_quant_algo: FP8`) — you do not declare
-it in `model.yaml`. NVFP4 requires Blackwell (`SM100+`) GPUs.
-
-To run on a single GPU instead, swap in a smaller model and drop the parallelism:
-
-```yaml
-model: Qwen/Qwen3-8B
-backend: "pytorch"
-tensor_parallel_size: 1
-pipeline_parallel_size: 1
-
-triton_config:
-  max_batch_size: 0
-  decoupled: False
-```
-
 ### 4. Launch the server
 
 Run the launch script from the parent of `TensorRT-LLM/`. Running it from inside
@@ -162,37 +118,41 @@ python3 TensorRT-LLM/triton_backend/scripts/launch_triton_server.py \
 You should see the following logs once the server is ready:
 
 ```
-I0803 04:19:38.396545 3606543 grpc_server.cc:2579] "Started GRPCInferenceService at 0.0.0.0:8001"
-I0803 04:19:38.396742 3606543 http_server.cc:4961] "Started HTTPService at 0.0.0.0:8000"
-I0803 04:19:38.437685 3606543 http_server.cc:400] "Started Metrics Service at 0.0.0.0:8002"
+I0803 18:43:44.778509 1525575 grpc_server.cc:2579] "Started GRPCInferenceService at 0.0.0.0:8001"
+I0803 18:43:44.778681 1525575 http_server.cc:4961] "Started HTTPService at 0.0.0.0:8000"
+I0803 18:43:44.819624 1525575 http_server.cc:400] "Started Metrics Service at 0.0.0.0:8002"
 ```
 
-> [!NOTE]
-> `launch_triton_server.py` starts Triton as a background process and returns
-> immediately. It is designed for an interactive shell. If you wrap it in a
-> script, a batch job, or `srun`, keep the parent process alive or the server is
-> killed when your script exits.
-
-To stop Triton Server inside the container, run `pkill tritonserver`.
+On an 8x B200 node this configuration takes about 6 minutes to become ready and
+uses roughly 145 GiB of each GPU's 183 GiB, with 81.83 GiB left for the paged KV
+cache (2,500,608 tokens).
 
 ## Send an inference request
 
+`generate` is a raw completion endpoint and does not apply the model's chat
+template, so format the prompt using the template from the checkpoint's
+`tokenizer_config.json`:
+
 ```bash
-curl -X POST localhost:8000/v2/models/tensorrt_llm/generate \
-    -d '{"text_input": "How do I count to nine in French?", "sampling_param_max_tokens": 256}' | jq
+curl -X POST localhost:8000/v2/models/tensorrt_llm/generate -d '{
+  "text_input": "<｜begin▁of▁sentence｜><｜User｜>How do I count to nine in French?<｜Assistant｜>",
+  "sampling_param_max_tokens": 512,
+  "sampling_param_exclude_input_from_output": true }' | jq
+```
+
+DeepSeek-R1 emits its reasoning in a `<think>` block before the answer:
+
+```
+<think>
+Okay, the user is asking how to count to nine in French. That seems
+straightforward—they probably need the French numbers from one to nine.
+...
 ```
 
 Sampling options are passed as `sampling_param_*` inputs — see the `input`
 section of
 `TensorRT-LLM/triton_backend/all_models/llmapi/tensorrt_llm/config.pbtxt` for the
-full list. Add `"sampling_param_exclude_input_from_output": true` to get only the
-generated text back instead of prompt + completion.
-
-> [!NOTE]
-> This endpoint performs raw text completion and does **not** apply the model's
-> chat template. For instruct and reasoning models you must format the prompt
-> yourself — see
-> [Example: DeepSeek-R1 in NVFP4 on 8x B200](#example-deepseek-r1-in-nvfp4-on-8x-b200).
+full list.
 
 ## Streaming responses
 
@@ -219,91 +179,18 @@ curl -N -X POST localhost:8000/v2/models/tensorrt_llm/generate_stream \
     -d '{"text_input": "Count to three:", "sampling_param_max_tokens": 10, "streaming": true}'
 ```
 
-```
-data: {"model_name":"tensorrt_llm","model_version":"1","text_output":" 1"}
-data: {"model_name":"tensorrt_llm","model_version":"1","text_output":" 1,"}
-data: {"model_name":"tensorrt_llm","model_version":"1","text_output":" 1, 2"}
-```
-
 > [!NOTE]
-> Incremental, token-by-token events require the model repository from
-> TensorRT-LLM 1.3 or newer. With the `v1.2.x` `model.py`, a `streaming: true`
-> request is accepted but the server emits a single event containing the full
-> response.
-
-> [!NOTE]
-> A decoupled model cannot be used over the non-streaming HTTP `generate`
-> endpoint — Triton returns
-> `[501] HTTP end point doesn't support models with decoupled transaction policy`.
-> Keep `decoupled: False` unless you need streaming.
-
-## Multi-GPU models
-
-Models run across the GPUs of a single node by setting the parallelism in
-`model.yaml`, as the example config above does. The LLM API launches its own
-worker processes, so no extra `--world_size` argument is needed on
-`launch_triton_server.py`.
-
-For Mixture-of-Experts models, set the expert parallelism alongside the tensor
-parallelism. A bare `tensor_parallel_size` is often not sufficient — check the
-model's row in the
-[support matrix](https://nvidia.github.io/TensorRT-LLM/models/supported-models.html)
-and its example README for required settings.
-
-### Sizing: DeepSeek-R1 NVFP4 on 8x B200
-
-NVFP4 quantization brings the DeepSeek-R1 checkpoint from 642 GB (FP8) down to
-385 GB, so it fits on one 8x B200 node with room to spare for the KV cache. On
-that node, the configuration above measured:
-
-| | |
-| --- | --- |
-| Time to `Started HTTPService` | ~6 min (warm local cache) |
-| GPU memory in use | ~145 GiB of each B200's 183 GiB |
-| Paged KV cache | 81.83 GiB (2,500,608 tokens) |
-
-Loading 163 shards takes several minutes on first start. Watch for
-`Started HTTPService` before sending requests.
-
-> [!IMPORTANT]
-> `generate` is a **raw completion** endpoint — it does not apply the model's
-> chat template. Sending a bare question to an instruct or reasoning model makes
-> it continue the text rather than answer it. DeepSeek-R1 replies to
-> `"How do I count to nine in French?"` with a list of scraped page titles.
-> Format the prompt yourself using the model's template:
->
-> ```bash
-> curl -X POST localhost:8000/v2/models/tensorrt_llm/generate -d '{
->   "text_input": "<｜begin▁of▁sentence｜><｜User｜>How do I count to nine in French?<｜Assistant｜>",
->   "sampling_param_max_tokens": 512,
->   "sampling_param_exclude_input_from_output": true }'
-> ```
->
-> R1 then emits its reasoning trace in a `<think>` block before the answer:
->
-> ```
-> <think>
-> Okay, the user is asking how to count to nine in French. That seems
-> straightforward—they probably need the French numbers from one to nine.
-> ...
-> ```
->
-> Each model family uses a different template — read `chat_template` in the
-> checkpoint's `tokenizer_config.json`.
-
-> [!NOTE]
-> DeepSeek-V4 (`DeepSeek-V4-Flash` / `-Pro`) is **not** usable with these
-> containers. It requires TensorRT-LLM 1.3 or newer, which is not yet GA and is
-> not in `26.07` or earlier — those ship TensorRT-LLM 1.2.x, which does not
-> register `DeepseekV4ForCausalLM`. Loading it fails with
-> `The checkpoint you are trying to load has model type 'deepseek_v4' but
-> Transformers does not recognize this architecture.` The same applies to GLM-5.x
-> (`glm_moe_dsa`). Use DeepSeek-R1 or GLM-4.7 until a container ships 1.3.
+> Token-by-token events require the model repository from TensorRT-LLM 1.3 or
+> newer. With `v1.2.x`, a `streaming: true` request is accepted but the server
+> emits a single event containing the full response. A decoupled model also
+> cannot be used over the non-streaming `generate` endpoint, which returns
+> `[501] HTTP end point doesn't support models with decoupled transaction
+> policy` — keep `decoupled: False` unless you need streaming.
 
 ## Benchmark
 
-The LLM API backend ships its own benchmarking client. Install the Triton client
-in the server container and run it against the model, with `decoupled: False`:
+Install the Triton client in the server container and run the backend's
+benchmarking client against the model, with `decoupled: False`:
 
 ```bash
 pip install "tritonclient[grpc,http]"
@@ -313,26 +200,14 @@ python3 TensorRT-LLM/triton_backend/tools/inflight_batcher_llm/benchmark_core_mo
   --tensorrt-llm-model-name tensorrt_llm \
   --test-llmapi \
   dataset --dataset TensorRT-LLM/triton_backend/tools/dataset/mini_cnn_eval.json \
-  --tokenizer-dir <the model you set in model.yaml>
+  --tokenizer-dir nvidia/DeepSeek-R1-0528-FP4-V2
 ```
 
-Sample output (Qwen3-8B on a single GPU):
-
 ```
-Tokenizer: Tokens per word =  1.324
 [INFO] Warm up for benchmarking.
 [INFO] Start benchmarking on 37 prompts.
-[INFO] Total Latency: 853.993 ms
+[INFO] Total Latency: <ms>
 ```
-
-> [!NOTE]
-> GenAI-Perf's `--backend tensorrtllm` mode targets the legacy
-> `inflight_batcher_llm` model, whose inputs are named `max_tokens` and `stream`.
-> The LLM API backend names them `sampling_param_max_tokens` and `streaming`, so
-> GenAI-Perf fails with
-> `Failed to init manager inputs: The input or output 'max_tokens' is not found in
-> the model configuration`. Use the client above until GenAI-Perf adds LLM API
-> support.
 
 > [!NOTE]
 > The shipped `model.yaml` sets `max_batch_size: 0`, so the backend serves
