@@ -40,8 +40,13 @@ supported Hugging Face models directly — no TensorRT engine compilation requir
 > [TensorRT-LLM Backend README](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/README.md)
 > for the full set of configuration and deployment options.
 
-This guide uses [`Qwen/Qwen3-8B`](https://huggingface.co/Qwen/Qwen3-8B) as the
-example model. You can serve any model listed in the TensorRT-LLM
+This guide uses
+[`nvidia/DeepSeek-R1-0528-FP4-V2`](https://huggingface.co/nvidia/DeepSeek-R1-0528-FP4-V2)
+as the example model — a 671B-parameter Mixture-of-Experts model quantized to
+NVFP4 with an FP8 KV cache, served across one 8x B200 node. For a quick
+single-GPU trial, use a smaller model such as
+[`Qwen/Qwen3-8B`](https://huggingface.co/Qwen/Qwen3-8B) with
+`tensor_parallel_size: 1`. You can serve any model listed in the TensorRT-LLM
 [support matrix](https://nvidia.github.io/TensorRT-LLM/models/supported-models.html)
 by changing a single line in `model.yaml`.
 
@@ -107,10 +112,14 @@ Edit `TensorRT-LLM/triton_backend/all_models/llmapi/tensorrt_llm/1/model.yaml`
 and set `model:` to a Hugging Face model ID or a local path:
 
 ```yaml
-model: Qwen/Qwen3-8B
+model: nvidia/DeepSeek-R1-0528-FP4-V2
 backend: "pytorch"
-tensor_parallel_size: 1
-pipeline_parallel_size: 1
+tensor_parallel_size: 8
+moe_expert_parallel_size: 8
+max_seq_len: 4096
+max_num_tokens: 8192
+kv_cache_config:
+  free_gpu_memory_fraction: 0.7
 
 triton_config:
   max_batch_size: 0
@@ -120,6 +129,23 @@ triton_config:
 All keys outside `triton_config` map directly to the
 [`LLM()` constructor arguments](https://nvidia.github.io/TensorRT-LLM/llm-api/).
 This is where you configure KV cache, quantization, and parallelism.
+
+The NVFP4 quantization format is read from `hf_quant_config.json` in the
+checkpoint (`quant_algo: NVFP4`, `kv_cache_quant_algo: FP8`) — you do not declare
+it in `model.yaml`. NVFP4 requires Blackwell (`SM100+`) GPUs.
+
+To run on a single GPU instead, swap in a smaller model and drop the parallelism:
+
+```yaml
+model: Qwen/Qwen3-8B
+backend: "pytorch"
+tensor_parallel_size: 1
+pipeline_parallel_size: 1
+
+triton_config:
+  max_batch_size: 0
+  decoupled: False
+```
 
 ### 4. Launch the server
 
@@ -213,51 +239,31 @@ data: {"model_name":"tensorrt_llm","model_version":"1","text_output":" 1, 2"}
 
 ## Multi-GPU models
 
-Larger models run across the GPUs of a single node by setting the parallelism in
-`model.yaml`. The LLM API launches its own worker processes, so no extra
-`--world_size` argument is needed on `launch_triton_server.py`:
+Models run across the GPUs of a single node by setting the parallelism in
+`model.yaml`, as the example config above does. The LLM API launches its own
+worker processes, so no extra `--world_size` argument is needed on
+`launch_triton_server.py`.
 
-```yaml
-model: <your-model>
-tensor_parallel_size: 8
-```
-
-For Mixture-of-Experts models, also set the expert parallelism. A bare
-`tensor_parallel_size` is often not sufficient — check the model's row in the
+For Mixture-of-Experts models, set the expert parallelism alongside the tensor
+parallelism. A bare `tensor_parallel_size` is often not sufficient — check the
+model's row in the
 [support matrix](https://nvidia.github.io/TensorRT-LLM/models/supported-models.html)
 and its example README for required settings.
 
-### Example: DeepSeek-R1 in NVFP4 on 8x B200
+### Sizing: DeepSeek-R1 NVFP4 on 8x B200
 
-[`nvidia/DeepSeek-R1-0528-FP4-V2`](https://huggingface.co/nvidia/DeepSeek-R1-0528-FP4-V2)
-is a 671B-parameter MoE quantized to NVFP4 with an FP8 KV cache. Quantization
-brings the checkpoint from 642 GB (FP8) down to 385 GB, so it fits comfortably on
-one 8x B200 node with room left for the KV cache. NVFP4 requires Blackwell
-(`SM100+`).
+NVFP4 quantization brings the DeepSeek-R1 checkpoint from 642 GB (FP8) down to
+385 GB, so it fits on one 8x B200 node with room to spare for the KV cache. On
+that node, the configuration above measured:
 
-```yaml
-model: nvidia/DeepSeek-R1-0528-FP4-V2
-backend: "pytorch"
-tensor_parallel_size: 8
-moe_expert_parallel_size: 8
-max_seq_len: 4096
-max_num_tokens: 8192
-kv_cache_config:
-  free_gpu_memory_fraction: 0.7
+| | |
+| --- | --- |
+| Time to `Started HTTPService` | ~6 min (warm local cache) |
+| GPU memory in use | ~145 GiB of each B200's 183 GiB |
+| Paged KV cache | 81.83 GiB (2,500,608 tokens) |
 
-triton_config:
-  max_batch_size: 0
-  decoupled: False
-```
-
-The quantization format is read from `hf_quant_config.json` in the checkpoint
-(`quant_algo: NVFP4`, `kv_cache_quant_algo: FP8`) — you do not set it in
-`model.yaml`.
-
-Loading 385 GB takes several minutes on first start (about 6 minutes from a
-warm local cache). Watch for `Started HTTPService` before sending requests. Once
-resident, this configuration uses roughly 145 GiB of each B200's 183 GiB,
-leaving headroom for the KV cache.
+Loading 163 shards takes several minutes on first start. Watch for
+`Started HTTPService` before sending requests.
 
 > [!IMPORTANT]
 > `generate` is a **raw completion** endpoint — it does not apply the model's
@@ -307,8 +313,10 @@ python3 TensorRT-LLM/triton_backend/tools/inflight_batcher_llm/benchmark_core_mo
   --tensorrt-llm-model-name tensorrt_llm \
   --test-llmapi \
   dataset --dataset TensorRT-LLM/triton_backend/tools/dataset/mini_cnn_eval.json \
-  --tokenizer-dir Qwen/Qwen3-8B
+  --tokenizer-dir <the model you set in model.yaml>
 ```
+
+Sample output (Qwen3-8B on a single GPU):
 
 ```
 Tokenizer: Tokens per word =  1.324
