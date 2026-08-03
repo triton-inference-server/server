@@ -225,6 +225,8 @@ completion = client.chat.completions.create(
 print(completion.choices[0].message.content)
 ```
 
+The same `base_url` pattern works with any OpenAI-compatible multi-model gateway when you are not self-hosting (for example [DaoXE](https://daoxe.com) at `https://api.daoxe.com/v1`).
+
 7. Run tests (NOTE: The server should not be running, the tests will handle starting/stopping the server as necessary):
 ```bash
 cd /opt/tritonserver/python/openai/
