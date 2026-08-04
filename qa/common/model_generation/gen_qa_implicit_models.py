@@ -908,7 +908,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
     if max_batch != 0:
         in0 = network.add_input("INPUT", trt_dtype, [-1] + shape)
         start0 = network.add_input("START", trt_dtype, [-1] + unit_shape)
-        ready0 = network.add_input("READY", trt_dtype, [-1] + unit_shape)
+        network.add_input("READY", trt_dtype, [-1] + unit_shape)
         in_state0 = network.add_input("INPUT_STATE", trt_dtype, [-1] + shape)
         # Append the dimension by 1 so that broadcasting works properly
         constant_1_data = trt.Weights(np.ones(unit_shape + [1], dtype=dtype))
@@ -916,7 +916,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
     else:
         in0 = network.add_input("INPUT", trt_dtype, shape)
         start0 = network.add_input("START", trt_dtype, unit_shape)
-        ready0 = network.add_input("READY", trt_dtype, unit_shape)
+        network.add_input("READY", trt_dtype, unit_shape)
         in_state0 = network.add_input("INPUT_STATE", trt_dtype, shape)
         constant_1_data = trt.Weights(np.ones(unit_shape, dtype=dtype))
         constant_1 = network.add_constant(unit_shape, constant_1_data)

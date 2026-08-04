@@ -29,6 +29,7 @@
 import argparse
 import os
 from builtins import range
+from typing import List, Tuple
 
 import gen_ensemble_model_utils as emu
 import numpy as np
@@ -42,7 +43,6 @@ from gen_common import (
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
-from typing import List, Tuple
 
 
 def create_ensemble_modelfile(

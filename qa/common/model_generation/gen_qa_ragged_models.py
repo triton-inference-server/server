@@ -425,7 +425,7 @@ def create_plan_itemshape_modelfile(models_dir, model_version, dtype):
     network = builder.create_network()
     trt_dtype = np_to_trt_dtype(dtype)
 
-    in_node = network.add_input("RAGGED_INPUT", trt_dtype, [-1])
+    network.add_input("RAGGED_INPUT", trt_dtype, [-1])
     batch_node = network.add_input("BATCH_INPUT", trt_dtype, [-1, 2])
 
     batch_out_node = network.add_identity(batch_node)
