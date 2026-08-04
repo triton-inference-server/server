@@ -13,6 +13,10 @@ cprofile
 .venv
 **/.venv
 
+# Per-framework scripts emitted by qa/common/model_generation drivers
+qa/common/model_generation/gen.*.sh
+qa/common/model_generation/gen.*.cmds
+
 # Test exclusions
 qa/L0_openai/openai
 tensorrtllm_models

@@ -29,20 +29,19 @@
 import argparse
 import os
 from builtins import range
+from typing import List, Tuple
 
 import gen_ensemble_model_utils as emu
 import numpy as np
 from gen_common import (
     np_to_model_dtype,
     np_to_onnx_dtype,
-    np_to_torch_dtype,
     np_to_trt_dtype,
     openvino_save_model,
 )
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
-from typing import List
 
 
 def create_plan_modelfile(
@@ -218,7 +217,6 @@ def create_libtorch_modelfile(
     ):
         return
 
-    torch_dtype = np_to_torch_dtype(dtype)
     io_cnt = len(input_shapes)
     model_name = tu.get_zero_model_name(
         "libtorch_nobatch" if max_batch == 0 else "libtorch", io_cnt, dtype

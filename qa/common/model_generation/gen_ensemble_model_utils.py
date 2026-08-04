@@ -842,8 +842,8 @@ def create_ensemble_modelconfig(
 
         if labels is not None:
             with open(config_dir + "/output0_labels.txt", "w") as lfile:
-                for l in range(output0_label_cnt):
-                    lfile.write("label" + str(l) + "\n")
+                for label_idx in range(output0_label_cnt):
+                    lfile.write("label" + str(label_idx) + "\n")
 
 
 def create_identity_ensemble_modelfile(
