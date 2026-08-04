@@ -33,7 +33,7 @@ import sys
 FLAGS = None
 
 
-#### helper functions
+# helper functions
 def log(msg, force=False):
     if force or not FLAGS.quiet:
         try:
@@ -255,12 +255,12 @@ def create_argmap(images, skip_pull):
     vars = p_path.stdout
     log_verbose("inspect args: {}".format(vars))
 
-    e0 = re.search("TRITON_SERVER_GPU_ENABLED=([\S]{1,}) ", vars)
+    e0 = re.search("TRITON_SERVER_GPU_ENABLED=([\\S]{1,}) ", vars)
     e1 = re.search("CUDA_VERSION", vars)
     gpu_enabled = False
-    if e0 != None:
+    if e0 is not None:
         gpu_enabled = e0.group(1) == "1"
-    elif e1 != None:
+    elif e1 is not None:
         gpu_enabled = True
     fail_if(
         gpu_enabled != enable_gpu,
@@ -268,22 +268,22 @@ def create_argmap(images, skip_pull):
         "'TRITON_SERVER_GPU_ENABLED' as {} and you are composing container"
         "with 'TRITON_SERVER_GPU_ENABLED' as {}".format(gpu_enabled, enable_gpu),
     )
-    e = re.search("TRITON_SERVER_VERSION=([\S]{6,}) ", vars)
+    e = re.search("TRITON_SERVER_VERSION=([\\S]{6,}) ", vars)
     version = "" if e is None else e.group(1)
     fail_if(
         len(version) == 0,
         "docker inspect to find triton server version failed, {}".format(p_path.stderr),
     )
-    e = re.search("NVIDIA_TRITON_SERVER_VERSION=([\S]{5,}) ", vars)
+    e = re.search("NVIDIA_TRITON_SERVER_VERSION=([\\S]{5,}) ", vars)
     container_version = "" if e is None else e.group(1)
     fail_if(
         len(container_version) == 0,
         "docker inspect to find triton container version failed, {}".format(vars),
     )
-    dcgm_ver = re.search("DCGM_VERSION=([\S]{4,}) ", vars)
+    dcgm_ver = re.search("DCGM_VERSION=([\\S]{4,}) ", vars)
     dcgm_version = ""
     if dcgm_ver is None:
-        dcgm_version = "4.5.3-1"
+        dcgm_version = "4.6.1-1"
         log(
             "WARNING: DCGM version not found from image, installing the earlierst version {}".format(
                 dcgm_version
