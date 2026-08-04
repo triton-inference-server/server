@@ -92,6 +92,14 @@ function define_model_output_directories() {
     log_message.status "define: model output directories"
     TRITON_MDLS_BLD_DIR=${TRITON_MDLS_BLD_DIR:=/mnt/$CI_JOB_ID}
     TRITON_MDLS_SRC_DIR=${TRITON_MDLS_SRC_DIR:=$TRITON_MDLS_BLD_DIR/gen_srcdir}
+    # Files outside this directory that the generators need at runtime. They are
+    # staged flat into $TRITON_MDLS_SRC_DIR alongside the generators:
+    #   test_util.py        imported by 14 generators, shared with the L0_* suites
+    #   resnet50_labels.txt read by gen_qa_models.py as $TRITON_GENSRCDIR/<name>
+    TRITON_MDLS_SHARED_SRC=(
+        "$TRITON_MDLS_BASE_SCRIPT_DIR/../test_util.py"
+        "$TRITON_MDLS_BASE_SCRIPT_DIR/../resnet50_labels.txt"
+    )
     TRITON_MDLS_QA_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_model_repository
     TRITON_MDLS_QA_VARIABLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_model_repository
     TRITON_MDLS_QA_IDENTITY_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_model_repository
@@ -470,6 +478,12 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
     log_message.status "docker container: copy script to container"
     docker cp . $DOCKER_VOLUME_CONTAINER:/mnt/$CI_JOB_ID/gen_srcdir
 
+    log_message.status "docker container: copy shared sources to container"
+    for shared_src in "${TRITON_MDLS_SHARED_SRC[@]}"; do
+        log_message.info "docker cp $shared_src"
+        docker cp "$shared_src" $DOCKER_VOLUME_CONTAINER:/mnt/$CI_JOB_ID/gen_srcdir/
+    done
+
 
     log_message.status "docker run: $OPENVINOSCRIPT"
     log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $UBUNTU_IMAGE bash -e $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT"
@@ -618,6 +632,9 @@ elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
 
     log_message.status "copy scripts to: $TRITON_MDLS_SRC_DIR"
     cp -rv $TRITON_MDLS_BASE_SCRIPT_DIR/* $TRITON_MDLS_SRC_DIR/
+
+    log_message.status "copy shared sources to: $TRITON_MDLS_SRC_DIR"
+    cp -v "${TRITON_MDLS_SHARED_SRC[@]}" $TRITON_MDLS_SRC_DIR/
 
     log_message.status "enroot import: $UBUNTU_IMAGE to ubuntu.$CI_JOB_ID.enroot.sqsh"
     enroot import --output /tmp/ubuntu.$CI_JOB_ID.enroot.sqsh docker://$UBUNTU_IMAGE

@@ -33,6 +33,19 @@
 #!/bin/bash -xe
 # Make all generated files accessible outside of container
 umask 0000
+
+# The generated command file and the "docker cp ." below are both relative to the
+# working directory, so pin it to this script's directory.
+BASE_SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+cd "$BASE_SCRIPT_DIR"
+
+# Files outside this directory that the generators need at runtime; staged flat
+# into gen_srcdir alongside them.
+SHARED_SRC=(
+    "$BASE_SCRIPT_DIR/../test_util.py"
+    "$BASE_SCRIPT_DIR/../resnet50_labels.txt"
+)
+
 # Set the version of the models
 TRITON_VERSION=${TRITON_VERSION:=26.07}
 # Set the CUDA device to use
@@ -59,6 +72,9 @@ docker rm -f $DOCKER_VOLUME
 docker run --rm -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $UBUNTU_IMAGE mkdir -p gen_srcdir ${TRITON_VERSION}
 docker create --name $DOCKER_VOLUME -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $UBUNTU_IMAGE
 docker cp . $DOCKER_VOLUME:/mnt/$CI_JOB_ID/gen_srcdir
+for shared_src in "${SHARED_SRC[@]}"; do
+    docker cp "$shared_src" $DOCKER_VOLUME:/mnt/$CI_JOB_ID/gen_srcdir/
+done
 
 # Set model output directories
 VOLUME_BUILD_DIR=${VOLUME_BUILD_DIR:=/mnt/$CI_JOB_ID}

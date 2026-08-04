@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,7 +34,7 @@ SERVER_LOG="./python_based_backends_server.log"
 CLIENT_LOG="./python_based_backends_client.log"
 TEST_RESULT_FILE="./test_results.txt"
 CLIENT_PY="./python_based_backends_test.py"
-GEN_PYTORCH_MODEL_PY="../../common/gen_qa_pytorch_model.py"
+GEN_PYTORCH_MODEL_PY="../../common/model_generation/gen_qa_pytorch_model.py"
 RET=0
 
 rm -rf ${MODEL_REPOSITORY}
