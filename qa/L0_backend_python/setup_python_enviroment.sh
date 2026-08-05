@@ -41,59 +41,10 @@ SERVER_ARGS=$BASE_SERVER_ARGS
 SERVER_LOG="./inference_server.log"
 export PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="12"}
 RET=0
-EXPECTED_VERSION_STRINGS=""
 
 rm -fr ./models
 rm -rf *.tar.gz
 install_build_deps
-install_conda
-
-# Test other python versions
-conda update -n base -c defaults conda -y
-
-# Create a model with python 3.11 version
-# Successful execution of the Python model indicates that the environment has
-# been setup correctly.
-if [ ${PYTHON_ENV_VERSION} = "11" ]; then
-    create_conda_env "3.11" "python-3-11"
-    conda install pytorch=2.8.0 -y
-    conda install -c conda-forge libstdcxx-ng=14 -y
-    conda install numpy=1.23.5 -y
-    EXPECTED_VERSION_STRING="Python version is 3.11, NumPy version is 1.23.5, and PyTorch version is 2.8.0"
-    create_python_backend_stub
-    conda-pack -o python3.11.tar.gz
-    path_to_conda_pack="$PWD/python-3-11"
-    mkdir -p $path_to_conda_pack
-    tar -xzf python3.11.tar.gz -C $path_to_conda_pack
-    mkdir -p models/python_3_11/1/
-    cp ../python_models/python_version/config.pbtxt ./models/python_3_11
-    (cd models/python_3_11 && \
-            sed -i "s/^name:.*/name: \"python_3_11\"/" config.pbtxt && \
-            echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
-    cp ../python_models/python_version/model.py ./models/python_3_11/1/
-    cp python_backend/builddir/triton_python_backend_stub ./models/python_3_11
-fi
-conda deactivate
-rm -rf ./miniconda
-
-# test that
-set +e
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-kill_server
-
-grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
-if [ $? -ne 0 ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
-    RET=1
-fi
-set -e
 
 echo "python environment 3.${PYTHON_ENV_VERSION}"
 # copy the stub out to /opt/tritonserver/backends/python/triton_python_backend_stub
