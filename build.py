@@ -622,6 +622,15 @@ def python_cmake_args():
                 "python", "PYBIND11_PYTHON_VERSION", "STRING", FLAGS.rhel_py_version
             )
         )
+        # The stub embeds a statically linked CPython on RHEL (see
+        # restore_embeddable_python_lib_rhel), so its dynamic symbol table
+        # must be exported for Python C extension modules loaded at runtime
+        # to resolve Py_* against it. A shared libpython would not need this.
+        cargs.append(
+            cmake_backend_arg(
+                "python", "CMAKE_EXE_LINKER_FLAGS", "STRING", "-Wl,--export-dynamic"
+            )
+        )
 
     return cargs
 
@@ -958,8 +967,8 @@ RUN ccache -p
 """.format(
             os.getenv("CCACHE_REMOTE_STORAGE")
         )
-    # Requires openssl-devel to be installed first for pyenv build to be successful
     df += change_default_python_version_rhel(FLAGS.rhel_py_version)
+    df += restore_embeddable_python_lib_rhel()
     df += """
 
 RUN pip3 install --upgrade pip \\
@@ -1410,7 +1419,6 @@ RUN yum install -y \\
         openssl-devel \\
         readline-devel
 """
-            # Requires openssl-devel to be installed first for pyenv build to be successful
             df += change_default_python_version_rhel(FLAGS.rhel_py_version)
             df += """
 RUN pip3 install --upgrade pip \\
@@ -1557,6 +1565,23 @@ def change_default_python_version_rhel(version):
 ENV PATH="/opt/_internal/pipx/shared/bin:$PATH"
 """
     return df
+
+
+def restore_embeddable_python_lib_rhel():
+    # The manylinux base container configures CPython with --disable-shared,
+    # so no libpython*.so is ever built, and its finalize.sh then compresses
+    # every libpython*.a into static-libs-for-embedding-only.tar.xz and drops
+    # the originals. triton_python_backend_stub links pybind11::embed and so
+    # needs that archive. Restore it in place -- the path it unpacks to is
+    # exactly the LIBDIR the interpreter's sysconfig reports, which is where
+    # pybind11's FindPythonLibsNew looks.
+    #
+    # This deliberately fails the build if the archive is absent: without it
+    # the stub link fails much later with an unresolvable -lpython<ver>.
+    return """
+RUN tar -xf /opt/_internal/static-libs-for-embedding-only.tar.xz \\
+        -C /opt/_internal
+"""
 
 
 def create_build_dockerfiles(
@@ -1967,17 +1992,6 @@ def backend_build(
 
     cmake_script.mkdir(os.path.join(install_dir, "backends"))
     cmake_script.rmdir(os.path.join(install_dir, "backends", be))
-
-    # The python library version available for install via 'yum install python3.X-devel' does not
-    # match the version of python inside the RHEL base container. This means that python packages
-    # installed within the container will not be picked up by the python backend stub process pybind
-    # bindings. It must instead must be installed via pyenv. We package it here for better usability.
-    if target_platform() == "rhel" and be == "python":
-        major_minor_version = ".".join((FLAGS.rhel_py_version).split(".")[:2])
-        version_matched_files = "/usr/lib64/libpython" + major_minor_version + "*"
-        cmake_script.cp(
-            version_matched_files, os.path.join(repo_install_dir, "backends", be)
-        )
 
     cmake_script.cpdir(
         os.path.join(repo_install_dir, "backends", be),
