@@ -1570,7 +1570,7 @@ def restore_embeddable_python_lib_rhel():
     # This deliberately fails the build if the archive is absent: without it
     # the stub link fails much later with an unresolvable -lpython<ver>.
     return """
-RUN tar -xf /opt/_internal/static-libs-for-embedding-only.tar.xz \\
+RUN tar -xvf /opt/_internal/static-libs-for-embedding-only.tar.xz \\
         -C /opt/_internal
 """
 
