@@ -626,20 +626,9 @@ def python_cmake_args():
         # restore_embeddable_python_lib_rhel), so its dynamic symbol table
         # must be exported for Python C extension modules loaded at runtime
         # to resolve Py_* against it. A shared libpython would not need this.
-        stub_link_flags = ["-Wl,--export-dynamic"]
-        # That archive is built without -fPIC. On x86-64 its R_X86_64_32 and
-        # R_X86_64_32S relocations cannot appear in a position-independent
-        # executable, and gcc-toolset defaults to -pie, so the stub has to be
-        # linked non-PIE. aarch64 addressing is PC-relative and links into a
-        # PIE unchanged, so it keeps the hardening.
-        if target_machine() == "x86_64":
-            stub_link_flags.append("-no-pie")
         cargs.append(
             cmake_backend_arg(
-                "python",
-                "CMAKE_EXE_LINKER_FLAGS",
-                "STRING",
-                " ".join(stub_link_flags),
+                "python", "CMAKE_EXE_LINKER_FLAGS", "STRING", "-Wl,--export-dynamic"
             )
         )
 
