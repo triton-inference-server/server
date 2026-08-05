@@ -622,15 +622,6 @@ def python_cmake_args():
                 "python", "PYBIND11_PYTHON_VERSION", "STRING", FLAGS.rhel_py_version
             )
         )
-        # The stub embeds a statically linked CPython on RHEL (see
-        # restore_embeddable_python_lib_rhel), so its dynamic symbol table
-        # must be exported for Python C extension modules loaded at runtime
-        # to resolve Py_* against it. A shared libpython would not need this.
-        cargs.append(
-            cmake_backend_arg(
-                "python", "CMAKE_EXE_LINKER_FLAGS", "STRING", "-Wl,--export-dynamic"
-            )
-        )
 
     return cargs
 
