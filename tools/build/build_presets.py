@@ -117,7 +117,6 @@ _FLAG_TO_DEST = {
     "TRITON_ENABLE_AZURE_STORAGE": "filesystem",
     "TRITON_ENABLE_ENSEMBLE": "backend",
     "TRITON_ENABLE_TENSORRT": "backend",
-    "PYBIND11_PYTHON_VERSION": "rhel_py_version",
     "TRITON_PYTORCH_DOCKER_IMAGE": "image",
     "TRITON_BUILD_CONTAINER": "image",
     "TRITON_BUILD_ONNXRUNTIME_VERSION": "ort_version",

@@ -79,7 +79,6 @@ DEFAULT_TRITON_VERSION_MAP = {
     "ort_openvino_version": "2026.3.0",
     "standalone_openvino_version": "2026.3.0",
     "dcgm_version": "4.6.1-1",
-    "rhel_py_version": "3.12.3",
 }
 
 CORE_BACKENDS = ["ensemble"]
@@ -554,8 +553,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = onnxruntime_cmake_args(images, library_paths)
     elif be == "openvino":
         args = openvino_cmake_args()
-    elif be == "python":
-        args = python_cmake_args()
     elif be == "dali":
         args = dali_cmake_args()
     elif be == "pytorch":
@@ -611,18 +608,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
 
     else:
         cargs.append("..")
-    return cargs
-
-
-def python_cmake_args():
-    cargs = []
-    if target_platform() == "rhel":
-        cargs.append(
-            cmake_backend_arg(
-                "python", "PYBIND11_PYTHON_VERSION", "STRING", FLAGS.rhel_py_version
-            )
-        )
-
     return cargs
 
 
@@ -958,7 +943,7 @@ RUN ccache -p
 """.format(
             os.getenv("CCACHE_REMOTE_STORAGE")
         )
-    df += change_default_python_version_rhel(FLAGS.rhel_py_version)
+    df += set_python_location_to_manylinux_for_rhel()
     df += restore_embeddable_python_lib_rhel()
     df += """
 
@@ -1333,9 +1318,10 @@ RUN yum install -y \\
         libb64-devel \\
         gperftools-devel \\
         wget \\
-        python3.12-pip \\
         numactl-devel
-
+"""
+        df += set_python_location_to_manylinux_for_rhel()
+        df += """
 RUN pip3 install patchelf==0.17.2
 
 """
@@ -1410,7 +1396,7 @@ RUN yum install -y \\
         openssl-devel \\
         readline-devel
 """
-            df += change_default_python_version_rhel(FLAGS.rhel_py_version)
+            df += set_python_location_to_manylinux_for_rhel()
             df += """
 RUN pip3 install --upgrade pip \\
     && pip3 install --upgrade \\
@@ -1551,7 +1537,7 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
     return df
 
 
-def change_default_python_version_rhel(version):
+def set_python_location_to_manylinux_for_rhel():
     df = """
 ENV PATH="/opt/_internal/pipx/shared/bin:$PATH"
 """
@@ -2601,12 +2587,6 @@ if __name__ == "__main__":
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["dcgm_version"],
         help="This flag sets the DCGM version for Triton Inference Server to be built. Default: the latest supported version.",
-    )
-    parser.add_argument(
-        "--rhel-py-version",
-        required=False,
-        default=DEFAULT_TRITON_VERSION_MAP["rhel_py_version"],
-        help="This flag sets the Python version for RHEL platform of Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
         "--build-secret",
