@@ -221,10 +221,62 @@ namespace {
 
 struct ModelSlotBuild {
   size_t feature_count{0};
+  int adsize_idx{-1};
   std::vector<char> tensor;
   std::vector<ImpRouteRow> routes;
   std::string original_model_name;
 };
+
+int AdsizeFeatureIndex(const std::vector<std::string>& feature_sequence)
+{
+  for (size_t fi = 0; fi < feature_sequence.size(); ++fi) {
+    if (feature_sequence[fi] == TRITON_BT_FEATURE_ADSIZE) {
+      return static_cast<int>(fi);
+    }
+  }
+  return -1;
+}
+
+const CampaignBtModelBundle* LookupCampaignBundle(const CampaignToFeatureMappings* cmap, int32_t campaign_id)
+{
+  auto it = cmap->find(campaign_id);
+  if (it == cmap->end()) {
+    it = cmap->find(0);
+  }
+  if (it == cmap->end()) {
+    return nullptr;
+  }
+  return &it->second;
+}
+
+size_t CountCampInferRows(const rapidjson::Value& camp, int adsize_idx)
+{
+  if (adsize_idx >= 0 && camp.HasMember(TRITON_BT_FEATURE_ADSIZE) && camp[TRITON_BT_FEATURE_ADSIZE].IsArray()) {
+    return camp[TRITON_BT_FEATURE_ADSIZE].Size();
+  }
+  return 0;
+}
+
+TRITONSERVER_Error* CheckModelReadyFromSnapshot(const std::string& model_name, const std::string& original_model_name, std::unordered_set<std::string>* verified_models)
+{
+  if (verified_models->find(model_name) != verified_models->end()) {
+    return nullptr;
+  }
+
+  const std::unordered_set<std::string>* ready = ActiveReadyModelNames();
+  if (ready == nullptr) {
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNAVAILABLE, "ready model snapshot is not initialized");
+  }
+
+  if (ready->find(model_name) != ready->end() ||
+      (!original_model_name.empty() && ready->find(original_model_name) != ready->end())) {
+    verified_models->insert(model_name);
+    return nullptr;
+  }
+
+  const std::string not_ready = "model " + model_name + " not ready";
+  return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, not_ready.c_str());
+}
 
 void AppendFloatRowToTensor(std::vector<char>* tensor, const std::vector<float>& row)
 {
@@ -234,29 +286,6 @@ void AppendFloatRowToTensor(std::vector<char>* tensor, const std::vector<float>&
   }
   const char* bytes = reinterpret_cast<const char*>(row.data());
   tensor->insert(tensor->end(), bytes, bytes + nbytes);
-}
-
-TRITONSERVER_Error* CheckModelReadyCached(TRITONSERVER_Server* server, const std::string& model_name, std::unordered_map<std::string, bool>* ready_cache) {
-  auto it = ready_cache->find(model_name);
-  if (it != ready_cache->end()) {
-    if (!it->second) {
-      const std::string not_ready = "model " + model_name + " not ready";
-      return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, not_ready.c_str());
-    }
-    return nullptr;
-  }
-
-  bool ready = false;
-  TRITONSERVER_Error* err = TRITONSERVER_ServerModelIsReady(server, model_name.c_str(), -1 /* latest version */, &ready);
-  if (err != nullptr) {
-    return err;
-  }
-  (*ready_cache)[model_name] = ready;
-  if (!ready) {
-    const std::string not_ready = "model " + model_name + " not ready";
-    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, not_ready.c_str());
-  }
-  return nullptr;
 }
 
 }  // namespace
@@ -296,7 +325,33 @@ TRITONSERVER_Error* GenerateImpsInferSlots(const rapidjson::Document& doc, TRITO
     return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_UNAVAILABLE, "campaign feature mappings are not loaded");
   }
 
-  std::unordered_map<std::string, bool> ready_cache;
+  const rapidjson::Value& imps = doc[TRITON_BT_JSON_IMPS];
+
+  std::unordered_map<std::string, size_t> rows_per_model;
+  for (rapidjson::SizeType ii = 0; ii < imps.Size(); ++ii) {
+    const rapidjson::Value& imp = imps[ii];
+    if (!imp.IsObject()) {
+      continue;
+    }
+    if (!imp.HasMember(TRITON_BT_JSON_CAMPS) || !imp[TRITON_BT_JSON_CAMPS].IsArray()) {
+      continue;
+    }
+    const rapidjson::Value& camps = imp[TRITON_BT_JSON_CAMPS];
+    for (rapidjson::SizeType ci = 0; ci < camps.Size(); ++ci) {
+      const rapidjson::Value& camp = camps[ci];
+      if (!camp.IsObject() || !camp.HasMember(TRITON_BT_JSON_CID) || !camp[TRITON_BT_JSON_CID].IsInt()) {
+        continue;
+      }
+      const CampaignBtModelBundle* bundle = LookupCampaignBundle(cmap, camp[TRITON_BT_JSON_CID].GetInt());
+      if (bundle == nullptr) {
+        continue;
+      }
+      const int adsize_idx = AdsizeFeatureIndex(bundle->feature_sequence);
+      rows_per_model[bundle->model_name_lower] += CountCampInferRows(camp, adsize_idx);
+    }
+  }
+
+  std::unordered_set<std::string> verified_ready_models;
   std::unordered_map<std::string, ModelSlotBuild> slots_by_model;
   const std::string* cached_slot_model_name = nullptr;
   ModelSlotBuild* cached_slot_build = nullptr;
@@ -308,8 +363,7 @@ TRITONSERVER_Error* GenerateImpsInferSlots(const rapidjson::Document& doc, TRITO
     out_routing->slots.clear();
   }
 
-  const rapidjson::Value& imps = doc[TRITON_BT_JSON_IMPS];
-  std::vector<float> row;
+  std::vector<float> scratch_row;
   std::unordered_map<std::string, std::vector<float>> imp_base_by_model;
 
   for (rapidjson::SizeType ii = 0; ii < imps.Size(); ++ii) {
@@ -343,7 +397,7 @@ TRITONSERVER_Error* GenerateImpsInferSlots(const rapidjson::Document& doc, TRITO
       const std::vector<std::string>& feature_sequence = cmap_it->second.feature_sequence;
       const FeatureMappingTables& tables = cmap_it->second.feature_mapping;
 
-      err = CheckModelReadyCached(server, model_name, &ready_cache);
+      err = CheckModelReadyFromSnapshot(model_name, original_model_name, &verified_ready_models);
       if (err != nullptr) {
         return err;
       }
@@ -356,6 +410,11 @@ TRITONSERVER_Error* GenerateImpsInferSlots(const rapidjson::Document& doc, TRITO
         if (slot_it == slots_by_model.end()) {
           slot_it = slots_by_model.emplace(model_name, ModelSlotBuild{}).first;
           slot_it->second.original_model_name = original_model_name;
+          slot_it->second.adsize_idx = AdsizeFeatureIndex(feature_sequence);
+          const auto row_est = rows_per_model.find(model_name);
+          if (row_est != rows_per_model.end() && !feature_sequence.empty()) {
+            slot_it->second.tensor.reserve(row_est->second * feature_sequence.size() * sizeof(float));
+          }
         }
         cached_slot_model_name = &slot_it->first;
         cached_slot_build = &slot_it->second;
@@ -379,26 +438,23 @@ TRITONSERVER_Error* GenerateImpsInferSlots(const rapidjson::Document& doc, TRITO
         base_it = imp_base_by_model.emplace(model_name, std::move(base_row)).first;
       }
 
-      row = base_it->second;
-      err = FillCampFeaturesInRow(camp, campaign_id, feature_sequence, tables, &row);
+      if (scratch_row.size() != feature_count) {
+        scratch_row.resize(feature_count);
+      }
+      std::memcpy(scratch_row.data(), base_it->second.data(), feature_count * sizeof(float));
+      err = FillCampFeaturesInRow(camp, campaign_id, feature_sequence, tables, &scratch_row);
       if (err != nullptr) {
         return err;
       }
 
-      int adsize_idx = -1;
-      for (size_t fi = 0; fi < feature_sequence.size(); ++fi) {
-        if (feature_sequence[fi] == TRITON_BT_FEATURE_ADSIZE) {
-          adsize_idx = static_cast<int>(fi);
-          break;
-        }
-      }
+      const int adsize_idx = slot_build->adsize_idx;
 
       if (adsize_idx >= 0 && camp.HasMember(TRITON_BT_FEATURE_ADSIZE) && camp[TRITON_BT_FEATURE_ADSIZE].IsArray()) {
         const rapidjson::Value& adsize = camp[TRITON_BT_FEATURE_ADSIZE];
         for (rapidjson::SizeType ai = 0; ai < adsize.Size(); ++ai) {
           const rapidjson::Value& adsize_item = adsize[ai];
-          row[static_cast<size_t>(adsize_idx)] = static_cast<float>(FeatureIdxFromJsonValue(TRITON_BT_FEATURE_ADSIZE, adsize_item, &tables));
-          AppendFloatRowToTensor(&slot_build->tensor, row);
+          scratch_row[static_cast<size_t>(adsize_idx)] = static_cast<float>(FeatureIdxFromJsonValue(TRITON_BT_FEATURE_ADSIZE, adsize_item, &tables));
+          AppendFloatRowToTensor(&slot_build->tensor, scratch_row);
           if (out_routing != nullptr) {
             slot_build->routes.push_back(ImpRouteRow{static_cast<int>(ii), static_cast<int>(ci), static_cast<int>(ai), campaign_id});
           }

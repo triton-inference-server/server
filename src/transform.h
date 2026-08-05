@@ -85,7 +85,7 @@ TRITONSERVER_Error* InitializeReadyModelNames(TRITONSERVER_Server* server);
 // Lock-free read of the snapshot initialized by InitializeReadyModelNames.
 const std::unordered_set<std::string>* ActiveReadyModelNames();
 
-// Feature mapping + FP32 tensor build for POST /v2/multi_infer imps requests.
+// Feature mapping + FP32 tensor build for POST /v2/predict imps requests.
 TRITONSERVER_Error* GenerateImpsInferSlots(
     const rapidjson::Document& doc, TRITONSERVER_Server* server,
     std::vector<ImpsInferSlot>* out_slots,

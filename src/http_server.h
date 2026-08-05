@@ -609,7 +609,11 @@ class HTTPAPIServer : public HTTPServer {
   void HandleInfer(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
-  // POST /v2/multi_infer — parallel infer for multiple models in one HTTP call.
+#ifdef TRITON_ENABLE_MYSQL_ODBC
+  // POST /v2/predict — imps-shaped BT inference (feature mapping + model routing).
+  void HandlePredict(evhtp_request_t* req);
+#endif  // TRITON_ENABLE_MYSQL_ODBC
+  // POST /v2/multi_infer — parallel infer for multiple models (requests array).
   void HandleMultiInfer(evhtp_request_t* req);
   void HandleModelStats(
       evhtp_request_t* req, const std::string& model_name = "",

@@ -4959,9 +4959,13 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingOutput(
 void HTTPAPIServer::Handle(evhtp_request_t* req) {
   LOG_VERBOSE(1) << "HTTP request: " << req->method << " " << req->uri->path->full;
 
-#ifdef TRITON_ENABLE_MYSQL_ODBC
   if (std::string(req->uri->path->full) == "/v2/multi_infer") {
     HandleMultiInfer(req);
+    return;
+  }
+#ifdef TRITON_ENABLE_MYSQL_ODBC
+  if (std::string(req->uri->path->full) == "/v2/predict") {
+    HandlePredict(req);
     return;
   }
 #endif

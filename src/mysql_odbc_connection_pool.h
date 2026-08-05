@@ -157,7 +157,6 @@ struct LightgbmBtModelRow {
   std::vector<int32_t> applicable_campaigns;
 };
 
-std::optional<std::string> FetchLightgbmFeatureMappingMaxUpdateUnixSeconds(int64_t* out_ts);
 std::optional<std::string> FetchLightgbmBtModelsMaxUpdateUnixSeconds(int64_t* out_ts);
 
 std::optional<std::string> FetchLightgbmBtModelsForDc(CampaignToFeatureMappings& out_campaign_map);

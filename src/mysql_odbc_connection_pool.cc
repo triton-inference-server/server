@@ -37,6 +37,8 @@
 #include <array>
 #include <atomic>
 #include <cctype>
+#include <chrono>
+#include <climits>
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
@@ -48,6 +50,8 @@ namespace triton { namespace server {
 namespace {
 
 std::atomic<MysqlOdbcConnectionPool*> g_global_mysql_odbc_pool{nullptr};
+
+constexpr auto kPoolAcquireTimeout = std::chrono::seconds(30);
 
 std::string BuildMySqlDriverConnectString(const DatabaseConfig& c)
 {
@@ -187,7 +191,9 @@ std::optional<std::string> MysqlOdbcConnectionPool::Initialize()
 PooledOdbcConnection MysqlOdbcConnectionPool::Acquire()
 {
   std::unique_lock<std::mutex> lk(mu_);
-  cv_.wait(lk, [this] { return !free_.empty(); });
+  if (!cv_.wait_for(lk, kPoolAcquireTimeout, [this] { return !free_.empty(); })) {
+    return PooledOdbcConnection();
+  }
   SQLHDBC dbc = free_.front();
   free_.pop_front();
   return PooledOdbcConnection(this, dbc);
@@ -396,6 +402,9 @@ std::optional<std::string> ParseApplicableCampaignIds(const std::string& s, std:
     const long v = std::strtol(tok.c_str(), &endptr, 10);
     if (endptr == tok.c_str() || *endptr != '\0') {
       return std::string("invalid campaign id token: ") + tok;
+    }
+    if (v < INT32_MIN || v > INT32_MAX) {
+      return std::string("campaign id out of int32_t range: ") + tok;
     }
     out->push_back(static_cast<int32_t>(v));
   }
@@ -729,7 +738,6 @@ std::optional<std::string> UpdateTritonModelsData()
   const int inactive = 1 - idx;
   g_triton_campaign_feature_mappings[inactive] = std::move(by_campaign);
   g_triton_models_active.store(inactive, std::memory_order_release);
-  g_triton_campaign_feature_mappings[idx].clear();
   return std::nullopt;
 }
 
