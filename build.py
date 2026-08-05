@@ -1554,7 +1554,7 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
 
 def change_default_python_version_rhel(version):
     df = """
-RUN . /opt/_internal/pipx/shared/bin/activate
+ENV PATH="/opt/_internal/pipx/shared/bin:$PATH"
 """
     return df
 
