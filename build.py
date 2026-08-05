@@ -1725,6 +1725,14 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             runargs += ["-it"]
 
         runargs += docker_runargs()
+        # If --github-organization is a local directory (a repo mirror), mount
+        # it too. The org propagates into every nested component configure
+        # (TRITON_REPO_ORGANIZATION), so pointing it at a local mirror is the
+        # only way to resolve deeply-nested clones (e.g. core -> common)
+        # offline; FETCHCONTENT_SOURCE_DIR overrides do not reach those builds.
+        if FLAGS.github_organization and os.path.isdir(FLAGS.github_organization):
+            org_abs = os.path.abspath(FLAGS.github_organization)
+            runargs += ["-v", f"{org_abs}:{org_abs}"]
         if FLAGS.use_user_docker_config:
             if os.path.exists(FLAGS.use_user_docker_config):
                 runargs += [
