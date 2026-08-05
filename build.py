@@ -925,9 +925,6 @@ RUN yum install -y \\
             numactl-devel \\
             openssl-devel \\
             pkg-config \\
-            python3-pip \\
-            python3-scons \\
-            python3-setuptools \\
             rapidjson-devel \\
             re2-devel \\
             readline-devel \\
@@ -969,12 +966,13 @@ RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
           auditwheel \\
           build \\
-          wheel \\
-          setuptools \\
+          cmake==4.0.3 \\
           docker \\
-          virtualenv \\
           patchelf==0.17.2 \\
-          cmake==4.0.3
+          scons \\
+          setuptools \\
+          virtualenv \\
+          wheel
 """
     df += f"""
 # Install boost version >= 1.78 for boost::span
@@ -1555,25 +1553,8 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
 
 
 def change_default_python_version_rhel(version):
-    df = f"""
-# The python library version available for install via 'yum install python3.X-devel' does not
-# match the version of python inside the RHEL base container. This means that python packages
-# installed within the container will not be picked up by the python backend stub process pybind
-# bindings. It must instead must be installed via pyenv.
-ENV PYENV_ROOT=/opt/pyenv_build
-RUN curl https://pyenv.run | bash
-ENV PATH="${{PYENV_ROOT}}/bin:$PATH"
-RUN eval "$(pyenv init -)"
-RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {version} \\
-    && cp ${{PYENV_ROOT}}/versions/{version}/lib/libpython3* /usr/lib64/
-
-# RHEL image has several python versions. It's important
-# to set the correct version, otherwise, packages that are
-# pip installed will not be found during testing.
-ENV PYVER={version} PYTHONPATH=/opt/python/v
-RUN ln -sf ${{PYENV_ROOT}}/versions/${{PYVER}}* ${{PYTHONPATH}}
-ENV PYBIN=${{PYTHONPATH}}/bin
-ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
+    df = """
+RUN . /opt/_internal/pipx/shared/bin/activate
 """
     return df
 
