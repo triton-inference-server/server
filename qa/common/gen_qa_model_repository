@@ -68,7 +68,13 @@ cd ${TRITON_MDLS_BASE_SCRIPT_DIR}
 log_message.status "define: default values"
 TRITON_VERSION=${TRITON_VERSION:=26.07}
 ONNX_VERSION=1.22.0
-ONNX_OPSET=0
+# Stamp an opset ONNX Runtime accepts rather than letting the onnx package pick
+# its newest. onnx 1.22 defaults to opset 27, ONNX Runtime 1.28 supports up to
+# 26, and a model stamped above that fails to load at all. These models are
+# generated once and shared by every test job, so this must not exceed what the
+# oldest ONNX Runtime in the pipeline supports -- the runtime prints its maximum
+# in the load error if this ever drifts again.
+ONNX_OPSET=26
 OPENVINO_VERSION=2024.5.0
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
