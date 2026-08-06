@@ -306,6 +306,38 @@ byte-identical file.
 
 `--repository` and `--provenance` narrow the walk; `--dry-run` reports without writing.
 
+### What it reports while it runs
+
+One line per model as it is stamped — a full tree is ~976 models and the pass is not
+instantaneous, so without this it looks hung:
+
+```
+[manifest]   qa_model_repository/openvino_float32_float32_float32   openvino   13.9 KiB  s
+[manifest]   qa_model_repository/openvino_nobatch_int32_int8_int8   openvino    4.7 KiB  xs
+[manifest] updated 16 manifest(s), skipped 0
+```
+
+The fields are the ones a reader decides on: what serves the model, how big it is, and which
+tier that puts it in. `--quiet` keeps only the summary line.
+
+`--summary PATH` additionally writes the whole pass as JSON, so CI can assert on counts and
+totals instead of grepping log text. `--summary -` sends it to stdout.
+
+```json
+{
+  "kind": "triton-qa-model-manifest-summary",
+  "written": 16, "skipped": 0, "model_count": 16, "total_bytes": 128424,
+  "by_size_tier": {"s": 6, "xs": 10},
+  "by_provenance": {"openvino": 16},
+  "models": [{"name": "...", "path": "...", "repository": "...",
+              "provenance": "openvino", "size_bytes": 14220, "size_tier": "s"}]
+}
+```
+
+`gen_qa_model_repository.py` writes one to `<tree>/manifest-summary.json` at the end of a run.
+It sits at the *root* of the tree, not inside a model, so it travels with the tree while no walk
+of it — sizing, archiving or manifesting — ever picks the file up.
+
 ### What gets recorded, and where it comes from
 
 | field | source |
