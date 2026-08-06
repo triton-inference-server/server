@@ -142,6 +142,81 @@ items.find({"repo":"sw-dl-triton-generic-local",
 Keep `size_bytes` authoritative and treat `size_tier` as derived. If the boundaries are ever
 retuned, tiers can be recomputed from bytes without re-measuring the corpus.
 
+## Writing the manifest: `gen_manifest.py`
+
+`gen_manifest.py` builds and maintains the per-model `manifest.json`. It sits beside
+`gen_common.py` and is imported the same way, by every generator script.
+
+### From a generator script
+
+Two calls, either side of generation:
+
+```python
+import gen_manifest
+
+if __name__ == "__main__":
+    FLAGS, unparsed = parser.parse_known_args()
+
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
+    ...generate models...
+
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)
+```
+
+The baseline is the load-bearing part. Every stage writes into the *same* repositories —
+`qa_model_repository` receives models from all four — so a script that stamped everything it
+found would relabel the previous stage's models with its own image and framework.
+`snapshot_model_dirs()` fingerprints each model directory (file count, total bytes, newest
+mtime) before generation; `emit_manifests()` writes only where that fingerprint changed. A
+model another script later adds files to is correctly re-stamped by that script.
+
+`emit_manifests()` never raises. A run that has already produced its models must not fail over
+a metadata file, so problems are logged and counted in the `[manifest]` summary line instead.
+Missing manifests are caught by the phase-2 pass below, not by killing the build.
+
+### From the command line
+
+```bash
+# phase 1 -- stamp a tree with build provenance
+python3 gen_manifest.py --tree /tmp/26.08 --image ubuntu:24.04 --framework openvino
+
+# phase 2 -- (re)measure sizes once every stage has finished
+python3 gen_manifest.py --tree /tmp/26.08 --update-sizes
+```
+
+Sizes are a second pass because a model directory receives files from more than one stage: the
+size recorded by the stage that created a model is only final once the later stages have run.
+Phase 2 is idempotent — `size_bytes` excludes `manifest.json`, so re-running produces a
+byte-identical file.
+
+`--repository` and `--provenance` narrow the walk; `--dry-run` reports without writing.
+
+### What gets recorded, and where it comes from
+
+| field | source |
+|---|---|
+| `model.name`, `platform`, `backend` | top-level keys in `config.pbtxt`, anchored at column 0 so tensor `name:` inside an input block cannot win |
+| `model.provenance` | normalised from `platform`, else `backend`, else the artifact suffix |
+| `model.generator` | the script that wrote it — `provenance` alone does not identify it, since eight generators emit onnx models |
+| `model.framework`, `framework_version` | `TRITON_MODEL_GEN_FRAMEWORK`, else the model's own provenance; the version is read in-process from the installed library, not from a pin |
+| `model.gpu` | `cuda-python` + NVML if importable, else `nvidia-smi`; probed once per run, not once per model |
+| `model.origin` | `static` for the pinned stores listed in `STATIC_REPOSITORIES`, else `dynamic` |
+| `container.image_name` | `TRITON_MODEL_GEN_IMAGE` |
+| `container.runtime` | `TRITON_MODEL_GEN_RUNTIME`, else detected |
+| `platform.*` | `platform.system()`, `/etc/os-release`, `platform.machine()` |
+
+The container block is named `container`, not `docker` or `enroot`. Naming it after the engine
+would make the schema shape depend on the data, forcing every consumer to probe both keys to
+find the image; enroot pulls `docker://` references anyway, so only `runtime` differs.
+
+Runtime detection is best-effort. Docker leaves `/.dockerenv` in every image. enroot leaves
+nothing — it exports no marker and strips the `ENROOT_*` variables it was invoked with, so
+testing the environment both misses real enroot containers *and* false-positives on any host
+whose shell has `ENROOT_CONFIG_PATH` set. What it does leave is the mount shape: `/` is
+bind-mounted from `$ENROOT_DATA_PATH/<container>`. Retuning `ENROOT_DATA_PATH` defeats that, so
+set `TRITON_MODEL_GEN_RUNTIME` when the value has to be exact.
+
 ## Computing the tier
 
 ```python
