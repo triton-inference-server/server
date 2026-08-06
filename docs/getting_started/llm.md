@@ -75,9 +75,12 @@ The Triton model repository for the LLM API backend lives in the TensorRT-LLM
 repo. Clone the tag matching the `tensorrt_llm` version in your container:
 
 ```bash
-python3 -c "import tensorrt_llm; print(tensorrt_llm.__version__)"   # e.g. 1.2.1
-git clone --depth 1 --branch v1.2.1 https://github.com/NVIDIA/TensorRT-LLM.git
+TRTLLM_VERSION=$(python3 -c "import tensorrt_llm; print(tensorrt_llm.__version__)")
+git clone --depth 1 --branch "v${TRTLLM_VERSION}" https://github.com/NVIDIA/TensorRT-LLM.git
 ```
+
+Deriving the tag this way keeps the model repository in step with the container,
+so changing `RELEASE` above needs no second edit here.
 
 ### 3. Configure your model
 
