@@ -29,6 +29,7 @@
 import argparse
 import os
 
+import gen_manifest
 import numpy as np
 import onnx
 import test_util as tu
@@ -125,7 +126,14 @@ if __name__ == "__main__":
     if not FLAGS.models_dir:
         raise Exception("--models_dir is required")
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     create_onnx_modelfile(FLAGS.models_dir, shape=[1], dtype=np.float32)
     create_onnx_modelconfig(FLAGS.models_dir, shape=[1], dtype=np.float32)
     create_onnx_modelfile(FLAGS.models_dir, shape=[1, 1], dtype=np.float32)
     create_onnx_modelconfig(FLAGS.models_dir, shape=[1, 1], dtype=np.float32)
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

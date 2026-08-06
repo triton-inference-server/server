@@ -33,6 +33,7 @@ from builtins import range
 from typing import List, Tuple
 
 import gen_ensemble_model_utils as emu
+import gen_manifest
 import numpy as np
 from gen_common import (
     np_dtype_bfloat16,
@@ -2773,6 +2774,10 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     if FLAGS.tensorrt:
         import tensorrt as trt
     if FLAGS.onnx:
@@ -3201,3 +3206,6 @@ if __name__ == "__main__":
         # batching of a real, higher-rank ([N,3,224,224]) model.
         if create_torchvision_aoti_model_file(FLAGS.models_dir, 8):
             create_torchvision_aoti_model_config(FLAGS.models_dir, 8)
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)
