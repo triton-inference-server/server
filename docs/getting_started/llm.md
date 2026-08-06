@@ -159,14 +159,9 @@ full list.
 
 ## Streaming responses
 
-Streaming requires Triton's decoupled transaction policy. Setting
-`decoupled: True` in `model.yaml` alone is **not** enough: the launch script
-passes `--disable-auto-complete-config`, which skips the `auto_complete_config()`
-hook where `model.yaml`'s `triton_config` is applied. The server then streams
-while Triton core still treats the model as non-decoupled, and the request hangs
-with `Streaming is only supported in decoupled mode.` in the server log.
-
-To enable streaming, also append the policy to
+Streaming requires Triton's decoupled transaction policy, which must be set in
+`config.pbtxt` — setting `decoupled: True` in `model.yaml` alone has no effect.
+Append the policy to
 `TensorRT-LLM/triton_backend/all_models/llmapi/tensorrt_llm/config.pbtxt`:
 
 ```
@@ -181,14 +176,6 @@ Then restart the server and use the `generate_stream` endpoint:
 curl -N -X POST localhost:8000/v2/models/tensorrt_llm/generate_stream \
     -d '{"text_input": "Count to three:", "sampling_param_max_tokens": 10, "streaming": true}'
 ```
-
-> [!NOTE]
-> Token-by-token events require the model repository from TensorRT-LLM 1.3 or
-> newer. With `v1.2.x`, a `streaming: true` request is accepted but the server
-> emits a single event containing the full response. A decoupled model also
-> cannot be used over the non-streaming `generate` endpoint, which returns
-> `[501] HTTP end point doesn't support models with decoupled transaction
-> policy` — keep `decoupled: False` unless you need streaming.
 
 ## Benchmark
 
@@ -214,8 +201,7 @@ python3 TensorRT-LLM/triton_backend/tools/inflight_batcher_llm/benchmark_core_mo
 
 > [!NOTE]
 > The shipped `model.yaml` sets `max_batch_size: 0`, so the backend serves
-> requests without batching. Concurrency sweeps will not show throughput scaling
-> until batching support lands.
+> requests without batching.
 
 ## References
 
