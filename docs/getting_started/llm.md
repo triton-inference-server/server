@@ -75,12 +75,13 @@ The Triton model repository for the LLM API backend lives in the TensorRT-LLM
 repo. Clone the tag matching the `tensorrt_llm` version in your container:
 
 ```bash
-TRTLLM_VERSION=$(python3 -c "import tensorrt_llm; print(tensorrt_llm.__version__)")
-git clone --depth 1 --branch "v${TRTLLM_VERSION}" https://github.com/NVIDIA/TensorRT-LLM.git
+python3 -c "import tensorrt_llm; print(tensorrt_llm.__version__)"   # e.g. 1.2.1
+git clone --depth 1 --branch v1.2.1 https://github.com/NVIDIA/TensorRT-LLM.git
 ```
 
-Deriving the tag this way keeps the model repository in step with the container,
-so changing `RELEASE` above needs no second edit here.
+Use the version the first command reports as the tag for the second. If you
+change `RELEASE` above, re-run both so the model repository stays in step with
+the library in the container.
 
 ### 3. Configure your model
 
@@ -126,8 +127,8 @@ I0803 18:43:44.778681 1525575 http_server.cc:4961] "Started HTTPService at 0.0.0
 I0803 18:43:44.819624 1525575 http_server.cc:400] "Started Metrics Service at 0.0.0.0:8002"
 ```
 
-On an 8x B200 node this configuration takes about 6 minutes to become ready and
-uses roughly 145 GiB of each GPU's 183 GiB, with 81.83 GiB left for the paged KV
+On an 8x B200 node this configuration takes a few minutes to become ready and
+uses roughly 143 GiB of each GPU's 179 GiB, with 81.83 GiB left for the paged KV
 cache (2,500,608 tokens).
 
 ## Send an inference request
@@ -159,15 +160,12 @@ full list.
 
 ## Streaming responses
 
-Streaming requires Triton's decoupled transaction policy, which must be set in
-`config.pbtxt` — setting `decoupled: True` in `model.yaml` alone has no effect.
-Append the policy to
-`TensorRT-LLM/triton_backend/all_models/llmapi/tensorrt_llm/config.pbtxt`:
+Streaming requires decoupled mode. Set it in `model.yaml`:
 
-```
-model_transaction_policy {
+```yaml
+triton_config:
+  max_batch_size: 0
   decoupled: True
-}
 ```
 
 Then restart the server and use the `generate_stream` endpoint:
@@ -195,8 +193,8 @@ python3 TensorRT-LLM/triton_backend/tools/inflight_batcher_llm/benchmark_core_mo
 
 ```
 [INFO] Warm up for benchmarking.
-[INFO] Start benchmarking on 37 prompts.
-[INFO] Total Latency: <ms>
+[INFO] Start benchmarking on 38 prompts.
+[INFO] Total Latency: 1694.09 ms
 ```
 
 > [!NOTE]
