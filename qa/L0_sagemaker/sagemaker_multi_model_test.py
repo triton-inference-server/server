@@ -320,6 +320,100 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
             "Expected status code 404, received {}".format(r.status_code),
         )
 
+    def test_sm_5b_identity_confusion_poc(self):
+        """TRI-1563 PoC: URL hash and X-Amzn-SageMaker-Target-Model header must refer
+        to the same model. Sending a mismatched header must NOT silently run or unload
+        the wrong model. Before the fix this test demonstrates the vulnerability;
+        after the fix it confirms the server rejects the mismatch."""
+
+        # --- Setup: load both models fresh (re-load in case test_sm_5 already unloaded) ---
+        for name, url in [
+            (self.model1_name, self.model1_url),
+            (self.model2_name, self.model2_url),
+        ]:
+            r = requests.post(
+                self.url_mme_,
+                data=json.dumps({"model_name": name, "url": url}),
+                headers={"Content-Type": "application/json"},
+            )
+            time.sleep(5)
+            # 200 = freshly loaded, 409 = already loaded — both are fine
+            self.assertIn(
+                r.status_code,
+                [200, 409],
+                "Setup: failed to load {} — status {}".format(name, r.status_code),
+            )
+
+        # --- PoC 1: INVOKE with mismatched header ---
+        # URL says model1_name (authorized), header says model2_name (different model).
+        # BEFORE fix: server runs model2 and returns its response (wrong model executed).
+        # AFTER fix:  server must return 4xx (mismatch rejected).
+        inputs = []
+        inputs.append(httpclient.InferInput("INPUT0", [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput("INPUT1", [1, 16], "INT32"))
+        input_data = np.array(self.model1_input_data_, dtype=np.int32)
+        input_data = np.expand_dims(input_data, axis=0)
+        inputs[0].set_data_from_numpy(input_data, binary_data=False)
+        inputs[1].set_data_from_numpy(input_data, binary_data=False)
+        outputs = [
+            httpclient.InferRequestedOutput("OUTPUT0", binary_data=False),
+            httpclient.InferRequestedOutput("OUTPUT1", binary_data=False),
+        ]
+        request_body, _ = httpclient.InferenceServerClient.generate_request_body(
+            inputs, outputs=outputs
+        )
+
+        invoke_url = "{}/{}/invoke".format(self.url_mme_, self.model1_name)
+        mismatched_headers = {
+            "Content-Type": "application/json",
+            # Deliberately point to a DIFFERENT model than the URL hash
+            "X-Amzn-SageMaker-Target-Model": self.model2_name,
+        }
+        r = requests.post(invoke_url, data=request_body, headers=mismatched_headers)
+
+        # After the fix: expect 4xx rejection
+        self.assertGreaterEqual(
+            r.status_code,
+            400,
+            "TRI-1563 PoC FAILED (vulnerability present): INVOKE with mismatched "
+            "X-Amzn-SageMaker-Target-Model header succeeded (status {}) — server "
+            "ran {} when authorized for {}. Expected 4xx rejection.".format(
+                r.status_code, self.model2_name, self.model1_name
+            ),
+        )
+
+        # --- PoC 2: UNLOAD with mismatched header ---
+        # URL says model1_name (authorized), header says model2_name (victim).
+        # BEFORE fix: model2 is evicted and model1's map entry is erased (state corruption).
+        # AFTER fix:  server must return 4xx (mismatch rejected).
+        unload_url = "{}/{}".format(self.url_mme_, self.model1_name)
+        r = requests.delete(unload_url, headers=mismatched_headers)
+        time.sleep(3)
+
+        self.assertGreaterEqual(
+            r.status_code,
+            400,
+            "TRI-1563 PoC FAILED (vulnerability present): UNLOAD with mismatched "
+            "X-Amzn-SageMaker-Target-Model header succeeded (status {}) — server "
+            "may have evicted {} instead of {}. Expected 4xx rejection.".format(
+                r.status_code, self.model2_name, self.model1_name
+            ),
+        )
+
+        # Verify model2 is still alive (was not evicted by the mismatched unload)
+        r = requests.get("{}/{}".format(self.url_mme_, self.model2_name))
+        self.assertEqual(
+            r.status_code,
+            200,
+            "TRI-1563 PoC: {} was evicted by a mismatched unload targeting {} — "
+            "state corruption confirmed.".format(self.model2_name, self.model1_name),
+        )
+
+        # Cleanup: unload both models with correct (no) header
+        for name in [self.model1_name, self.model2_name]:
+            requests.delete("{}/{}".format(self.url_mme_, name))
+            time.sleep(3)
+
     def test_sm_6_ensemble_model(self):
         # Load ensemble model
         request_body = {"model_name": self.model3_name, "url": self.model3_url}
