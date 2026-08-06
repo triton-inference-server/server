@@ -58,6 +58,12 @@ Sizes are written in a second pass because a model directory receives files from
 more than one stage: the size recorded by the stage that created a model is only
 final once every later stage has run.
 
+Either way it reports one line per model as it goes -- a full tree is ~976 models
+and the pass is not instantaneous, so a silent run is indistinguishable from a
+hung one. `--quiet` keeps just the summary line, and `--summary PATH` writes the
+whole pass as JSON so CI can assert on counts and totals rather than parsing them
+back out of log text.
+
 Standard library only. This is imported inside bare containers where the only
 third-party packages installed are the framework being generated for.
 """
@@ -288,6 +294,14 @@ def resolve_size_tier(total):
         if total < limit:
             return tier
     return LARGEST_TIER
+
+
+def format_size(total):
+    """A byte count in the largest unit that keeps it readable."""
+    for unit, limit in (("GiB", GIB), ("MiB", MIB), ("KiB", KIB)):
+        if total >= limit:
+            return "{:.1f} {}".format(total / float(limit), unit)
+    return "{} B".format(total)
 
 
 # --------------------------------------------------------------------------
@@ -618,6 +632,76 @@ def update_manifest_sizes(model_dir):
     return manifest
 
 
+SUMMARY_NAME = "manifest-summary.json"
+SUMMARY_KIND = "triton-qa-model-manifest-summary"
+
+
+def describe_model(model_dir, tree, manifest):
+    """One model as a summary record."""
+    model = manifest["properties"]["model"]
+    try:
+        path = str(
+            pathlib.Path(model_dir).resolve().relative_to(pathlib.Path(tree).resolve())
+        )
+    except ValueError:
+        path = str(model_dir)
+    return {
+        "name": model.get("name"),
+        "path": path,
+        "repository": resolve_repository(model_dir, tree),
+        "provenance": model.get("provenance"),
+        "framework": model.get("framework"),
+        "size_bytes": model.get("size_bytes"),
+        "size_tier": model.get("size_tier"),
+    }
+
+
+def build_summary(tree, records, written=0, unchanged=0, skipped=0, **fields):
+    """A machine-readable account of a manifest pass.
+
+    Exists so CI can assert on counts and totals directly instead of parsing
+    them back out of log text.
+    """
+    by_tier = collections.Counter()
+    by_provenance = collections.Counter()
+    total = 0
+    for record in records:
+        if record.get("size_tier"):
+            by_tier[record["size_tier"]] += 1
+        if record.get("provenance"):
+            by_provenance[record["provenance"]] += 1
+        total += record.get("size_bytes") or 0
+
+    summary = {
+        "schema_version": SCHEMA_VERSION,
+        "kind": SUMMARY_KIND,
+        "tree": str(tree),
+        "written": written,
+        "unchanged": unchanged,
+        "skipped": skipped,
+        "model_count": len(records),
+        "total_bytes": total,
+        "by_size_tier": dict(sorted(by_tier.items())),
+        "by_provenance": dict(sorted(by_provenance.items())),
+        "models": sorted(records, key=lambda record: record["path"]),
+    }
+    summary.update({key: value for key, value in fields.items() if value is not None})
+    return summary
+
+
+def write_summary(target, summary):
+    """Write a summary to a path, or to stdout when target is '-'."""
+    text = json.dumps(summary, indent=2) + "\n"
+    if str(target) == "-":
+        sys.stdout.write(text)
+        sys.stdout.flush()
+        return None
+    path = pathlib.Path(target)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    return path
+
+
 # --------------------------------------------------------------------------
 # generator-script hook
 # --------------------------------------------------------------------------
@@ -671,12 +755,18 @@ def emit_manifests(
     upstream_version=None,
     include_size=True,
     dry_run=False,
+    verbose=True,
+    summary_path=None,
 ):
     """Write manifests for the models under `tree` that changed since `baseline`.
 
     The one call a generator script makes. Unset arguments are resolved from the
     environment, and `framework` falls back per model to the backend that serves
     it, so a script needs to pass nothing but the tree and its baseline.
+
+    Reports each model as it goes, so a long pass over a large tree shows
+    progress rather than going silent; pass verbose=False for just the summary
+    line. `summary_path` additionally writes the whole pass as JSON.
 
     Never raises. A generation run that has already produced its models must not
     fail over a metadata file, so problems are reported on stdout and counted in
@@ -697,6 +787,8 @@ def emit_manifests(
             upstream_version=upstream_version,
             include_size=include_size,
             dry_run=dry_run,
+            verbose=verbose,
+            summary_path=summary_path,
         )
     except Exception as error:
         # Deliberately broad: see the docstring. A generation run that has
@@ -716,6 +808,8 @@ def _emit_manifests(
     upstream_version,
     include_size,
     dry_run,
+    verbose=True,
+    summary_path=None,
 ):
     if generator is None:
         generator = os.path.basename(sys.argv[0]) or None
@@ -730,6 +824,7 @@ def _emit_manifests(
     declared_framework = framework or os.environ.get(ENV_FRAMEWORK)
 
     written = unchanged = skipped = 0
+    records = []
     for model_dir in iter_model_dirs(tree):
         if baseline is not None:
             key = str(model_dir)
@@ -756,6 +851,10 @@ def _emit_manifests(
             if not dry_run:
                 write_manifest(model_dir, manifest)
             written += 1
+            record = describe_model(model_dir, tree, manifest)
+            records.append(record)
+            if verbose:
+                _log_model(record)
         except ManifestError as error:
             _log("skipped {}: {}".format(model_dir, error))
             skipped += 1
@@ -766,6 +865,23 @@ def _emit_manifests(
             verb, written, tree, unchanged, skipped
         )
     )
+    if summary_path and not dry_run:
+        target = write_summary(
+            summary_path,
+            build_summary(
+                tree,
+                records,
+                written=written,
+                unchanged=unchanged,
+                skipped=skipped,
+                generator=generator,
+                framework=declared_framework,
+                image=image,
+                container_runtime=container_runtime,
+            ),
+        )
+        if target:
+            _log("summary written to {}".format(target))
     return written
 
 
@@ -776,6 +892,25 @@ def _emit_manifests(
 
 def _log(message):
     print("[manifest] {}".format(message), flush=True)
+
+
+def _log_model(record):
+    """One line per model, as it is stamped.
+
+    A full tree is ~976 models and the pass is not instant, so without this the
+    run looks hung. The fields are the ones a reader is deciding on: what serves
+    it, how big it is, and which tier that puts it in.
+    """
+    _log(
+        "  {:<64} {:<10} {:>10}  {}".format(
+            record["path"][:64],
+            record["provenance"] or "-",
+            format_size(record["size_bytes"])
+            if record["size_bytes"] is not None
+            else "-",
+            record["size_tier"] or "-",
+        )
+    )
 
 
 def main(argv=None):
@@ -817,12 +952,22 @@ def main(argv=None):
     parser.add_argument(
         "--dry-run", action="store_true", help="report without writing anything"
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="suppress the per-model lines, keep the summary line",
+    )
+    parser.add_argument(
+        "--summary",
+        help="write a JSON account of this pass to PATH, or to stdout for '-'",
+    )
     args = parser.parse_args(argv)
 
     if not args.tree.is_dir():
         parser.error("no such tree: {}".format(args.tree))
 
     touched = skipped = 0
+    records = []
     for model_dir in iter_model_dirs(args.tree):
         if args.repository:
             if resolve_repository(model_dir, args.tree) not in args.repository:
@@ -835,8 +980,11 @@ def main(argv=None):
                     )
                     if current not in args.provenance:
                         continue
-                if not args.dry_run:
+                manifest = (
                     update_manifest_sizes(model_dir)
+                    if not args.dry_run
+                    else load_manifest(model_dir)
+                )
             else:
                 config = read_model_config(model_dir)
                 if args.provenance and config.provenance not in args.provenance:
@@ -861,12 +1009,32 @@ def main(argv=None):
                 if not args.dry_run:
                     write_manifest(model_dir, manifest)
             touched += 1
+            record = describe_model(model_dir, args.tree, manifest)
+            records.append(record)
+            if not args.quiet:
+                _log_model(record)
         except ManifestError as error:
             _log("skipped {}: {}".format(model_dir, error))
             skipped += 1
 
     verb = "would update" if args.dry_run else "updated"
     _log("{} {} manifest(s), skipped {}".format(verb, touched, skipped))
+
+    if args.summary:
+        target = write_summary(
+            args.summary,
+            build_summary(
+                args.tree,
+                records,
+                written=touched,
+                skipped=skipped,
+                generator=args.generator,
+                framework=args.framework,
+                image=args.image,
+            ),
+        )
+        if target:
+            _log("summary written to {}".format(target))
     return 1 if skipped else 0
 
 

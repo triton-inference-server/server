@@ -703,8 +703,12 @@ def render_stage_script(stage, ctx, final=False):
             "",
             "# Phase 2: sizes are only final once every stage has written its"
             " artifacts.",
-            "python3 {}/gen_manifest.py --tree {}/{} --update-sizes || true".format(
-                ctx.source_dir, ctx.build_dir, ctx.triton_version
+            # The summary lands at the root of the tree, not inside a model, so
+            # it travels with the tree and no walk of it picks the file up.
+            "python3 {src}/gen_manifest.py --tree {root} --update-sizes"
+            " --summary {root}/manifest-summary.json || true".format(
+                src=ctx.source_dir,
+                root="{}/{}".format(ctx.build_dir, ctx.triton_version),
             ),
         ]
         if ctx.archive:
