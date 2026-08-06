@@ -26,7 +26,121 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-# QA Model Size Classification
+# QA Model Generation
+
+The QA model corpus, how it is built, and how it is described once built.
+
+| file | role |
+|---|---|
+| `gen_qa_model_repository` | the original shell driver — still the one CI calls |
+| `gen_qa_model_repository.py` | Python wrapper over the same work, with per-framework selection |
+| `gen_qa_*.py` | the generators, one per model family |
+| `gen_common.py` | dtype helpers shared by every generator |
+| `gen_manifest.py` | builds and maintains each model's `manifest.json` |
+| `gen_archive.py` | packs each model into its own archive, with a fetch index |
+
+## Usage
+
+### Generate models
+
+```bash
+# everything, exactly what the shell driver does
+./gen_qa_model_repository.py
+
+# one framework
+./gen_qa_model_repository.py --openvino
+
+# a subset, with an image override and a specific opset
+./gen_qa_model_repository.py --onnx --pytorch \
+    --ubuntu-image ubuntu:24.04 --onnx-opset 17
+
+# see what a flag combination would do, without doing it
+./gen_qa_model_repository.py --all --list
+./gen_qa_model_repository.py --tensorrt --dry-run
+```
+
+Stages always run in the order OpenVINO → ONNX → PyTorch → TensorRT, whatever order the flags
+are given in, and never in parallel. That is not cosmetic: all four write into the *same*
+repositories — `qa_model_repository` receives models from every one of them.
+
+With no framework flag, all four run. `MODEL_TYPE=igpu` drops the TensorRT stage entirely and
+`torch_tensorrt` within the PyTorch stage.
+
+### Every environment variable is also a flag
+
+The wrapper reads the same variables the shell driver does, so existing CI works unchanged, and
+each has a flag that overrides it for one invocation:
+
+| flag | variable | default |
+|---|---|---|
+| `--triton-version` | `TRITON_VERSION` | `26.07` |
+| `--ubuntu-image` | `UBUNTU_IMAGE` | `ubuntu:22.04` |
+| `--pytorch-image` | `PYTORCH_IMAGE` | `nvcr.io/nvidia/pytorch:<version>-py3` |
+| `--tensorrt-image` | `TENSORRT_IMAGE` | `nvcr.io/nvidia/tensorrt:<version>-py3` |
+| `--onnx-version` | `ONNX_VERSION` | `1.20.1` |
+| `--onnx-opset` | `ONNX_OPSET` | `0` |
+| `--openvino-version` | `OPENVINO_VERSION` | `2024.5.0` |
+| `--model-type` | `MODEL_TYPE` | unset |
+| `--runtime`, `--use-docker`, `--use-enroot` | `TRITON_MODELS_USE_DOCKER`, `TRITON_MODELS_USE_ENROOT` | auto |
+| `--nvidia-visible-devices` | `NVIDIA_VISIBLE_DEVICES` | `0` |
+| `--docker-volume` | `DOCKER_VOLUME` | `volume.gen_qa_model_repository.<job id>` |
+| `--build-dir` | `TRITON_MDLS_BLD_DIR` | `<mount>/<job id>` |
+| `--job-id` | `CI_JOB_ID` | timestamp |
+
+### Container engines
+
+Both engines the shell driver supports are kept. `--runtime auto` follows its precedence —
+docker if enabled and installed, else enroot — and `--runtime docker|enroot` forces one, failing
+loudly rather than falling back if it is not installed.
+
+|  | docker | enroot |
+|---|---|---|
+| storage | named volume at `/mnt` | host `/tmp`, bind-mounted |
+| output | `docker cp` to `--output-dir` at the end | written straight to `/tmp/<job id>` |
+| privilege | container default | `--root` for the apt-based stages only |
+
+enroot is not vestigial — it is how the SLURM B200 job builds, with `TRITON_MODELS_USE_DOCKER=0`.
+
+### Archive the models
+
+```bash
+./gen_qa_model_repository.py --all --archive
+./gen_qa_model_repository.py --all --archive --archive-dir /mnt/artifacts
+```
+
+Archives go in a folder of their own, `<version>-archives`, a **sibling** of the model tree
+rather than a directory inside it. That separation is structural: an archive written under the
+tree would be found by the next walk of it — measured as part of a model, packed into the next
+archive.
+
+`gen_archive.py` can also be run on its own against a finished tree:
+
+```bash
+python3 gen_archive.py --tree /tmp/26.08 --dest /tmp/26.08-archives
+python3 gen_archive.py --tree /tmp/26.08 --dest /tmp/26.08-archives \
+    --provenance onnx --repository qa_model_repository
+```
+
+Every model gets its own `.tar.gz`, laid out to mirror its position in the tree, plus an
+`index.json` describing all of them. Per-model granularity is close to free — measured over a
+full tree, per-model archives occupy the same bytes as per-repository-group archives to within
+0.1%, because tar's per-entry overhead disappears against the payload.
+
+The index is the load-bearing part. It carries `provenance`, `size_bytes` and `size_tier` for
+each entry, so a job filters *before* transferring anything. The same fields stored only inside
+the archives would mean downloading a thing to find out whether you wanted it.
+
+Archives are byte-reproducible: entries sorted, ownership and timestamps normalised, gzip header
+stamped with a fixed mtime. Re-running a build over unchanged models therefore produces
+identical checksums, so a runner can skip a download it already has.
+
+Reproducible does *not* mean identical across build environments, because `manifest.json` is
+inside the archive and describes the environment. The same model built under docker and under
+enroot yields two different checksums — measured, and the whole difference was
+`container.runtime` plus the GPU block. Deduplication works within a train and a runtime, not
+across them.
+
+## Size classification
 
 Every model in the QA corpus is labelled with a **t-shirt size** derived from its on-disk
 footprint. The label exists so a consumer can decide *what to fetch* without fetching it first:
