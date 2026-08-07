@@ -116,31 +116,53 @@ specific, so the field has to be real. The hook's own opt-out value, `none`, is 
 ./gen_qa_model_repository.py --all --archive --archive-dir /mnt/artifacts
 ```
 
-Archives go in a folder of their own, `<version>-archives`, a **sibling** of the model tree
-rather than a directory inside it. That separation is structural: an archive written under the
-tree would be found by the next walk of it — measured as part of a model, packed into the next
-archive.
+Archives go in `archives/`, a folder of their own at the root of the model tree, so they travel
+with the tree. They are safe there because every walk — sizing, manifesting, archiving — keys on
+a directory holding a `config.pbtxt`, and this one holds only tarballs. `--archive-dir` puts them
+somewhere else entirely.
 
 `gen_archive.py` can also be run on its own against a finished tree:
 
 ```bash
-python3 gen_archive.py --tree /tmp/26.08 --dest /tmp/26.08-archives
-python3 gen_archive.py --tree /tmp/26.08 --dest /tmp/26.08-archives \
+python3 gen_archive.py --tree /tmp/26.08 --dest /tmp/26.08/archives
+python3 gen_archive.py --tree /tmp/26.08 --dest /tmp/26.08/archives \
     --provenance onnx --repository qa_model_repository
 ```
 
-Every model gets its own `.tar.gz`, laid out to mirror its position in the tree, plus an
-`index.json` describing all of them. Per-model granularity is close to free — measured over a
-full tree, per-model archives occupy the same bytes as per-repository-group archives to within
+Every model gets its own `.tar`, plus an `index.json` describing all of them. Archives are flat
+in the destination and named for what they hold:
+
+```
+archives/qa_model_repository-openvino_int8_int8_int8-26.08-2.72.0dev-1234567-89012.tar
+         └─ repository ────┘ └─ model ────────────┘ └ train ┘ └ semver ┘ └ pipeline ┘ └ job ┘
+```
+
+The trailing components come from `TRITON_VERSION`, `TRITON_SEMVER`, `CI_PIPELINE_ID` and
+`CI_JOB_ID` — the same values the manifests record. The CI pair is dropped when unset, so local
+archives are not named after a pipeline that does not exist. Each `--<name>` flag overrides one.
+
+Inside, the model keeps its full path relative to the tree:
+
+```
+qa_model_repository/openvino_int8_int8_int8/config.pbtxt
+qa_model_repository/openvino_int8_int8_int8/1/model.xml
+```
+
+so unpacking an archive over a tree root restores the model to its own repository — necessary
+because the same model name appears in more than one repository.
+
+Pass `--compress` for `.tar.gz` instead. Per-model granularity is close to free — measured over
+a full tree, per-model archives occupy the same bytes as per-repository-group archives to within
 0.1%, because tar's per-entry overhead disappears against the payload.
 
 The index is the load-bearing part. It carries `provenance`, `size_bytes` and `size_tier` for
 each entry, so a job filters *before* transferring anything. The same fields stored only inside
 the archives would mean downloading a thing to find out whether you wanted it.
 
-Archives are byte-reproducible: entries sorted, ownership and timestamps normalised, gzip header
-stamped with a fixed mtime. Re-running a build over unchanged models therefore produces
-identical checksums, so a runner can skip a download it already has.
+Archives are byte-reproducible: entries sorted, ownership and timestamps normalised, and the
+gzip header stamped with a fixed mtime under `--compress`. Re-running a build over unchanged
+models therefore produces identical checksums, so a runner can skip a download it already has —
+provided the name components match, since `CI_JOB_ID` differs per run and is part of the name.
 
 Reproducible does *not* mean identical across build environments, because `manifest.json` is
 inside the archive and describes the environment. The same model built under docker and under
