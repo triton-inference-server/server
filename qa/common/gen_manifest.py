@@ -161,7 +161,12 @@ STATIC_REPOSITORIES = frozenset(
         "onnx_model_store",
         "onnx_model_store2",
         "openvino_model_store",
+        # perf_model_store ships as two artifacts split by backend. Both the
+        # merged directory and the split ones are listed: a tree unpacked from
+        # the older artifacts still has the former.
         "perf_model_store",
+        "perf_model_store_libtorch",
+        "perf_model_store_onnx",
         "pytorch_model_store",
     ]
 )
