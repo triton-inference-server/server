@@ -36,6 +36,7 @@ import gen_ensemble_model_utils as emu
 import gen_manifest
 import numpy as np
 from gen_common import (
+    create_general_modelconfig,
     np_dtype_bfloat16,
     np_to_model_dtype,
     np_to_onnx_dtype,
@@ -998,9 +999,8 @@ def create_onnx_modelconfig(
 
     config_dir = models_dir + "/" + model_name
 
-    # [TODO] move create_general_modelconfig() out of emu as it is general
     # enough for all backends to use
-    config = emu.create_general_modelconfig(
+    config = create_general_modelconfig(
         model_name,
         "onnxruntime_onnx",
         max_batch,
