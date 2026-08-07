@@ -150,6 +150,13 @@ CUSTOM_OPS_DIR = "qa_custom_ops/libtorch_custom_ops"
 
 STAGE_ORDER = ("openvino", "onnx", "pytorch", "tensorrt")
 
+# Stage scripts run with -x as well as -e, so the log carries every command a
+# stage ran rather than only its output. That is what makes a CI failure
+# reproducible: the exact pip install or generator invocation can be lifted
+# from the log and rerun locally. The shell driver did this on its enroot path
+# but not its docker one; the inconsistency was not deliberate.
+STAGE_SHELL_FLAGS = "-xe"
+
 # Accepted in TRITON_MODELS_FRAMEWORKS alongside the stage names themselves.
 # The values on the left are what config.pbtxt and the L0_* suites' BACKENDS
 # call these backends, and asking for models "for onnxruntime" or "for plan"
@@ -930,7 +937,7 @@ class DockerRuntime(Runtime):
             "TRT_VERBOSE",
             stage.image,
             "bash",
-            "-e",
+            STAGE_SHELL_FLAGS,
             "{}/{}".format(ctx.source_dir, script_name),
         ]
         run_command(command, ctx.dry_run)
@@ -1053,7 +1060,7 @@ class EnrootRuntime(Runtime):
         command += [
             container,
             "bash",
-            "-xe",
+            STAGE_SHELL_FLAGS,
             "{}/{}".format(ctx.source_dir, script_name),
         ]
         run_command(command, ctx.dry_run)
