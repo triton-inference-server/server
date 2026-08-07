@@ -98,8 +98,16 @@ loudly rather than falling back if it is not installed.
 | storage | named volume at `/mnt` | host `/tmp`, bind-mounted |
 | output | `docker cp` to `--output-dir` at the end | written straight to `/tmp/<job id>` |
 | privilege | container default | `--root` for the apt-based stages only |
+| GPU | `--runtime=nvidia -e NVIDIA_VISIBLE_DEVICES` | `-e NVIDIA_VISIBLE_DEVICES` |
 
 enroot is not vestigial — it is how the SLURM B200 job builds, with `TRITON_MODELS_USE_DOCKER=0`.
+
+`--nvidia-visible-devices` reaches both engines. That matters more on enroot than it looks:
+enroot exposes GPUs through its `98-nvidia.sh` hook, which keys entirely off
+`NVIDIA_VISIBLE_DEVICES` in the container environment and does nothing at all when it is unset.
+The shell driver never sets it on the enroot path, so enroot builds ran without a GPU and
+recorded `gpu: null` — invisible for OpenVINO, but TensorRT plan files are compute-capability
+specific, so the field has to be real. The hook's own opt-out value, `none`, is passed through.
 
 ### Archive the models
 
@@ -136,9 +144,8 @@ identical checksums, so a runner can skip a download it already has.
 
 Reproducible does *not* mean identical across build environments, because `manifest.json` is
 inside the archive and describes the environment. The same model built under docker and under
-enroot yields two different checksums — measured, and the whole difference was
-`container.runtime` plus the GPU block. Deduplication works within a train and a runtime, not
-across them.
+enroot yields two different checksums — measured, and the whole difference is the one
+`container.runtime` line. Deduplication works within a runtime, not across them.
 
 ## Size classification
 
