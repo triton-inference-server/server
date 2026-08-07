@@ -1014,6 +1014,16 @@ class EnrootRuntime(Runtime):
             # already carry theirs and run unprivileged.
             command.append("--root")
         command += ["--rw", "-m", "/tmp:/tmp"]
+        # enroot exposes GPUs through its 98-nvidia.sh hook, which keys entirely
+        # off NVIDIA_VISIBLE_DEVICES in the container environment and bails when
+        # it is unset. The shell driver never sets it on this path, so enroot
+        # builds saw no GPU and recorded gpu: null -- harmless for OpenVINO, but
+        # TensorRT plan files are compute-capability specific, so the field has
+        # to be real. 'none' is the hook's own opt-out and is passed through.
+        command += [
+            "-e",
+            "NVIDIA_VISIBLE_DEVICES={}".format(ctx.nvidia_visible_devices),
+        ]
         for key, value in stage_environment(stage, ctx).items():
             command += ["-e", "{}={}".format(key, value)]
         command += [
