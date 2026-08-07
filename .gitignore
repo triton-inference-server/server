@@ -13,9 +13,9 @@ cprofile
 .venv
 **/.venv
 
-# Per-framework scripts emitted by qa/common/model_generation drivers
-qa/common/model_generation/gen.*.sh
-qa/common/model_generation/gen.*.cmds
+# Per-framework scripts emitted by the qa/common model generation drivers
+qa/common/gen.*.sh
+qa/common/gen.*.cmds
 
 # Test exclusions
 qa/L0_openai/openai
