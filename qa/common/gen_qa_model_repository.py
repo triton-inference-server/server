@@ -104,18 +104,17 @@ ARCHIVE_DIR_NAME = "archives"
 DEFAULT_UPSTREAM_VERSION = "26.07"
 DEFAULT_SEMVER = "2.72.0dev"
 
-# server/build.py, four levels up from qa/common/model_generation. Its
+# server/build.py, three levels up from qa/common. Its
 # DEFAULT_TRITON_VERSION_MAP is the one place all three versions are declared
 # together, so reading it keeps them from drifting apart here.
-BUILD_PY = pathlib.Path(__file__).resolve().parents[3] / "build.py"
+BUILD_PY = pathlib.Path(__file__).resolve().parents[2] / "build.py"
 VERSION_MAP_NAME = "DEFAULT_TRITON_VERSION_MAP"
 
-# Files outside this directory the generators need at run time. Staged flat
-# into the source directory alongside the generators:
-#   test_util.py        imported by 14 generators, shared with the L0_* suites,
-#                       which is why it stays in qa/common rather than moving
-#                       here with the generators that use it
-SHARED_SOURCES = ("../test_util.py",)
+# Files outside this directory the generators need at run time. Empty now that
+# the generators sit in qa/common beside everything they import -- the whole
+# directory is staged, so nothing has to be named individually. Kept because
+# that is a property of the current layout, not a guarantee.
+SHARED_SOURCES = ()
 
 # Repository directories created up front, in the shell driver's order.
 # Two deliberate quirks preserved from it: qa_noshape_model_repository is

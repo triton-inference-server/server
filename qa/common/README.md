@@ -30,6 +30,12 @@
 
 The QA model corpus, how it is built, and how it is described once built.
 
+Everything lives directly in `qa/common`, beside the helpers the generators import. They were
+briefly split into a `model_generation/` subdirectory, but `test_util.py` is imported by 14 of
+them *and* by the `L0_*` suites, so it could not follow — and a split that leaves the most-used
+import behind buys nothing. Keeping them together means the staged source directory is just a
+copy of this one, with nothing named individually.
+
 | file | role |
 |---|---|
 | `gen_qa_model_repository` | the original shell driver — still the one CI calls |
