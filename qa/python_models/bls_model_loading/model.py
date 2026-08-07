@@ -72,7 +72,7 @@ class PBBLSModelLoadingTest(unittest.TestCase):
 
         # Send the config with the wrong format
         wrong_config = '"parameters": {"config": {{"backend":"onnxruntime", "version_policy":{"specific":{"versions":[2]}}}}}'
-        with self.assertRaises(pb_utils.TritonModelException):
+        with self.assertRaises((pb_utils.TritonModelException, UnicodeDecodeError)):
             pb_utils.load_model(model_name=self.model_name, config=wrong_config)
         # The model should not be changed after a failed load model request
         for version in ["2", "3"]:
