@@ -186,7 +186,7 @@ chmod -R 777 $TRITON_MDLS_QA_MODEL
 python3 $TRITON_MDLS_SRC_DIR/gen_qa_reshape_models.py --openvino --models_dir=$TRITON_MDLS_QA_RESHAPE_MODEL
 chmod -R 777 $TRITON_MDLS_QA_RESHAPE_MODEL
 # python3 $TRITON_MDLS_SRC_DIR/gen_qa_sequence_models.py --openvino --models_dir=$TRITON_MDLS_QA_SEQUENCE_MODEL
-# chmod -R 777 $SVOLUME_EQDESTDIR
+# chmod -R 777 $TRITON_MDLS_QA_SEQUENCE_MODEL
 # python3 $TRITON_MDLS_SRC_DIR/gen_qa_dyna_sequence_models.py --openvino --models_dir=$TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 # chmod -R 777 $TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL
 exit 0
