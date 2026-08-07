@@ -62,6 +62,12 @@ import urllib.request
 
 INDEX_NAME = "index.json"
 TOKEN_ENV = "ARTIFACTORY_TOKEN"
+URL_ENV = "ARTIFACTORY_URL"
+
+# Where the jfrog CLI keeps its servers. Read as a last resort for --url and
+# --token so a developer who has already run `jf config add` does not have to
+# restate either; CI sets the variables and never reaches this.
+JFROG_CONFIG = pathlib.Path.home() / ".jfrog" / "jfrog-cli.conf.v6"
 
 # Per-archive properties taken from the index, so a query can select on them.
 INDEX_PROPERTIES = ("model", "repository", "provenance", "size_tier")
@@ -74,6 +80,40 @@ RETRY_BACKOFF_SECONDS = 2
 
 class UploadError(Exception):
     """An archive could not be uploaded."""
+
+
+def read_jfrog_server(config_path=None, server_id=None):
+    """One server block from the jfrog CLI config, or {}.
+
+    Selected by `isDefault` rather than by position: the servers are an array
+    and a second `jf config add` reorders them, so an index that is right today
+    is right by luck. `server_id` picks a specific one by name.
+
+    Never raises. This is a convenience for local runs -- a missing, uneadable
+    or restructured config just means the caller has to pass --url and --token.
+    """
+    path = pathlib.Path(config_path or JFROG_CONFIG)
+    try:
+        servers = json.loads(path.read_text()).get("servers") or []
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(servers, list):
+        return {}
+    if server_id:
+        return next(
+            (
+                s
+                for s in servers
+                if isinstance(s, dict) and s.get("serverId") == server_id
+            ),
+            {},
+        )
+    default = next(
+        (s for s in servers if isinstance(s, dict) and s.get("isDefault")), None
+    )
+    if default is not None:
+        return default
+    return next((s for s in servers if isinstance(s, dict)), {})
 
 
 def _log(message):
@@ -160,12 +200,26 @@ def main(argv=None):
         type=pathlib.Path,
         help="the archives/ directory holding index.json",
     )
-    parser.add_argument("--url", required=True, help="Artifactory base URL")
+    parser.add_argument(
+        "--url",
+        default=os.environ.get(URL_ENV),
+        help="Artifactory base URL; defaults to ${}, then to the jfrog CLI "
+        "config".format(URL_ENV),
+    )
     parser.add_argument("--path", required=True, help="repository and path prefix")
     parser.add_argument(
         "--token",
         default=os.environ.get(TOKEN_ENV),
-        help="access token; defaults to ${} and is never logged".format(TOKEN_ENV),
+        help="access token; defaults to ${}, then to the jfrog CLI config, "
+        "and is never logged".format(TOKEN_ENV),
+    )
+    parser.add_argument(
+        "--jfrog-config",
+        help="jfrog CLI config to fall back on (default: {})".format(JFROG_CONFIG),
+    )
+    parser.add_argument(
+        "--jfrog-server-id",
+        help="server block to read from it; default is the one marked isDefault",
     )
     parser.add_argument(
         "--properties",
@@ -181,8 +235,31 @@ def main(argv=None):
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
+    # Flag, then environment, then the jfrog CLI config -- explicit beats
+    # ambient, and CI never reaches the third.
+    if not args.url or not args.token:
+        server = read_jfrog_server(args.jfrog_config, args.jfrog_server_id)
+        if server:
+            source = args.jfrog_config or JFROG_CONFIG
+            if not args.url:
+                args.url = server.get("artifactoryUrl") or server.get("url")
+                if args.url:
+                    _log("url from {} ({})".format(source, server.get("serverId")))
+            if not args.token:
+                args.token = server.get("accessToken")
+                if args.token:
+                    _log("token from {} ({})".format(source, server.get("serverId")))
+
+    if not args.url:
+        parser.error(
+            "no url: pass --url, set {}, or configure the jfrog CLI".format(URL_ENV)
+        )
     if not args.token and not args.dry_run:
-        parser.error("no token: pass --token or set {}".format(TOKEN_ENV))
+        parser.error(
+            "no token: pass --token, set {}, or configure the jfrog CLI".format(
+                TOKEN_ENV
+            )
+        )
 
     try:
         index = load_index(args.archives)
