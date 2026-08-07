@@ -425,6 +425,27 @@ def _import_optional(name):
         return None
 
 
+def format_cuda_version(raw):
+    """The CUDA version as `<major>.<minor>`, from either probe's spelling.
+
+    cuDriverGetVersion returns a packed integer -- 13010 is 13.1.0 -- while the
+    CUDA_VERSION an image declares is already dotted, and may carry a patch
+    component. Normalising both to `13.1` gives one field a consumer can
+    compare without knowing which path produced it; `cuda_runtime` keeps the
+    raw value for anyone who needs the patch level.
+    """
+    if raw in (None, ""):
+        return None
+    text = str(raw).strip()
+    if "." in text:
+        parts = text.split(".")
+        return ".".join(parts[:2]) if len(parts) >= 2 else None
+    if not text.isdigit():
+        return None
+    packed = int(text)
+    return "{}.{}".format(packed // 1000, (packed % 1000) // 10)
+
+
 def _probe_gpu_cuda_python():
     """GPU details from cuda-python and NVML, or None if either is absent.
 
@@ -448,6 +469,7 @@ def _probe_gpu_cuda_python():
             "compute_capability": "{}.{}".format(capability.major, capability.minor),
             "driver_version": None,
             "cuda_runtime": None,
+            "cuda_version": None,
         }
     except Exception:
         # Any driver-level failure means we cannot describe the GPU; fall back.
@@ -458,6 +480,7 @@ def _probe_gpu_cuda_python():
         try:
             _, version = bindings.cuDriverGetVersion()
             details["cuda_runtime"] = str(version)
+            details["cuda_version"] = format_cuda_version(version)
         except Exception:
             pass
 
@@ -513,6 +536,7 @@ def _probe_gpu_nvidia_smi():
         # Only what the image declares; cuDriverGetVersion is authoritative but
         # needs cuda-python, which this path exists precisely to do without.
         "cuda_runtime": os.environ.get("CUDA_VERSION"),
+        "cuda_version": format_cuda_version(os.environ.get("CUDA_VERSION")),
     }
 
 
