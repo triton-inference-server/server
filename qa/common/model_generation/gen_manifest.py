@@ -91,13 +91,10 @@ ENV_FRAMEWORK = "TRITON_MODEL_GEN_FRAMEWORK"
 ENV_RUNTIME = "TRITON_MODEL_GEN_RUNTIME"
 ENV_SEMVER = "TRITON_SEMVER"
 ENV_UPSTREAM = "NVIDIA_UPSTREAM_VERSION"
-# TRITON_VERSION does not mean one thing: the shell driver defaults it to the
-# container train (26.07), while GitLab exports it as the semver (2.71.0). It
-# therefore stands in for a missing train only, which is the local case -- the
-# one where the driver did default it to the train. Reading it unconditionally,
-# as this did, recorded the semver in a field named for the train on every
-# manifest CI produced.
-ENV_UPSTREAM_FALLBACK = "TRITON_VERSION"
+# TRITON_VERSION used to be read here as the container train. It was not one:
+# the driver defaulted it to the train, CI exported it as the semver, so this
+# field recorded the semver on every manifest CI produced. Each version now has
+# a variable carrying one meaning, and none of them is TRITON_VERSION.
 
 KIB = 1024
 MIB = 1024**2
@@ -317,11 +314,7 @@ def format_size(total):
 @functools.lru_cache(maxsize=1)
 def resolve_upstream_version(declared=None):
     """The container train, from the environment when not passed in."""
-    return (
-        declared
-        or os.environ.get(ENV_UPSTREAM)
-        or os.environ.get(ENV_UPSTREAM_FALLBACK)
-    )
+    return declared or os.environ.get(ENV_UPSTREAM)
 
 
 def probe_os_release():

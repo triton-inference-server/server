@@ -66,13 +66,23 @@ log_message.status "Changing working directory to the script directory to: " "${
 cd ${TRITON_MDLS_BASE_SCRIPT_DIR}
 
 log_message.status "define: default values"
-TRITON_VERSION=${TRITON_VERSION:=26.07}
+# The three versions, each read from build.py's DEFAULT_TRITON_VERSION_MAP so
+# they cannot drift from what the server is actually built as. TRITON_VERSION
+# is deliberately gone: it named the container train here and the semver in CI,
+# so reading it was wrong half the time.
+build_version() { sed -n "s/.*\"$1\": *\"\\([^\"]*\\)\".*/\\1/p" \
+    ${TRITON_MDLS_BASE_SCRIPT_DIR}/../../../build.py | head -1 ; }
+TRITON_CONTAINER_VERSION=${TRITON_CONTAINER_VERSION:=$(build_version triton_container_version)}
+NVIDIA_UPSTREAM_VERSION=${NVIDIA_UPSTREAM_VERSION:=$(build_version upstream_container_version)}
+TRITON_SEMVER=${TRITON_SEMVER:=$(build_version release_version)}
 ONNX_VERSION=1.20.1
 ONNX_OPSET=0
 OPENVINO_VERSION=2024.5.0
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
-PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
-TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
+# Upstream NGC containers, so they follow the upstream train, not the container
+# being built -- there is no nvcr.io/nvidia/pytorch:26.08dev-py3.
+PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$NVIDIA_UPSTREAM_VERSION-py3}
+TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$NVIDIA_UPSTREAM_VERSION-py3}
 NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:=0}
 MODEL_TYPE=${MODEL_TYPE:-""}
 TRITON_MODELS_USE_DOCKER=${TRITON_MODELS_USE_DOCKER:-"1"}
@@ -100,30 +110,30 @@ function define_model_output_directories() {
         "$TRITON_MDLS_BASE_SCRIPT_DIR/../test_util.py"
         "$TRITON_MDLS_BASE_SCRIPT_DIR/../resnet50_labels.txt"
     )
-    TRITON_MDLS_QA_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_model_repository
-    TRITON_MDLS_QA_VARIABLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_model_repository
-    TRITON_MDLS_QA_IDENTITY_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_model_repository
-    TRITON_MDLS_QA_IDENTITY_BIG_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
-    TRITON_MDLS_QA_SHAPETENSOR_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
-    TRITON_MDLS_QA_RESHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_reshape_model_repository
-    TRITON_MDLS_QA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_model_repository
-    TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
-    TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
-    TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
-    TRITON_MDLS_QA_ENSEMBLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
-    TRITON_MDLS_QA_NOSHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_noshape_model_repository
-    TRITON_MDLS_QA_TRT_PLUGIN_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
-    TRITON_MDLS_QA_RAGGED_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_ragged_model_repository
-    TRITON_MDLS_QA_TRT_FORMAT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
-    TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
-    TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
-    TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
-    TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
-    TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
-    TRITON_MDLS_QA_TORCHTRT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/torchtrt_model_store
-    TRITON_MDLS_QA_SCALAR_MODELS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_scalar_models
-    TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_dynamic_batch_image_model_repository
-    TRITON_MDLS_QA_CUSTOM_OPS=$TRITON_MDLS_BLD_DIR/$TRITON_VERSION/qa_custom_ops/libtorch_custom_ops
+    TRITON_MDLS_QA_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_model_repository
+    TRITON_MDLS_QA_VARIABLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_variable_model_repository
+    TRITON_MDLS_QA_IDENTITY_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_identity_model_repository
+    TRITON_MDLS_QA_IDENTITY_BIG_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_identity_big_model_repository
+    TRITON_MDLS_QA_SHAPETENSOR_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_shapetensor_model_repository
+    TRITON_MDLS_QA_RESHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_reshape_model_repository
+    TRITON_MDLS_QA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_sequence_model_repository
+    TRITON_MDLS_QA_DYNA_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_dyna_sequence_model_repository
+    TRITON_MDLS_QA_DYNA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_dyna_sequence_implicit_model_repository
+    TRITON_MDLS_QA_VARIABLE_SEQUENCE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_variable_sequence_model_repository
+    TRITON_MDLS_QA_ENSEMBLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_ensemble_model_repository
+    TRITON_MDLS_QA_NOSHAPE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_noshape_model_repository
+    TRITON_MDLS_QA_TRT_PLUGIN_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_trt_plugin_model_repository
+    TRITON_MDLS_QA_RAGGED_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_ragged_model_repository
+    TRITON_MDLS_QA_TRT_FORMAT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_trt_format_model_repository
+    TRITON_MDLS_QA_TRT_DATA_DEPENDENT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_trt_data_dependent_model_repository
+    TRITON_MDLS_QA_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_sequence_implicit_model_repository
+    TRITON_MDLS_QA_VARIABLE_SEQUENCE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_variable_sequence_implicit_model_repository
+    TRITON_MDLS_QA_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_sequence_initial_state_implicit_model_repository
+    TRITON_MDLS_QA_VARIABLE_SEQUENCE_INITIAL_STATE_IMPLICIT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
+    TRITON_MDLS_QA_TORCHTRT_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/torchtrt_model_store
+    TRITON_MDLS_QA_SCALAR_MODELS=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_scalar_models
+    TRITON_MDLS_QA_DYNAMIC_BATCH_IMAGE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_dynamic_batch_image_model_repository
+    TRITON_MDLS_QA_CUSTOM_OPS=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_custom_ops/libtorch_custom_ops
 }
 
 function define_models_generation_scripts() {
@@ -420,7 +430,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
     docker pull $UBUNTU_IMAGE
 
     log_message.status "docker volume: create destination directory on volume"
-    log_message.info "docker run -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $UBUNTU_IMAGE mkdir -p gen_srcdir ${TRITON_VERSION}"
+    log_message.info "docker run -v $DOCKER_VOLUME:/mnt -w /mnt/$CI_JOB_ID $UBUNTU_IMAGE mkdir -p gen_srcdir ${TRITON_CONTAINER_VERSION}"
     docker run \
         --rm \
         --label RUNNER_ID=$RUNNER_ID \
@@ -428,7 +438,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
         -v $DOCKER_VOLUME:/mnt \
         -w /mnt/$CI_JOB_ID \
         $UBUNTU_IMAGE \
-        mkdir -p gen_srcdir ${TRITON_VERSION}
+        mkdir -p gen_srcdir ${TRITON_CONTAINER_VERSION}
 
     log_message.status "docker volume: create model directories on volume"
     docker run \
@@ -495,6 +505,10 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
         $DOCKER_GPU_ARGS \
         -v $DOCKER_VOLUME:/mnt \
         -t \
+        -e TRITON_MODEL_GEN_IMAGE=$UBUNTU_IMAGE \
+        -e TRITON_CONTAINER_VERSION=$TRITON_CONTAINER_VERSION \
+        -e NVIDIA_UPSTREAM_VERSION=$NVIDIA_UPSTREAM_VERSION \
+        -e TRITON_SEMVER=$TRITON_SEMVER \
         $UBUNTU_IMAGE \
         bash -e $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
 
@@ -517,6 +531,10 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
         $DOCKER_GPU_ARGS \
         -v $DOCKER_VOLUME:/mnt \
         -t \
+        -e TRITON_MODEL_GEN_IMAGE=$UBUNTU_IMAGE \
+        -e TRITON_CONTAINER_VERSION=$TRITON_CONTAINER_VERSION \
+        -e NVIDIA_UPSTREAM_VERSION=$NVIDIA_UPSTREAM_VERSION \
+        -e TRITON_SEMVER=$TRITON_SEMVER \
         $UBUNTU_IMAGE \
         bash -e $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
 
@@ -543,6 +561,10 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
         $DOCKER_GPU_ARGS \
         -v $DOCKER_VOLUME:/mnt \
         -t \
+        -e TRITON_MODEL_GEN_IMAGE=$PYTORCH_IMAGE \
+        -e TRITON_CONTAINER_VERSION=$TRITON_CONTAINER_VERSION \
+        -e NVIDIA_UPSTREAM_VERSION=$NVIDIA_UPSTREAM_VERSION \
+        -e TRITON_SEMVER=$TRITON_SEMVER \
         $PYTORCH_IMAGE \
         bash -e $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
 
@@ -570,6 +592,10 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
             -v $DOCKER_VOLUME:/mnt \
             -t \
             -e TRT_VERBOSE \
+            -e TRITON_MODEL_GEN_IMAGE=$TENSORRT_IMAGE \
+            -e TRITON_CONTAINER_VERSION=$TRITON_CONTAINER_VERSION \
+            -e NVIDIA_UPSTREAM_VERSION=$NVIDIA_UPSTREAM_VERSION \
+            -e TRITON_SEMVER=$TRITON_SEMVER \
             $TENSORRT_IMAGE \
             bash -e $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
 
@@ -585,7 +611,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
 
     if [ -z $CI ] ; then
         log_message.status "docker cp:copying generated models to /tmp/"
-        docker cp $DOCKER_VOLUME_CONTAINER:$TRITON_MDLS_BLD_DIR/$TRITON_VERSION /tmp/
+        docker cp $DOCKER_VOLUME_CONTAINER:$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION /tmp/
         log_message.status "docker rm: removing docker container $DOCKER_VOLUME_CONTAINER"
         docker rm -f $(docker ps -a --filter volume=$DOCKER_VOLUME --format '{{ .ID }}')
         log_message.status "docker volume rm: removing docker volume $DOCKER_VOLUME"
@@ -643,7 +669,7 @@ elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
     log_message.status "enroot create: openvino.ubuntu.$CI_JOB_ID"
     enroot create --name openvino.ubuntu.$CI_JOB_ID /tmp/ubuntu.$CI_JOB_ID.enroot.sqsh
     log_message.info "enroot start: openvino.ubuntu.$CI_JOB_ID"
-    enroot start --root --rw -m /tmp:/tmp -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR openvino.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
+    enroot start --root --rw -m /tmp:/tmp -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR -e TRITON_MODEL_GEN_IMAGE=$UBUNTU_IMAGE -e TRITON_CONTAINER_VERSION=$TRITON_CONTAINER_VERSION -e NVIDIA_UPSTREAM_VERSION=$NVIDIA_UPSTREAM_VERSION -e TRITON_SEMVER=$TRITON_SEMVER openvino.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
     if [ $? -ne 0 ]; then
         log_message.error "enroot start: ${OPENVINOSCRIPT} failed"
         exit 1
@@ -653,7 +679,7 @@ elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
     log_message.status "enroot create: onnxruntime.ubuntu.$CI_JOB_ID"
     enroot create --name onnxruntime.ubuntu.$CI_JOB_ID /tmp/ubuntu.$CI_JOB_ID.enroot.sqsh
     log_message.info "enroot start: onnxruntime.ubuntu.$CI_JOB_ID"
-    enroot start --root --rw -m /tmp:/tmp -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR onnxruntime.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
+    enroot start --root --rw -m /tmp:/tmp -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR -e TRITON_MODEL_GEN_IMAGE=$UBUNTU_IMAGE -e TRITON_CONTAINER_VERSION=$TRITON_CONTAINER_VERSION -e NVIDIA_UPSTREAM_VERSION=$NVIDIA_UPSTREAM_VERSION -e TRITON_SEMVER=$TRITON_SEMVER onnxruntime.ubuntu.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
     if [ $? -ne 0 ]; then
         log_message.error "enroot start: ${ONNXSCRIPT} failed"
         exit 1
@@ -670,7 +696,7 @@ elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
     log_message.status "enroot create: pytorch.$CI_JOB_ID"
     enroot create --name pytorch.$CI_JOB_ID /tmp/pytorch.$CI_JOB_ID.enroot.sqsh
     log_message.info "enroot start: pytorch.$CI_JOB_ID"
-    enroot start --rw -m /tmp:/tmp -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR pytorch.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
+    enroot start --rw -m /tmp:/tmp -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR -e TRITON_MODEL_GEN_IMAGE=$PYTORCH_IMAGE -e TRITON_CONTAINER_VERSION=$TRITON_CONTAINER_VERSION -e NVIDIA_UPSTREAM_VERSION=$NVIDIA_UPSTREAM_VERSION -e TRITON_SEMVER=$TRITON_SEMVER pytorch.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
     if [ $? -ne 0 ]; then
         log_message.error "enroot start: ${TORCHSCRIPT} failed"
         exit 1
@@ -681,7 +707,7 @@ elif [ "$TRITON_MODELS_USE_ENROOT" -eq 1 ] && which enroot ; then
     log_message.status "enroot create: tensorrt.$CI_JOB_ID"
     enroot create --name tensorrt.$CI_JOB_ID /tmp/tensorrt.$CI_JOB_ID.enroot.sqsh
     log_message.info "enroot start: tensorrt.$CI_JOB_ID"
-    enroot start --rw -m /tmp:/tmp -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR tensorrt.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
+    enroot start --rw -m /tmp:/tmp -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR -e TRITON_MODEL_GEN_IMAGE=$TENSORRT_IMAGE -e TRITON_CONTAINER_VERSION=$TRITON_CONTAINER_VERSION -e NVIDIA_UPSTREAM_VERSION=$NVIDIA_UPSTREAM_VERSION -e TRITON_SEMVER=$TRITON_SEMVER tensorrt.$CI_JOB_ID bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
     if [ $? -ne 0 ]; then
         log_message.error "enroot start: ${TRTSCRIPT} failed"
         exit 1

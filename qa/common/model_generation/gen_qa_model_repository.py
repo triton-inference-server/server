@@ -35,7 +35,7 @@ What it adds over the shell driver:
 
   * **Selective generation.** Run one framework, or any subset, instead of all
     four. `--openvino`, `--onnx`, `--pytorch`, `--tensorrt`, or `--all`.
-  * **Every environment variable is also a flag.** `--triton-version`,
+  * **Every environment variable is also a flag.** `--container-version`,
     `--ubuntu-image`, `--onnx-opset` and the rest default to the variable the
     shell driver reads, so existing CI keeps working unchanged, but anything
     can be overridden per invocation without exporting.
@@ -63,9 +63,11 @@ exist are bash and one of docker or enroot.
 """
 
 import argparse
+import ast
 import collections
 import datetime
 import difflib
+import functools
 import os
 import pathlib
 import re
@@ -90,7 +92,7 @@ SH_COLOR_RESET = "\\033[0m"
 SH_COLOR_WARNING = "\\033[33m"
 
 # Defaults, matching the shell driver's `${VAR:=default}` values.
-DEFAULT_TRITON_VERSION = "26.07"
+DEFAULT_CONTAINER_VERSION = "26.08dev"
 DEFAULT_ONNX_VERSION = "1.20.1"
 DEFAULT_ONNX_OPSET = "0"
 DEFAULT_OPENVINO_VERSION = "2024.5.0"
@@ -99,10 +101,14 @@ DEFAULT_NVIDIA_VISIBLE_DEVICES = "0"
 DEFAULT_PROJECT_NAME = "tritonserver"
 DEFAULT_OUTPUT_DIR = "/tmp"
 ARCHIVE_DIR_NAME = "archives"
-# server/TRITON_VERSION, four levels up from qa/common/model_generation. The
-# authoritative semver; the container train lives in TRITON_VERSION the
-# variable, which is a different thing with a confusingly similar name.
-SEMVER_FILE = pathlib.Path(__file__).resolve().parents[3] / "TRITON_VERSION"
+DEFAULT_UPSTREAM_VERSION = "26.07"
+DEFAULT_SEMVER = "2.72.0dev"
+
+# server/build.py, four levels up from qa/common/model_generation. Its
+# DEFAULT_TRITON_VERSION_MAP is the one place all three versions are declared
+# together, so reading it keeps them from drifting apart here.
+BUILD_PY = pathlib.Path(__file__).resolve().parents[3] / "build.py"
+VERSION_MAP_NAME = "DEFAULT_TRITON_VERSION_MAP"
 
 # Files outside this directory the generators need at run time. Staged flat
 # into the source directory alongside the generators:
@@ -205,7 +211,9 @@ class Generate:
         self.chmod = chmod
 
     def render(self, ctx):
-        target = "{}/{}/{}".format(ctx.build_dir, ctx.triton_version, self.repository)
+        target = "{}/{}/{}".format(
+            ctx.build_dir, ctx.container_version, self.repository
+        )
         command = ["python3", "{}/{}".format(ctx.source_dir, self.script)]
         command += self.flags
         command.append("--models_dir={}".format(target))
@@ -267,7 +275,7 @@ def build_stages(ctx):
     host-side value, and a literal `$VAR` in the text is evaluated in the
     container.
     """
-    version_root = "{}/{}".format(ctx.build_dir, ctx.triton_version)
+    version_root = "{}/{}".format(ctx.build_dir, ctx.container_version)
     custom_ops_root = "{}/{}".format(version_root, CUSTOM_OPS_DIR)
     plugin_root = "{}/qa_trt_plugin_model_repository".format(version_root)
     data_dependent_root = "{}/qa_trt_data_dependent_model_repository".format(
@@ -728,22 +736,9 @@ def render_stage_script(stage, ctx, final=False):
             "python3 {src}/gen_manifest.py --tree {root} --update-sizes"
             " --summary {root}/manifest-summary.json || true".format(
                 src=ctx.source_dir,
-                root="{}/{}".format(ctx.build_dir, ctx.triton_version),
+                root="{}/{}".format(ctx.build_dir, ctx.container_version),
             ),
         ]
-        if ctx.archive:
-            lines += [
-                "",
-                "# Pack each model separately, into a folder of its own at the"
-                " root of the tree.",
-                "python3 {}/gen_archive.py --tree {}/{} --dest {} || true".format(
-                    ctx.source_dir,
-                    ctx.build_dir,
-                    ctx.triton_version,
-                    ctx.container_archive_dir(),
-                ),
-                "chmod -R 777 {} || true".format(ctx.container_archive_dir()),
-            ]
     lines += ["", "exit 0", ""]
     return "\n".join(lines)
 
@@ -756,11 +751,10 @@ def stage_environment(stage, ctx):
             ("TRITON_MODEL_GEN_IMAGE", stage.image),
             ("TRITON_MODEL_GEN_FRAMEWORK", stage.key),
             ("TRITON_MODEL_GEN_RUNTIME", ctx.runtime_name),
-            ("TRITON_VERSION", ctx.triton_version),
-            # The train and the semver, each under a name that means one thing.
-            # TRITON_VERSION above is left as the driver has always set it --
-            # it names the output directory -- but is not read as either, since
-            # CI overrides it with the semver.
+            # Three versions, each under a name that carries one meaning: the
+            # container being built, the NGC containers it is built against,
+            # and the release. All three come from build.py's version map.
+            ("TRITON_CONTAINER_VERSION", ctx.container_version),
             ("NVIDIA_UPSTREAM_VERSION", ctx.upstream_version),
             ("TRITON_SEMVER", ctx.semver),
             # Named in the archives, absent outside CI. Empty values are
@@ -949,30 +943,12 @@ class DockerRuntime(Runtime):
             [
                 "docker",
                 "cp",
-                "{}:{}/{}".format(self.container, ctx.build_dir, ctx.triton_version),
+                "{}:{}/{}".format(self.container, ctx.build_dir, ctx.container_version),
                 str(destination) + "/",
             ],
             ctx.dry_run,
         )
-        # Archives sit inside the tree, so the copy above already brought them.
-        # Only an explicit --archive-dir needs a second copy, to put them
-        # somewhere other than where the tree went.
-        if ctx.archive and ctx.archive_dir:
-            archives = pathlib.Path(ctx.archive_dir)
-            log_status("docker cp: copying archives to {}".format(archives))
-            if not ctx.dry_run:
-                archives.mkdir(parents=True, exist_ok=True)
-            run_command(
-                [
-                    "docker",
-                    "cp",
-                    "{}:{}".format(self.container, ctx.container_archive_dir()),
-                    str(archives) + "/",
-                ],
-                ctx.dry_run,
-                check=False,
-            )
-        return destination / ctx.triton_version
+        return destination / ctx.container_version
 
     def cleanup(self):
         ctx = self.ctx
@@ -1082,13 +1058,7 @@ class EnrootRuntime(Runtime):
                 "--output-dir is a docker-only option; the enroot stages build "
                 "in place, so the tree stays under {}".format(ctx.build_dir)
             )
-        if ctx.archive and ctx.archive_dir:
-            produced = pathlib.Path(ctx.container_archive_dir())
-            wanted = pathlib.Path(ctx.archive_dir) / ctx.archive_basename()
-            if produced != wanted and produced.is_dir() and not ctx.dry_run:
-                log_status("copy: archives to {}".format(wanted))
-                shutil.copytree(str(produced), str(wanted), dirs_exist_ok=True)
-        return pathlib.Path(ctx.build_dir) / ctx.triton_version
+        return pathlib.Path(ctx.build_dir) / ctx.container_version
 
     def cleanup(self):
         ctx = self.ctx
@@ -1148,18 +1118,20 @@ class Context:
     """Resolved configuration: flags win, environment is the default."""
 
     def __init__(self, args):
-        self.triton_version = args.triton_version
+        self.container_version = args.container_version
+        self.upstream_version = args.upstream_version
+        self.semver = args.semver
         self.onnx_version = args.onnx_version
         self.onnx_opset = args.onnx_opset
         self.openvino_version = args.openvino_version
         self.ubuntu_image = args.ubuntu_image
         self.pytorch_image = (
             args.pytorch_image
-            or "nvcr.io/nvidia/pytorch:{}-py3".format(self.triton_version)
+            or "nvcr.io/nvidia/pytorch:{}-py3".format(self.upstream_version)
         )
         self.tensorrt_image = (
             args.tensorrt_image
-            or "nvcr.io/nvidia/tensorrt:{}-py3".format(self.triton_version)
+            or "nvcr.io/nvidia/tensorrt:{}-py3".format(self.upstream_version)
         )
         self.model_type = args.model_type
         self.job_id = args.job_id
@@ -1176,11 +1148,6 @@ class Context:
         self.is_ci = bool(os.environ.get("CI"))
         self.archive = args.archive
         self.archive_dir = args.archive_dir
-        self.semver = args.semver
-        # Locally TRITON_VERSION *is* the train and names the output directory,
-        # so it is the right fallback; in CI it is the semver, but there
-        # NVIDIA_UPSTREAM_VERSION is set and this never fires.
-        self.upstream_version = args.upstream_version or args.triton_version
         self.cleanup = args.cleanup
         self.clean_build_dir = args.clean_build_dir
         self.nvidia_visible_devices = args.nvidia_visible_devices
@@ -1199,20 +1166,20 @@ class Context:
         self.source_dir = "{}/gen_srcdir".format(self.build_dir)
 
     def repository_paths(self):
-        root = "{}/{}".format(self.build_dir, self.triton_version)
+        root = "{}/{}".format(self.build_dir, self.container_version)
         return ["{}/{}".format(root, name) for name in REPOSITORY_DIRS]
 
-    def container_archive_dir(self):
-        """Archives sit in their own folder at the root of the model tree.
+    def archive_dest(self, tree):
+        """Where the archives go, given the finished tree on the host.
 
-        Inside the tree, so they travel with it, but not inside a model: every
-        walk of the tree -- sizing, manifesting, archiving -- keys on a
-        directory holding a config.pbtxt, and this one holds only tarballs.
+        Default is a folder at the root of the tree, so archives travel with
+        it. Safe there because every walk of the tree -- sizing, manifesting,
+        archiving -- keys on a directory holding a config.pbtxt, and this one
+        holds only tarballs.
         """
-        return "{}/{}/{}".format(self.build_dir, self.triton_version, ARCHIVE_DIR_NAME)
-
-    def archive_basename(self):
-        return ARCHIVE_DIR_NAME
+        if self.archive_dir:
+            return pathlib.Path(self.archive_dir) / ARCHIVE_DIR_NAME
+        return pathlib.Path(tree) / ARCHIVE_DIR_NAME
 
 
 def resolve_gpu_args(args):
@@ -1271,16 +1238,44 @@ def parse_frameworks(value):
     return [key for key in STAGE_ORDER if key in selected]
 
 
-def read_semver():
-    """server/TRITON_VERSION, or None if this tree is laid out differently.
+@functools.lru_cache(maxsize=None)
+def read_version_map():
+    """server/build.py's DEFAULT_TRITON_VERSION_MAP, or {}.
 
-    Not fatal when missing: the semver is one component of an archive name and
-    one manifest field, neither of which is worth failing a generation run for.
+    Parsed rather than imported: build.py is a build script, not a module, and
+    importing it to read one dict would run everything at its top level.
+
+    Never fatal. A missing or restructured build.py falls back to the constants
+    above -- these versions name a directory and fill in manifest fields, none
+    of which is worth failing a generation run for.
     """
     try:
-        return SEMVER_FILE.read_text().strip() or None
-    except OSError:
-        return None
+        tree = ast.parse(BUILD_PY.read_text())
+    except (OSError, SyntaxError) as error:
+        log_warning("cannot read {}: {}".format(BUILD_PY, error))
+        return {}
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(
+            isinstance(t, ast.Name) and t.id == VERSION_MAP_NAME for t in node.targets
+        ):
+            continue
+        try:
+            return {
+                key: value
+                for key, value in ast.literal_eval(node.value).items()
+                if isinstance(value, str)
+            }
+        except ValueError:
+            break
+    log_warning("no {} in {}".format(VERSION_MAP_NAME, BUILD_PY))
+    return {}
+
+
+def version_from_build(key, fallback):
+    """One entry of the version map, or `fallback` when it cannot be read."""
+    return read_version_map().get(key) or fallback
 
 
 def env_default(name, fallback=None):
@@ -1334,22 +1329,30 @@ def parse_args(argv):
 
     versions = parser.add_argument_group("versions")
     versions.add_argument(
-        "--triton-version",
-        default=env_default("TRITON_VERSION", DEFAULT_TRITON_VERSION),
-        help="container train, names the output directory [TRITON_VERSION]",
+        "--container-version",
+        default=env_default(
+            "TRITON_CONTAINER_VERSION",
+            version_from_build("triton_container_version", DEFAULT_CONTAINER_VERSION),
+        ),
+        help="the Triton container being built; names the output directory "
+        "[TRITON_CONTAINER_VERSION]",
     )
     versions.add_argument(
         "--upstream-version",
-        default=env_default("NVIDIA_UPSTREAM_VERSION"),
-        help="container train recorded in every manifest and archive name; "
-        "defaults to --triton-version, which names it locally "
-        "[NVIDIA_UPSTREAM_VERSION]",
+        default=env_default(
+            "NVIDIA_UPSTREAM_VERSION",
+            version_from_build("upstream_container_version", DEFAULT_UPSTREAM_VERSION),
+        ),
+        help="the NGC containers built against; tags the PyTorch and TensorRT "
+        "images and is recorded in every manifest [NVIDIA_UPSTREAM_VERSION]",
     )
     versions.add_argument(
         "--semver",
-        default=env_default("TRITON_SEMVER", read_semver()),
-        help="Triton semver recorded in every manifest and archive name; "
-        "defaults to server/TRITON_VERSION [TRITON_SEMVER]",
+        default=env_default(
+            "TRITON_SEMVER", version_from_build("release_version", DEFAULT_SEMVER)
+        ),
+        help="Triton semver recorded in every manifest and archive name "
+        "[TRITON_SEMVER]",
     )
     versions.add_argument(
         "--onnx-version",
@@ -1436,13 +1439,14 @@ def parse_args(argv):
     behaviour.add_argument(
         "--archive",
         action="store_true",
-        help="once generation finishes, pack each model into its own archive "
-        "under <version>-archives, with an index.json describing them all",
+        help="after generation finishes, pack each model into its own archive "
+        "under <tree>/archives, with an index.json describing them all; runs "
+        "on the host, not in the generation containers",
     )
     behaviour.add_argument(
         "--archive-dir",
         default=None,
-        help="where the archive folder is placed (default: alongside the "
+        help="where the archives/ folder is placed (default: at the root of "
         "generated tree)",
     )
     behaviour.add_argument(
@@ -1509,7 +1513,9 @@ def parse_args(argv):
 def describe_plan(ctx, stages, selected):
     print("")
     print("runtime          : {}".format(ctx.runtime_name or ctx.runtime))
-    print("triton version   : {}".format(ctx.triton_version))
+    print("container version: {}".format(ctx.container_version))
+    print("upstream version : {}".format(ctx.upstream_version))
+    print("semver           : {}".format(ctx.semver))
     print("build dir        : {}".format(ctx.build_dir))
     print("source dir       : {}".format(ctx.source_dir))
     print("model type       : {}".format(ctx.model_type or "(unset)"))
@@ -1541,6 +1547,40 @@ def write_stage_scripts(ctx, stages, selected, directory):
         path.chmod(0o755)
         scripts[key] = path
     return scripts
+
+
+def archive_tree(ctx, tree):
+    """Pack the finished tree, on the host, once generation is over.
+
+    Deliberately not a stage step: packing is not model generation, and doing
+    it here means a tree can be re-archived -- under different naming, or after
+    a failed upload -- without regenerating a single model. It also keeps the
+    generation containers free of any archiving concern.
+    """
+    dest = ctx.archive_dest(tree)
+    log_status("archive: packing {} into {}".format(tree, dest))
+    command = [
+        sys.executable,
+        str(SCRIPT_DIR / "gen_archive.py"),
+        "--tree",
+        str(tree),
+        "--dest",
+        str(dest),
+        "--nvidia-upstream-version",
+        ctx.upstream_version or "",
+        "--triton-semver",
+        ctx.semver or "",
+    ]
+    for name in ("CI_PIPELINE_ID", "CI_JOB_ID"):
+        value = os.environ.get(name)
+        if value:
+            command += ["--" + name.lower().replace("_", "-"), value]
+    try:
+        run_command(command, ctx.dry_run)
+    except GenerationError as error:
+        # The models are generated and correct by this point; a packaging
+        # failure must not turn a multi-hour run into a non-zero exit.
+        log_warning("archive: {}".format(error))
 
 
 def main(argv=None):
@@ -1600,6 +1640,10 @@ def main(argv=None):
 
     if tree is not None:
         log_status("models generated in {}".format(tree))
+        if ctx.archive:
+            archive_tree(ctx, tree)
+    elif ctx.archive:
+        log_warning("CI set: models stay in the volume, nothing to archive")
     log_status("done")
     return 0
 
