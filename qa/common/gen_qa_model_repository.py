@@ -944,7 +944,12 @@ class DockerRuntime(Runtime):
 
     def collect(self):
         ctx = self.ctx
-        if ctx.is_ci:
+        # CI used to leave the tree in the volume for a shared mount to pick up,
+        # which is why this skipped the copy. Archiving and uploading read the
+        # tree from the host, so skipping it there means a run that was asked to
+        # publish quietly publishes nothing -- exactly what a green job with no
+        # artifacts looked like.
+        if ctx.is_ci and not (ctx.archive or ctx.artifactory_upload):
             log_status("CI set: leaving models in volume {}".format(self.volume))
             return None
         destination = pathlib.Path(ctx.output_dir)
@@ -968,7 +973,12 @@ class DockerRuntime(Runtime):
 
     def cleanup(self):
         ctx = self.ctx
-        if ctx.is_ci or not ctx.cleanup:
+        # Same reasoning: once the tree has been copied out there is nothing in
+        # the volume worth keeping, so an explicit --cleanup is honoured in CI
+        # too rather than leaving the volume behind.
+        if not ctx.cleanup:
+            return
+        if ctx.is_ci and not (ctx.archive or ctx.artifactory_upload):
             return
         log_status("docker: removing container and volume")
         run_command(["docker", "rm", "-f", self.container], ctx.dry_run, check=False)
