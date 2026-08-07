@@ -35,6 +35,13 @@ Per-model granularity is close to free. Measured on a 26.08 tree, 946 archives
 occupy the same bytes as 22 group archives to within 0.1% -- tar's per-entry
 overhead disappears against the payload.
 
+Archives are flat in the destination and named for what they hold:
+
+    qa_model_repository-openvino_int8_int8_int8-26.08-2.72.0dev-<pipeline>.tar
+
+carrying `qa_model_repository/openvino_int8_int8_int8/...` inside, so unpacking
+one over a tree root restores the model to its own repository.
+
 Archives are byte-reproducible: entries sorted, ownership and timestamps
 normalised. Identical model content therefore yields an identical checksum, so
 Artifactory can deduplicate and a runner can skip a download it already has.
@@ -45,6 +52,7 @@ import gzip
 import hashlib
 import io
 import json
+import os
 import pathlib
 import sys
 import tarfile
@@ -55,6 +63,12 @@ INDEX_NAME = "index.json"
 ARCHIVE_SUFFIX = ".tar"
 COMPRESSED_SUFFIX = ".tar.gz"
 
+# Appended to every archive name, in this order, empty parts dropped. The first
+# two identify the corpus a model belongs to; the CI pair is present only when
+# the environment supplies it, so a developer's local archives are not named
+# after a pipeline that does not exist.
+STAMP_ENV = ("TRITON_VERSION", "TRITON_SEMVER", "CI_PIPELINE_ID", "CI_JOB_ID")
+
 # Fixed metadata for reproducibility. The epoch matters less than that it never
 # varies: a build-time mtime would give every rebuild a new checksum.
 EPOCH = 0
@@ -64,18 +78,50 @@ class ArchiveError(Exception):
     """A model could not be packed."""
 
 
-def resolve_archive_path(model_dir, tree, dest_root, compress=True):
-    """Where a model's archive goes, mirroring its position in the tree.
+def resolve_stamp(overrides=None):
+    """The trailing `-` separated identity every archive name carries.
 
-    <repository>/<model>.tar.gz, and for the nested repositories
-    <repository>/<sub-repository>/<model>.tar.gz -- so the archive layout is
-    navigable in the same terms as the tree it came from.
+    `<upstream_version>-<triton_version>[-<pipeline>][-<job>]`. Read from the
+    environment so the value is the same one the manifests record, with
+    overrides for the command line. Absent parts are dropped rather than left
+    as empty segments.
     """
-    relative = (
-        pathlib.Path(model_dir).resolve().relative_to(pathlib.Path(tree).resolve())
+    overrides = overrides or {}
+    parts = [overrides.get(name) or os.environ.get(name) for name in STAMP_ENV]
+    return "-".join(part for part in parts if part)
+
+
+def resolve_archive_name(model_dir, tree, stamp="", compress=False):
+    """A model's archive file name: flat, and self-describing.
+
+    The tree position is folded into the name -- `qa_model_repository` plus
+    `openvino_int8_int8_int8` becomes `qa_model_repository-openvino_int8_...`
+    -- so every archive sits directly in the destination directory and still
+    says where it came from. Nested repositories contribute their extra
+    component the same way.
+    """
+    relative = archive_member_path(model_dir, tree)
+    name = "-".join(relative.parts)
+    if stamp:
+        name = "{}-{}".format(name, stamp)
+    return name + (COMPRESSED_SUFFIX if compress else ARCHIVE_SUFFIX)
+
+
+def archive_member_path(model_dir, tree):
+    """A model's path relative to the tree, which is also its path in the tar.
+
+    Preserved in full rather than reduced to the model name: unpacking an
+    archive over a tree root has to land the model back in its repository, and
+    the same model name appears in more than one repository.
+    """
+    return pathlib.Path(model_dir).resolve().relative_to(pathlib.Path(tree).resolve())
+
+
+def resolve_archive_path(model_dir, tree, dest_root, stamp="", compress=False):
+    """Where a model's archive goes."""
+    return pathlib.Path(dest_root) / resolve_archive_name(
+        model_dir, tree, stamp, compress
     )
-    suffix = COMPRESSED_SUFFIX if compress else ARCHIVE_SUFFIX
-    return pathlib.Path(dest_root) / relative.parent / (relative.name + suffix)
 
 
 def _normalise(info):
@@ -94,7 +140,7 @@ def _iter_members(model_dir):
     return sorted(root.rglob("*"), key=lambda p: str(p.relative_to(root)))
 
 
-def build_archive_bytes(model_dir, arcname, compress=True):
+def build_archive_bytes(model_dir, arcname, compress=False):
     """Pack a model directory into archive bytes."""
     raw = io.BytesIO()
     with tarfile.open(fileobj=raw, mode="w", format=tarfile.GNU_FORMAT) as tar:
@@ -118,15 +164,17 @@ def build_archive_bytes(model_dir, arcname, compress=True):
     return out.getvalue()
 
 
-def create_model_archive(model_dir, tree, dest_root, compress=True, dry_run=False):
+def create_model_archive(
+    model_dir, tree, dest_root, compress=False, dry_run=False, stamp=""
+):
     """Write one model's archive. Returns a dict describing it."""
     model_dir = pathlib.Path(model_dir)
     tree = pathlib.Path(tree)
-    relative = model_dir.resolve().relative_to(tree.resolve())
-    target = resolve_archive_path(model_dir, tree, dest_root, compress)
+    relative = archive_member_path(model_dir, tree)
+    target = resolve_archive_path(model_dir, tree, dest_root, stamp, compress)
 
     try:
-        data = build_archive_bytes(model_dir, relative.name, compress)
+        data = build_archive_bytes(model_dir, str(relative), compress)
     except OSError as error:
         raise ArchiveError("cannot pack {}: {}".format(model_dir, error))
 
@@ -193,15 +241,25 @@ def main(argv=None):
     parser.add_argument("--repository", action="append", default=[])
     parser.add_argument("--provenance", action="append", default=[])
     parser.add_argument(
-        "--no-compress",
+        "--compress",
         action="store_true",
-        help="store uncompressed; plan files compress ~96%%, so rarely wanted",
+        help="gzip the archives (.tar.gz); plan files compress ~96%%",
     )
+    for name in STAMP_ENV:
+        parser.add_argument(
+            "--" + name.lower().replace("_", "-"),
+            help="archive name component, defaults to ${}".format(name),
+        )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
     if not args.tree.is_dir():
         parser.error("no such tree: {}".format(args.tree))
+
+    stamp = resolve_stamp(
+        {name: getattr(args, name.lower()) for name in STAMP_ENV},
+    )
+    _log("archive name stamp: {}".format(stamp or "(none)"))
 
     entries, skipped = [], 0
     for model_dir in manifest.iter_model_dirs(args.tree):
@@ -216,7 +274,12 @@ def main(argv=None):
                 ):
                     continue
             entry = create_model_archive(
-                model_dir, args.tree, args.dest, not args.no_compress, args.dry_run
+                model_dir,
+                args.tree,
+                args.dest,
+                args.compress,
+                args.dry_run,
+                stamp,
             )
             entries.append(_describe(model_dir, args.tree, entry))
         except (ArchiveError, manifest.ManifestError) as error:

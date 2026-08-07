@@ -96,6 +96,11 @@ DEFAULT_UBUNTU_IMAGE = "ubuntu:22.04"
 DEFAULT_NVIDIA_VISIBLE_DEVICES = "0"
 DEFAULT_PROJECT_NAME = "tritonserver"
 DEFAULT_OUTPUT_DIR = "/tmp"
+ARCHIVE_DIR_NAME = "archives"
+# server/TRITON_VERSION, four levels up from qa/common/model_generation. The
+# authoritative semver; the container train lives in TRITON_VERSION the
+# variable, which is a different thing with a confusingly similar name.
+SEMVER_FILE = pathlib.Path(__file__).resolve().parents[3] / "TRITON_VERSION"
 
 # Files outside this directory the generators need at run time. Staged flat
 # into the source directory alongside the generators:
@@ -715,8 +720,8 @@ def render_stage_script(stage, ctx, final=False):
         if ctx.archive:
             lines += [
                 "",
-                "# Pack each model separately, into a folder of its own beside"
-                " the tree.",
+                "# Pack each model separately, into a folder of its own at the"
+                " root of the tree.",
                 "python3 {}/gen_archive.py --tree {}/{} --dest {} || true".format(
                     ctx.source_dir,
                     ctx.build_dir,
@@ -738,6 +743,11 @@ def stage_environment(stage, ctx):
             ("TRITON_MODEL_GEN_FRAMEWORK", stage.key),
             ("TRITON_MODEL_GEN_RUNTIME", ctx.runtime_name),
             ("TRITON_VERSION", ctx.triton_version),
+            ("TRITON_SEMVER", ctx.semver),
+            # Named in the archives, absent outside CI. Empty values are
+            # dropped from the name rather than left as empty segments.
+            ("CI_PIPELINE_ID", os.environ.get("CI_PIPELINE_ID", "")),
+            ("CI_JOB_ID", os.environ.get("CI_JOB_ID", "")),
         ]
     )
 
@@ -925,8 +935,11 @@ class DockerRuntime(Runtime):
             ],
             ctx.dry_run,
         )
-        if ctx.archive:
-            archives = pathlib.Path(ctx.archive_dir or ctx.output_dir)
+        # Archives sit inside the tree, so the copy above already brought them.
+        # Only an explicit --archive-dir needs a second copy, to put them
+        # somewhere other than where the tree went.
+        if ctx.archive and ctx.archive_dir:
+            archives = pathlib.Path(ctx.archive_dir)
             log_status("docker cp: copying archives to {}".format(archives))
             if not ctx.dry_run:
                 archives.mkdir(parents=True, exist_ok=True)
@@ -1144,6 +1157,7 @@ class Context:
         self.is_ci = bool(os.environ.get("CI"))
         self.archive = args.archive
         self.archive_dir = args.archive_dir
+        self.semver = args.semver
         self.cleanup = args.cleanup
         self.clean_build_dir = args.clean_build_dir
         self.nvidia_visible_devices = args.nvidia_visible_devices
@@ -1166,16 +1180,16 @@ class Context:
         return ["{}/{}".format(root, name) for name in REPOSITORY_DIRS]
 
     def container_archive_dir(self):
-        """Archives live beside the model tree, never inside it.
+        """Archives sit in their own folder at the root of the model tree.
 
-        An archive written under the tree would be picked up by the next walk
-        of it -- measured as part of a model, packed into the next archive --
-        so the separation is structural, not tidiness.
+        Inside the tree, so they travel with it, but not inside a model: every
+        walk of the tree -- sizing, manifesting, archiving -- keys on a
+        directory holding a config.pbtxt, and this one holds only tarballs.
         """
-        return "{}/{}-archives".format(self.build_dir, self.triton_version)
+        return "{}/{}/{}".format(self.build_dir, self.triton_version, ARCHIVE_DIR_NAME)
 
     def archive_basename(self):
-        return "{}-archives".format(self.triton_version)
+        return ARCHIVE_DIR_NAME
 
 
 def resolve_gpu_args(args):
@@ -1194,6 +1208,18 @@ def resolve_gpu_args(args):
         "-e",
         "NVIDIA_VISIBLE_DEVICES={}".format(args.nvidia_visible_devices),
     ]
+
+
+def read_semver():
+    """server/TRITON_VERSION, or None if this tree is laid out differently.
+
+    Not fatal when missing: the semver is one component of an archive name and
+    one manifest field, neither of which is worth failing a generation run for.
+    """
+    try:
+        return SEMVER_FILE.read_text().strip() or None
+    except OSError:
+        return None
 
 
 def env_default(name, fallback=None):
@@ -1244,6 +1270,12 @@ def parse_args(argv):
         "--triton-version",
         default=env_default("TRITON_VERSION", DEFAULT_TRITON_VERSION),
         help="container train, names the output directory [TRITON_VERSION]",
+    )
+    versions.add_argument(
+        "--semver",
+        default=env_default("TRITON_SEMVER", read_semver()),
+        help="Triton semver recorded in every manifest and archive name; "
+        "defaults to server/TRITON_VERSION [TRITON_SEMVER]",
     )
     versions.add_argument(
         "--onnx-version",
