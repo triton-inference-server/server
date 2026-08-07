@@ -411,7 +411,11 @@ def main(argv=None):
             failed += 1
             continue
         uploaded += 1
-        _log("  {:<72} {} B".format(name[:72], len(payload)))
+        # The destination, not just the file name: a reader checking whether a
+        # run published anything should not have to reconstruct the path from
+        # the flags. Properties are left off -- there are up to two dozen, and
+        # they are on the artifact for anyone who queries it.
+        _log("  {} -> {} ({} B)".format(name, target.split(";", 1)[0], len(payload)))
 
     _log(
         "{} {} archive(s), {} failed".format(
