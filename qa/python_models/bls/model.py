@@ -598,7 +598,7 @@ class PBBLSTest(unittest.TestCase):
                 # error
                 self.assertTrue(infer_response.has_error())
                 self.assertIn(
-                    "Error when running inference: Request for unknown model: 'non_existent_model' is not found",
+                    "Model 'non_existent_model' is not ready.",
                     infer_response.error().message(),
                 )
 
@@ -612,7 +612,7 @@ class PBBLSTest(unittest.TestCase):
             # error
             self.assertTrue(infer_response.has_error())
             self.assertIn(
-                "Error when running inference: Request for unknown model: 'non_existent_model' is not found",
+                "Model 'non_existent_model' is not ready.",
                 infer_response.error().message(),
             )
 
