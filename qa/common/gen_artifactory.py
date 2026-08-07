@@ -63,11 +63,16 @@ import urllib.request
 INDEX_NAME = "index.json"
 TOKEN_ENV = "ARTIFACTORY_TOKEN"
 URL_ENV = "ARTIFACTORY_URL"
-PROPERTIES_ENV = "ARTIFACTORY_PROPERTIES"
-# What CI already sets, and where the STATIC stores' provenance lives -- the
-# CI_*, ISSUE and TRITON_VERSION values that say what actually built an
-# artifact, which nothing derivable from the artifact can tell you.
-PROPERTIES_FALLBACK_ENV = "ARTIFACTORY_PKG_MODELS_COMMON_PROPERTIES"
+# Property sources, lowest precedence first. All four are merged rather than
+# one being chosen: they are different scopes of the same thing -- what is true
+# of every model package, then of this upload, then of this CI job, then of
+# this invocation -- and picking one would silently discard the others. A key
+# present in more than one resolves to the narrowest scope that sets it.
+PROPERTY_SOURCE_ENVS = (
+    "ARTIFACTORY_PKG_MODELS_COMMON_PROPERTIES",
+    "ARTIFACTORY_PROPERTIES",
+    "ARTIFACTORY_PROPERTIES_CI_JOB_PROPERTIES",
+)
 
 # Where the jfrog CLI keeps its servers. Read as a last resort for --url and
 # --token so a developer who has already run `jf config add` does not have to
@@ -262,14 +267,11 @@ def main(argv=None):
     )
     parser.add_argument(
         "--properties",
-        default=(
-            os.environ.get(PROPERTIES_ENV)
-            or os.environ.get(PROPERTIES_FALLBACK_ENV)
-            or ""
-        ),
-        help="'k=v;k=v' set on every upload, merged with the per-archive ones "
-        "and winning on a clash; defaults to ${}, then ${}".format(
-            PROPERTIES_ENV, PROPERTIES_FALLBACK_ENV
+        default="",
+        help="'k=v;k=v' set on every upload. Merged with {}, in that order, "
+        "this flag winning on a clash; the result is merged with each "
+        "archive's own properties and wins there too".format(
+            ", ".join("$" + name for name in PROPERTY_SOURCE_ENVS)
         ),
     )
     parser.add_argument(
@@ -336,7 +338,9 @@ def main(argv=None):
         _log("ERROR: {}".format(error))
         return 1
 
-    common = parse_properties(args.properties)
+    common = parse_properties(
+        *[os.environ.get(name) for name in PROPERTY_SOURCE_ENVS], args.properties
+    )
     entries = index.get("archives", [])
     if args.framework:
         entries = [e for e in entries if e.get("framework") in args.framework]
