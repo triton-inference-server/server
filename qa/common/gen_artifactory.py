@@ -69,8 +69,8 @@ URL_ENV = "ARTIFACTORY_URL"
 # restate either; CI sets the variables and never reaches this.
 JFROG_CONFIG = pathlib.Path.home() / ".jfrog" / "jfrog-cli.conf.v6"
 
-# Per-archive properties taken from the index, so a query can select on them.
-INDEX_PROPERTIES = ("model", "repository", "provenance", "size_tier")
+# Identify the bundle itself alongside the flattened manifest properties.
+BUNDLE_PROPERTIES = ("framework", "model_count", "sha256")
 
 # Uploads are the step most exposed to a flaky network -- the reason this corpus
 # is being decomposed at all -- so a failed PUT is retried before it is believed.
@@ -89,7 +89,7 @@ def read_jfrog_server(config_path=None, server_id=None):
     and a second `jf config add` reorders them, so an index that is right today
     is right by luck. `server_id` picks a specific one by name.
 
-    Never raises. This is a convenience for local runs -- a missing, uneadable
+    Never raises. This is a convenience for local runs -- a missing, unreadable
     or restructured config just means the caller has to pass --url and --token.
     """
     path = pathlib.Path(config_path or JFROG_CONFIG)
@@ -133,6 +133,20 @@ def parse_properties(*sources):
             if key:
                 properties[key] = value
     return properties
+
+
+def bundle_path(args, framework):
+    """`<path>/<model type>/<upstream>-<semver>/<framework>`.
+
+    The layout Artifactory already holds, one level per thing a consumer
+    narrows by: which device the models were built for, which release, which
+    backend. Absent segments collapse rather than leaving an empty one.
+    """
+    versions = "-".join(
+        part for part in (args.nvidia_upstream_version, args.triton_semver) if part
+    )
+    parts = [args.path.strip("/"), args.model_type, versions, framework]
+    return "/".join(part.strip("/") for part in parts if part)
 
 
 def build_target(url, path, name, properties):
@@ -227,10 +241,26 @@ def main(argv=None):
         help="'k=v;k=v' set on every upload, merged with the per-archive ones",
     )
     parser.add_argument(
-        "--provenance",
+        "--framework",
         action="append",
         default=[],
-        help="upload only archives with this provenance; repeatable",
+        help="upload only this framework's bundle; repeatable",
+    )
+    parser.add_argument(
+        "--model-type",
+        default=os.environ.get("MODEL_TYPE"),
+        help="device the models were built for, e.g. DGX-Spark-sbsa-12.1 "
+        "[MODEL_TYPE]",
+    )
+    parser.add_argument(
+        "--nvidia-upstream-version",
+        default=os.environ.get("NVIDIA_UPSTREAM_VERSION"),
+        help="[NVIDIA_UPSTREAM_VERSION]",
+    )
+    parser.add_argument(
+        "--triton-semver",
+        default=os.environ.get("TRITON_SEMVER"),
+        help="[TRITON_SEMVER]",
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
@@ -269,8 +299,8 @@ def main(argv=None):
 
     common = parse_properties(args.properties)
     entries = index.get("archives", [])
-    if args.provenance:
-        entries = [e for e in entries if e.get("provenance") in args.provenance]
+    if args.framework:
+        entries = [e for e in entries if e.get("framework") in args.framework]
 
     _log(
         "uploading {} archive(s) to {}/{}".format(
@@ -283,15 +313,22 @@ def main(argv=None):
     uploaded = failed = 0
     for entry in entries:
         name = entry.get("archive")
+        framework = entry.get("framework") or "unknown"
         source = pathlib.Path(args.archives) / name
-        properties = dict(common)
-        for key in INDEX_PROPERTIES:
-            if entry.get(key):
+        # The bundle's own properties are already flat -- see gen_archive's
+        # common_properties -- so they merge straight in. Explicit --properties
+        # win, being the ones the caller typed for this run.
+        properties = dict(entry.get("properties") or {})
+        for key in BUNDLE_PROPERTIES:
+            if entry.get(key) is not None:
                 properties[key] = str(entry[key])
-        target = build_target(args.url, args.path, name, properties)
+        properties.update(common)
+        target = build_target(args.url, bundle_path(args, framework), name, properties)
 
         if args.dry_run:
-            _log("would upload {}".format(name))
+            # The full target, properties and all: a dry run is for checking
+            # where a thing would land, which the name alone does not say.
+            _log("would upload {}".format(target))
             uploaded += 1
             continue
         try:

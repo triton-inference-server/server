@@ -1640,7 +1640,13 @@ def upload_tree(ctx, tree):
         ctx.artifactory_path,
         "--properties",
         ctx.artifactory_properties or "",
+        "--nvidia-upstream-version",
+        ctx.upstream_version or "",
+        "--triton-semver",
+        ctx.semver or "",
     ]
+    if ctx.model_type:
+        command += ["--model-type", ctx.model_type]
     environment = dict(os.environ)
     environment["ARTIFACTORY_TOKEN"] = ctx.artifactory_token
     try:
