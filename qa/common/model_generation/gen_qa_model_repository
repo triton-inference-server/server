@@ -66,15 +66,14 @@ log_message.status "Changing working directory to the script directory to: " "${
 cd ${TRITON_MDLS_BASE_SCRIPT_DIR}
 
 log_message.status "define: default values"
-# The three versions, each read from build.py's DEFAULT_TRITON_VERSION_MAP so
-# they cannot drift from what the server is actually built as. TRITON_VERSION
-# is deliberately gone: it named the container train here and the semver in CI,
-# so reading it was wrong half the time.
-build_version() { sed -n "s/.*\"$1\": *\"\\([^\"]*\\)\".*/\\1/p" \
-    ${TRITON_MDLS_BASE_SCRIPT_DIR}/../../../build.py | head -1 ; }
-TRITON_CONTAINER_VERSION=${TRITON_CONTAINER_VERSION:=$(build_version triton_container_version)}
-NVIDIA_UPSTREAM_VERSION=${NVIDIA_UPSTREAM_VERSION:=$(build_version upstream_container_version)}
-TRITON_SEMVER=${TRITON_SEMVER:=$(build_version release_version)}
+# The three versions, matching build.py's DEFAULT_TRITON_VERSION_MAP entries
+# triton_container_version, upstream_container_version and release_version.
+# Bump them here when that map moves. TRITON_VERSION is deliberately gone: it
+# named the container train here and the semver in CI, so reading it was wrong
+# half the time.
+TRITON_CONTAINER_VERSION=${TRITON_CONTAINER_VERSION:=26.08dev}
+NVIDIA_UPSTREAM_VERSION=${NVIDIA_UPSTREAM_VERSION:=26.07}
+TRITON_SEMVER=${TRITON_SEMVER:=2.72.0dev}
 ONNX_VERSION=1.20.1
 ONNX_OPSET=0
 OPENVINO_VERSION=2024.5.0
