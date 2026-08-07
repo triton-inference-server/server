@@ -67,7 +67,9 @@ URL_ENV = "ARTIFACTORY_URL"
 # Where the jfrog CLI keeps its servers. Read as a last resort for --url and
 # --token so a developer who has already run `jf config add` does not have to
 # restate either; CI sets the variables and never reaches this.
-JFROG_CONFIG = pathlib.Path.home() / ".jfrog" / "jfrog-cli.conf.v6"
+JFROG_HOME_ENV = "JFROG_CLI_HOME_DIR"
+DEFAULT_JFROG_HOME = "~/.jfrog"
+JFROG_CONFIG_NAME = "jfrog-cli.conf.v6"
 
 # Identify the bundle itself alongside the flattened manifest properties.
 BUNDLE_PROPERTIES = ("framework", "model_count", "sha256")
@@ -82,6 +84,17 @@ class UploadError(Exception):
     """An archive could not be uploaded."""
 
 
+def jfrog_config_path():
+    """The jfrog CLI config, honouring JFROG_CLI_HOME_DIR.
+
+    Resolved per call rather than at import: the variable is the documented way
+    to move that directory, and a module-level constant would bake in whatever
+    the environment happened to be when this was imported.
+    """
+    home = os.environ.get(JFROG_HOME_ENV, "").strip() or DEFAULT_JFROG_HOME
+    return pathlib.Path(home).expanduser() / JFROG_CONFIG_NAME
+
+
 def read_jfrog_server(config_path=None, server_id=None):
     """One server block from the jfrog CLI config, or {}.
 
@@ -92,7 +105,7 @@ def read_jfrog_server(config_path=None, server_id=None):
     Never raises. This is a convenience for local runs -- a missing, unreadable
     or restructured config just means the caller has to pass --url and --token.
     """
-    path = pathlib.Path(config_path or JFROG_CONFIG)
+    path = pathlib.Path(config_path) if config_path else jfrog_config_path()
     try:
         servers = json.loads(path.read_text()).get("servers") or []
     except (OSError, ValueError):
@@ -229,7 +242,8 @@ def main(argv=None):
     )
     parser.add_argument(
         "--jfrog-config",
-        help="jfrog CLI config to fall back on (default: {})".format(JFROG_CONFIG),
+        help="jfrog CLI config to fall back on (default: {}, moved with "
+        "${})".format(jfrog_config_path(), JFROG_HOME_ENV),
     )
     parser.add_argument(
         "--jfrog-server-id",
@@ -270,7 +284,7 @@ def main(argv=None):
     if not args.url or not args.token:
         server = read_jfrog_server(args.jfrog_config, args.jfrog_server_id)
         if server:
-            source = args.jfrog_config or JFROG_CONFIG
+            source = args.jfrog_config or jfrog_config_path()
             if not args.url:
                 args.url = server.get("artifactoryUrl") or server.get("url")
                 if args.url:
