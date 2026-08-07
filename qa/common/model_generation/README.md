@@ -38,6 +38,7 @@ The QA model corpus, how it is built, and how it is described once built.
 | `gen_common.py` | dtype helpers shared by every generator |
 | `gen_manifest.py` | builds and maintains each model's `manifest.json` |
 | `gen_archive.py` | packs each model into its own archive, with a fetch index |
+| `gen_artifactory.py` | uploads those archives, with properties to select on |
 
 ## Usage
 
@@ -219,6 +220,47 @@ Reproducible does *not* mean identical across build environments, because `manif
 inside the archive and describes the environment. The same model built under docker and under
 enroot yields two different checksums — measured, and the whole difference is the one
 `container.runtime` line. Deduplication works within a runtime, not across them.
+
+### Upload the archives
+
+```bash
+./gen_qa_model_repository.py --all --artifactory-upload
+```
+
+`--artifactory-upload` implies `--archive` — uploading what was never packed is not something
+that can be asked for — and needs four settings, each a flag or the matching variable:
+
+| flag | variable |
+|---|---|
+| `--artifactory-url` | `ARTIFACTORY_URL` |
+| `--artifactory-token` | `ARTIFACTORY_TOKEN` |
+| `--artifactory-path` | `ARTIFACTORY_PATH` |
+| `--artifactory-properties` | `ARTIFACTORY_PROPERTIES`, falling back to `ARTIFACTORY_PKG_MODELS_COMMON_PROPERTIES` |
+
+They are checked **before** the first container starts, not after generation, so a missing token
+costs a second rather than a multi-hour run that cannot deliver its output. The error names
+every setting that is absent, not just the first.
+
+The token is passed to the uploader through the environment, never argv: the driver logs every
+command it runs, and argv is readable by any process on the host, so a token on a command line
+would reach both the CI log and `ps`.
+
+`gen_artifactory.py` also runs on its own against any packed tree:
+
+```bash
+python3 gen_artifactory.py --archives /tmp/26.08dev/archives \
+    --url https://artifactory.nvidia.com/artifactory \
+    --path sw-dl-triton-generic-local/triton/models/26.07-2.72.0dev \
+    --properties "MODEL_TYPE=A100-x86-8.0" --provenance onnx
+```
+
+Each upload carries the common properties plus `model`, `repository`, `provenance` and
+`size_tier` from the index, so a consumer can select with an AQL query rather than downloading a
+repository group to discover what is in it — which is the whole point of per-model archives.
+The `sha256` the index already records is sent as `X-Checksum-Sha256`, so Artifactory rejects a
+truncated upload rather than leaving it to be found later by a test job. Failed PUTs are retried,
+since an unstable network is the friction this decomposition exists to remove; a 4xx is not
+retried, because a bad token or a bad path will not fix itself.
 
 ## Size classification
 

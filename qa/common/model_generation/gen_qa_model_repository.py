@@ -770,11 +770,13 @@ def stage_environment(stage, ctx):
 # --------------------------------------------------------------------------
 
 
-def run_command(command, dry_run=False, check=True, capture=False):
+def run_command(command, dry_run=False, check=True, capture=False, environment=None):
     log_info("$ {}".format(" ".join(shlex.quote(part) for part in command)))
     if dry_run:
         return 0
-    result = subprocess.run(command, capture_output=capture, text=capture)
+    result = subprocess.run(
+        command, capture_output=capture, text=capture, env=environment
+    )
     if check and result.returncode != 0:
         raise GenerationError(
             "command failed ({}): {}".format(result.returncode, command[0])
@@ -1148,6 +1150,11 @@ class Context:
         self.is_ci = bool(os.environ.get("CI"))
         self.archive = args.archive
         self.archive_dir = args.archive_dir
+        self.artifactory_upload = args.artifactory_upload
+        self.artifactory_url = args.artifactory_url
+        self.artifactory_token = args.artifactory_token
+        self.artifactory_path = args.artifactory_path
+        self.artifactory_properties = args.artifactory_properties
         self.cleanup = args.cleanup
         self.clean_build_dir = args.clean_build_dir
         self.nvidia_visible_devices = args.nvidia_visible_devices
@@ -1449,6 +1456,42 @@ def parse_args(argv):
         help="where the archives/ folder is placed (default: at the root of "
         "generated tree)",
     )
+    upload = parser.add_argument_group(
+        "artifactory", "Upload the archives once they are packed"
+    )
+    upload.add_argument(
+        "--artifactory-upload",
+        action="store_true",
+        help="upload the archives to Artifactory; implies --archive and "
+        "requires the four settings below [ARTIFACTORY_UPLOAD]",
+    )
+    upload.add_argument(
+        "--artifactory-url",
+        default=env_default("ARTIFACTORY_URL"),
+        help="Artifactory base URL [ARTIFACTORY_URL]",
+    )
+    upload.add_argument(
+        "--artifactory-token",
+        default=env_default("ARTIFACTORY_TOKEN"),
+        help="access token; passed to the uploader through the environment, "
+        "never argv, and never logged [ARTIFACTORY_TOKEN]",
+    )
+    upload.add_argument(
+        "--artifactory-path",
+        default=env_default("ARTIFACTORY_PATH"),
+        help="repository and path prefix to upload under [ARTIFACTORY_PATH]",
+    )
+    upload.add_argument(
+        "--artifactory-properties",
+        default=env_default(
+            "ARTIFACTORY_PROPERTIES",
+            env_default("ARTIFACTORY_PKG_MODELS_COMMON_PROPERTIES"),
+        ),
+        help="'k=v;k=v' set on every upload; falls back to "
+        "ARTIFACTORY_PKG_MODELS_COMMON_PROPERTIES, which CI already sets "
+        "[ARTIFACTORY_PROPERTIES]",
+    )
+
     behaviour.add_argument(
         "--list", action="store_true", help="print what would run, then exit"
     )
@@ -1496,6 +1539,27 @@ def parse_args(argv):
         log_warning("MODEL_TYPE=igpu: skipping the TensorRT stage")
         selected.remove("tensorrt")
     args.selected = selected
+
+    if args.artifactory_upload:
+        # Checked here rather than after generation: a missing token should
+        # cost a second, not a multi-hour run that cannot deliver its output.
+        missing = [
+            name
+            for name, value in (
+                ("--artifactory-url/ARTIFACTORY_URL", args.artifactory_url),
+                ("--artifactory-token/ARTIFACTORY_TOKEN", args.artifactory_token),
+                ("--artifactory-path/ARTIFACTORY_PATH", args.artifactory_path),
+                (
+                    "--artifactory-properties/ARTIFACTORY_PROPERTIES",
+                    args.artifactory_properties,
+                ),
+            )
+            if not value
+        ]
+        if missing:
+            parser.error("--artifactory-upload needs {}".format(", ".join(missing)))
+        # Uploading what was not packed is not a thing that can be asked for.
+        args.archive = True
 
     if args.cleanup is None:
         # Match the shell driver: docker tears its volume down outside CI,
@@ -1547,6 +1611,36 @@ def write_stage_scripts(ctx, stages, selected, directory):
         path.chmod(0o755)
         scripts[key] = path
     return scripts
+
+
+def upload_tree(ctx, tree):
+    """Push the packed archives to Artifactory.
+
+    The token goes through the environment rather than argv: `run_command` logs
+    every command it runs, and argv is readable by any process on the host, so
+    a token on the command line would leak into CI logs and to `ps`.
+    """
+    dest = ctx.archive_dest(tree)
+    log_status("artifactory: uploading {}".format(dest))
+    command = [
+        sys.executable,
+        str(SCRIPT_DIR / "gen_artifactory.py"),
+        "--archives",
+        str(dest),
+        "--url",
+        ctx.artifactory_url,
+        "--path",
+        ctx.artifactory_path,
+        "--properties",
+        ctx.artifactory_properties or "",
+    ]
+    environment = dict(os.environ)
+    environment["ARTIFACTORY_TOKEN"] = ctx.artifactory_token
+    try:
+        run_command(command, ctx.dry_run, environment=environment)
+    except GenerationError as error:
+        log_error("artifactory: {}".format(error))
+        raise
 
 
 def archive_tree(ctx, tree):
@@ -1642,6 +1736,8 @@ def main(argv=None):
         log_status("models generated in {}".format(tree))
         if ctx.archive:
             archive_tree(ctx, tree)
+        if ctx.artifactory_upload:
+            upload_tree(ctx, tree)
     elif ctx.archive:
         log_warning("CI set: models stay in the volume, nothing to archive")
     log_status("done")
