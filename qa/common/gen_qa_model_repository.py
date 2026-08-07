@@ -1202,12 +1202,30 @@ def resolve_gpu_args(args):
     declared = os.environ.get("DOCKER_GPU_ARGS")
     if declared:
         return shlex.split(os.path.expandvars(declared))
+
     runner_gpus = os.environ.get("RUNNER_GPUS", "")
-    if runner_gpus[:1].isdigit():
-        # The shell driver `eval`s NV_DOCKER_ARGS here. Expanding variables and
-        # splitting is the same thing for every value CI actually sets, without
-        # handing the environment to a shell.
-        return shlex.split(os.path.expandvars(os.environ.get("NV_DOCKER_ARGS", "")))
+    command = os.environ.get("NV_DOCKER_ARGS", "").strip()
+    if runner_gpus[:1].isdigit() and command:
+        # NV_DOCKER_ARGS is a *command*, not a value: CI sets it to a curl
+        # against the local nvidia-docker plugin, and the shell driver's
+        # `eval` inside $( ) substitutes what that prints. Splitting the
+        # string instead put the word `curl` where the image name belongs.
+        try:
+            result = subprocess.run(
+                command, shell=True, capture_output=True, text=True, timeout=30
+            )
+            flags = shlex.split(result.stdout)
+        except (OSError, subprocess.SubprocessError, ValueError) as error:
+            log_warning("NV_DOCKER_ARGS failed: {}".format(error))
+            flags = []
+        if flags:
+            return flags
+        # The plugin is unreachable or said nothing. The shell driver would
+        # carry on with no GPU flags at all; fall back to the explicit form so
+        # a stage that needs a GPU gets one instead of failing later.
+        log_warning(
+            "NV_DOCKER_ARGS produced no flags; falling back to --runtime=nvidia"
+        )
     return [
         "--runtime=nvidia",
         "-e",
