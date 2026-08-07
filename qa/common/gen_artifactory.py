@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-"""Upload the per-model archives to Artifactory, from the index that describes them.
+"""Upload the per-framework archives to Artifactory, from the index that describes them.
 
 Reads `archives/index.json`, uploads each archive beside it, and stamps every
 upload with properties so a consumer can select what it needs with an AQL query
@@ -76,7 +76,7 @@ BUNDLE_PROPERTIES = ("framework", "model_count", "sha256")
 
 # Uploads are the step most exposed to a flaky network -- the reason this corpus
 # is being decomposed at all -- so a failed PUT is retried before it is believed.
-RETRIES = 3
+DEFAULT_RETRIES = 3
 RETRY_BACKOFF_SECONDS = 2
 
 
@@ -178,7 +178,9 @@ def build_target(url, path, name, properties):
     return target
 
 
-def upload_archive(target, payload, token, sha256=None, timeout=300):
+def upload_archive(
+    target, payload, token, sha256=None, timeout=300, retries=DEFAULT_RETRIES
+):
     """PUT one archive. Returns the parsed response, or raises UploadError."""
     request = urllib.request.Request(target, data=payload, method="PUT")
     request.add_header("Authorization", "Bearer {}".format(token))
@@ -189,7 +191,7 @@ def upload_archive(target, payload, token, sha256=None, timeout=300):
         request.add_header("X-Checksum-Sha256", sha256)
 
     last = None
-    for attempt in range(1, RETRIES + 1):
+    for attempt in range(1, max(1, retries) + 1):
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 body = response.read().decode("utf-8", "replace")
@@ -205,7 +207,7 @@ def upload_archive(target, payload, token, sha256=None, timeout=300):
                 break
         except (urllib.error.URLError, OSError) as error:
             last = str(error)
-        if attempt < RETRIES:
+        if attempt < retries:
             time.sleep(RETRY_BACKOFF_SECONDS * attempt)
     raise UploadError(last or "unknown error")
 
@@ -275,6 +277,13 @@ def main(argv=None):
         "--triton-semver",
         default=os.environ.get("TRITON_SEMVER"),
         help="[TRITON_SEMVER]",
+    )
+    parser.add_argument(
+        "--retries",
+        type=int,
+        default=DEFAULT_RETRIES,
+        help="attempts per archive before giving up (default: %(default)s); a "
+        "4xx is never retried, since a bad token or path will not fix itself",
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
@@ -352,7 +361,13 @@ def main(argv=None):
             failed += 1
             continue
         try:
-            upload_archive(target, payload, args.token, entry.get("sha256"))
+            upload_archive(
+                target,
+                payload,
+                args.token,
+                entry.get("sha256"),
+                retries=args.retries,
+            )
         except UploadError as error:
             _log("FAILED {}: {}".format(name, error))
             failed += 1
