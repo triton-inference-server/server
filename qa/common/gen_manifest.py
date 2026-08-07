@@ -71,13 +71,16 @@ third-party packages installed are the framework being generated for.
 import argparse
 import collections
 import functools
+import io
 import json
 import os
 import pathlib
 import platform
 import re
+import struct
 import subprocess
 import sys
+import zipfile
 
 MANIFEST_NAME = "manifest.json"
 SCHEMA_VERSION = "2.0"
@@ -341,6 +344,206 @@ def per_model_logging(declared=None):
 def resolve_upstream_version(declared=None):
     """The container train, from the environment when not passed in."""
     return declared or os.environ.get(ENV_UPSTREAM)
+
+
+# ModelProto.opset_import, from onnx.proto. The default domain is spelled two
+# ways; anything else is a custom operator set and not what "the opset" means.
+ONNX_IR_VERSION_FIELD = 1
+ONNX_OPSET_FIELD = 8
+ONNX_DEFAULT_DOMAINS = ("", "ai.onnx")
+TENSORRT_PLAN_MAGIC = 0x74727466
+
+
+def _read_varint(handle):
+    """One protobuf varint, or None at EOF or on a malformed run."""
+    shift = value = 0
+    while shift <= 63:
+        byte = handle.read(1)
+        if not byte:
+            return None
+        value |= (byte[0] & 0x7F) << shift
+        if not byte[0] & 0x80:
+            return value
+        shift += 7
+    return None
+
+
+def _parse_opset_entry(blob):
+    """domain and version out of one OperatorSetIdProto."""
+    domain, version = "", None
+    handle = io.BytesIO(blob)
+    while True:
+        tag = _read_varint(handle)
+        if tag is None:
+            break
+        field, wire = tag >> 3, tag & 7
+        if wire == 2:
+            length = _read_varint(handle)
+            if length is None:
+                break
+            data = handle.read(length)
+            if field == 1:
+                domain = data.decode("utf-8", "replace")
+        elif wire == 0:
+            value = _read_varint(handle)
+            if value is None:
+                break
+            if field == 2:
+                version = value
+        elif wire == 1:
+            handle.seek(8, io.SEEK_CUR)
+        elif wire == 5:
+            handle.seek(4, io.SEEK_CUR)
+        else:
+            break
+    return domain, version
+
+
+def probe_onnx_header(path):
+    """`{ir_version, opset}` from an .onnx file's ModelProto, or {}.
+
+    Both are properties of the file rather than of whatever produced it, so
+    they are recorded for static models too. The producer fields are read past
+    but not kept: they name the exporter -- tf2onnx in this corpus -- which is
+    not the ONNX version anyone means.
+    """
+    found = {}
+    try:
+        with open(path, "rb") as handle:
+            while True:
+                tag = _read_varint(handle)
+                if tag is None:
+                    break
+                field, wire = tag >> 3, tag & 7
+                if wire == 0:
+                    value = _read_varint(handle)
+                    if value is None:
+                        break
+                    if field == ONNX_IR_VERSION_FIELD:
+                        found["onnx_version"] = value
+                elif wire == 2:
+                    length = _read_varint(handle)
+                    if length is None:
+                        break
+                    if field == ONNX_OPSET_FIELD:
+                        domain, version = _parse_opset_entry(handle.read(length))
+                        if version is not None and domain in ONNX_DEFAULT_DOMAINS:
+                            found["onnx_opset_version"] = version
+                    else:
+                        handle.seek(length, io.SEEK_CUR)
+                elif wire == 1:
+                    handle.seek(8, io.SEEK_CUR)
+                elif wire == 5:
+                    handle.seek(4, io.SEEK_CUR)
+                else:
+                    break
+    except OSError:
+        return {}
+    return found
+
+
+def probe_openvino_ir_version(path):
+    """The IR version an OpenVINO .xml declares, or None.
+
+    `<net ... version="11">` is the only version these files carry -- the
+    product version is not written into the IR -- so this is the OpenVINO
+    version *of the artifact*, not of the toolkit that produced it.
+
+    Only the opening tag is read: the graph body runs to megabytes and none of
+    it is needed.
+    """
+    try:
+        with open(path, "rb") as handle:
+            head = handle.read(4096).decode("utf-8", "replace")
+    except OSError:
+        return None
+    match = re.search(r"<net\b[^>]*?\bversion=\"(\d+)\"", head)
+    return int(match.group(1)) if match else None
+
+
+def probe_torchscript_version(path):
+    """The TorchScript archive version inside a .pt, or None.
+
+    A .pt is a zip whose `<name>/version` entry holds the serialization format
+    version. That is what the artifact declares; the torch release that wrote
+    it is not recorded in the archive.
+    """
+    try:
+        with zipfile.ZipFile(path) as archive:
+            entry = next(
+                (n for n in archive.namelist() if n.rsplit("/", 1)[-1] == "version"),
+                None,
+            )
+            if entry is None:
+                return None
+            text = archive.read(entry).decode("ascii", "replace").strip()
+    except (OSError, zipfile.BadZipFile, KeyError):
+        return None
+    return int(text) if text.isdigit() else None
+
+
+def probe_tensorrt_version(path):
+    """The TensorRT version a serialized .plan declares, or None.
+
+    The plan begins with the magic 0x74727466 ("ftrt"), and four bytes at
+    offset 0x18 carry major, minor, patch and build. That offset is read from
+    the format rather than from documentation NVIDIA publishes, so the magic is
+    checked first and anything implausible is discarded -- a wrong version here
+    would be worse than an absent one, since a plan is only loadable by the
+    runtime that matches it.
+    """
+    try:
+        with open(path, "rb") as handle:
+            head = handle.read(28)
+    except OSError:
+        return None
+    if len(head) < 28 or struct.unpack_from("<I", head, 0)[0] != TENSORRT_PLAN_MAGIC:
+        return None
+    major, minor, patch, build = head[24:28]
+    if not 1 <= major <= 99:
+        return None
+    return "{}.{}.{}.{}".format(major, minor, patch, build)
+
+
+def _first_file(model_dir, pattern):
+    """The first matching *file*, sorted.
+
+    Files only: an ONNX model with external data is a *directory* named
+    model.onnx holding model.onnx plus its weights, and the directory sorts
+    ahead of the file inside it.
+    """
+    return next((p for p in sorted(model_dir.rglob(pattern)) if p.is_file()), None)
+
+
+def probe_artifact_versions(model_dir):
+    """Per-format version blocks for whichever artifacts a model directory holds."""
+    blocks = {}
+
+    onnx_file = _first_file(model_dir, "*.onnx")
+    if onnx_file is not None:
+        header = probe_onnx_header(onnx_file)
+        if header:
+            blocks["onnx"] = header
+
+    openvino_file = _first_file(model_dir, "*.xml")
+    if openvino_file is not None:
+        version = probe_openvino_ir_version(openvino_file)
+        if version is not None:
+            blocks["openvino"] = {"openvino_version": version}
+
+    torch_file = _first_file(model_dir, "*.pt")
+    if torch_file is not None:
+        version = probe_torchscript_version(torch_file)
+        if version is not None:
+            blocks["pytorch"] = {"pytorch_version": version}
+
+    plan_file = _first_file(model_dir, "*.plan")
+    if plan_file is not None:
+        version = probe_tensorrt_version(plan_file)
+        if version is not None:
+            blocks["tensorrt"] = {"tensorrt_version": version}
+
+    return blocks
 
 
 def probe_os_release():
@@ -640,6 +843,13 @@ def build_manifest(
         "upstream_container_version": upstream_version,
         "gpu": probe_gpu() if built_here else None,
     }
+    # What the artifacts themselves declare. Recorded even for static models,
+    # unlike the build-environment fields: these are properties of the files,
+    # not of whatever produced them, and they decide whether a runtime can load
+    # the model at all. A block appears only when its format is present and
+    # readable, so a libtorch model carries no `onnx` key.
+    model.update(probe_artifact_versions(model_dir))
+
     if include_size:
         total = measure_model_bytes(model_dir)
         model["size_bytes"] = total
