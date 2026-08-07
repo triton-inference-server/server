@@ -65,8 +65,10 @@ exist are bash and one of docker or enroot.
 import argparse
 import collections
 import datetime
+import difflib
 import os
 import pathlib
+import re
 import shlex
 import shutil
 import subprocess
@@ -141,6 +143,18 @@ REPOSITORY_DIRS = (
 CUSTOM_OPS_DIR = "qa_custom_ops/libtorch_custom_ops"
 
 STAGE_ORDER = ("openvino", "onnx", "pytorch", "tensorrt")
+
+# Accepted in TRITON_MODELS_FRAMEWORKS alongside the stage names themselves.
+# The values on the left are what config.pbtxt and the L0_* suites' BACKENDS
+# call these backends, and asking for models "for onnxruntime" or "for plan"
+# is the same request as asking for the stage that builds them.
+FRAMEWORK_ALIASES = {
+    "libtorch": "pytorch",
+    "onnxruntime": "onnx",
+    "plan": "tensorrt",
+    "torch": "pytorch",
+    "trt": "tensorrt",
+}
 
 
 # --------------------------------------------------------------------------
@@ -1210,6 +1224,44 @@ def resolve_gpu_args(args):
     ]
 
 
+def parse_frameworks(value):
+    """The stages named by TRITON_MODELS_FRAMEWORKS, verified.
+
+    Comma or whitespace separated, case-insensitive, `all` for every stage.
+    Returns them in STAGE_ORDER: the four stages write into the same
+    repositories, so the order they run in is load-bearing and is never the
+    order they happened to be listed in.
+
+    Raises ValueError on anything unrecognised. Silently ignoring a typo is
+    the failure mode worth designing against -- `TRITON_MODELS_FRAMEWORKS=onx`
+    that quietly built nothing would surface hours later as a test suite
+    failing on missing models, far from its cause.
+    """
+    names = [part for part in re.split(r"[,\s]+", value.strip().lower()) if part]
+    if not names:
+        raise ValueError("no frameworks named")
+
+    selected = set()
+    for name in names:
+        if name == "all":
+            selected.update(STAGE_ORDER)
+            continue
+        resolved = FRAMEWORK_ALIASES.get(name, name)
+        if resolved not in STAGE_ORDER:
+            suggestion = difflib.get_close_matches(
+                name, list(STAGE_ORDER) + list(FRAMEWORK_ALIASES), 1
+            )
+            raise ValueError(
+                "unknown framework {!r}{}; valid: {}".format(
+                    name,
+                    " (did you mean {!r}?)".format(suggestion[0]) if suggestion else "",
+                    ", ".join(STAGE_ORDER + ("all",)),
+                )
+            )
+        selected.add(resolved)
+    return [key for key in STAGE_ORDER if key in selected]
+
+
 def read_semver():
     """server/TRITON_VERSION, or None if this tree is laid out differently.
 
@@ -1247,6 +1299,12 @@ def parse_args(argv):
     )
     stages.add_argument("--tensorrt", action="store_true", help="build TensorRT models")
     stages.add_argument("--all", action="store_true", help="build all four (default)")
+    stages.add_argument(
+        "--frameworks",
+        default=env_default("TRITON_MODELS_FRAMEWORKS"),
+        help="comma or space separated stage names, or 'all'; the per-stage "
+        "flags above override it [TRITON_MODELS_FRAMEWORKS]",
+    )
 
     images = parser.add_argument_group("images", "Per-framework image overrides")
     images.add_argument(
@@ -1400,9 +1458,20 @@ def parse_args(argv):
 
     args = parser.parse_args(argv)
 
+    # Precedence: --all, then the per-stage flags, then the variable, then
+    # every stage. An explicit flag outranks the environment, as everywhere
+    # else here.
     selected = [key for key in STAGE_ORDER if getattr(args, key)]
-    if args.all or not selected:
+    if args.all:
         selected = list(STAGE_ORDER)
+    elif not selected:
+        if args.frameworks:
+            try:
+                selected = parse_frameworks(args.frameworks)
+            except ValueError as error:
+                parser.error("--frameworks/TRITON_MODELS_FRAMEWORKS: {}".format(error))
+        else:
+            selected = list(STAGE_ORDER)
     if args.model_type == "igpu" and "tensorrt" in selected:
         log_warning("MODEL_TYPE=igpu: skipping the TensorRT stage")
         selected.remove("tensorrt")

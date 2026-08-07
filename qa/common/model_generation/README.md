@@ -66,6 +66,32 @@ repositories — `qa_model_repository` receives models from every one of them.
 With no framework flag, all four run. `MODEL_TYPE=igpu` drops the TensorRT stage entirely and
 `torch_tensorrt` within the PyTorch stage.
 
+Stage selection also comes from the environment, for a CI job that sets variables rather than
+composing a command line:
+
+```bash
+TRITON_MODELS_FRAMEWORKS=onnx,openvino ./gen_qa_model_repository.py
+TRITON_MODELS_FRAMEWORKS="pytorch tensorrt" ./gen_qa_model_repository.py
+TRITON_MODELS_FRAMEWORKS=all ./gen_qa_model_repository.py
+```
+
+Comma or whitespace separated, case-insensitive. The backend names used in `config.pbtxt` and
+in the `L0_*` suites' `BACKENDS` are accepted too — `plan`, `libtorch`, `onnxruntime`, `trt`,
+`torch` — since asking for models *for* a backend is the same request as asking for the stage
+that builds them. Precedence runs `--all`, then the per-stage flags, then the variable, then
+all four.
+
+The value is verified, and an unrecognised name is refused rather than skipped:
+
+```
+$ TRITON_MODELS_FRAMEWORKS=onx ./gen_qa_model_repository.py
+error: --frameworks/TRITON_MODELS_FRAMEWORKS: unknown framework 'onx' (did you mean 'onnx'?);
+       valid: openvino, onnx, pytorch, tensorrt, all
+```
+
+That refusal is the point of the check. A typo that quietly generated nothing would not surface
+until a test suite failed on missing models, hours later and far from the cause.
+
 ### Every environment variable is also a flag
 
 The wrapper reads the same variables the shell driver does, so existing CI works unchanged, and
@@ -73,7 +99,9 @@ each has a flag that overrides it for one invocation:
 
 | flag | variable | default |
 |---|---|---|
+| `--frameworks` | `TRITON_MODELS_FRAMEWORKS` | all four |
 | `--triton-version` | `TRITON_VERSION` | `26.07` |
+| `--semver` | `TRITON_SEMVER` | `server/TRITON_VERSION` |
 | `--ubuntu-image` | `UBUNTU_IMAGE` | `ubuntu:22.04` |
 | `--pytorch-image` | `PYTORCH_IMAGE` | `nvcr.io/nvidia/pytorch:<version>-py3` |
 | `--tensorrt-image` | `TENSORRT_IMAGE` | `nvcr.io/nvidia/tensorrt:<version>-py3` |
