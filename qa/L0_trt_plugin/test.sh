@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,6 +47,7 @@ PLUGIN_TEST=trt_plugin_test.py
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
+TEST_WINDOWS=0
 if [[ -v WSL_DISTRO_NAME ]] || [[ -v MSYSTEM ]]; then
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     MODELDIR=${MODELDIR:=C:/models}
