@@ -172,7 +172,7 @@ def bundle_path(args, framework):
     versions = "-".join(
         part for part in (args.nvidia_upstream_version, args.triton_semver) if part
     )
-    parts = [args.path.strip("/"), args.model_type, versions]
+    parts = [args.path.strip("/"), args.model_type, versions, args.build_id]
     # The grouping segment is worth a directory when a handful of bundles share
     # a release. Per-model archives already carry repository and model in their
     # own names, so nesting them only buys a directory per model.
@@ -307,6 +307,13 @@ def main(argv=None):
         default=DEFAULT_RETRIES,
         help="attempts per archive before giving up (default: %(default)s); a "
         "4xx is never retried, since a bad token or path will not fix itself",
+    )
+    parser.add_argument(
+        "--build-id",
+        help="a directory between the release and the archives, keeping one "
+        "run's output separate from the next -- CI passes its pipeline id. No "
+        "default: an id inherited from the environment would silently change "
+        "where a local run publishes",
     )
     parser.add_argument(
         "--flat",
