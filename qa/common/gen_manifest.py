@@ -588,13 +588,22 @@ def build_manifest(
         repository = resolve_repository(model_dir, tree) if tree else ""
         origin = "static" if repository in STATIC_REPOSITORIES else "dynamic"
 
+    # A static model was built elsewhere, at an unknown time, on unknown
+    # hardware -- it is copied forward, not generated here. Probing this host
+    # for its GPU, platform and library version would answer a question about
+    # the machine that happened to stamp the manifest, and record it as though
+    # it described the artifact. Compute capability is exactly the field a
+    # consumer filters on to decide whether a plan or AOTI artifact is portable
+    # to their GPU, so a confident wrong answer there is worse than none.
+    built_here = origin != "static"
+
     model = {
         "name": config.name,
         # The stage and library that produced this model. Distinct from
         # provenance, which is the backend that serves it: the ONNX stage also
         # produces ensemble and identity models.
         "framework": framework,
-        "framework_version": framework_version,
+        "framework_version": framework_version if built_here else None,
         # The script that wrote it, which provenance alone does not identify --
         # eight different generators emit onnx models.
         "generator": generator,
@@ -605,7 +614,7 @@ def build_manifest(
         "origin": origin,
         "triton_version": triton_version,
         "upstream_container_version": upstream_version,
-        "gpu": probe_gpu(),
+        "gpu": probe_gpu() if built_here else None,
     }
     if include_size:
         total = measure_model_bytes(model_dir)
@@ -621,10 +630,16 @@ def build_manifest(
             # data, forcing every consumer to probe both keys to find the image.
             # enroot pulls docker:// references too, so image_name means the
             # same thing either way; only the engine differs.
-            "container": {"image_name": image, "runtime": container_runtime},
+            "container": {
+                "image_name": image if built_here else None,
+                "runtime": container_runtime if built_here else None,
+            },
             "platform": {
-                "platform": platform.system(),
-                "os_release": probe_os_release(),
+                "platform": platform.system() if built_here else None,
+                "os_release": probe_os_release() if built_here else None,
+                # Architecture survives: a static artifact is fetched for an
+                # arch, and the tree it came from is arch-specific even when
+                # nothing else about the build host is known.
                 "arch": platform.machine().lower(),
             },
             "model": model,
