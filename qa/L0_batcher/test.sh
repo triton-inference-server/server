@@ -841,14 +841,22 @@ kill_server
 # (core dynamic-batcher / InstanceQueue path).
 INSTANCE_QUEUE_TEST_LOG="./instance_queue_test.log"
 INSTANCE_QUEUE_TEST_EXEC=./instance_queue_test
-set +e
-LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $INSTANCE_QUEUE_TEST_EXEC >>$INSTANCE_QUEUE_TEST_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $INSTANCE_QUEUE_TEST_LOG
-    echo -e "\n***\n*** Instance Queue Unit Test Failed\n***"
-    RET=1
+# The RHEL QA image is assembled from the release zip, which ships only
+# bin/tritonserver, so the unit test binaries are not available there. The
+# test covers platform-independent core logic and is already exercised on
+# x86 and aarch64 by the non-RHEL jobs, so skip rather than fail.
+if [ -x $INSTANCE_QUEUE_TEST_EXEC ]; then
+    set +e
+    LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $INSTANCE_QUEUE_TEST_EXEC >>$INSTANCE_QUEUE_TEST_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $INSTANCE_QUEUE_TEST_LOG
+        echo -e "\n***\n*** Instance Queue Unit Test Failed\n***"
+        RET=1
+    fi
+    set -e
+else
+    echo -e "\n***\n*** Skipping Instance Queue Unit Test: $INSTANCE_QUEUE_TEST_EXEC not found\n***"
 fi
-set -e
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
