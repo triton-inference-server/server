@@ -172,7 +172,12 @@ def bundle_path(args, framework):
     versions = "-".join(
         part for part in (args.nvidia_upstream_version, args.triton_semver) if part
     )
-    parts = [args.path.strip("/"), args.model_type, versions, framework]
+    parts = [args.path.strip("/"), args.model_type, versions]
+    # The grouping segment is worth a directory when a handful of bundles share
+    # a release. Per-model archives already carry repository and model in their
+    # own names, so nesting them only buys a directory per model.
+    if not args.flat:
+        parts.append(framework)
     return "/".join(part.strip("/") for part in parts if part)
 
 
@@ -302,6 +307,12 @@ def main(argv=None):
         default=DEFAULT_RETRIES,
         help="attempts per archive before giving up (default: %(default)s); a "
         "4xx is never retried, since a bad token or path will not fix itself",
+    )
+    parser.add_argument(
+        "--flat",
+        action="store_true",
+        help="put every archive directly under <path>/<model type>/<versions>, "
+        "with no directory per bundle",
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)

@@ -123,14 +123,22 @@ def resolve_stamp(upstream=None, semver=None, pipeline=None, job=None):
     return "-".join(part for part in (versions, ci) if part)
 
 
-def resolve_archive_name(framework, stamp="", compress=False):
-    """`<framework>-<stamp>.tar`."""
-    name = "{}-{}".format(framework, stamp) if stamp else framework
+def resolve_archive_name(label, stamp="", compress=False):
+    """`<label>-<stamp>.tar`, with any path separator folded into the name.
+
+    Per-model labels are `<repository>/<model>`, which names the directory an
+    upload lands in; the file itself has to be flat, and keeping both parts in
+    it means the archive still says where it came from once detached.
+    """
+    flat = label.replace("/", "-")
+    name = "{}-{}".format(flat, stamp) if stamp else flat
     return name + (COMPRESSED_SUFFIX if compress else ARCHIVE_SUFFIX)
 
 
-def manifest_name(framework):
-    return "{}{}.json".format(MANIFEST_PREFIX, framework)
+def manifest_name(label):
+    """Flattened for the same reason the archive name is: a per-model label is
+    a path, and the manifest sits beside its archive rather than under it."""
+    return "{}{}.json".format(MANIFEST_PREFIX, label.replace("/", "-"))
 
 
 def archive_member_path(model_dir, tree):
@@ -181,6 +189,25 @@ def common_properties(manifests):
         for key in sorted(shared)
         if all(other[key] == flattened[0][key] for other in flattened)
     }
+
+
+def group_by_model(tree):
+    """One group per model, keyed `<repository>/<model>`.
+
+    The granularity the static stores want: a bundle's shared properties are
+    only the fields its models agree on, so `model.name` and the sizes vanish
+    the moment a store holds more than one. One archive per model makes every
+    field true of its artifact, and makes a single model fetchable without the
+    repository around it.
+    """
+    groups = collections.OrderedDict()
+    for model_dir in manifest.iter_model_dirs(tree):
+        try:
+            loaded = manifest.load_manifest(model_dir)
+        except manifest.ManifestError:
+            loaded = None
+        groups[str(archive_member_path(model_dir, tree))] = [(model_dir, loaded)]
+    return groups
 
 
 def group_by_framework(tree):
@@ -310,7 +337,14 @@ def main(argv=None):
         "--framework",
         action="append",
         default=[],
-        help="pack only this framework; repeatable",
+        help="pack only this group; repeatable. Matches a framework name, or "
+        "a <repository>/<model> under --granularity model",
+    )
+    parser.add_argument(
+        "--granularity",
+        choices=["framework", "model"],
+        default="framework",
+        help="one archive per framework (default), or one per model",
     )
     parser.add_argument(
         "--compress",
@@ -337,7 +371,11 @@ def main(argv=None):
     )
     _log("archive name stamp: {}".format(stamp or "(none)"))
 
-    groups = group_by_framework(args.tree)
+    groups = (
+        group_by_model(args.tree)
+        if args.granularity == "model"
+        else group_by_framework(args.tree)
+    )
     if args.framework:
         groups = {k: v for k, v in groups.items() if k in args.framework}
 
