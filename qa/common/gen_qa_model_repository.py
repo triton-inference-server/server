@@ -1162,6 +1162,7 @@ class Context:
         self.artifactory_token = args.artifactory_token
         self.artifactory_path = args.artifactory_path
         self.artifactory_properties = args.artifactory_properties
+        self.artifactory_build_id = args.artifactory_build_id
         self.cleanup = args.cleanup
         self.clean_build_dir = args.clean_build_dir
         self.nvidia_visible_devices = args.nvidia_visible_devices
@@ -1489,6 +1490,12 @@ def parse_args(argv):
         help="repository and path prefix to upload under [ARTIFACTORY_PATH]",
     )
     upload.add_argument(
+        "--artifactory-build-id",
+        default=env_default("CI_PIPELINE_ID"),
+        help="a directory between the release and the archives, keeping one "
+        "run's output separate from the next [CI_PIPELINE_ID]",
+    )
+    upload.add_argument(
         "--artifactory-properties",
         default=env_default(
             "ARTIFACTORY_PROPERTIES",
@@ -1647,6 +1654,8 @@ def upload_tree(ctx, tree):
     ]
     if ctx.model_type:
         command += ["--model-type", ctx.model_type]
+    if ctx.artifactory_build_id:
+        command += ["--build-id", ctx.artifactory_build_id]
     environment = dict(os.environ)
     environment["ARTIFACTORY_TOKEN"] = ctx.artifactory_token
     try:
