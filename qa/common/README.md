@@ -153,79 +153,65 @@ specific, so the field has to be real. The hook's own opt-out value, `none`, is 
 ```
 
 Archiving runs **on the host, after generation finishes** — it is not a stage and never happens
-inside a generation container. That means a finished tree can be re-archived, under different
+inside a generation container. A finished tree can therefore be re-archived, under different
 naming or after a failed upload, without regenerating a single model, and the generation images
 carry no archiving concern. A packaging failure is warned about rather than failing the run,
 since by then the models are already generated and correct.
 
 Archives go in `archives/`, a folder of their own at the root of the model tree, so they travel
-with the tree. They are safe there because every walk — sizing, manifesting, archiving — keys on
-a directory holding a `config.pbtxt`, and this one holds only tarballs. `--archive-dir` puts them
+with it. They are safe there because every walk — sizing, manifesting, archiving — keys on a
+directory holding a `config.pbtxt`, and this one holds only tarballs. `--archive-dir` puts them
 somewhere else entirely.
 
-`gen_archive.py` can also be run on its own against a finished tree:
-
-```bash
-python3 gen_archive.py --tree /tmp/26.08 --dest /tmp/26.08/archives
-python3 gen_archive.py --tree /tmp/26.08 --dest /tmp/26.08/archives \
-    --provenance onnx --repository qa_model_repository
-```
-
-Every model gets its own `.tar`, plus an `index.json` describing all of them. Archives are flat
-in the destination and named for what they hold:
+**One archive per framework.** A test suite runs against one backend and the four stages are
+already split that way, so the framework is the unit a consumer actually fetches:
 
 ```
-archives/qa_model_repository-openvino_int8_int8_int8-26.08-2.72.0dev-1234567-89012.tar
-         └─ repository ────┘ └─ model ────────────┘ └ train ┘ └ semver ┘ └ pipeline ┘ └ job ┘
+onnx-26.07-2.72.0dev-57638316.360696202.tar       735 models       4.2 MiB  14 properties
+openvino-26.07-2.72.0dev-57638316.360696202.tar    16 models       0.2 MiB  15 properties
+pytorch-26.07-2.72.0dev-57638316.360696202.tar    113 models    1164.3 MiB  14 properties
+tensorrt-26.07-2.72.0dev-57638316.360696202.tar    84 models     106.5 MiB  14 properties
 ```
 
-The trailing components come from `NVIDIA_UPSTREAM_VERSION`, `TRITON_SEMVER`, `CI_PIPELINE_ID`
-and `CI_JOB_ID` — the same values the manifests record. The CI pair is dropped when unset, so
-local archives are not named after a pipeline that does not exist. Each `--<name>` flag
-overrides one.
+The trailing components are `<upstream>-<semver>`, then `<pipeline>.<job>` when CI supplies
+them — a dot between the CI pair, matching the names already in Artifactory, and a dash between
+the versions. Absent parts are dropped rather than left as empty segments, so a local archive is
+not named after a pipeline that does not exist.
 
-`TRITON_VERSION` is gone from this subsystem. It did not mean one thing — the shell driver
-defaulted it to the container train while GitLab exports it as the semver — so reading it was
-wrong half the time. Each version now has a variable that only ever carries one meaning, and all
-three are read from `server/build.py`'s `DEFAULT_TRITON_VERSION_MAP`, the single place they are
-declared together:
-
-| variable | `build.py` key | example | what it is |
-|---|---|---|---|
-| `TRITON_CONTAINER_VERSION` | `triton_container_version` | `26.08dev` | the Triton container being built; names the tree |
-| `NVIDIA_UPSTREAM_VERSION` | `upstream_container_version` | `26.07` | the NGC containers built against; tags the PyTorch and TensorRT images |
-| `TRITON_SEMVER` | `release_version` | `2.72.0dev` | the release |
-
-Note the tree is named for the *container* version while the images are tagged with the
-*upstream* one — there is no `nvcr.io/nvidia/pytorch:26.08dev-py3`.
-
-Inside, the model keeps its full path relative to the tree:
+Inside, each model keeps its full path relative to the tree:
 
 ```
 qa_model_repository/openvino_int8_int8_int8/config.pbtxt
-qa_model_repository/openvino_int8_int8_int8/1/model.xml
+qa_model_repository/openvino_int8_int8_int8/manifest.json
 ```
 
-so unpacking an archive over a tree root restores the model to its own repository — necessary
-because the same model name appears in more than one repository.
+so unpacking a bundle over a tree root restores every model to its own repository — necessary
+because the same model name appears in more than one.
 
-Pass `--compress` for `.tar.gz` instead. Per-model granularity is close to free — measured over
-a full tree, per-model archives occupy the same bytes as per-repository-group archives to within
-0.1%, because tar's per-entry overhead disappears against the payload.
+Each bundle gets a `manifest-<framework>.json` beside it carrying the properties **every model
+in it agrees on**, already flattened:
 
-The index is the load-bearing part. It carries `provenance`, `size_bytes` and `size_tier` for
-each entry, so a job filters *before* transferring anything. The same fields stored only inside
-the archives would mean downloading a thing to find out whether you wanted it.
+```
+container.image_name=ubuntu:22.04   model.framework=onnx        platform.arch=x86_64
+container.runtime=docker            model.framework_version=1.20.1
+```
 
-Archives are byte-reproducible: entries sorted, ownership and timestamps normalised, and the
-gzip header stamped with a fixed mtime under `--compress`. Re-running a build over unchanged
-models therefore produces identical checksums, so a runner can skip a download it already has —
-provided the name components match, since `CI_JOB_ID` differs per run and is part of the name.
+A field the models *disagree* on is dropped rather than resolved to a first or majority value: a
+property true of only some of an archive's contents is worse than an absent one. That is why the
+ONNX bundle has one property fewer than OpenVINO — it also carries ensemble models, whose
+`model.provenance` differs.
 
-Reproducible does *not* mean identical across build environments, because `manifest.json` is
-inside the archive and describes the environment. The same model built under docker and under
-enroot yields two different checksums — measured, and the whole difference is the one
-`container.runtime` line. Deduplication works within a runtime, not across them.
+`gen_archive.py` runs on its own against any finished tree:
+
+```bash
+python3 gen_archive.py --tree /tmp/26.08dev --dest /tmp/26.08dev/archives
+python3 gen_archive.py --tree /tmp/26.08dev --dest /tmp/26.08dev/archives --framework onnx
+```
+
+Pass `--compress` for `.tar.gz` instead of `.tar`; plan files compress ~96%, which matters for
+the TensorRT and PyTorch bundles. Archives are byte-reproducible — entries sorted, ownership and
+timestamps normalised — so identical content yields an identical checksum and a runner can skip a
+download it already has, provided the name components match.
 
 ### Upload the archives
 
@@ -233,40 +219,70 @@ enroot yields two different checksums — measured, and the whole difference is 
 ./gen_qa_model_repository.py --all --artifactory-upload
 ```
 
-`--artifactory-upload` implies `--archive` — uploading what was never packed is not something
-that can be asked for — and needs four settings, each a flag or the matching variable:
+`--artifactory-upload` implies `--archive` and needs four settings, each a flag or a variable:
 
 | flag | variable |
 |---|---|
 | `--artifactory-url` | `ARTIFACTORY_URL` |
 | `--artifactory-token` | `ARTIFACTORY_TOKEN` |
 | `--artifactory-path` | `ARTIFACTORY_PATH` |
-| `--artifactory-properties` | `ARTIFACTORY_PROPERTIES`, falling back to `ARTIFACTORY_PKG_MODELS_COMMON_PROPERTIES` |
+| `--artifactory-properties` | `ARTIFACTORY_PROPERTIES` |
 
-They are checked **before** the first container starts, not after generation, so a missing token
-costs a second rather than a multi-hour run that cannot deliver its output. The error names
-every setting that is absent, not just the first.
+They are checked **before the first container starts**, so a missing token costs a second rather
+than a multi-hour run that cannot deliver its output, and the error names every absent setting
+rather than the first. The token reaches the uploader through the environment, never argv: the
+driver logs every command it runs, and argv is readable by any process on the host.
 
-The token is passed to the uploader through the environment, never argv: the driver logs every
-command it runs, and argv is readable by any process on the host, so a token on a command line
-would reach both the CI log and `ps`.
-
-`gen_artifactory.py` also runs on its own against any packed tree:
+`gen_artifactory.py` also runs on its own:
 
 ```bash
 python3 gen_artifactory.py --archives /tmp/26.08dev/archives \
-    --url https://artifactory.nvidia.com/artifactory \
-    --path sw-dl-triton-generic-local/triton/models/26.07-2.72.0dev \
-    --properties "MODEL_TYPE=A100-x86-8.0" --provenance onnx
+    --path sw-dl-triton-generic-local/triton/models \
+    --model-type DGX-Spark-sbsa-12.1 \
+    --nvidia-upstream-version 26.07 --triton-semver 2.72.0dev
 ```
 
-Each upload carries the common properties plus `model`, `repository`, `provenance` and
-`size_tier` from the index, so a consumer can select with an AQL query rather than downloading a
-repository group to discover what is in it — which is the whole point of per-model archives.
-The `sha256` the index already records is sent as `X-Checksum-Sha256`, so Artifactory rejects a
-truncated upload rather than leaving it to be found later by a test job. Failed PUTs are retried,
-since an unstable network is the friction this decomposition exists to remove; a 4xx is not
-retried, because a bad token or a bad path will not fix itself.
+Uploads land one level per thing a consumer narrows by — device, release, then bundle:
+
+```
+sw-dl-triton-generic-local/triton/models/DGX-Spark-sbsa-12.1/26.07-2.72.0dev/onnx/onnx-26.07-2.72.0dev-57638316.360696202.tar
+```
+
+`--url` and `--token` fall back to the jfrog CLI config, so a developer who has already run
+`jf config add` need not restate either. It is read from `$JFROG_CLI_HOME_DIR/jfrog-cli.conf.v6`,
+defaulting to `~/.jfrog`, and the server is chosen by `isDefault` rather than by position — the
+servers are a JSON array and a second `jf config add` reorders them. `--jfrog-server-id` picks one
+by name. Which source supplied each value is logged, by server id; the token never is.
+
+Failed PUTs are retried `--retries` times, default 3. A 4xx is not retried — a bad token or path
+will not fix itself. The `sha256` from the index is sent as `X-Checksum-Sha256`, so Artifactory
+rejects a truncated upload rather than leaving it for a test job to find.
+
+#### Which properties an upload carries
+
+Three layers, each winning over the one before:
+
+1. **The bundle's own**, flattened from `manifest-<framework>.json` — `model.framework`,
+   `platform.arch`, `container.runtime` and the rest.
+2. **The bundle's identity** — `bundle`, `model_count`, `sha256`. The grouping key is published
+   as `bundle`, not `framework`: for the generated corpus the two coincide, but the static stores
+   group by repository, where `framework=c2_model_store` would contradict the
+   `model.framework=netdef` the manifest supplies.
+3. **Declared properties**, merged from four sources, lowest scope first:
+
+   ```
+   ARTIFACTORY_PKG_MODELS_COMMON_PROPERTIES   what is true of every model package
+   ARTIFACTORY_PROPERTIES                     this upload
+   ARTIFACTORY_PROPERTIES_CI_JOB_PROPERTIES   this CI job
+   --properties                               this invocation
+   ```
+
+   All four are **merged**, not chosen between — they are scopes of the same thing, and a key set
+   by more than one resolves to the narrowest scope that sets it.
+
+That third layer is how provenance survives that no artifact can supply. The static stores carry
+`NVIDIA_UPSTREAM_VERSION=25.09` and `TRITON_VERSION=2.61.0` — what actually built them, older
+than the directory they sit in — alongside `ISSUE`, `MODEL_TYPE` and the `CI_*` set.
 
 ## Size classification
 
@@ -501,10 +517,34 @@ of it — sizing, archiving or manifesting — ever picks the file up.
 | `model.generator` | the script that wrote it — `provenance` alone does not identify it, since eight generators emit onnx models |
 | `model.framework`, `framework_version` | `TRITON_MODEL_GEN_FRAMEWORK`, else the model's own provenance; the version is read in-process from the installed library, not from a pin |
 | `model.gpu` | `cuda-python` + NVML if importable, else `nvidia-smi`; probed once per run, not once per model |
-| `model.origin` | `static` for the pinned stores listed in `STATIC_REPOSITORIES`, else `dynamic` |
+| `model.origin` | `static` for the pinned stores listed in `STATIC_REPOSITORIES`, else `dynamic`. `perf_model_store` is listed under all three of its spellings — it ships as two artifacts split by backend, and a tree laid out to match them has the split names |
 | `container.image_name` | `TRITON_MODEL_GEN_IMAGE` |
 | `container.runtime` | `TRITON_MODEL_GEN_RUNTIME`, else detected |
 | `platform.*` | `platform.system()`, `/etc/os-release`, `platform.machine()` |
+
+#### Static models record almost none of that
+
+A `static` model is copied forward, not generated: it was built elsewhere, at an unknown time, on
+unknown hardware. So for `origin: static` the host is not probed at all — `gpu`, `platform.platform`,
+`platform.os_release`, `framework_version` and both `container` fields are recorded as null,
+even when the caller passes an image or version explicitly, because those describe the process
+doing the stamping rather than whatever produced the artifact.
+
+```json
+"container": { "image_name": null, "runtime": null },
+"platform":  { "platform": null, "os_release": null, "arch": "x86_64" },
+"model":     { "framework": "openvino", "provenance": "openvino", "origin": "static",
+               "framework_version": null, "gpu": null, "size_tier": "m" }
+```
+
+Stamping the `26.07-2.71.0` static stores on a dev box would otherwise assert they were built
+against that box's GPU and OS — and compute capability is exactly what a consumer filters on to
+decide whether a plan or AOTI artifact is portable to their hardware, so a confident wrong answer
+there is worse than none. Architecture survives: a static artifact is fetched for an arch and its
+tree is arch-specific regardless.
+
+What the build environment actually was lives in the Artifactory properties instead — see
+[Which properties an upload carries](#which-properties-an-upload-carries).
 
 The container block is named `container`, not `docker` or `enroot`. Naming it after the engine
 would make the schema shape depend on the data, forcing every consumer to probe both keys to
