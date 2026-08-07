@@ -90,6 +90,7 @@ ENV_IMAGE = "TRITON_MODEL_GEN_IMAGE"
 ENV_FRAMEWORK = "TRITON_MODEL_GEN_FRAMEWORK"
 ENV_RUNTIME = "TRITON_MODEL_GEN_RUNTIME"
 ENV_SEMVER = "TRITON_SEMVER"
+ENV_VERBOSE = "TRITON_MODEL_GEN_VERBOSE"
 ENV_UPSTREAM = "NVIDIA_UPSTREAM_VERSION"
 # TRITON_VERSION used to be read here as the container train. It was not one:
 # the driver defaulted it to the train, CI exported it as the semver, so this
@@ -312,6 +313,26 @@ def format_size(total):
 
 
 @functools.lru_cache(maxsize=1)
+def per_model_logging(declared=None):
+    """Whether to print one line per model as it is stamped.
+
+    Off by default. A full tree is ~976 models across ~20 passes, so this was
+    ~1700 lines burying the generators' own output. What a reader actually
+    needs from a running pass -- that it is progressing, and what it is
+    recording -- is the properties block and the per-repository line, which
+    together cost about 300 lines. Set TRITON_MODEL_GEN_VERBOSE=1 when a
+    specific model's size or tier is the thing being chased.
+    """
+    if declared is not None:
+        return declared
+    return os.environ.get(ENV_VERBOSE, "").strip().lower() not in (
+        "",
+        "0",
+        "false",
+        "no",
+    )
+
+
 def resolve_upstream_version(declared=None):
     """The container train, from the environment when not passed in."""
     return declared or os.environ.get(ENV_UPSTREAM)
@@ -763,6 +784,7 @@ def emit_manifests(
     include_size=True,
     dry_run=False,
     verbose=True,
+    per_model=None,
     summary_path=None,
 ):
     """Write manifests for the models under `tree` that changed since `baseline`.
@@ -771,9 +793,11 @@ def emit_manifests(
     environment, and `framework` falls back per model to the backend that serves
     it, so a script needs to pass nothing but the tree and its baseline.
 
-    Reports each model as it goes, so a long pass over a large tree shows
-    progress rather than going silent; pass verbose=False for just the summary
-    line. `summary_path` additionally writes the whole pass as JSON.
+    Announces the properties it will record and reports each repository as it
+    finishes, so a long pass shows progress rather than going silent; pass
+    verbose=False for just the summary line. Per-model lines are off unless
+    per_model=True or TRITON_MODEL_GEN_VERBOSE is set -- see per_model_logging.
+    `summary_path` additionally writes the whole pass as JSON.
 
     Never raises. A generation run that has already produced its models must not
     fail over a metadata file, so problems are reported on stdout and counted in
@@ -795,6 +819,7 @@ def emit_manifests(
             include_size=include_size,
             dry_run=dry_run,
             verbose=verbose,
+            per_model=per_model,
             summary_path=summary_path,
         )
     except Exception as error:
@@ -816,6 +841,7 @@ def _emit_manifests(
     include_size,
     dry_run,
     verbose=True,
+    per_model=None,
     summary_path=None,
 ):
     if generator is None:
@@ -830,6 +856,7 @@ def _emit_manifests(
         upstream_version = resolve_upstream_version()
     declared_framework = framework or os.environ.get(ENV_FRAMEWORK)
 
+    show_models = per_model_logging(per_model)
     if verbose:
         _log_properties(
             tree,
@@ -871,7 +898,7 @@ def _emit_manifests(
             written += 1
             record = describe_model(model_dir, tree, manifest)
             records.append(record)
-            if verbose:
+            if show_models:
                 _log_model(record)
         except ManifestError as error:
             _log("skipped {}: {}".format(model_dir, error))
@@ -1017,7 +1044,13 @@ def main(argv=None):
     parser.add_argument(
         "--quiet",
         action="store_true",
-        help="suppress the per-model lines, keep the summary line",
+        help="suppress the properties block, keep the summary line",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="also print one line per model; off by default because a full "
+        "tree is ~976 of them [{}]".format(ENV_VERBOSE),
     )
     parser.add_argument(
         "--summary",
@@ -1048,6 +1081,8 @@ def main(argv=None):
             args.upstream_version,
             framework_version=args.framework_version,
         )
+
+    show_models = per_model_logging(args.verbose or None)
 
     touched = skipped = 0
     records = []
@@ -1094,7 +1129,7 @@ def main(argv=None):
             touched += 1
             record = describe_model(model_dir, args.tree, manifest)
             records.append(record)
-            if not args.quiet:
+            if show_models:
                 _log_model(record)
         except ManifestError as error:
             _log("skipped {}: {}".format(model_dir, error))

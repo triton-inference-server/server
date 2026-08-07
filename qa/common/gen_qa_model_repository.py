@@ -751,6 +751,13 @@ def stage_environment(stage, ctx):
             ("TRITON_MODEL_GEN_IMAGE", stage.image),
             ("TRITON_MODEL_GEN_FRAMEWORK", stage.key),
             ("TRITON_MODEL_GEN_RUNTIME", ctx.runtime_name),
+            # Off unless the caller asked: per-model manifest lines are ~1700
+            # of them over a full tree. Passed through so the switch works from
+            # the host without editing anything.
+            (
+                "TRITON_MODEL_GEN_VERBOSE",
+                os.environ.get("TRITON_MODEL_GEN_VERBOSE", ""),
+            ),
             # Three versions, each under a name that carries one meaning: the
             # container being built, the NGC containers it is built against,
             # and the release. All three come from build.py's version map.
