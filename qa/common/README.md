@@ -201,6 +201,38 @@ property true of only some of an archive's contents is worse than an absent one.
 ONNX bundle has one property fewer than OpenVINO — it also carries ensemble models, whose
 `model.provenance` differs.
 
+#### One archive per model instead
+
+`--granularity model` packs each model separately rather than bundling a framework:
+
+```bash
+python3 gen_archive.py --tree /tmp/26.08dev --dest /tmp/26.08dev/archives \
+    --granularity model
+```
+
+```
+qa_model_repository-openvino_int8_int8_int8-26.07-2.72.0dev.tar   1 model   13.9 KiB
+```
+
+The choice is what a consumer has to download, and what the properties can say:
+
+| | fetch cost | properties |
+|---|---|---|
+| `framework` (default) | a whole backend to get one model | only the fields its models agree on |
+| `model` | exactly the model wanted | everything, since each is true of its artifact |
+
+A bundle publishes only what its models agree on, so `model.name`, the sizes and the format
+versions drop out the moment it holds more than one — they would be false of the bundle. The
+static stores carry 17 properties bundled and 23 per model for exactly that reason.
+
+Framework granularity suits the generated corpus, where a suite runs against one backend and
+wants all of it. Model granularity suits the static stores, where the point is pulling
+individual objects rather than a repository to find out what is in it.
+
+Labels become `<repository>/<model>`, which names the directory an upload lands in; the archive
+and its manifest are files, so both flatten the separator into their names and still say where
+they came from once detached.
+
 `gen_archive.py` runs on its own against any finished tree:
 
 ```bash
@@ -247,6 +279,16 @@ Uploads land one level per thing a consumer narrows by — device, release, then
 ```
 sw-dl-triton-generic-local/triton/models/DGX-Spark-sbsa-12.1/26.07-2.72.0dev/onnx/onnx-26.07-2.72.0dev-57638316.360696202.tar
 ```
+
+`--flat` drops the bundle directory, putting every archive directly under the release:
+
+```
+sw-dl-triton-generic-local/triton/models/STATIC/26.07-2.71.2/openvino_model_store-resnet50_int8_openvino-26.07-2.71.2-manual.tar
+```
+
+The directory earns its place when a handful of bundles share a release. Per-model archives
+already carry repository and model in their own names, so nesting them buys a directory per
+model and nothing else — which is why the static stores are published flat.
 
 `--url` and `--token` fall back to the jfrog CLI config, so a developer who has already run
 `jf config add` need not restate either. It is read from `$JFROG_CLI_HOME_DIR/jfrog-cli.conf.v6`,
