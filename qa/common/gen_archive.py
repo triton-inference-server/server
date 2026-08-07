@@ -79,9 +79,14 @@ ENV_SEMVER = "TRITON_SEMVER"
 ENV_PIPELINE = "CI_PIPELINE_ID"
 ENV_JOB = "CI_JOB_ID"
 
-# Per-model fields, excluded from a bundle's common properties even on the
-# accident of a single-model framework agreeing with itself: they describe one
-# model and would be false of the bundle.
+# Fields that describe one model rather than a bundle of them. Dropped when a
+# bundle holds several -- the values agreeing across two models is a
+# coincidence of content, and the property would become false the moment a
+# third disagreed. Kept when a bundle holds exactly one, where the bundle *is*
+# that model and every one of them is true of the artifact: for a single-model
+# bundle like onnx_model_store2, at 13 GiB, being able to query the name and
+# tier without downloading is the whole point of the properties. `model_count`
+# is published alongside, so a consumer can always tell which case it has.
 PER_MODEL_KEYS = frozenset(
     [
         "model.name",
@@ -169,9 +174,11 @@ def common_properties(manifests):
     shared = set(flattened[0])
     for other in flattened[1:]:
         shared &= set(other)
+    if len(flattened) > 1:
+        shared -= PER_MODEL_KEYS
     return {
         key: flattened[0][key]
-        for key in sorted(shared - PER_MODEL_KEYS)
+        for key in sorted(shared)
         if all(other[key] == flattened[0][key] for other in flattened)
     }
 
