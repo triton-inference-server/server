@@ -1180,6 +1180,7 @@ class Context:
         self.artifactory_path = args.artifactory_path
         self.artifactory_properties = args.artifactory_properties
         self.artifactory_build_id = args.artifactory_build_id
+        self.artifactory_flat = args.artifactory_flat
         self.cleanup = args.cleanup
         self.clean_build_dir = args.clean_build_dir
         self.nvidia_visible_devices = args.nvidia_visible_devices
@@ -1525,6 +1526,12 @@ def parse_args(argv):
         help="repository and path prefix to upload under [ARTIFACTORY_PATH]",
     )
     upload.add_argument(
+        "--artifactory-flat",
+        action="store_true",
+        help="put every archive directly under the release directory, with no "
+        "directory per bundle",
+    )
+    upload.add_argument(
         "--artifactory-build-id",
         default=env_default("CI_PIPELINE_ID"),
         help="a directory between the release and the archives, keeping one "
@@ -1691,6 +1698,8 @@ def upload_tree(ctx, tree):
         command += ["--model-type", ctx.model_type]
     if ctx.artifactory_build_id:
         command += ["--build-id", ctx.artifactory_build_id]
+    if ctx.artifactory_flat:
+        command += ["--flat"]
     environment = dict(os.environ)
     environment["ARTIFACTORY_TOKEN"] = ctx.artifactory_token
     try:
@@ -1722,10 +1731,21 @@ def archive_tree(ctx, tree):
         "--triton-semver",
         ctx.semver or "",
     ]
-    for name in ("CI_PIPELINE_ID", "CI_JOB_ID"):
-        value = os.environ.get(name)
+    # The pipeline component comes from the build id when one was given, so the
+    # directory an archive lands in and the id inside its name are the same
+    # run. CI has two: the child pipeline in CI_PIPELINE_ID and the parent in
+    # PARENT_CI_PIPELINE_ID, and the parent is what the existing artifact names
+    # and the common property set already record.
+    identities = (
+        (
+            "--ci-pipeline-id",
+            ctx.artifactory_build_id or os.environ.get("CI_PIPELINE_ID"),
+        ),
+        ("--ci-job-id", os.environ.get("CI_JOB_ID")),
+    )
+    for flag, value in identities:
         if value:
-            command += ["--" + name.lower().replace("_", "-"), value]
+            command += [flag, value]
     try:
         run_command(command, ctx.dry_run)
     except GenerationError as error:
