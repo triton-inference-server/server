@@ -30,10 +30,11 @@ import argparse
 import os
 from typing import List, Tuple
 
-import gen_ensemble_model_utils as emu
 import gen_manifest
 import numpy as np
 from gen_common import (
+    create_general_modelconfig,
+    dtype_str,
     np_to_model_dtype,
     np_to_onnx_dtype,
     np_to_torch_dtype,
@@ -554,14 +555,14 @@ max_batch_size: {max_batch}
 input [
   {{
     name: "INPUT__0"
-    data_type: {emu.dtype_str(dtype)}
+    data_type: {dtype_str(dtype)}
     dims: [ {tu.shape_to_dims_str(shape)} ]
   }}
 ]
 output [
   {{
     name: "OUTPUT__0"
-    data_type: {emu.dtype_str(dtype)}
+    data_type: {dtype_str(dtype)}
     dims: [ {tu.shape_to_dims_str(shape)} ]
   }}
 ]
@@ -612,7 +613,7 @@ output [
     """.format(
             type=control_type,
             dims=tu.shape_to_dims_str(shape),
-            dtype=emu.dtype_str(dtype),
+            dtype=dtype_str(dtype),
         )
     elif initial_state == "zero":
         config += f"""
@@ -642,11 +643,11 @@ output [
         {{
           input_name: "INPUT_STATE__1"
           output_name: "OUTPUT_STATE__1"
-          data_type: {emu.dtype_str(dtype)}
+          data_type: {dtype_str(dtype)}
           dims: {tu.shape_to_dims_str(shape)}
           initial_state: {{
               name: "state init"
-              data_type: {emu.dtype_str(dtype)}
+              data_type: {dtype_str(dtype)}
               dims: {tu.shape_to_dims_str(shape_without_variable_dims)}
               zero_data: true
           }}
@@ -696,7 +697,7 @@ output [
     """.format(
             type=control_type,
             dims=tu.shape_to_dims_str(shape),
-            dtype=emu.dtype_str(dtype),
+            dtype=dtype_str(dtype),
             shape_without_variable_dims=tu.shape_to_dims_str(
                 shape_without_variable_dims
             ),
@@ -735,9 +736,8 @@ instance_group [
 ]
 """
 
-    # [TODO] move create_general_modelconfig() out of emu as it is general
     # enough for all backends to use
-    config = emu.create_general_modelconfig(
+    config = create_general_modelconfig(
         model_name,
         "onnxruntime_onnx",
         max_batch,
@@ -796,7 +796,7 @@ instance_group [
     """.format(
             type=control_type,
             dims=tu.shape_to_dims_str(shape),
-            dtype=emu.dtype_str(dtype),
+            dtype=dtype_str(dtype),
         )
     elif initial_state == "zero":
         config += f"""
@@ -826,11 +826,11 @@ instance_group [
         {{
           input_name: "INPUT_STATE"
           output_name: "OUTPUT_STATE"
-          data_type: {emu.dtype_str(dtype)}
+          data_type: {dtype_str(dtype)}
           dims: {tu.shape_to_dims_str(shape)}
           initial_state: {{
               name: "state init"
-              data_type: {emu.dtype_str(dtype)}
+              data_type: {dtype_str(dtype)}
               dims: {tu.shape_to_dims_str(shape_without_variable_dims)}
               zero_data: true
           }}
@@ -880,7 +880,7 @@ instance_group [
     """.format(
             type=control_type,
             dims=tu.shape_to_dims_str(shape),
-            dtype=emu.dtype_str(dtype),
+            dtype=dtype_str(dtype),
             shape_without_variable_dims=tu.shape_to_dims_str(
                 shape_without_variable_dims
             ),

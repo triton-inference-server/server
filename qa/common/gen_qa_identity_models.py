@@ -35,6 +35,7 @@ import gen_ensemble_model_utils as emu
 import gen_manifest
 import numpy as np
 from gen_common import (
+    create_general_modelconfig,
     np_to_model_dtype,
     np_to_onnx_dtype,
     np_to_trt_dtype,
@@ -145,7 +146,7 @@ def create_onnx_modelconfig(models_dir, io_cnt, max_batch, dtype, shape):
     )
     config_dir = os.path.join(models_dir, model_name)
 
-    config = emu.create_general_modelconfig(
+    config = create_general_modelconfig(
         model_name,
         "onnxruntime_onnx",
         max_batch,
