@@ -823,6 +823,17 @@ def _emit_manifests(
         upstream_version = os.environ.get(ENV_UPSTREAM)
     declared_framework = framework or os.environ.get(ENV_FRAMEWORK)
 
+    if verbose:
+        _log_properties(
+            tree,
+            generator,
+            declared_framework,
+            image,
+            container_runtime,
+            triton_version,
+            upstream_version,
+        )
+
     written = unchanged = skipped = 0
     records = []
     for model_dir in iter_model_dirs(tree):
@@ -894,6 +905,48 @@ def _log(message):
     print("[manifest] {}".format(message), flush=True)
 
 
+def _log_properties(
+    tree,
+    generator,
+    framework,
+    image,
+    container_runtime,
+    triton_version,
+    upstream_version,
+    framework_version=None,
+):
+    """The properties this pass will record, once, before it starts stamping.
+
+    Everything here ends up in every manifest the pass writes. Printing it as
+    generation runs is what makes a log answer "which openvino was this built
+    against?" without unpacking a model and reading its manifest.
+
+    `framework` is None when the caller did not declare a stage, in which case
+    it is resolved per model from the backend that serves it -- and its version
+    with it, so neither can be reported up front.
+    """
+    gpu = probe_gpu() or {}
+    if framework_version is None and framework:
+        framework_version = probe_framework_version(framework)
+    properties = [
+        ("tree", tree),
+        ("generator", generator),
+        ("framework", framework or "per model (from config.pbtxt)"),
+        ("framework version", framework_version),
+        ("container image", image),
+        ("container runtime", container_runtime),
+        ("platform", "{} {}".format(probe_os_release(), platform.machine().lower())),
+        ("gpu", gpu.get("name")),
+        ("gpu compute capability", gpu.get("compute_capability")),
+        ("driver version", gpu.get("driver_version")),
+        ("triton version", triton_version),
+        ("upstream container version", upstream_version),
+    ]
+    _log("properties recorded by this pass:")
+    for name, value in properties:
+        _log("  {:<28} {}".format(name, value if value else "-"))
+
+
 def _log_model(record):
     """One line per model, as it is stamped.
 
@@ -905,9 +958,11 @@ def _log_model(record):
         "  {:<64} {:<10} {:>10}  {}".format(
             record["path"][:64],
             record["provenance"] or "-",
-            format_size(record["size_bytes"])
-            if record["size_bytes"] is not None
-            else "-",
+            (
+                format_size(record["size_bytes"])
+                if record["size_bytes"] is not None
+                else "-"
+            ),
             record["size_tier"] or "-",
         )
     )
@@ -965,6 +1020,21 @@ def main(argv=None):
 
     if not args.tree.is_dir():
         parser.error("no such tree: {}".format(args.tree))
+
+    # The size pass rewrites only size_bytes/size_tier, leaving every property
+    # below untouched, so reporting them there would describe this invocation
+    # rather than what the manifests actually say.
+    if not args.quiet and not args.update_sizes:
+        _log_properties(
+            args.tree,
+            args.generator,
+            args.framework,
+            args.image,
+            args.container_runtime or probe_container_runtime(),
+            args.triton_version,
+            args.upstream_version,
+            framework_version=args.framework_version,
+        )
 
     touched = skipped = 0
     records = []
