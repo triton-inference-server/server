@@ -95,6 +95,7 @@ DEFAULT_OPENVINO_VERSION = "2024.5.0"
 DEFAULT_UBUNTU_IMAGE = "ubuntu:22.04"
 DEFAULT_NVIDIA_VISIBLE_DEVICES = "0"
 DEFAULT_PROJECT_NAME = "tritonserver"
+DEFAULT_OUTPUT_DIR = "/tmp"
 
 # Files outside this directory the generators need at run time. Staged flat
 # into the source directory alongside the generators:
@@ -909,6 +910,12 @@ class DockerRuntime(Runtime):
             return None
         destination = pathlib.Path(ctx.output_dir)
         log_status("docker cp: copying generated models to {}".format(destination))
+        # `docker cp` into a path that does not exist names the copy after that
+        # path, putting the tree at <destination> instead of the
+        # <destination>/<version> this returns. Create it first so the layout
+        # does not depend on whether the caller's directory happens to exist.
+        if not ctx.dry_run:
+            destination.mkdir(parents=True, exist_ok=True)
         run_command(
             [
                 "docker",
@@ -1038,6 +1045,11 @@ class EnrootRuntime(Runtime):
         # Already on the host filesystem: enroot bind-mounts /tmp, so the tree
         # was written straight to where the caller wanted it.
         ctx = self.ctx
+        if ctx.output_dir != DEFAULT_OUTPUT_DIR:
+            log_warning(
+                "--output-dir is a docker-only option; the enroot stages build "
+                "in place, so the tree stays under {}".format(ctx.build_dir)
+            )
         if ctx.archive and ctx.archive_dir:
             produced = pathlib.Path(ctx.container_archive_dir())
             wanted = pathlib.Path(ctx.archive_dir) / ctx.archive_basename()
@@ -1288,8 +1300,9 @@ def parse_args(argv):
     )
     layout.add_argument(
         "--output-dir",
-        default="/tmp",
-        help="where docker copies the finished tree (default: /tmp)",
+        default=DEFAULT_OUTPUT_DIR,
+        help="where docker copies the finished tree; docker only, the enroot "
+        "stages build in place (default: {})".format(DEFAULT_OUTPUT_DIR),
     )
     layout.add_argument(
         "--model-type",
