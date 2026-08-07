@@ -315,7 +315,33 @@ byte-identical file.
 
 ### What it reports while it runs
 
-One line per model as it is stamped — a full tree is ~976 models and the pass is not
+The properties this pass will stamp into every manifest it writes, once, before it starts —
+so a generation log answers "which openvino was this built against?" without unpacking a
+model and reading its manifest:
+
+```
+[manifest] properties recorded by this pass:
+[manifest]   tree                         /mnt/26.07
+[manifest]   generator                    gen_qa_models.py
+[manifest]   framework                    openvino
+[manifest]   framework version            2024.5.0-17288-7975fa5da0c
+[manifest]   container image              ubuntu:22.04
+[manifest]   container runtime            docker
+[manifest]   platform                     Ubuntu:22.04 x86_64
+[manifest]   gpu                          NVIDIA RTX 5880 Ada Generation
+[manifest]   gpu compute capability       8.9
+[manifest]   driver version               590.44.01
+[manifest]   triton version               2.72.0dev
+[manifest]   upstream container version   26.07
+```
+
+A field the driver did not set prints as `-` and is recorded as null rather than guessed at.
+When no stage is declared, `framework` reads `per model (from config.pbtxt)` — it and its
+version are then resolved per model from the backend that serves it, so neither can be
+reported up front. `--update-sizes` skips the block: that pass rewrites only `size_bytes` and
+`size_tier`, so reporting the rest would describe the invocation rather than the manifests.
+
+Then one line per model as it is stamped — a full tree is ~976 models and the pass is not
 instantaneous, so without this it looks hung:
 
 ```
