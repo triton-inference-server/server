@@ -491,7 +491,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
 
 
     log_message.status "docker run: $OPENVINOSCRIPT"
-    log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $UBUNTU_IMAGE bash -e $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT"
+    log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $UBUNTU_IMAGE bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT"
     docker run \
         --rm \
         -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR \
@@ -505,7 +505,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
         -e NVIDIA_UPSTREAM_VERSION=$NVIDIA_UPSTREAM_VERSION \
         -e TRITON_SEMVER=$TRITON_SEMVER \
         $UBUNTU_IMAGE \
-        bash -e $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
+        bash -xe $TRITON_MDLS_SRC_DIR/$OPENVINOSCRIPT
 
     exit_code=$?
 
@@ -517,7 +517,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
     rm $OPENVINOSCRIPT
 
     log_message.status "docker run: $ONNXSCRIPT"
-    log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $UBUNTU_IMAGE bash -e $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT"
+    log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $UBUNTU_IMAGE bash -xe $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT"
     docker run \
         --rm \
         -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR \
@@ -531,7 +531,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
         -e NVIDIA_UPSTREAM_VERSION=$NVIDIA_UPSTREAM_VERSION \
         -e TRITON_SEMVER=$TRITON_SEMVER \
         $UBUNTU_IMAGE \
-        bash -e $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
+        bash -xe $TRITON_MDLS_SRC_DIR/$ONNXSCRIPT
 
     exit_code=$?
 
@@ -547,7 +547,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
     docker pull $PYTORCH_IMAGE
 
     log_message.status "docker run: $TORCHSCRIPT"
-    log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $PYTORCH_IMAGE bash -e $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT"
+    log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $PYTORCH_IMAGE bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT"
     docker run \
         --rm \
         -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR \
@@ -561,7 +561,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
         -e NVIDIA_UPSTREAM_VERSION=$NVIDIA_UPSTREAM_VERSION \
         -e TRITON_SEMVER=$TRITON_SEMVER \
         $PYTORCH_IMAGE \
-        bash -e $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
+        bash -xe $TRITON_MDLS_SRC_DIR/$TORCHSCRIPT
 
     exit_code=$?
 
@@ -577,7 +577,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
         docker pull $TENSORRT_IMAGE
 
         log_message.status "docker run: $TRTSCRIPT"
-        log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $TENSORRT_IMAGE bash -e $TRITON_MDLS_SRC_DIR/$TRTSCRIPT"
+        log_message.info "docker run $DOCKER_GPU_ARGS -v $DOCKER_VOLUME:/mnt $TENSORRT_IMAGE bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT"
         docker run \
             --rm \
             -e TRITON_GENSRCDIR=$TRITON_MDLS_SRC_DIR \
@@ -592,7 +592,7 @@ if [ "$TRITON_MODELS_USE_DOCKER" -eq 1 ] && which docker ; then
             -e NVIDIA_UPSTREAM_VERSION=$NVIDIA_UPSTREAM_VERSION \
             -e TRITON_SEMVER=$TRITON_SEMVER \
             $TENSORRT_IMAGE \
-            bash -e $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
+            bash -xe $TRITON_MDLS_SRC_DIR/$TRTSCRIPT
 
         exit_code=$?
 
