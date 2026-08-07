@@ -100,9 +100,9 @@ each has a flag that overrides it for one invocation:
 | flag | variable | default |
 |---|---|---|
 | `--frameworks` | `TRITON_MODELS_FRAMEWORKS` | all four |
-| `--triton-version` | `TRITON_VERSION` | `26.07` |
-| `--upstream-version` | `NVIDIA_UPSTREAM_VERSION` | `--triton-version` |
-| `--semver` | `TRITON_SEMVER` | `server/TRITON_VERSION` |
+| `--container-version` | `TRITON_CONTAINER_VERSION` | `build.py` `triton_container_version` |
+| `--upstream-version` | `NVIDIA_UPSTREAM_VERSION` | `build.py` `upstream_container_version` |
+| `--semver` | `TRITON_SEMVER` | `build.py` `release_version` |
 | `--ubuntu-image` | `UBUNTU_IMAGE` | `ubuntu:22.04` |
 | `--pytorch-image` | `PYTORCH_IMAGE` | `nvcr.io/nvidia/pytorch:<version>-py3` |
 | `--tensorrt-image` | `TENSORRT_IMAGE` | `nvcr.io/nvidia/tensorrt:<version>-py3` |
@@ -145,6 +145,12 @@ specific, so the field has to be real. The hook's own opt-out value, `none`, is 
 ./gen_qa_model_repository.py --all --archive --archive-dir /mnt/artifacts
 ```
 
+Archiving runs **on the host, after generation finishes** — it is not a stage and never happens
+inside a generation container. That means a finished tree can be re-archived, under different
+naming or after a failed upload, without regenerating a single model, and the generation images
+carry no archiving concern. A packaging failure is warned about rather than failing the run,
+since by then the models are already generated and correct.
+
 Archives go in `archives/`, a folder of their own at the root of the model tree, so they travel
 with the tree. They are safe there because every walk — sizing, manifesting, archiving — keys on
 a directory holding a `config.pbtxt`, and this one holds only tarballs. `--archive-dir` puts them
@@ -171,12 +177,20 @@ and `CI_JOB_ID` — the same values the manifests record. The CI pair is dropped
 local archives are not named after a pipeline that does not exist. Each `--<name>` flag
 overrides one.
 
-`TRITON_VERSION` is deliberately **not** one of them. It does not mean one thing: the shell
-driver defaults it to the container train (`26.07`), while GitLab exports it as the semver
-(`.gitlab-ci.yml` sets `TRITON_VERSION: "2.71.0"` next to `NVIDIA_UPSTREAM_VERSION: "26.07"`).
-Reading it as either would be wrong half the time, so each meaning gets a variable that only
-ever carries it, and `TRITON_VERSION` stands in for a missing train only — the local case, which
-is exactly where the driver did default it to the train.
+`TRITON_VERSION` is gone from this subsystem. It did not mean one thing — the shell driver
+defaulted it to the container train while GitLab exports it as the semver — so reading it was
+wrong half the time. Each version now has a variable that only ever carries one meaning, and all
+three are read from `server/build.py`'s `DEFAULT_TRITON_VERSION_MAP`, the single place they are
+declared together:
+
+| variable | `build.py` key | example | what it is |
+|---|---|---|---|
+| `TRITON_CONTAINER_VERSION` | `triton_container_version` | `26.08dev` | the Triton container being built; names the tree |
+| `NVIDIA_UPSTREAM_VERSION` | `upstream_container_version` | `26.07` | the NGC containers built against; tags the PyTorch and TensorRT images |
+| `TRITON_SEMVER` | `release_version` | `2.72.0dev` | the release |
+
+Note the tree is named for the *container* version while the images are tagged with the
+*upstream* one — there is no `nvcr.io/nvidia/pytorch:26.08dev-py3`.
 
 Inside, the model keeps its full path relative to the tree:
 
