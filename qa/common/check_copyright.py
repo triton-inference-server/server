@@ -63,7 +63,7 @@ SKIP_PATHS = (
     "docs/repositories.txt",
     "docs/exclusions.txt",
     "docker",
-    "qa/common/resnet50_labels.txt",
+    "qa/common/model_generation/resnet50_labels.txt",
     "qa/ensemble_models/mix_platform_float32_float32_float32/output0_labels.txt",
     "qa/ensemble_models/mix_type_int32_float32_float32/output0_labels.txt",
     "qa/ensemble_models/mix_ensemble_int32_float32_float32/output0_labels.txt",

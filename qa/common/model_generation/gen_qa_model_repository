@@ -103,11 +103,11 @@ function define_model_output_directories() {
     TRITON_MDLS_SRC_DIR=${TRITON_MDLS_SRC_DIR:=$TRITON_MDLS_BLD_DIR/gen_srcdir}
     # Files outside this directory that the generators need at runtime. They are
     # staged flat into $TRITON_MDLS_SRC_DIR alongside the generators:
-    #   test_util.py        imported by 14 generators, shared with the L0_* suites
-    #   resnet50_labels.txt read by gen_qa_models.py as $TRITON_GENSRCDIR/<name>
+    #   test_util.py        imported by 14 generators, shared with the L0_*
+    #                       suites, which is why it stays in qa/common rather
+    #                       than moving here with the generators that use it
     TRITON_MDLS_SHARED_SRC=(
         "$TRITON_MDLS_BASE_SCRIPT_DIR/../test_util.py"
-        "$TRITON_MDLS_BASE_SCRIPT_DIR/../resnet50_labels.txt"
     )
     TRITON_MDLS_QA_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_model_repository
     TRITON_MDLS_QA_VARIABLE_MODEL=$TRITON_MDLS_BLD_DIR/$TRITON_CONTAINER_VERSION/qa_variable_model_repository

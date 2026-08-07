@@ -112,9 +112,10 @@ VERSION_MAP_NAME = "DEFAULT_TRITON_VERSION_MAP"
 
 # Files outside this directory the generators need at run time. Staged flat
 # into the source directory alongside the generators:
-#   test_util.py        imported by 14 generators, shared with the L0_* suites
-#   resnet50_labels.txt read by gen_qa_models.py as $TRITON_GENSRCDIR/<name>
-SHARED_SOURCES = ("../test_util.py", "../resnet50_labels.txt")
+#   test_util.py        imported by 14 generators, shared with the L0_* suites,
+#                       which is why it stays in qa/common rather than moving
+#                       here with the generators that use it
+SHARED_SOURCES = ("../test_util.py",)
 
 # Repository directories created up front, in the shell driver's order.
 # Two deliberate quirks preserved from it: qa_noshape_model_repository is
