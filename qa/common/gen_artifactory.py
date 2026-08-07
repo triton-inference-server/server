@@ -63,6 +63,11 @@ import urllib.request
 INDEX_NAME = "index.json"
 TOKEN_ENV = "ARTIFACTORY_TOKEN"
 URL_ENV = "ARTIFACTORY_URL"
+PROPERTIES_ENV = "ARTIFACTORY_PROPERTIES"
+# What CI already sets, and where the STATIC stores' provenance lives -- the
+# CI_*, ISSUE and TRITON_VERSION values that say what actually built an
+# artifact, which nothing derivable from the artifact can tell you.
+PROPERTIES_FALLBACK_ENV = "ARTIFACTORY_PKG_MODELS_COMMON_PROPERTIES"
 
 # Where the jfrog CLI keeps its servers. Read as a last resort for --url and
 # --token so a developer who has already run `jf config add` does not have to
@@ -71,8 +76,12 @@ JFROG_HOME_ENV = "JFROG_CLI_HOME_DIR"
 DEFAULT_JFROG_HOME = "~/.jfrog"
 JFROG_CONFIG_NAME = "jfrog-cli.conf.v6"
 
-# Identify the bundle itself alongside the flattened manifest properties.
-BUNDLE_PROPERTIES = ("framework", "model_count", "sha256")
+# Identify the bundle itself alongside the flattened manifest properties. The
+# grouping key is published as `bundle`, not `framework`: for the generated
+# corpus the two coincide, but the static stores group by repository, where
+# `framework=c2_model_store` would contradict the `model.framework=netdef` that
+# the manifest supplies.
+BUNDLE_PROPERTIES = (("framework", "bundle"), ("model_count", None), ("sha256", None))
 
 # Uploads are the step most exposed to a flaky network -- the reason this corpus
 # is being decomposed at all -- so a failed PUT is retried before it is believed.
@@ -253,8 +262,15 @@ def main(argv=None):
     )
     parser.add_argument(
         "--properties",
-        default="",
-        help="'k=v;k=v' set on every upload, merged with the per-archive ones",
+        default=(
+            os.environ.get(PROPERTIES_ENV)
+            or os.environ.get(PROPERTIES_FALLBACK_ENV)
+            or ""
+        ),
+        help="'k=v;k=v' set on every upload, merged with the per-archive ones "
+        "and winning on a clash; defaults to ${}, then ${}".format(
+            PROPERTIES_ENV, PROPERTIES_FALLBACK_ENV
+        ),
     )
     parser.add_argument(
         "--framework",
@@ -342,9 +358,9 @@ def main(argv=None):
         # common_properties -- so they merge straight in. Explicit --properties
         # win, being the ones the caller typed for this run.
         properties = dict(entry.get("properties") or {})
-        for key in BUNDLE_PROPERTIES:
+        for key, published_as in BUNDLE_PROPERTIES:
             if entry.get(key) is not None:
-                properties[key] = str(entry[key])
+                properties[published_as or key] = str(entry[key])
         properties.update(common)
         target = build_target(args.url, bundle_path(args, framework), name, properties)
 
