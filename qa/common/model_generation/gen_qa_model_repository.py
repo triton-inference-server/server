@@ -757,6 +757,11 @@ def stage_environment(stage, ctx):
             ("TRITON_MODEL_GEN_FRAMEWORK", stage.key),
             ("TRITON_MODEL_GEN_RUNTIME", ctx.runtime_name),
             ("TRITON_VERSION", ctx.triton_version),
+            # The train and the semver, each under a name that means one thing.
+            # TRITON_VERSION above is left as the driver has always set it --
+            # it names the output directory -- but is not read as either, since
+            # CI overrides it with the semver.
+            ("NVIDIA_UPSTREAM_VERSION", ctx.upstream_version),
             ("TRITON_SEMVER", ctx.semver),
             # Named in the archives, absent outside CI. Empty values are
             # dropped from the name rather than left as empty segments.
@@ -1172,6 +1177,10 @@ class Context:
         self.archive = args.archive
         self.archive_dir = args.archive_dir
         self.semver = args.semver
+        # Locally TRITON_VERSION *is* the train and names the output directory,
+        # so it is the right fallback; in CI it is the semver, but there
+        # NVIDIA_UPSTREAM_VERSION is set and this never fires.
+        self.upstream_version = args.upstream_version or args.triton_version
         self.cleanup = args.cleanup
         self.clean_build_dir = args.clean_build_dir
         self.nvidia_visible_devices = args.nvidia_visible_devices
@@ -1328,6 +1337,13 @@ def parse_args(argv):
         "--triton-version",
         default=env_default("TRITON_VERSION", DEFAULT_TRITON_VERSION),
         help="container train, names the output directory [TRITON_VERSION]",
+    )
+    versions.add_argument(
+        "--upstream-version",
+        default=env_default("NVIDIA_UPSTREAM_VERSION"),
+        help="container train recorded in every manifest and archive name; "
+        "defaults to --triton-version, which names it locally "
+        "[NVIDIA_UPSTREAM_VERSION]",
     )
     versions.add_argument(
         "--semver",

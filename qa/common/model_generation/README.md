@@ -101,6 +101,7 @@ each has a flag that overrides it for one invocation:
 |---|---|---|
 | `--frameworks` | `TRITON_MODELS_FRAMEWORKS` | all four |
 | `--triton-version` | `TRITON_VERSION` | `26.07` |
+| `--upstream-version` | `NVIDIA_UPSTREAM_VERSION` | `--triton-version` |
 | `--semver` | `TRITON_SEMVER` | `server/TRITON_VERSION` |
 | `--ubuntu-image` | `UBUNTU_IMAGE` | `ubuntu:22.04` |
 | `--pytorch-image` | `PYTORCH_IMAGE` | `nvcr.io/nvidia/pytorch:<version>-py3` |
@@ -165,9 +166,17 @@ archives/qa_model_repository-openvino_int8_int8_int8-26.08-2.72.0dev-1234567-890
          └─ repository ────┘ └─ model ────────────┘ └ train ┘ └ semver ┘ └ pipeline ┘ └ job ┘
 ```
 
-The trailing components come from `TRITON_VERSION`, `TRITON_SEMVER`, `CI_PIPELINE_ID` and
-`CI_JOB_ID` — the same values the manifests record. The CI pair is dropped when unset, so local
-archives are not named after a pipeline that does not exist. Each `--<name>` flag overrides one.
+The trailing components come from `NVIDIA_UPSTREAM_VERSION`, `TRITON_SEMVER`, `CI_PIPELINE_ID`
+and `CI_JOB_ID` — the same values the manifests record. The CI pair is dropped when unset, so
+local archives are not named after a pipeline that does not exist. Each `--<name>` flag
+overrides one.
+
+`TRITON_VERSION` is deliberately **not** one of them. It does not mean one thing: the shell
+driver defaults it to the container train (`26.07`), while GitLab exports it as the semver
+(`.gitlab-ci.yml` sets `TRITON_VERSION: "2.71.0"` next to `NVIDIA_UPSTREAM_VERSION: "26.07"`).
+Reading it as either would be wrong half the time, so each meaning gets a variable that only
+ever carries it, and `TRITON_VERSION` stands in for a missing train only — the local case, which
+is exactly where the driver did default it to the train.
 
 Inside, the model keeps its full path relative to the tree:
 

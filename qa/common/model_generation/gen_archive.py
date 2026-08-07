@@ -67,7 +67,19 @@ COMPRESSED_SUFFIX = ".tar.gz"
 # two identify the corpus a model belongs to; the CI pair is present only when
 # the environment supplies it, so a developer's local archives are not named
 # after a pipeline that does not exist.
-STAMP_ENV = ("TRITON_VERSION", "TRITON_SEMVER", "CI_PIPELINE_ID", "CI_JOB_ID")
+STAMP_ENV = (
+    "NVIDIA_UPSTREAM_VERSION",
+    "TRITON_SEMVER",
+    "CI_PIPELINE_ID",
+    "CI_JOB_ID",
+)
+
+# TRITON_VERSION is not in that list because it does not mean one thing: the
+# shell driver defaults it to the container train (26.07), while GitLab exports
+# it as the semver (2.71.0). Reading it as either is wrong half the time, so it
+# is consulted only to stand in for a missing train -- the local case, which is
+# exactly where the driver did default it to the train.
+STAMP_FALLBACK = {"NVIDIA_UPSTREAM_VERSION": "TRITON_VERSION"}
 
 # Fixed metadata for reproducibility. The epoch matters less than that it never
 # varies: a build-time mtime would give every rebuild a new checksum.
@@ -87,8 +99,14 @@ def resolve_stamp(overrides=None):
     as empty segments.
     """
     overrides = overrides or {}
-    parts = [overrides.get(name) or os.environ.get(name) for name in STAMP_ENV]
-    return "-".join(part for part in parts if part)
+    parts = []
+    for name in STAMP_ENV:
+        value = overrides.get(name) or os.environ.get(name)
+        if not value and name in STAMP_FALLBACK:
+            value = os.environ.get(STAMP_FALLBACK[name])
+        if value:
+            parts.append(value)
+    return "-".join(parts)
 
 
 def resolve_archive_name(model_dir, tree, stamp="", compress=False):

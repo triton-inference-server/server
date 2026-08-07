@@ -90,9 +90,14 @@ ENV_IMAGE = "TRITON_MODEL_GEN_IMAGE"
 ENV_FRAMEWORK = "TRITON_MODEL_GEN_FRAMEWORK"
 ENV_RUNTIME = "TRITON_MODEL_GEN_RUNTIME"
 ENV_SEMVER = "TRITON_SEMVER"
-# gen_qa_model_repository sets TRITON_VERSION to the container train (26.07),
-# not to the Triton semver (2.72.0dev). Read as the train accordingly.
-ENV_UPSTREAM = "TRITON_VERSION"
+ENV_UPSTREAM = "NVIDIA_UPSTREAM_VERSION"
+# TRITON_VERSION does not mean one thing: the shell driver defaults it to the
+# container train (26.07), while GitLab exports it as the semver (2.71.0). It
+# therefore stands in for a missing train only, which is the local case -- the
+# one where the driver did default it to the train. Reading it unconditionally,
+# as this did, recorded the semver in a field named for the train on every
+# manifest CI produced.
+ENV_UPSTREAM_FALLBACK = "TRITON_VERSION"
 
 KIB = 1024
 MIB = 1024**2
@@ -310,6 +315,15 @@ def format_size(total):
 
 
 @functools.lru_cache(maxsize=1)
+def resolve_upstream_version(declared=None):
+    """The container train, from the environment when not passed in."""
+    return (
+        declared
+        or os.environ.get(ENV_UPSTREAM)
+        or os.environ.get(ENV_UPSTREAM_FALLBACK)
+    )
+
+
 def probe_os_release():
     """'{NAME}:{VERSION_ID}', e.g. Ubuntu:24.04.
 
@@ -820,7 +834,7 @@ def _emit_manifests(
     if triton_version is None:
         triton_version = os.environ.get(ENV_SEMVER)
     if upstream_version is None:
-        upstream_version = os.environ.get(ENV_UPSTREAM)
+        upstream_version = resolve_upstream_version()
     declared_framework = framework or os.environ.get(ENV_FRAMEWORK)
 
     if verbose:
@@ -1020,6 +1034,12 @@ def main(argv=None):
 
     if not args.tree.is_dir():
         parser.error("no such tree: {}".format(args.tree))
+
+    # Same resolution the library path uses, so a manifest does not depend on
+    # which of the two entry points wrote it.
+    args.upstream_version = resolve_upstream_version(args.upstream_version)
+    if args.triton_version is None:
+        args.triton_version = os.environ.get(ENV_SEMVER)
 
     # The size pass rewrites only size_bytes/size_tier, leaving every property
     # below untouched, so reporting them there would describe this invocation
