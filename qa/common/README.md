@@ -138,6 +138,12 @@ loudly rather than falling back if it is not installed.
 
 enroot is not vestigial — it is how the SLURM B200 job builds, with `TRITON_MODELS_USE_DOCKER=0`.
 
+The GPU is exposed only to the stages that generate on it — PyTorch and TensorRT. OpenVINO and
+ONNX build on the CPU, and the nvidia runtime mounts `nvidia-smi` and the driver libraries into
+*any* image, so handing them a device meant the probe found a real GPU and stamped its compute
+capability onto artifacts that do not depend on one. An ONNX model tagged `compute_capability=8.9`
+reads as a portability constraint it does not have.
+
 `--nvidia-visible-devices` reaches both engines. That matters more on enroot than it looks:
 enroot exposes GPUs through its `98-nvidia.sh` hook, which keys entirely off
 `NVIDIA_VISIBLE_DEVICES` in the container environment and does nothing at all when it is unset.
