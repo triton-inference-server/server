@@ -1183,7 +1183,14 @@ class Context:
         self.artifactory_flat = args.artifactory_flat
         self.cleanup = args.cleanup
         self.clean_build_dir = args.clean_build_dir
-        self.nvidia_visible_devices = args.nvidia_visible_devices
+        # An empty value is never a meaningful GPU list, and it is what a CI
+        # job produces when it forwards a variable the runner does not define.
+        # enroot's nvidia hook keys entirely off this and does nothing when it
+        # is blank, so the stage runs without a GPU and fails later inside
+        # torch. "none" remains the explicit opt-out.
+        self.nvidia_visible_devices = (
+            args.nvidia_visible_devices or DEFAULT_NVIDIA_VISIBLE_DEVICES
+        )
 
         # Filled in once the engine is known: the mount root differs, and the
         # build directory hangs off it.
