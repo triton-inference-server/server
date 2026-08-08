@@ -1640,12 +1640,75 @@ def parse_args(argv):
         # enroot leaves its containers in place.
         args.cleanup = args.runtime != "enroot" and not os.environ.get("CI")
 
+    # Last, so the echo reflects every default resolved above.
+    args.invocation = effective_invocation(parser, args)
+
     return args
 
 
 # --------------------------------------------------------------------------
 # entry point
 # --------------------------------------------------------------------------
+
+
+# Redacted in the echoed invocation. The token reaches the uploader through
+# the environment and never through argv, so this is only about the echo.
+SECRET_DESTS = frozenset(["artifactory_token"])
+
+INVOCATION_PROGRAM = "python3 ./gen_qa_model_repository.py"
+
+
+def effective_invocation(parser, args):
+    """The command line as it resolved, as a list of (flag, value) pairs.
+
+    Rebuilt from the parsed values rather than echoed from argv, which is the
+    point: environment defaults, computed defaults and shell expansions all
+    appear as the literal value the run actually used. A CI job definition
+    saying --nvidia-visible-devices "${NVIDIA_VISIBLE_DEVICES}" tells a reader
+    nothing about whether the variable was set, and an empty value there is not
+    the same as an absent one -- it means "void" to the container toolkit.
+
+    `value` is None for a flag that carries no argument. Reads parser._actions
+    because argparse exposes no public view of its options; the alternative is
+    a second hand-maintained list of every flag, which would drift.
+    """
+    negatives = {}
+    for action in parser._actions:
+        if action.option_strings and getattr(action, "const", None) is False:
+            negatives[action.dest] = max(action.option_strings, key=len)
+
+    pairs = []
+    seen = set()
+    for action in parser._actions:
+        dest = action.dest
+        if not action.option_strings or dest == "help" or dest in seen:
+            continue
+        seen.add(dest)
+        value = getattr(args, dest, None)
+        if value is None:
+            continue
+        flag = max(action.option_strings, key=len)
+        if value is True:
+            pairs.append((flag, None))
+        elif value is False:
+            # Only worth a line when the flag has an explicit off switch: for
+            # a plain store_true, absent and false are the same statement.
+            if dest in negatives:
+                pairs.append((negatives[dest], None))
+        else:
+            secret = dest in SECRET_DESTS
+            pairs.append((flag, "***" if secret else shlex.quote(str(value))))
+    return pairs
+
+
+def render_invocation(pairs, program=INVOCATION_PROGRAM):
+    """Format the resolved invocation so it reads well and pastes back."""
+    lines = [program]
+    for flag, value in pairs:
+        lines.append(
+            "    {}".format(flag) if value is None else "    {} {}".format(flag, value)
+        )
+    return " \\\n".join(lines)
 
 
 def describe_plan(ctx, stages, selected):
@@ -1775,6 +1838,10 @@ def main(argv=None):
     args = parse_args(argv)
     ctx = Context(args)
     selected = args.selected
+
+    log_status("invocation, with every value resolved:")
+    print(render_invocation(args.invocation))
+    print("")
 
     if not selected:
         log_error("no stages selected")
