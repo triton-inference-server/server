@@ -97,7 +97,14 @@ DEFAULT_ONNX_VERSION = "1.20.1"
 DEFAULT_ONNX_OPSET = "0"
 DEFAULT_OPENVINO_VERSION = "2024.5.0"
 DEFAULT_UBUNTU_IMAGE = "ubuntu:22.04"
-DEFAULT_NVIDIA_VISIBLE_DEVICES = "0"
+# "all" per the container toolkit's documented values, where it means every GPU
+# and is the default in the base CUDA images. "0" assumed an index that exists
+# on the docker runners and need not on a compute node.
+#   all           every GPU
+#   0,1 / GPU-... specific GPUs by index or UUID
+#   none          no GPU, driver capabilities still enabled
+#   void / empty  runtime behaves as runc -- neither GPUs nor capabilities
+DEFAULT_NVIDIA_VISIBLE_DEVICES = "all"
 DEFAULT_PROJECT_NAME = "tritonserver"
 DEFAULT_OUTPUT_DIR = "/tmp"
 ARCHIVE_DIR_NAME = "archives"
@@ -1183,11 +1190,12 @@ class Context:
         self.artifactory_flat = args.artifactory_flat
         self.cleanup = args.cleanup
         self.clean_build_dir = args.clean_build_dir
-        # An empty value is never a meaningful GPU list, and it is what a CI
-        # job produces when it forwards a variable the runner does not define.
-        # enroot's nvidia hook keys entirely off this and does nothing when it
-        # is blank, so the stage runs without a GPU and fails later inside
-        # torch. "none" remains the explicit opt-out.
+        # Empty is a documented value meaning void -- no GPUs, no capabilities --
+        # but it is also what a job produces when it forwards a variable its
+        # runner never defined, and argparse cannot tell the two apart. Falling
+        # back to the default keeps that accident from reading as a deliberate
+        # opt-out; "void" and "none" spell the opt-out explicitly and are
+        # passed through untouched.
         self.nvidia_visible_devices = (
             args.nvidia_visible_devices or DEFAULT_NVIDIA_VISIBLE_DEVICES
         )
