@@ -92,7 +92,6 @@ SH_COLOR_RESET = "\\033[0m"
 SH_COLOR_WARNING = "\\033[33m"
 
 # Defaults, matching the shell driver's `${VAR:=default}` values.
-DEFAULT_CONTAINER_VERSION = "26.08dev"
 DEFAULT_ONNX_VERSION = "1.20.1"
 DEFAULT_ONNX_OPSET = "0"
 DEFAULT_OPENVINO_VERSION = "2024.5.0"
@@ -108,6 +107,12 @@ DEFAULT_NVIDIA_VISIBLE_DEVICES = "all"
 DEFAULT_PROJECT_NAME = "tritonserver"
 DEFAULT_OUTPUT_DIR = "/tmp"
 ARCHIVE_DIR_NAME = "archives"
+# The model tree's directory name. Fixed rather than versioned: the build
+# directory above it already carries the job id, so it is unique per run, and
+# every version that matters is recorded where it is actually consumed -- in
+# the manifests, the archive names and the upload path. A version here only
+# created a second place for the two spellings to disagree.
+MODEL_TREE_DIRNAME = "models"
 DEFAULT_UPSTREAM_VERSION = "26.07"
 DEFAULT_SEMVER = "2.72.0dev"
 
@@ -225,9 +230,7 @@ class Generate:
         self.chmod = chmod
 
     def render(self, ctx):
-        target = "{}/{}/{}".format(
-            ctx.build_dir, ctx.container_version, self.repository
-        )
+        target = "{}/{}/{}".format(ctx.build_dir, MODEL_TREE_DIRNAME, self.repository)
         command = ["python3", "{}/{}".format(ctx.source_dir, self.script)]
         command += self.flags
         command.append("--models_dir={}".format(target))
@@ -289,7 +292,7 @@ def build_stages(ctx):
     host-side value, and a literal `$VAR` in the text is evaluated in the
     container.
     """
-    version_root = "{}/{}".format(ctx.build_dir, ctx.container_version)
+    version_root = "{}/{}".format(ctx.build_dir, MODEL_TREE_DIRNAME)
     custom_ops_root = "{}/{}".format(version_root, CUSTOM_OPS_DIR)
     plugin_root = "{}/qa_trt_plugin_model_repository".format(version_root)
     data_dependent_root = "{}/qa_trt_data_dependent_model_repository".format(
@@ -754,7 +757,7 @@ def render_stage_script(stage, ctx, final=False):
             "python3 {src}/gen_manifest.py --tree {root} --update-sizes"
             " --summary {root}/manifest-summary.json || true".format(
                 src=ctx.source_dir,
-                root="{}/{}".format(ctx.build_dir, ctx.container_version),
+                root="{}/{}".format(ctx.build_dir, MODEL_TREE_DIRNAME),
             ),
         ]
     lines += ["", "exit 0", ""]
@@ -776,10 +779,9 @@ def stage_environment(stage, ctx):
                 "TRITON_MODEL_GEN_VERBOSE",
                 os.environ.get("TRITON_MODEL_GEN_VERBOSE", ""),
             ),
-            # Three versions, each under a name that carries one meaning: the
-            # container being built, the NGC containers it is built against,
-            # and the release. All three come from build.py's version map.
-            ("TRITON_CONTAINER_VERSION", ctx.container_version),
+            # Two versions, each under a name that carries one meaning: the
+            # NGC containers this is built against, and the release. Both come
+            # from build.py's version map.
             ("NVIDIA_UPSTREAM_VERSION", ctx.upstream_version),
             ("TRITON_SEMVER", ctx.semver),
             # Named in the archives, absent outside CI. Empty values are
@@ -981,12 +983,12 @@ class DockerRuntime(Runtime):
             [
                 "docker",
                 "cp",
-                "{}:{}/{}".format(self.container, ctx.build_dir, ctx.container_version),
+                "{}:{}/{}".format(self.container, ctx.build_dir, MODEL_TREE_DIRNAME),
                 str(destination) + "/",
             ],
             ctx.dry_run,
         )
-        return destination / ctx.container_version
+        return destination / MODEL_TREE_DIRNAME
 
     def cleanup(self):
         ctx = self.ctx
@@ -1102,7 +1104,7 @@ class EnrootRuntime(Runtime):
                 "--output-dir is a docker-only option; the enroot stages build "
                 "in place, so the tree stays under {}".format(ctx.build_dir)
             )
-        return pathlib.Path(ctx.build_dir) / ctx.container_version
+        return pathlib.Path(ctx.build_dir) / MODEL_TREE_DIRNAME
 
     def cleanup(self):
         ctx = self.ctx
@@ -1162,7 +1164,6 @@ class Context:
     """Resolved configuration: flags win, environment is the default."""
 
     def __init__(self, args):
-        self.container_version = args.container_version
         self.upstream_version = args.upstream_version
         self.semver = args.semver
         self.onnx_version = args.onnx_version
@@ -1225,7 +1226,7 @@ class Context:
         self.source_dir = "{}/gen_srcdir".format(self.build_dir)
 
     def repository_paths(self):
-        root = "{}/{}".format(self.build_dir, self.container_version)
+        root = "{}/{}".format(self.build_dir, MODEL_TREE_DIRNAME)
         return ["{}/{}".format(root, name) for name in REPOSITORY_DIRS]
 
     def archive_dest(self, tree):
@@ -1405,15 +1406,6 @@ def parse_args(argv):
     )
 
     versions = parser.add_argument_group("versions")
-    versions.add_argument(
-        "--container-version",
-        default=env_default(
-            "TRITON_CONTAINER_VERSION",
-            version_from_build("triton_container_version", DEFAULT_CONTAINER_VERSION),
-        ),
-        help="the Triton container being built; names the output directory "
-        "[TRITON_CONTAINER_VERSION]",
-    )
     versions.add_argument(
         "--upstream-version",
         default=env_default(
@@ -1659,7 +1651,6 @@ def parse_args(argv):
 def describe_plan(ctx, stages, selected):
     print("")
     print("runtime          : {}".format(ctx.runtime_name or ctx.runtime))
-    print("container version: {}".format(ctx.container_version))
     print("upstream version : {}".format(ctx.upstream_version))
     print("semver           : {}".format(ctx.semver))
     print("build dir        : {}".format(ctx.build_dir))
