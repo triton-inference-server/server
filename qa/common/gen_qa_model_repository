@@ -82,7 +82,9 @@ UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 # being built -- there is no nvcr.io/nvidia/pytorch:26.08dev-py3.
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$NVIDIA_UPSTREAM_VERSION-py3}
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$NVIDIA_UPSTREAM_VERSION-py3}
-NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:=0}
+# "all" per the container toolkit's documented values: every GPU, and the
+# default in the base CUDA images. "0" assumed that index exists.
+NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:=all}
 MODEL_TYPE=${MODEL_TYPE:-""}
 TRITON_MODELS_USE_DOCKER=${TRITON_MODELS_USE_DOCKER:-"1"}
 TRITON_MODELS_USE_ENROOT=${TRITON_MODELS_USE_ENROOT:-"1"}

@@ -118,7 +118,7 @@ each has a flag that overrides it for one invocation:
 | `--openvino-version` | `OPENVINO_VERSION` | `2024.5.0` |
 | `--model-type` | `MODEL_TYPE` | unset |
 | `--runtime`, `--use-docker`, `--use-enroot` | `TRITON_MODELS_USE_DOCKER`, `TRITON_MODELS_USE_ENROOT` | auto |
-| `--nvidia-visible-devices` | `NVIDIA_VISIBLE_DEVICES` | `0` |
+| `--nvidia-visible-devices` | `NVIDIA_VISIBLE_DEVICES` | `all` |
 | `--docker-volume` | `DOCKER_VOLUME` | `volume.gen_qa_model_repository.<job id>` |
 | `--build-dir` | `TRITON_MDLS_BLD_DIR` | `<mount>/<job id>` |
 | `--job-id` | `CI_JOB_ID` | timestamp |
@@ -141,6 +141,15 @@ enroot is not vestigial — it is how the SLURM B200 job builds, with `TRITON_MO
 `--nvidia-visible-devices` reaches both engines. That matters more on enroot than it looks:
 enroot exposes GPUs through its `98-nvidia.sh` hook, which keys entirely off
 `NVIDIA_VISIBLE_DEVICES` in the container environment and does nothing at all when it is unset.
+
+The values are the container toolkit's, not ours: `all` for every GPU, `0,1` or a `GPU-…` UUID
+for specific ones, `none` for no GPU with driver capabilities still enabled, and `void` — which
+empty and unset also mean — for a runtime that behaves like `runc`, exposing neither. `all` is
+the default here because it is the documented way to ask for whatever GPUs exist, where `0`
+assumed an index that a given node need not have. An *empty* value falls back to that default
+rather than being honoured as `void`: it is indistinguishable from a caller forwarding a
+variable its environment never defined, which is exactly how a CI job came to build without a
+GPU and fail minutes later inside torch.
 The shell driver never sets it on the enroot path, so enroot builds ran without a GPU and
 recorded `gpu: null` — invisible for OpenVINO, but TensorRT plan files are compute-capability
 specific, so the field has to be real. The hook's own opt-out value, `none`, is passed through.
