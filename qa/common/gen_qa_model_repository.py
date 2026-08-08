@@ -275,7 +275,7 @@ class Skipped:
 
 
 Stage = collections.namedtuple(
-    "Stage", "key title image needs_root prelude setup steps"
+    "Stage", "key title image needs_root needs_gpu prelude setup steps"
 )
 
 
@@ -302,6 +302,7 @@ def build_stages(ctx):
         title="OpenVINO",
         image=ctx.ubuntu_image,
         needs_root=True,
+        needs_gpu=False,
         prelude=[],
         setup=[
             "export DEBIAN_FRONTEND=noninteractive",
@@ -341,6 +342,7 @@ def build_stages(ctx):
         title="ONNX",
         image=ctx.ubuntu_image,
         needs_root=True,
+        needs_gpu=False,
         prelude=[],
         setup=[
             "export DEBIAN_FRONTEND=noninteractive",
@@ -556,6 +558,7 @@ def build_stages(ctx):
         title="PyTorch",
         image=ctx.pytorch_image,
         needs_root=False,
+        needs_gpu=True,
         # Before `set -e`, exactly as in the shell driver: a failure to install
         # onnxscript does not abort the stage.
         prelude=["pip3 install onnxscript"],
@@ -573,6 +576,7 @@ def build_stages(ctx):
         title="TensorRT",
         image=ctx.tensorrt_image,
         needs_root=False,
+        needs_gpu=True,
         prelude=[],
         setup=[
             # Under `set -e` this is an assertion: no TensorRT packages in the
@@ -935,7 +939,13 @@ class DockerRuntime(Runtime):
         for key, value in stage_environment(stage, ctx).items():
             command += ["-e", "{}={}".format(key, value)]
         command += self._labels()
-        command += ctx.docker_gpu_args
+        # Only the stages that generate on the device. OpenVINO and ONNX build
+        # on the CPU, and handing them a GPU had them record one -- the nvidia
+        # runtime mounts nvidia-smi into any image, so the probe found a real
+        # device and stamped its compute capability onto artifacts that do not
+        # depend on it.
+        if stage.needs_gpu:
+            command += ctx.docker_gpu_args
         command += [
             "-v",
             "{}:/mnt".format(self.volume),
@@ -1068,10 +1078,11 @@ class EnrootRuntime(Runtime):
         # builds saw no GPU and recorded gpu: null -- harmless for OpenVINO, but
         # TensorRT plan files are compute-capability specific, so the field has
         # to be real. 'none' is the hook's own opt-out and is passed through.
-        command += [
-            "-e",
-            "NVIDIA_VISIBLE_DEVICES={}".format(ctx.nvidia_visible_devices),
-        ]
+        if stage.needs_gpu:
+            command += [
+                "-e",
+                "NVIDIA_VISIBLE_DEVICES={}".format(ctx.nvidia_visible_devices),
+            ]
         for key, value in stage_environment(stage, ctx).items():
             command += ["-e", "{}={}".format(key, value)]
         command += [
