@@ -107,7 +107,6 @@ each has a flag that overrides it for one invocation:
 | flag | variable | default |
 |---|---|---|
 | `--frameworks` | `TRITON_MODELS_FRAMEWORKS` | all four |
-| `--container-version` | `TRITON_CONTAINER_VERSION` | `build.py` `triton_container_version` |
 | `--upstream-version` | `NVIDIA_UPSTREAM_VERSION` | `build.py` `upstream_container_version` |
 | `--semver` | `TRITON_SEMVER` | `build.py` `release_version` |
 | `--ubuntu-image` | `UBUNTU_IMAGE` | `ubuntu:22.04` |
@@ -122,6 +121,58 @@ each has a flag that overrides it for one invocation:
 | `--docker-volume` | `DOCKER_VOLUME` | `volume.gen_qa_model_repository.<job id>` |
 | `--build-dir` | `TRITON_MDLS_BLD_DIR` | `<mount>/<job id>` |
 | `--job-id` | `CI_JOB_ID` | timestamp |
+
+### What actually ran
+
+Because every one of those has three possible sources — flag, variable, built-in default — the
+command in a job definition is not a record of what took effect. So the first thing the driver
+prints is its own invocation, rebuilt from the parsed values:
+
+```
+2026-08-08 12:50:51 - [ STATUS ] - invocation, with every value resolved:
+python3 ./gen_qa_model_repository.py \
+    --all \
+    --ubuntu-image ubuntu:22.04 \
+    --upstream-version 26.07 \
+    --semver 2.72.0dev \
+    --onnx-version 1.20.1 \
+    --runtime docker \
+    --nvidia-visible-devices '' \
+    --model-type RTX5880-x86-8.9 \
+    --archive \
+    --artifactory-upload \
+    --artifactory-token *** \
+    --cleanup
+```
+
+Rebuilt rather than echoed from `argv`, which is the point: environment defaults, computed
+defaults and shell expansions all appear as the literal value used. A job line reading
+`--nvidia-visible-devices "${NVIDIA_VISIBLE_DEVICES}"` says nothing about whether the variable
+was set, and — as above — an empty value there is not an absent one. Values are shell-quoted, so
+empty is visible as `''` and the block pastes back into a shell to reproduce a run.
+
+The token is redacted. It reaches the uploader through the environment and never through argv,
+so only this echo needed handling.
+
+### Where the tree lands
+
+Models are written to a `models/` directory inside the build directory:
+
+```
+<build dir>/models/qa_model_repository/...
+<build dir>/models/manifest-summary.json
+<build dir>/models/archives/
+```
+
+The name is fixed rather than versioned. The build directory above it already carries the job
+id, so it is unique per run, and every version that matters is recorded where it is consumed —
+in the manifests, in the archive names and in the upload path. A version in the directory name
+only created a second place for two spellings of it to disagree, which they did: a CI job `cd`'d
+into a path built from one variable while the driver wrote to a path built from another, and
+because `docker` creates a missing working directory the loop found nothing and the job passed.
+
+On docker the tree is copied out to `--output-dir` at the end, so it arrives as
+`<output dir>/models/`. On enroot it is already on the host and stays put.
 
 ### Container engines
 
@@ -216,12 +267,18 @@ property true of only some of an archive's contents is worse than an absent one.
 ONNX bundle has one property fewer than OpenVINO — it also carries ensemble models, whose
 `model.provenance` differs.
 
+An `index.json` is written beside them listing every bundle with its size, model count and
+properties — the rollup a consumer reads before fetching anything, and what the uploader itself
+reads to know what to send. Note that it is *consumed* by the upload rather than included in it:
+the index and the per-bundle manifests stay on the build host, so the tarballs in Artifactory
+carry their properties individually and there is no single object there describing the set.
+
 #### One archive per model instead
 
 `--granularity model` packs each model separately rather than bundling a framework:
 
 ```bash
-python3 gen_archive.py --tree /tmp/26.08dev --dest /tmp/26.08dev/archives \
+python3 gen_archive.py --tree /tmp/360696202/models --dest /tmp/360696202/models/archives \
     --granularity model
 ```
 
@@ -251,8 +308,9 @@ they came from once detached.
 `gen_archive.py` runs on its own against any finished tree:
 
 ```bash
-python3 gen_archive.py --tree /tmp/26.08dev --dest /tmp/26.08dev/archives
-python3 gen_archive.py --tree /tmp/26.08dev --dest /tmp/26.08dev/archives --framework onnx
+python3 gen_archive.py --tree /tmp/360696202/models --dest /tmp/360696202/models/archives
+python3 gen_archive.py --tree /tmp/360696202/models --dest /tmp/360696202/models/archives \
+    --framework onnx
 ```
 
 Pass `--compress` for `.tar.gz` instead of `.tar`; plan files compress ~96%, which matters for
@@ -283,7 +341,7 @@ driver logs every command it runs, and argv is readable by any process on the ho
 `gen_artifactory.py` also runs on its own:
 
 ```bash
-python3 gen_artifactory.py --archives /tmp/26.08dev/archives \
+python3 gen_artifactory.py --archives /tmp/360696202/models/archives \
     --path sw-dl-triton-generic-local/triton/models \
     --model-type DGX-Spark-sbsa-12.1 \
     --nvidia-upstream-version 26.07 --triton-semver 2.72.0dev
