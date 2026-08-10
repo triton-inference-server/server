@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,16 +29,16 @@ import sys
 
 sys.path.append("../common")
 
-import json
-import os
-import sys
-import time
-import unittest
+import json  # noqa: E402
+import os  # noqa: E402
+import sys  # noqa: E402
+import time  # noqa: E402
+import unittest  # noqa: E402
 
-import numpy as np
-import requests
-import test_util as tu
-import tritonclient.http as httpclient
+import numpy as np  # noqa: E402
+import requests  # noqa: E402
+import test_util as tu  # noqa: E402
+import tritonclient.http as httpclient  # noqa: E402
 
 
 class SageMakerMultiModelTest(tu.TestResultCollector):
