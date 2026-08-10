@@ -163,11 +163,12 @@ def parse_properties(*sources):
 
 
 def bundle_path(args, framework):
-    """`<path>/<model type>/<upstream>-<semver>/<framework>`.
+    """`<path>/<model type>/<upstream>-<semver>/<build id>[/<framework>]`.
 
     The layout Artifactory already holds, one level per thing a consumer
     narrows by: which device the models were built for, which release, which
-    backend. Absent segments collapse rather than leaving an empty one.
+    run, and -- unless --flat -- which backend. Absent segments collapse rather
+    than leaving an empty one.
     """
     versions = "-".join(
         part for part in (args.nvidia_upstream_version, args.triton_semver) if part
