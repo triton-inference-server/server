@@ -371,15 +371,22 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         }
         r = requests.post(invoke_url, data=request_body, headers=mismatched_headers)
 
-        # After the fix: expect 4xx rejection
-        self.assertGreaterEqual(
+        # After the fix: the mismatch must be rejected with the specific 400 from
+        # the identity check (not merely any 4xx). Asserting the exact status and
+        # the error payload proves this branch ran, not an unrelated 404/error.
+        self.assertEqual(
             r.status_code,
             400,
-            "TRI-1563 PoC FAILED (vulnerability present): INVOKE with mismatched "
-            "X-Amzn-SageMaker-Target-Model header succeeded (status {}) — server "
-            "ran {} when authorized for {}. Expected 4xx rejection.".format(
-                r.status_code, self.model2_name, self.model1_name
+            "TRI-1563 PoC: INVOKE with a mismatched X-Amzn-SageMaker-Target-Model "
+            "header must be rejected with 400 (got {}). Body: {}".format(
+                r.status_code, r.text
             ),
+        )
+        self.assertIn(
+            "does not match",
+            r.text,
+            "TRI-1563 PoC: INVOKE 400 must be the target-model mismatch rejection; "
+            "got body: {}".format(r.text),
         )
 
         # --- PoC 2: UNLOAD with mismatched header ---
@@ -390,14 +397,19 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         r = requests.delete(unload_url, headers=mismatched_headers)
         time.sleep(3)
 
-        self.assertGreaterEqual(
+        self.assertEqual(
             r.status_code,
             400,
-            "TRI-1563 PoC FAILED (vulnerability present): UNLOAD with mismatched "
-            "X-Amzn-SageMaker-Target-Model header succeeded (status {}) — server "
-            "may have evicted {} instead of {}. Expected 4xx rejection.".format(
-                r.status_code, self.model2_name, self.model1_name
+            "TRI-1563 PoC: UNLOAD with a mismatched X-Amzn-SageMaker-Target-Model "
+            "header must be rejected with 400 (got {}). Body: {}".format(
+                r.status_code, r.text
             ),
+        )
+        self.assertIn(
+            "does not match",
+            r.text,
+            "TRI-1563 PoC: UNLOAD 400 must be the target-model mismatch rejection; "
+            "got body: {}".format(r.text),
         )
 
         # Verify model2 is still alive (was not evicted by the mismatched unload)
