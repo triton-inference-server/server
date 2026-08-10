@@ -90,6 +90,17 @@ endif()
 #
 find_package(re2 REQUIRED)
 
+# protobuf
+#
+# protobuf v33's libprotobuf.a calls into abseil internally, and the
+# tritonserver executable statically links libprotobuf.a (via the gRPC
+# endpoint). Linking the protobuf package target directly ensures its own
+# abseil dependencies are pulled onto the executable's link line, so builds
+# that do not enable metrics/GPU (which otherwise pull abseil incidentally)
+# still resolve those symbols. protobuf carries its own abseil deps, so no
+# abseil target is referenced here.
+find_package(Protobuf CONFIG REQUIRED)
+
 #
 # tritonserver executable
 #
@@ -150,6 +161,7 @@ target_link_libraries(
     triton-common-logging           # from repo-common
     triton-core-serverapi           # from repo-core
     triton-core-serverstub          # from repo-core
+    protobuf::libprotobuf           # brings its own abseil deps
 )
 
 if(${TRITON_ENABLE_ASAN})
