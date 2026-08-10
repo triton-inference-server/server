@@ -25,6 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Local test modules are imported after adjusting sys.path for ../common.
+# flake8: noqa: E402
 import sys
 
 sys.path.append("../common")

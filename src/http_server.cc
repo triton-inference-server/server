@@ -2496,8 +2496,8 @@ HTTPAPIServer::GetInferenceHeaderLength(
     catch (const std::out_of_range& oor) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
-          (std::string("Unable to parse ") + kInferHeaderContentLengthHTTPHeader +
-           ", value is out of range [ " +
+          (std::string("Unable to parse ") +
+           kInferHeaderContentLengthHTTPHeader + ", value is out of range [ " +
            std::to_string(std::numeric_limits<std::int32_t>::min()) + ", " +
            std::to_string(std::numeric_limits<std::int32_t>::max()) +
            " ], got: " + header_length_c_str)
