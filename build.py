@@ -1761,6 +1761,11 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             if os.environ.get(var):
                 runargs += ["-e", f"{var}={os.environ[var]}"]
 
+        # Forward the CUDA arch list into the buildbase container so nested
+        # backend builds honor --cuda-arch-list.
+        if FLAGS.cuda_arch_list is not None:
+            runargs += ["-e", f'"CUDA_ARCH_LIST={FLAGS.cuda_arch_list}"']
+
         runargs += ["tritonserver_buildbase"]
 
         runargs += ["./cmake_build"]
