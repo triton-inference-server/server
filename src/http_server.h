@@ -49,9 +49,9 @@
 
 namespace triton { namespace server {
 
-#ifdef TRITON_ENABLE_MYSQL_ODBC
-struct ImpsInferSlot;
-#endif
+// Defer work to an evhtp worker thread; retries when evthr_defer returns
+// EVTHR_RES_RETRY (pipe backpressure under load).
+bool EvthrDeferWithRetry(evthr_t* thread, evthr_cb cb, void* arg);
 
 class MappingSchema {
  public:
@@ -109,6 +109,8 @@ class HTTPServer {
   virtual void Handle(evhtp_request_t* req) = 0;
 
   static void StopCallback(evutil_socket_t sock, short events, void* arg);
+
+  static void EvhtpWorkerThreadInit(evhtp_t* htp, evthr_t* thread, void* arg);
 
   static evhtp_res NewConnection(evhtp_connection_t* conn, void* arg);
   static evhtp_res EndConnection(evhtp_connection_t* conn, void* arg);
@@ -331,14 +333,6 @@ class HTTPAPIServer : public HTTPServer {
     virtual TRITONSERVER_Error* FinalizeResponse(
         TRITONSERVER_InferenceResponse* response,
         evbuffer* json_only_out = nullptr);
-
-    // Direct tensor read for multi_infer imps folding (skips infer JSON build).
-    TRITONSERVER_Error* ExtractFirstJsonOutputAsRowMajorDoubles(
-        TRITONSERVER_InferenceResponse* response, size_t expect_rows,
-        std::vector<std::vector<double>>* rows_out);
-    TRITONSERVER_Error* ExtractFirstJsonOutputAsScalars(
-        TRITONSERVER_InferenceResponse* response, size_t expect_rows,
-        std::vector<float>* scores_out);
 
     // Helper function to set infer response header in the form specified by
     // the endpoint protocol
@@ -575,7 +569,8 @@ class HTTPAPIServer : public HTTPServer {
       TRITONSERVER_InferenceTrace* triton_trace,
       void (*infer_response_complete_fn)(
           TRITONSERVER_InferenceResponse*, const uint32_t, void*) =
-          InferRequestClass::InferResponseComplete);
+          InferRequestClass::InferResponseComplete,
+      bool forward_headers = true);
 
   static TRITONSERVER_Error* InferResponseAlloc(
       TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -609,10 +604,6 @@ class HTTPAPIServer : public HTTPServer {
   void HandleInfer(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
-#ifdef TRITON_ENABLE_MYSQL_ODBC
-  // POST /v2/predict — imps-shaped BT inference (feature mapping + model routing).
-  void HandlePredict(evhtp_request_t* req);
-#endif  // TRITON_ENABLE_MYSQL_ODBC
   // POST /v2/multi_infer — parallel infer for multiple models (requests array).
   void HandleMultiInfer(evhtp_request_t* req);
   void HandleModelStats(
@@ -679,21 +670,11 @@ class HTTPAPIServer : public HTTPServer {
       TRITONSERVER_InferenceRequest* irequest);
 
   // Fills irequest from a multi_infer slot object (inputs/outputs/id/parameters).
-  // JSON tensor data only; no trailing binary block (v/n/header_length unused).
+  // Only JSON inline tensor data ("data" fields) is supported.
   TRITONSERVER_Error* FillMultiInferSlotTritonRequest(
       const std::string& model_name,
       triton::common::TritonJson::Value& infer_json,
       TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req);
-
-#ifdef TRITON_ENABLE_MYSQL_ODBC
-  static TRITONSERVER_Error* AddJsonRequestedOutput(
-      TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req,
-      const char* output_name, uint32_t class_cnt = 0);
-
-  static TRITONSERVER_Error* FillImpsTritonRequest(
-      TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req,
-      ImpsInferSlot&& slot);
-#endif  // TRITON_ENABLE_MYSQL_ODBC
 
   std::shared_ptr<TRITONSERVER_Server> server_;
 
