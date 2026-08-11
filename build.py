@@ -1730,9 +1730,12 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         # (TRITON_REPO_ORGANIZATION), so pointing it at a local mirror is the
         # only way to resolve deeply-nested clones (e.g. core -> common)
         # offline; FETCHCONTENT_SOURCE_DIR overrides do not reach those builds.
+        # FLAGS.github_organization is already normalized as an absolute path
         if FLAGS.github_organization and os.path.isdir(FLAGS.github_organization):
-            org_abs = os.path.abspath(FLAGS.github_organization)
-            runargs += ["-v", f"{org_abs}:{org_abs}"]
+            runargs += [
+                "-v",
+                f"{FLAGS.github_organization}:{FLAGS.github_organization}",
+            ]
         if FLAGS.use_user_docker_config:
             if os.path.exists(FLAGS.use_user_docker_config):
                 runargs += [
@@ -2755,6 +2758,12 @@ if __name__ == "__main__":
         FLAGS.extra_backend_cmake_arg = []
     if FLAGS.build_secret is None:
         FLAGS.build_secret = []
+
+    # When --github-organization is a local directory, resolve it to an absolute
+    # path, so nested clones and CMake's TRITON_REPO_ORGANIZATION properly reference it.
+    # Absolute values and remote URLs are left unchanged.
+    if FLAGS.github_organization and os.path.isdir(FLAGS.github_organization):
+        FLAGS.github_organization = os.path.abspath(FLAGS.github_organization)
 
     FLAGS.boost_url = os.getenv(
         "TRITON_BOOST_URL",
