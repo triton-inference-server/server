@@ -987,12 +987,11 @@ void HTTPAPIServer::HandleMultiInfer(evhtp_request_t* req) {
     SlotPrep& prep = batch_state->slots[source_idx];
 
     TRITONSERVER_InferenceRequest* ireq = nullptr;
-    err = TRITONSERVER_InferenceRequestNew(
-        &ireq, server_.get(), prep.model_name.c_str(), prep.model_version);
+    err = TRITONSERVER_InferenceRequestNew(&ireq, server_.get(), prep.model_name.c_str(), prep.model_version);
     if (err != nullptr) {
       aggregator->CancelAllSubRequests();
       RespondWithTritonError(req, err);
-      return;
+      return; 
     }
 
     auto ireq_shared = std::shared_ptr<TRITONSERVER_InferenceRequest>(

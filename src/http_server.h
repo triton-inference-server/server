@@ -330,9 +330,7 @@ class HTTPAPIServer : public HTTPServer {
         void* userp);
     // When json_only_out is non-null, write infer response JSON there only
     // (no HTTP headers); used by POST /v2/multi_infer aggregation.
-    virtual TRITONSERVER_Error* FinalizeResponse(
-        TRITONSERVER_InferenceResponse* response,
-        evbuffer* json_only_out = nullptr);
+    virtual TRITONSERVER_Error* FinalizeResponse(TRITONSERVER_InferenceResponse* response, evbuffer* json_only_out = nullptr);
 
     // Helper function to set infer response header in the form specified by
     // the endpoint protocol
@@ -427,9 +425,7 @@ class HTTPAPIServer : public HTTPServer {
     void SendChunkResponse(bool end);
 
     // Response preparation
-    TRITONSERVER_Error* FinalizeResponse(
-        TRITONSERVER_InferenceResponse* response,
-        evbuffer* json_only_out = nullptr) override;
+    TRITONSERVER_Error* FinalizeResponse(TRITONSERVER_InferenceResponse* response, evbuffer* json_only_out = nullptr) override;
     void AddErrorJson(TRITONSERVER_Error* error);
     static void StartResponse(evthr_t* thr, void* arg, void* shared);
 
@@ -562,15 +558,10 @@ class HTTPAPIServer : public HTTPServer {
 
   // ForwardHeaders, release/response callbacks, and ServerInferAsync (shared
   // by HandleInfer and multi_infer sub-requests).
-  TRITONSERVER_Error* ScheduleInferAsync(
-      evhtp_request_t* req, TRITONSERVER_InferenceRequest* irequest,
-      InferRequestClass* infer_request,
+  TRITONSERVER_Error* ScheduleInferAsync(evhtp_request_t* req, TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_request,
       RequestReleasePayload* request_release_payload,
       TRITONSERVER_InferenceTrace* triton_trace,
-      void (*infer_response_complete_fn)(
-          TRITONSERVER_InferenceResponse*, const uint32_t, void*) =
-          InferRequestClass::InferResponseComplete,
-      bool forward_headers = true);
+      void (*infer_response_complete_fn)(TRITONSERVER_InferenceResponse*, const uint32_t, void*) = InferRequestClass::InferResponseComplete, bool forward_headers = true);
 
   static TRITONSERVER_Error* InferResponseAlloc(
       TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -671,10 +662,7 @@ class HTTPAPIServer : public HTTPServer {
 
   // Fills irequest from a multi_infer slot object (inputs/outputs/id/parameters).
   // Only JSON inline tensor data ("data" fields) is supported.
-  TRITONSERVER_Error* FillMultiInferSlotTritonRequest(
-      const std::string& model_name,
-      triton::common::TritonJson::Value& infer_json,
-      TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req);
+  TRITONSERVER_Error* FillMultiInferSlotTritonRequest(const std::string& model_name, triton::common::TritonJson::Value& infer_json, TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req);
 
   std::shared_ptr<TRITONSERVER_Server> server_;
 

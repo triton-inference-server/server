@@ -430,8 +430,7 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
   if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
     return;
   }
-  if (!EvthrDeferWithRetry(
-          infer_request->thread_, ReplyCallback, infer_request)) {
+  if (!EvthrDeferWithRetry(infer_request->thread_, ReplyCallback, infer_request)) {
 #ifdef TRITON_ENABLE_LOGGING
     LOG_ERROR << "failed to defer SageMaker infer reply to worker thread";
 #endif  // TRITON_ENABLE_LOGGING
