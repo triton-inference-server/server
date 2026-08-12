@@ -41,10 +41,9 @@ rm -rf *.tar.gz
 install_build_deps
 install_conda
 
-# Test conda env without custom Python backend stub This environment should
-# always use the default Python version shipped in the container. For Ubuntu
-# 24.04 it is Python 3.12, for Ubuntu 22.04 is Python 3.10 and for Ubuntu 20.04
-# is 3.8.
+# Test conda env without custom Python backend stub. This environment should
+# always use the default Python version shipped in the container, which is
+# 3.12 -- nothing below that is supported.
 path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python_3_12_environment.tar.gz'
 create_conda_env "3.12" "python-3-12"
 conda install -c conda-forge libstdcxx-ng=14 -y
