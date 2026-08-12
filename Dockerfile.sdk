@@ -41,7 +41,7 @@ ARG TRITON_ENABLE_GPU=ON
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
 ARG JAVA_BINDINGS_MAVEN_URL=https://archive.apache.org/dist/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz
 # DCGM version to install for Model Analyzer
-ARG DCGM_VERSION=4.5.3-1
+ARG DCGM_VERSION=4.6.1-1
 
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown

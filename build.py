@@ -75,11 +75,10 @@ DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.73.0dev",
     "triton_container_version": "26.09dev",
     "upstream_container_version": "26.07",
-    "ort_version": "1.27.0",
-    "ort_openvino_version": "2026.2.0",
-    "standalone_openvino_version": "2026.2.0",
-    "dcgm_version": "4.5.3-1",
-    "rhel_py_version": "3.12.3",
+    "ort_version": "1.28.0",
+    "ort_openvino_version": "2026.3.0",
+    "standalone_openvino_version": "2026.3.0",
+    "dcgm_version": "4.6.1-1",
 }
 
 CORE_BACKENDS = ["ensemble"]
@@ -554,8 +553,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = onnxruntime_cmake_args(images, library_paths)
     elif be == "openvino":
         args = openvino_cmake_args()
-    elif be == "python":
-        args = python_cmake_args()
     elif be == "dali":
         args = dali_cmake_args()
     elif be == "pytorch":
@@ -611,18 +608,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
 
     else:
         cargs.append("..")
-    return cargs
-
-
-def python_cmake_args():
-    cargs = []
-    if target_platform() == "rhel":
-        cargs.append(
-            cmake_backend_arg(
-                "python", "PYBIND11_PYTHON_VERSION", "STRING", FLAGS.rhel_py_version
-            )
-        )
-
     return cargs
 
 
@@ -1041,9 +1026,6 @@ RUN yum install -y \\
             numactl-devel \\
             openssl-devel \\
             pkg-config \\
-            python3-pip \\
-            python3-scons \\
-            python3-setuptools \\
             rapidjson-devel \\
             re2-devel \\
             readline-devel \\
@@ -1077,20 +1059,21 @@ RUN ccache -p
 """.format(
             os.getenv("CCACHE_REMOTE_STORAGE")
         )
-    # Requires openssl-devel to be installed first for pyenv build to be successful
-    df += change_default_python_version_rhel(FLAGS.rhel_py_version)
+    df += set_python_location_to_manylinux_for_rhel()
+    df += restore_embeddable_python_lib_rhel()
     df += """
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
           auditwheel \\
           build \\
-          wheel \\
-          setuptools \\
+          cmake==4.0.3 \\
           docker \\
-          virtualenv \\
           patchelf==0.17.2 \\
-          cmake==4.0.3
+          scons \\
+          setuptools \\
+          virtualenv \\
+          wheel
 """
     df += f"""
 # Install boost version >= 1.78 for boost::span
@@ -1455,9 +1438,10 @@ RUN yum install -y \\
         libb64-devel \\
         gperftools-devel \\
         wget \\
-        python3.12-pip \\
         numactl-devel
-
+"""
+        df += set_python_location_to_manylinux_for_rhel()
+        df += """
 RUN pip3 install patchelf==0.17.2
 
 """
@@ -1532,8 +1516,7 @@ RUN yum install -y \\
         openssl-devel \\
         readline-devel
 """
-            # Requires openssl-devel to be installed first for pyenv build to be successful
-            df += change_default_python_version_rhel(FLAGS.rhel_py_version)
+            df += set_python_location_to_manylinux_for_rhel()
             df += """
 RUN pip3 install --upgrade pip \\
     && pip3 install --upgrade \\
@@ -1674,28 +1657,28 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
     return df
 
 
-def change_default_python_version_rhel(version):
-    df = f"""
-# The python library version available for install via 'yum install python3.X-devel' does not
-# match the version of python inside the RHEL base container. This means that python packages
-# installed within the container will not be picked up by the python backend stub process pybind
-# bindings. It must instead must be installed via pyenv.
-ENV PYENV_ROOT=/opt/pyenv_build
-RUN curl https://pyenv.run | bash
-ENV PATH="${{PYENV_ROOT}}/bin:$PATH"
-RUN eval "$(pyenv init -)"
-RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {version} \\
-    && cp ${{PYENV_ROOT}}/versions/{version}/lib/libpython3* /usr/lib64/
-
-# RHEL image has several python versions. It's important
-# to set the correct version, otherwise, packages that are
-# pip installed will not be found during testing.
-ENV PYVER={version} PYTHONPATH=/opt/python/v
-RUN ln -sf ${{PYENV_ROOT}}/versions/${{PYVER}}* ${{PYTHONPATH}}
-ENV PYBIN=${{PYTHONPATH}}/bin
-ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
+def set_python_location_to_manylinux_for_rhel():
+    df = """
+ENV PATH="/opt/_internal/pipx/shared/bin:$PATH"
 """
     return df
+
+
+def restore_embeddable_python_lib_rhel():
+    # The manylinux base container configures CPython with --disable-shared,
+    # so no libpython*.so is ever built, and its finalize.sh then compresses
+    # every libpython*.a into static-libs-for-embedding-only.tar.xz and drops
+    # the originals. triton_python_backend_stub links pybind11::embed and so
+    # needs that archive. Restore it in place -- the path it unpacks to is
+    # exactly the LIBDIR the interpreter's sysconfig reports, which is where
+    # pybind11's FindPythonLibsNew looks.
+    #
+    # This deliberately fails the build if the archive is absent: without it
+    # the stub link fails much later with an unresolvable -lpython<ver>.
+    return """
+RUN tar -xvf /opt/_internal/static-libs-for-embedding-only.tar.xz \\
+        -C /opt/_internal
+"""
 
 
 def create_build_dockerfiles(
@@ -2130,17 +2113,6 @@ def backend_build(
 
     cmake_script.mkdir(os.path.join(install_dir, "backends"))
     cmake_script.rmdir(os.path.join(install_dir, "backends", be))
-
-    # The python library version available for install via 'yum install python3.X-devel' does not
-    # match the version of python inside the RHEL base container. This means that python packages
-    # installed within the container will not be picked up by the python backend stub process pybind
-    # bindings. It must instead must be installed via pyenv. We package it here for better usability.
-    if target_platform() == "rhel" and be == "python":
-        major_minor_version = ".".join((FLAGS.rhel_py_version).split(".")[:2])
-        version_matched_files = "/usr/lib64/libpython" + major_minor_version + "*"
-        cmake_script.cp(
-            version_matched_files, os.path.join(repo_install_dir, "backends", be)
-        )
 
     cmake_script.cpdir(
         os.path.join(repo_install_dir, "backends", be),
@@ -2759,12 +2731,6 @@ if __name__ == "__main__":
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["dcgm_version"],
         help="This flag sets the DCGM version for Triton Inference Server to be built. Default: the latest supported version.",
-    )
-    parser.add_argument(
-        "--rhel-py-version",
-        required=False,
-        default=DEFAULT_TRITON_VERSION_MAP["rhel_py_version"],
-        help="This flag sets the Python version for RHEL platform of Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
         "--docker-build-secret",

@@ -94,8 +94,8 @@ SH_COLOR_RESET = "\\033[0m"
 SH_COLOR_WARNING = "\\033[33m"
 
 # Defaults, matching the shell driver's `${VAR:=default}` values.
-DEFAULT_ONNX_VERSION = "1.20.1"
-DEFAULT_ONNX_OPSET = "0"
+DEFAULT_ONNX_VERSION = "1.22.0"
+DEFAULT_ONNX_OPSET = "26"
 DEFAULT_OPENVINO_VERSION = "2024.5.0"
 DEFAULT_UBUNTU_IMAGE = "ubuntu:22.04"
 # "all" per the container toolkit's documented values, where it means every GPU

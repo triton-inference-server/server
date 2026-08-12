@@ -74,8 +74,14 @@ log_message.status "define: default values"
 TRITON_CONTAINER_VERSION=${TRITON_CONTAINER_VERSION:=26.08dev}
 NVIDIA_UPSTREAM_VERSION=${NVIDIA_UPSTREAM_VERSION:=26.07}
 TRITON_SEMVER=${TRITON_SEMVER:=2.72.0dev}
-ONNX_VERSION=1.20.1
-ONNX_OPSET=0
+ONNX_VERSION=1.22.0 # https://github.com/microsoft/onnxruntime/blob/v1.28.0/tools/ci_build/github/linux/python/requirements.txt#L15
+# Max opset ONNX Runtime accepts: the last *released* opset of the onnx that ORT
+# was built against, i.e. one below that release's current opset. v1.28.0 pins
+# onnx 1.22.0, whose opset 27 is still in development, so the ceiling is 26.
+# Do NOT derive this from ONNX_VERSION -- 1.22.0 maps to 27, which fails to load.
+# ORT's onnx pin: https://github.com/microsoft/onnxruntime/blob/v1.28.0/cmake/deps.txt
+# As of 1.22.0 ONNX_OPSET is 26 - https://github.com/onnx/onnx/blob/v1.22.0/docs/Versioning.md#released-versions
+ONNX_OPSET=26
 OPENVINO_VERSION=2024.5.0
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 # Upstream NGC containers, so they follow the upstream train, not the container
