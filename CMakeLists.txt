@@ -26,6 +26,21 @@
 
 cmake_minimum_required(VERSION 3.18)
 
+# CMake 4.0+ rejects projects that call cmake_minimum_required(VERSION < 3.5).
+# The fetched third_party repo builds libevent 2.1.12 via ExternalProject using a
+# separate CMake invocation; that step does not inherit -D variables from the top
+# level unless they are also in the environment. If configure fails inside libevent
+# with "Compatibility with CMake < 3.5 has been removed", use either:
+#   export CMAKE_POLICY_VERSION_MINIMUM=3.5   # before cmake AND cmake --build
+# or install/use CMake 3.28.x–3.31.x for this build.
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.0")
+  message(
+    STATUS
+    "CMake ${CMAKE_VERSION}: for libevent/third_party with CMake 4.x, export "
+    "CMAKE_POLICY_VERSION_MINIMUM=3.5 in your shell before configure and build "
+    "(see docs/customization_guide/build.md).")
+endif()
+
 project(tritonserver LANGUAGES C CXX)
 
 include(CMakeDependentOption)

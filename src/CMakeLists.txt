@@ -180,6 +180,7 @@ target_link_libraries(
     triton-common-async-work-queue  # from repo-common
     triton-common-error             # from repo-common
     triton-common-logging           # from repo-common
+    triton-common-json              # from repo-common (RapidJSON)
     triton-core-serverapi           # from repo-core
     triton-core-serverstub          # from repo-core
 )
@@ -337,11 +338,14 @@ if(${TRITON_ENABLE_HTTP}
   list(APPEND
     HTTP_ENDPOINT_SRCS
     http_server.cc
+    multi_infer.cc
     orca_http.cc
   )
   list(APPEND
     HTTP_ENDPOINT_HDRS
     http_server.h
+    http_error_json.h
+    http_server_macros.h
     orca_http.h
   )
 

@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <cmath>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -46,6 +47,18 @@ constexpr char kContentTypeHeader[] = "Content-Type";
 constexpr char kContentLengthHeader[] = "Content-Length";
 
 constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
+
+/// Decimal places used when serializing model scores in JSON responses.
+constexpr int kScoreJsonDecimalPrecision = 6;
+
+inline double RoundToScorePrecision(double value)
+{
+  double scale = 1.0;
+  for (int i = 0; i < kScoreJsonDecimalPrecision; ++i) {
+    scale *= 10.0;
+  }
+  return std::round(value * scale) / scale;
+}
 
 /// The value for a dimension in a shape that indicates that that
 /// dimension can take on any size.

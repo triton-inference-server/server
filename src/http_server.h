@@ -36,6 +36,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 #include "common.h"
 #include "data_compressor.h"
@@ -47,6 +48,10 @@
 #include "triton/core/tritonserver.h"
 
 namespace triton { namespace server {
+
+// Defer work to an evhtp worker thread; retries when evthr_defer returns
+// EVTHR_RES_RETRY (pipe backpressure under load).
+bool EvthrDeferWithRetry(evthr_t* thread, evthr_cb cb, void* arg);
 
 class MappingSchema {
  public:
@@ -104,6 +109,8 @@ class HTTPServer {
   virtual void Handle(evhtp_request_t* req) = 0;
 
   static void StopCallback(evutil_socket_t sock, short events, void* arg);
+
+  static void EvhtpWorkerThreadInit(evhtp_t* htp, evthr_t* thread, void* arg);
 
   static evhtp_res NewConnection(evhtp_connection_t* conn, void* arg);
   static evhtp_res EndConnection(evhtp_connection_t* conn, void* arg);
@@ -278,11 +285,13 @@ class HTTPAPIServer : public HTTPServer {
         TRITONSERVER_Server* server, evhtp_request_t* req,
         DataCompressor::Type response_compression_type,
         const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
-        const std::shared_ptr<SharedMemoryManager>& shm_manager);
+        const std::shared_ptr<SharedMemoryManager>& shm_manager,
+        bool pause_http_request = true,
+        bool register_fini_cancel_hook = true);
 
     virtual ~InferRequestClass()
     {
-      if (req_ != nullptr) {
+      if (req_ != nullptr && register_fini_cancel_hook_) {
         evhtp_request_unset_hook(req_, evhtp_hook_on_request_fini);
       }
       req_ = nullptr;
@@ -319,8 +328,9 @@ class HTTPAPIServer : public HTTPServer {
     static void InferResponseComplete(
         TRITONSERVER_InferenceResponse* response, const uint32_t flags,
         void* userp);
-    virtual TRITONSERVER_Error* FinalizeResponse(
-        TRITONSERVER_InferenceResponse* response);
+    // When json_only_out is non-null, write infer response JSON there only
+    // (no HTTP headers); used by POST /v2/multi_infer aggregation.
+    virtual TRITONSERVER_Error* FinalizeResponse(TRITONSERVER_InferenceResponse* response, evbuffer* json_only_out = nullptr);
 
     // Helper function to set infer response header in the form specified by
     // the endpoint protocol
@@ -328,6 +338,8 @@ class HTTPAPIServer : public HTTPServer {
         const bool has_binary_data, const size_t header_length);
 
     uint32_t IncrementResponseCount();
+
+    uint32_t ResponseCount() const { return response_count_.load(); }
 
     // Only used if tracing enabled
     std::shared_ptr<TraceManager::Trace> trace_;
@@ -358,6 +370,8 @@ class HTTPAPIServer : public HTTPServer {
 
     // Counter to keep track of number of responses generated.
     std::atomic<uint32_t> response_count_{0};
+
+    const bool register_fini_cancel_hook_;
 
     // Event hook for called before request deletion
     static evhtp_res RequestFiniHook(evhtp_request* req, void* arg);
@@ -411,8 +425,7 @@ class HTTPAPIServer : public HTTPServer {
     void SendChunkResponse(bool end);
 
     // Response preparation
-    TRITONSERVER_Error* FinalizeResponse(
-        TRITONSERVER_InferenceResponse* response) override;
+    TRITONSERVER_Error* FinalizeResponse(TRITONSERVER_InferenceResponse* response, evbuffer* json_only_out = nullptr) override;
     void AddErrorJson(TRITONSERVER_Error* error);
     static void StartResponse(evthr_t* thr, void* arg, void* shared);
 
@@ -506,11 +519,13 @@ class HTTPAPIServer : public HTTPServer {
   // [FIXME] extract to "infer" class
   virtual std::unique_ptr<InferRequestClass> CreateInferRequest(
       evhtp_request_t* req,
-      const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request)
+      const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
+      bool pause_http_request = true,
+      bool register_fini_cancel_hook = true)
   {
     return std::unique_ptr<InferRequestClass>(new InferRequestClass(
         server_.get(), req, GetResponseCompressionType(req), triton_request,
-        shm_manager_));
+        shm_manager_, pause_http_request, register_fini_cancel_hook));
   }
 
   // Helper function to retrieve infer request header in the form specified by
@@ -540,6 +555,13 @@ class HTTPAPIServer : public HTTPServer {
       TRITONSERVER_InferenceTrace** triton_trace);
   TRITONSERVER_Error* ForwardHeaders(
       evhtp_request_t* req, TRITONSERVER_InferenceRequest* irequest);
+
+  // ForwardHeaders, release/response callbacks, and ServerInferAsync (shared
+  // by HandleInfer and multi_infer sub-requests).
+  TRITONSERVER_Error* ScheduleInferAsync(evhtp_request_t* req, TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_request,
+      RequestReleasePayload* request_release_payload,
+      TRITONSERVER_InferenceTrace* triton_trace,
+      void (*infer_response_complete_fn)(TRITONSERVER_InferenceResponse*, const uint32_t, void*) = InferRequestClass::InferResponseComplete, bool forward_headers = true);
 
   static TRITONSERVER_Error* InferResponseAlloc(
       TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -573,6 +595,8 @@ class HTTPAPIServer : public HTTPServer {
   void HandleInfer(
       evhtp_request_t* req, const std::string& model_name,
       const std::string& model_version_str);
+  // POST /v2/multi_infer — parallel infer for multiple models (requests array).
+  void HandleMultiInfer(evhtp_request_t* req);
   void HandleModelStats(
       evhtp_request_t* req, const std::string& model_name = "",
       const std::string& model_version_str = "");
@@ -635,6 +659,10 @@ class HTTPAPIServer : public HTTPServer {
   TRITONSERVER_Error* ParseJsonTritonRequestID(
       triton::common::TritonJson::Value& request_json,
       TRITONSERVER_InferenceRequest* irequest);
+
+  // Fills irequest from a multi_infer slot object (inputs/outputs/id/parameters).
+  // Only JSON inline tensor data ("data" fields) is supported.
+  TRITONSERVER_Error* FillMultiInferSlotTritonRequest(const std::string& model_name, triton::common::TritonJson::Value& infer_json, TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req);
 
   std::shared_ptr<TRITONSERVER_Server> server_;
 

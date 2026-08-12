@@ -25,6 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "sagemaker_server.h"
 
+#include "http_error_json.h"
+
 namespace triton { namespace server {
 
 #define HTTP_RESPOND_IF_ERR(REQ, X)                   \
@@ -39,21 +41,6 @@ namespace triton { namespace server {
   } while (false)
 
 namespace {
-
-void
-EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err)
-{
-  const char* message = TRITONSERVER_ErrorMessage(err);
-
-  triton::common::TritonJson::Value response(
-      triton::common::TritonJson::ValueType::OBJECT);
-  response.AddStringRef("error", message, strlen(message));
-
-  triton::common::TritonJson::WriteBuffer buffer_json;
-  response.Write(&buffer_json);
-
-  evbuffer_add(buffer, buffer_json.Base(), buffer_json.Size());
-}
 
 TRITONSERVER_Error*
 EVBufferToJson(
@@ -443,7 +430,11 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
   if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
     return;
   }
-  evthr_defer(infer_request->thread_, ReplyCallback, infer_request);
+  if (!EvthrDeferWithRetry(infer_request->thread_, ReplyCallback, infer_request)) {
+#ifdef TRITON_ENABLE_LOGGING
+    LOG_ERROR << "failed to defer SageMaker infer reply to worker thread";
+#endif  // TRITON_ENABLE_LOGGING
+  }
 }
 
 void
