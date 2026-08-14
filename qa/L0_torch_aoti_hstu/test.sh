@@ -48,6 +48,7 @@ MODELDIR=${MODELDIR:=./models}
 CLIENT_LOG="./${MODEL_NAME}-client.log"
 SERVER_LOG="./${MODEL_NAME}-server.log"
 KVCACHE_LOG="./${MODEL_NAME}-kvcache.log"
+EXPORT_KVCACHE_LOG="./cpp_kvcache_server.log"
 
 export FLEXKV_LOG_LEVEL=${FLEXKV_LOG_LEVEL:="WARNING"}
 
@@ -87,6 +88,12 @@ for artifact in ${EXPORTED_MODEL} ${DUMP_DIR}; do
         exit 1
     fi
 done
+
+# The export step's KV-cache server log, alongside this test's own logs so CI
+# collects it with them.
+if [[ -f ${EXPORT_DIR}/cpp_kvcache_server.log ]]; then
+    cp ${EXPORT_DIR}/cpp_kvcache_server.log ${EXPORT_KVCACHE_LOG}
+fi
 
 echo -e "${COLOR_DARK}Setting up model repository in ${MODELDIR}${COLOR_RESET}"
 rm -rf ${MODELDIR}
