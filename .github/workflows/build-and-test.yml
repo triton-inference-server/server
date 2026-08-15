@@ -1,0 +1,51 @@
+name: Build And Test
+
+on:
+    pull_request:
+      branches:
+        - main
+      types: [synchronize, opened, reopened, ready_for_review]
+
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: nvcr.io/nvidia/tritonserver:24.10-py3
+      volumes:
+        - ${{ github.workspace }}:/server
+        # Mount /usr so we can free space
+        - /usr:/host_usr
+      env:
+        AGENT_TOOLSDIRECTORY: "$AGENT_TOOLSDIRECTORY"
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Free space
+      run: |
+        rm -rf \
+          /host_usr/share/dotnet /host_usr/local/lib/android /opt/ghc \
+          /host_usr/local/share/powershell /host_usr/share/swift /host_usr/local/.ghcup \
+          /host_usr/lib/jvm
+        rm -rf "$AGENT_TOOLSDIRECTORY"
+
+    - name: Install dependencies
+      run: |
+        apt update
+        apt install -y --no-install-recommends clang-format-15 cmake libb64-dev rapidjson-dev libre2-dev libssl-dev
+        wget -O /tmp/boost.tar.gz https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz && (cd /tmp && tar xzf boost.tar.gz) && mv /tmp/boost_1_80_0/boost /usr/include/boost
+        pip install pytest requests /opt/tritonserver/python/*.whl pydantic tritonclient[all]
+
+    - name: Build
+      run: |
+        mkdir -p /server/build
+        cd /server/build
+        cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install ..
+        make -j8
+
+    - name: Run tests with pytest
+      run: |
+        cd /server
+        python3 -m pip install --force-reinstall build/triton-server/python/generic/wheel/dist/tritonfrontend-*.whl
+        pytest qa/L0_python_api/ -v
