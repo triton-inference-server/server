@@ -66,6 +66,10 @@ def _infer_url(model_name="parameter"):
     return f"{_HTTP_LOCALHOST}/v2/models/{model_name}/infer"
 
 
+def _generate_url(model_name="parameter"):
+    return f"{_HTTP_LOCALHOST}/v2/models/{model_name}/generate"
+
+
 def _minimal_fp32_infer_body(parameters=None):
     """KServe HTTP infer JSON matching qa/L0_parameters model `parameter` (INPUT0 FP32 [1])."""
     body = {
@@ -222,6 +226,37 @@ class InferenceParametersTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 400, msg=snippet)
         self.assertIn(text_substr, response.text, msg=snippet)
 
+    def _raw_http_post_generate(self, model_name, body_dict, extra_headers=None):
+        """POST /v2/models/.../generate without tritonclient (no header normalization)."""
+        headers = {"Content-Type": "application/json"}
+        if extra_headers:
+            headers.update(extra_headers)
+        return requests.post(
+            _generate_url(model_name),
+            json=body_dict,
+            headers=headers,
+            timeout=60,
+        )
+
+    def _verify_http_generate(self, model_name, headers, expected_headers):
+        """POST /generate and assert forwarded headers are echoed as key/value."""
+        response = self._raw_http_post_generate(
+            model_name, {"INPUT0": [1.0]}, extra_headers=headers
+        )
+        self.assertEqual(response.status_code, 200, msg=response.text[:2000])
+        body = response.json()
+        # We always forward multiple matching headers, so `key`/`value` come
+        # back as parallel JSON arrays (the /generate endpoint only strips
+        # single-element tensors to scalars). Reconstruct the mapping so we
+        # verify each header keeps its correct value, not just that the sets
+        # of keys and values match independently.
+        forwarded = dict(zip(body["key"], body["value"]))
+        self.assertEqual(
+            forwarded,
+            expected_headers,
+            msg=f"model={model_name} forwarded={forwarded}",
+        )
+
     async def _run_client_infer_suite(self, parameters, headers, expected_headers):
         """
         Full client matrix: gRPC/HTTP sync+async, stream, ensemble.
@@ -329,6 +364,24 @@ class InferenceParametersTest(unittest.IsolatedAsyncioTestCase):
     async def test_grpc_header_forward_pattern_case_sensitive(self):
         expected_headers = {}
         await self._run_client_infer_suite({}, _FORWARD_HEADERS, expected_headers)
+
+    async def test_http_header_forward_pattern_generate(self):
+        # Regression test for GitHub issue #8790: --http-header-forward-pattern
+        # had no effect on the /generate endpoint, silently dropping headers.
+        # The existing client-based header tests cannot cover this because
+        # tritonclient only speaks the KServe v2 /infer protocol and has no
+        # /generate method, so we exercise /generate via a raw HTTP POST
+        # (same approach as the raw cases in test_headers_reserved_rejected).
+        # Reuse the same forwarded headers and expectations as test_headers,
+        # covering both a plain Python-backend model and the ensemble -> Python
+        # backend path called out in the issue.
+        expected_headers = {
+            "my_header_1": "my_value_1",
+            "my_header_2": "my_value_2",
+            "my_header_3": 'This is a "quoted" string with a backslash\\ ',
+        }
+        self._verify_http_generate("parameter", _FORWARD_HEADERS, expected_headers)
+        self._verify_http_generate("ensemble", _FORWARD_HEADERS, expected_headers)
 
     async def test_headers_reserved_rejected(self):
         body = _minimal_fp32_infer_body({})
