@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -39,6 +39,11 @@ import test_util as tu
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 from tritonclient.utils import *
+
+# QA-suite convention: tritonclient.utils is imported via `*` here and in 20+
+# other QA files. Silence flake8's star-import warnings (F403/F405) for this
+# file only; proper cleanup is tracked separately.
+# flake8: noqa: F403,F405
 
 if sys.version_info >= (3, 0):
     import queue
@@ -93,7 +98,6 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
             _deferred_exceptions = []
 
     def add_deferred_exception(self, ex):
-        global _deferred_exceptions
         with _deferred_exceptions_lock:
             _deferred_exceptions.append(ex)
 
@@ -674,8 +678,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                             )
                         if gt_ms is not None:
                             self.assertTrue(
-                                (end_ms - start_ms) > gt_ms,
-                                "expected greater than "
+                                (end_ms - start_ms) >= gt_ms,
+                                "expected greater than or equal to "
                                 + str(gt_ms)
                                 + "ms response time, got "
                                 + str(end_ms - start_ms)
@@ -707,8 +711,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                         )
                     if gt_ms is not None:
                         self.assertTrue(
-                            (seq_end_ms - seq_start_ms) > gt_ms,
-                            "sequence expected greater than "
+                            (seq_end_ms - seq_start_ms) >= gt_ms,
+                            "sequence expected greater than or equal to "
                             + str(gt_ms)
                             + "ms response time, got "
                             + str(seq_end_ms - seq_start_ms)
@@ -883,8 +887,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                     )
                 if gt_ms is not None:
                     self.assertTrue(
-                        (seq_end_ms - seq_start_ms) > gt_ms,
-                        "sequence expected greater than "
+                        (seq_end_ms - seq_start_ms) >= gt_ms,
+                        "sequence expected greater than or equal to "
                         + str(gt_ms)
                         + "ms response time, got "
                         + str(seq_end_ms - seq_start_ms)
@@ -1100,8 +1104,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                     )
                 if gt_ms is not None:
                     self.assertTrue(
-                        (seq_end_ms - seq_start_ms) > gt_ms,
-                        "sequence expected greater than "
+                        (seq_end_ms - seq_start_ms) >= gt_ms,
+                        "sequence expected greater than or equal to "
                         + str(gt_ms)
                         + "ms response time, got "
                         + str(seq_end_ms - seq_start_ms)

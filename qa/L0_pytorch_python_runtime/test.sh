@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -121,6 +121,24 @@ else
             RET=1
         fi
     done
+
+    # Regression guard: core auto-complete must not fill in
+    # default_model_filename for a model using the Python-based runtime.
+    # If it does, 'neuralnet' is selected as TorchScript and torch.jit.load()
+    # fails on its weights file with a "constants.pkl not found" error.
+    grep "Loading 'neuralnet' as TorchScript" $SERVER_LOG
+    if [ $? -eq 0 ]; then
+        echo -e "\n***\n*** 'neuralnet' took the TorchScript load path: core autofilled default_model_filename for a runtime \"model.py\" model. \n***"
+        RET=1
+    fi
+
+    if ! NEURALNET_DEFAULT_FILENAME=$(curl -sf localhost:8000/v2/models/neuralnet/config | python3 -c "import json,sys; c=json.load(sys.stdin); assert c.get('name')=='neuralnet', c; print(c.get('default_model_filename', ''))"); then
+        echo -e "\n***\n*** Failed to retrieve or parse the configuration for 'neuralnet'. \n***"
+        RET=1
+    elif [ "$NEURALNET_DEFAULT_FILENAME" != "" ]; then
+        echo -e "\n***\n*** Expected empty default_model_filename for 'neuralnet', got \"$NEURALNET_DEFAULT_FILENAME\". \n***"
+        RET=1
+    fi
 
     # Infer TorchScript model
     CLIENT_LOG="./infer.torchscript.log"
