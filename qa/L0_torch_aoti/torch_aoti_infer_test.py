@@ -335,6 +335,48 @@ class TorchAotiTest(tu.TestResultCollector):
         self.assertGreater(executions, 0)
         self.assertLess(executions, num_requests)
 
+    def test_inference_statistics_sanity(self):
+        # The compute phase durations partition the execution window, so
+        # their sum can never exceed the total successful request time.
+        # Guards against ReportStatistics timestamp-ordering bugs in the PT2
+        # backend, where out-of-order arguments underflowed uint64 and
+        # reported ~1.8e19ns compute_infer durations (issue #8874).
+        MODEL_NAME = "torch_aoti_float32_float32"
+        for _ in range(5):
+            self._infer_one_row(MODEL_NAME)
+
+        with http.InferenceServerClient("localhost:8000") as client:
+            stats = client.get_inference_statistics(model_name=MODEL_NAME)
+
+        model_stats = stats["model_stats"][0]
+        inference_stats = model_stats["inference_stats"]
+        self.assertGreater(int(inference_stats["success"]["count"]), 0)
+        request_ns = int(inference_stats["success"]["ns"])
+        self.assertGreater(request_ns, 0)
+
+        phase_ns = {
+            phase: int(inference_stats[phase]["ns"])
+            for phase in ("compute_input", "compute_infer", "compute_output")
+        }
+        self.assertLessEqual(
+            sum(phase_ns.values()),
+            request_ns,
+            f"compute phase durations {phase_ns} sum past the total request "
+            f"duration {request_ns}ns; timestamps reported out of order",
+        )
+
+        # Batch statistics are reported through a separate call with the same
+        # timestamp-ordering hazard; batch compute windows are bounded by the
+        # request durations that contain them.
+        for batch_stats in model_stats["batch_stats"]:
+            for phase in ("compute_input", "compute_infer", "compute_output"):
+                self.assertLessEqual(
+                    int(batch_stats[phase]["ns"]),
+                    request_ns,
+                    f"batch {phase} duration exceeds the total request "
+                    "duration; timestamps reported out of order",
+                )
+
     def test_multi_instance(self):
         # Concurrent requests against a 2-instance model must all be correct.
         MODEL_NAME = "torch_aoti_multi_instance_float32"
