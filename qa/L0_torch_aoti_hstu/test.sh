@@ -106,16 +106,6 @@ ls -lha ${MODELDIR}/${MODEL_NAME}
 start_kvcache_server || exit 1
 
 SERVER_ARGS="--model-repository=${MODELDIR} --log-verbose=1"
-# The image LD_PRELOADs the HSTU ops into every process, so exercise the binary
-# before run_server: a link error surfaces here rather than as an opaque startup
-# timeout. tritonserver exits non-zero for --help, so match the usage banner.
-if ! ${SERVER} --help 2>&1 | grep -q "^Usage: tritonserver"; then
-    echo -e "${COLOR_ERROR}\n***\n*** ${SERVER} failed to run\n***${COLOR_RESET}" 1>&2
-    ${SERVER} --help 1>&2
-    stop_kvcache_server
-    echo -e "${COLOR_ERROR}\n***\n*** Test Suite FAILED\n***${COLOR_RESET}" 1>&2
-    exit 1
-fi
 run_server
 set +e
 if [[ "${SERVER_PID}" -eq 0 ]]; then
