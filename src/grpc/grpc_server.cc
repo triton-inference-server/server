@@ -866,10 +866,15 @@ CommonHandler::RegisterModelConfig()
         err = TRITONSERVER_MessageSerializeToJson(
             model_config_message, &buffer, &byte_size);
         if (err == nullptr) {
-          ::google::protobuf::util::JsonStringToMessage(
-              ::google::protobuf::stringpiece_internal::StringPiece(
-                  buffer, (int)byte_size),
-              response->mutable_config());
+          const auto parse_status =
+              ::google::protobuf::util::JsonStringToMessage(
+                  absl::string_view(buffer, byte_size),
+                  response->mutable_config());
+          if (!parse_status.ok()) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                std::string(parse_status.message()).c_str());
+          }
         }
         TRITONSERVER_MessageDelete(model_config_message);
       }

@@ -25,6 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Local test modules are imported after adjusting sys.path for ../common.
+# flake8: noqa: E402
 import sys
 
 sys.path.append("../common")
@@ -529,6 +531,32 @@ class HttpTest(tu.TestResultCollector):
             200,
             live_response.status_code,
             "Expected server to remain live after deeply nested JSON request.",
+        )
+
+    def test_inference_header_content_length_out_of_range(self):
+        """Inference-Header-Content-Length value exceeding INT_MAX triggers
+        std::out_of_range in std::stoi. Before the fix this crashed the server
+        process via std::terminate(); now it must return 400 and leave the
+        server alive."""
+        model = "onnx_zero_1_float32"
+        headers = {"Inference-Header-Content-Length": "99999999999"}
+        r = requests.post(
+            self._get_infer_url(model),
+            json={"inputs": []},
+            headers=headers,
+        )
+        self.assertEqual(
+            400,
+            r.status_code,
+            "Expected 400 for out-of-range Inference-Header-Content-Length; "
+            "got: {}".format(r.status_code),
+        )
+        # Server must still be alive — a crash would make this fail.
+        health = requests.get("http://localhost:8000/v2/health/live")
+        self.assertEqual(
+            200,
+            health.status_code,
+            "Server is not live after out-of-range Inference-Header-Content-Length request",
         )
 
 

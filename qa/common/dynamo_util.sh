@@ -34,7 +34,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/util.sh"
 SERVER_LAUNCH_MODE=${SERVER_LAUNCH_MODE:=dynamo}
 DYN_FRONTEND_LOG=${DYN_FRONTEND_LOG:=./frontend.log}
 DYN_FRONTEND_ARGS=${DYN_FRONTEND_ARGS:="--kserve-grpc-server"}
-DYN_WORKER_PY=${DYN_WORKER_PY:=/workspace/components/src/dynamo/triton/tritonworker.py}
 DYN_WORKER_ARGS=${DYN_WORKER_ARGS:=""}
 DYN_DISCOVERY_BACKEND=${DYN_DISCOVERY_BACKEND:=file}
 # The Dynamo frontend binds KServe gRPC to --http-port; serve it on 8001.
@@ -105,8 +104,8 @@ PY
     WAIT_RET=1
 }
 
-# Convert the given standalone tritonserver args (e.g. $SERVER_ARGS) into Triton
-# worker (tritonworker.py) flags on stdout, to auto-populate DYN_WORKER_ARGS.
+# Convert the given standalone tritonserver args (e.g. $SERVER_ARGS) into Dynamo
+# Triton worker flags on stdout, to auto-populate DYN_WORKER_ARGS.
 # Most flags pass through unchanged; the exception is --allow-* endpoint flags
 # (owned by the frontend) which are dropped. Accepts both --flag=value and
 # --flag value forms.
@@ -323,11 +322,6 @@ function run_server () {
         return
     fi
 
-    if [ ! -f "$DYN_WORKER_PY" ]; then
-        echo "=== $DYN_WORKER_PY does not exist"
-        return
-    fi
-
     # start_dynamo_discovery cleans up after itself on failure.
     if ! start_dynamo_discovery; then
         echo "=== Failed to bring up the etcd + NATS discovery services"
@@ -339,8 +333,8 @@ function run_server () {
         > $DYN_FRONTEND_LOG 2>&1 &
     DYN_FRONTEND_PID=$!
 
-    echo "=== Running $DYN_WORKER_PY $DYN_WORKER_ARGS --discovery-backend $DYN_DISCOVERY_BACKEND"
-    python3 $DYN_WORKER_PY $DYN_WORKER_ARGS --discovery-backend $DYN_DISCOVERY_BACKEND \
+    echo "=== Running dynamo.triton $DYN_WORKER_ARGS --discovery-backend $DYN_DISCOVERY_BACKEND"
+    python3 -m dynamo.triton $DYN_WORKER_ARGS --discovery-backend $DYN_DISCOVERY_BACKEND \
         > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
