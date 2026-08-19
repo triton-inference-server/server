@@ -29,6 +29,8 @@
 import argparse
 import os
 
+import gen_manifest
+
 FLAGS = None
 
 
@@ -227,6 +229,10 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     if FLAGS.libtorch:
         import torch
         import torch.utils.cpp_extension
@@ -235,3 +241,6 @@ if __name__ == "__main__":
 
         create_modulo_op_models(FLAGS.models_dir)
         create_vision_op_models(FLAGS.models_dir)
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)
