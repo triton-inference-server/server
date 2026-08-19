@@ -3514,6 +3514,8 @@ HTTPAPIServer::HandleGenerate(
           input_metadata, generate_request->RequestSchema(), request),
       error_callback);
 
+  RETURN_AND_CALLBACK_IF_ERR(ForwardHeaders(req, irequest), error_callback);
+
   auto request_release_payload =
       std::make_unique<RequestReleasePayload>(irequest_shared, nullptr);
   // [FIXME] decompression..
