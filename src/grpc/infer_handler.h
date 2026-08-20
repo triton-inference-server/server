@@ -397,6 +397,12 @@ InferAllocatorPayload(
     }
 
     if (has_shared_memory) {
+      // No shared memory manager (e.g. in-process Python frontend).
+      if (shm_manager == nullptr) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_UNAVAILABLE,
+            kSharedMemoryManagerUnavailableErrorStr);
+      }
       void* base;
       TRITONSERVER_MemoryType memory_type;
       int64_t memory_type_id;
