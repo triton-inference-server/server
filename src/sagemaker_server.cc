@@ -107,6 +107,14 @@ SagemakerAPIServer::GetInferenceHeaderLength(
              (content_type_c_str + binary_mime_type_.length()))
                 .c_str());
       }
+      catch (const std::out_of_range& oor) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("Unable to parse inference header size, value is out "
+                         "of range, got: ") +
+             (content_type_c_str + binary_mime_type_.length()))
+                .c_str());
+      }
 
       // Check if the content length is in proper range
       if ((parsed_value < 0) || (parsed_value > content_length)) {
@@ -535,6 +543,13 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
               TRITONSERVER_ERROR_INVALID_ARG,
               (std::string("Unable to parse ") + kContentLengthHeader +
                ", got: " + content_length_c_str)
+                  .c_str());
+        }
+        catch (const std::out_of_range& oor) {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              (std::string("Unable to parse ") + kContentLengthHeader +
+               ", value is out of range, got: " + content_length_c_str)
                   .c_str());
         }
       }

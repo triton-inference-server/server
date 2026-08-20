@@ -25,6 +25,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 repos:
+- repo: https://github.com/NVIDIA/security-workflows
+  rev: v0.3.0
+  hooks:
+  - id: secret-scan-trufflehog
 - repo: https://github.com/PyCQA/isort
   rev: 5.12.0
   hooks:
