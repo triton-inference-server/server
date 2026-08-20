@@ -52,6 +52,19 @@ constexpr char kClientShmDisabledErrorStr[] =
     "Client shared memory is disabled. Start the server with "
     "'--allow-client-shm=true' to enable.";
 
+// The error message used when a shared memory operation is requested but the
+// shared memory manager is not available. This happens when a frontend is
+// constructed without a SharedMemoryManager -- currently the case when the
+// frontend is started through the in-process Python bindings (tritonfrontend);
+// see DLIS-7194. Returning this error (TRITONSERVER_ERROR_UNAVAILABLE) instead
+// of dereferencing the null manager prevents an unauthenticated request from
+// crashing the server process (TRI-1698).
+constexpr char kSharedMemoryManagerUnavailableErrorStr[] =
+    "Shared memory is not supported in this server configuration. This can "
+    "occur when the frontend is started through the in-process Python bindings "
+    "(tritonfrontend); start the server with the tritonserver executable to "
+    "use shared memory.";
+
 // This prefix is reserved for shm regions created internally by Triton
 constexpr char kTritonSharedMemoryRegionPrefix[] =
     "triton_python_backend_shm_region_";

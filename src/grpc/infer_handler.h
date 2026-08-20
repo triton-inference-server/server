@@ -397,6 +397,14 @@ InferAllocatorPayload(
     }
 
     if (has_shared_memory) {
+      // A null shared memory manager (e.g. when the frontend is started
+      // through the in-process Python bindings) must not be dereferenced.
+      // Fail gracefully instead of crashing the process (TRI-1698).
+      if (shm_manager == nullptr) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_UNAVAILABLE,
+            kSharedMemoryManagerUnavailableErrorStr);
+      }
       void* base;
       TRITONSERVER_MemoryType memory_type;
       int64_t memory_type_id;
