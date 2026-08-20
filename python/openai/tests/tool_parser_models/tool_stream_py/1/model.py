@@ -86,9 +86,7 @@ class TritonPythonModel:
             prompt = _decode_prompt(request)
 
             if _CANCELLATION_STATUS_PROMPT in prompt:
-                status = (
-                    "cancelled" if self._cancellation_observed else "not-cancelled"
-                )
+                status = "cancelled" if self._cancellation_observed else "not-cancelled"
                 self._stream_response(sender, status)
                 continue
 

@@ -706,9 +706,7 @@ class TestStreamingToolParseLimit:
         assert record.exc_info and record.exc_info[0] is RuntimeError
 
     @pytest.mark.asyncio
-    async def test_abandoned_chat_stream_cancels_backend_inference(
-        self, client
-    ):
+    async def test_abandoned_chat_stream_cancels_backend_inference(self, client):
         from schemas.openai import CreateChatCompletionRequest
 
         request = CreateChatCompletionRequest(
@@ -728,9 +726,7 @@ class TestStreamingToolParseLimit:
         assert status == "cancelled"
 
     @pytest.mark.asyncio
-    async def test_abandoned_completion_stream_cancels_backend_inference(
-        self, client
-    ):
+    async def test_abandoned_completion_stream_cancels_backend_inference(self, client):
         from schemas.openai import CreateCompletionRequest
 
         request = CreateCompletionRequest(
