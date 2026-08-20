@@ -66,7 +66,7 @@ log_message.status "Changing working directory to the script directory to: " "${
 cd ${TRITON_MDLS_BASE_SCRIPT_DIR}
 
 log_message.status "define: default values"
-TRITON_VERSION=${TRITON_VERSION:=26.07}
+TRITON_VERSION=${TRITON_VERSION:=26.08}
 ONNX_VERSION=1.22.0 # https://github.com/microsoft/onnxruntime/blob/v1.28.0/tools/ci_build/github/linux/python/requirements.txt#L15
 # Max opset ONNX Runtime accepts: the last *released* opset of the onnx that ORT
 # was built against, i.e. one below that release's current opset. v1.28.0 pins
