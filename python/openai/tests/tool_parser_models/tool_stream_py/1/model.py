@@ -25,12 +25,17 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+import time
+
 import numpy as np
 import triton_python_backend_utils as pb_utils
 
 # Output is streamed in small fragments to mimic token-by-token generation,
 # which exercises the streaming tool-call parser.
 _CHUNK_SIZE = 8
+_CHUNK_DELAY_SECONDS = 0.002
+_LARGE_ARGUMENT_SIZE = 10_000
+_CANCELLATION_STATUS_PROMPT = "cancellation-status"
 
 
 def _decode_prompt(request):
@@ -61,19 +66,37 @@ class TritonPythonModel:
       * any other prompt -> a small argument that stays within it.
     """
 
+    def initialize(self, args):
+        self._cancellation_observed = False
+
+    def _stream_response(self, sender, text):
+        for start in range(0, len(text), _CHUNK_SIZE):
+            if sender.is_cancelled():
+                self._cancellation_observed = True
+                break
+            sender.send(_response(text[start : start + _CHUNK_SIZE]))
+            time.sleep(_CHUNK_DELAY_SECONDS)
+        if sender.is_cancelled():
+            self._cancellation_observed = True
+        sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+
     def execute(self, requests):
         for request in requests:
             sender = request.get_response_sender()
             prompt = _decode_prompt(request)
-            arg = "A" * (2000 if "big-tool-args" in prompt else 5)
+
+            if _CANCELLATION_STATUS_PROMPT in prompt:
+                status = (
+                    "cancelled" if self._cancellation_observed else "not-cancelled"
+                )
+                self._stream_response(sender, status)
+                continue
+
+            self._cancellation_observed = False
+            arg = "A" * (_LARGE_ARGUMENT_SIZE if "big-tool-args" in prompt else 5)
             text = (
                 '[TOOL_CALLS][{"name": "get_current_weather", '
                 '"arguments": {"city": "' + arg + '"}}]'
             )
-            for start in range(0, len(text), _CHUNK_SIZE):
-                sender.send(_response(text[start : start + _CHUNK_SIZE]))
-            sender.send(
-                _response(""),
-                flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL,
-            )
+            self._stream_response(sender, text)
         return None
