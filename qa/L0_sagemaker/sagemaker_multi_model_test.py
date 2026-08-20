@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,16 +29,16 @@ import sys
 
 sys.path.append("../common")
 
-import json
-import os
-import sys
-import time
-import unittest
+import json  # noqa: E402
+import os  # noqa: E402
+import sys  # noqa: E402
+import time  # noqa: E402
+import unittest  # noqa: E402
 
-import numpy as np
-import requests
-import test_util as tu
-import tritonclient.http as httpclient
+import numpy as np  # noqa: E402
+import requests  # noqa: E402
+import test_util as tu  # noqa: E402
+import tritonclient.http as httpclient  # noqa: E402
 
 
 class SageMakerMultiModelTest(tu.TestResultCollector):
@@ -319,6 +319,112 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
             404,
             "Expected status code 404, received {}".format(r.status_code),
         )
+
+    def test_sm_5b_identity_confusion_poc(self):
+        """TRI-1563 PoC: URL hash and X-Amzn-SageMaker-Target-Model header must refer
+        to the same model. Sending a mismatched header must NOT silently run or unload
+        the wrong model. Before the fix this test demonstrates the vulnerability;
+        after the fix it confirms the server rejects the mismatch."""
+
+        # --- Setup: load both models fresh (re-load in case test_sm_5 already unloaded) ---
+        for name, url in [
+            (self.model1_name, self.model1_url),
+            (self.model2_name, self.model2_url),
+        ]:
+            r = requests.post(
+                self.url_mme_,
+                data=json.dumps({"model_name": name, "url": url}),
+                headers={"Content-Type": "application/json"},
+            )
+            time.sleep(5)
+            # 200 = freshly loaded, 409 = already loaded — both are fine
+            self.assertIn(
+                r.status_code,
+                [200, 409],
+                "Setup: failed to load {} — status {}".format(name, r.status_code),
+            )
+
+        # --- PoC 1: INVOKE with mismatched header ---
+        # URL says model1_name (authorized), header says model2_name (different model).
+        # BEFORE fix: server runs model2 and returns its response (wrong model executed).
+        # AFTER fix:  server must return 4xx (mismatch rejected).
+        inputs = []
+        inputs.append(httpclient.InferInput("INPUT0", [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput("INPUT1", [1, 16], "INT32"))
+        input_data = np.array(self.model1_input_data_, dtype=np.int32)
+        input_data = np.expand_dims(input_data, axis=0)
+        inputs[0].set_data_from_numpy(input_data, binary_data=False)
+        inputs[1].set_data_from_numpy(input_data, binary_data=False)
+        outputs = [
+            httpclient.InferRequestedOutput("OUTPUT0", binary_data=False),
+            httpclient.InferRequestedOutput("OUTPUT1", binary_data=False),
+        ]
+        request_body, _ = httpclient.InferenceServerClient.generate_request_body(
+            inputs, outputs=outputs
+        )
+
+        invoke_url = "{}/{}/invoke".format(self.url_mme_, self.model1_name)
+        mismatched_headers = {
+            "Content-Type": "application/json",
+            # Deliberately point to a DIFFERENT model than the URL hash
+            "X-Amzn-SageMaker-Target-Model": self.model2_name,
+        }
+        r = requests.post(invoke_url, data=request_body, headers=mismatched_headers)
+
+        # After the fix: the mismatch must be rejected with the specific 400 from
+        # the identity check (not merely any 4xx). Asserting the exact status and
+        # the error payload proves this branch ran, not an unrelated 404/error.
+        self.assertEqual(
+            r.status_code,
+            400,
+            "TRI-1563 PoC: INVOKE with a mismatched X-Amzn-SageMaker-Target-Model "
+            "header must be rejected with 400 (got {}). Body: {}".format(
+                r.status_code, r.text
+            ),
+        )
+        self.assertIn(
+            "does not match",
+            r.text,
+            "TRI-1563 PoC: INVOKE 400 must be the target-model mismatch rejection; "
+            "got body: {}".format(r.text),
+        )
+
+        # --- PoC 2: UNLOAD with mismatched header ---
+        # URL says model1_name (authorized), header says model2_name (victim).
+        # BEFORE fix: model2 is evicted and model1's map entry is erased (state corruption).
+        # AFTER fix:  server must return 4xx (mismatch rejected).
+        unload_url = "{}/{}".format(self.url_mme_, self.model1_name)
+        r = requests.delete(unload_url, headers=mismatched_headers)
+        time.sleep(3)
+
+        self.assertEqual(
+            r.status_code,
+            400,
+            "TRI-1563 PoC: UNLOAD with a mismatched X-Amzn-SageMaker-Target-Model "
+            "header must be rejected with 400 (got {}). Body: {}".format(
+                r.status_code, r.text
+            ),
+        )
+        self.assertIn(
+            "does not match",
+            r.text,
+            "TRI-1563 PoC: UNLOAD 400 must be the target-model mismatch rejection; "
+            "got body: {}".format(r.text),
+        )
+
+        # Verify model2 is still alive (was not evicted by the mismatched unload)
+        r = requests.get("{}/{}".format(self.url_mme_, self.model2_name))
+        self.assertEqual(
+            r.status_code,
+            200,
+            "TRI-1563 PoC: {} was evicted by a mismatched unload targeting {} — "
+            "state corruption confirmed.".format(self.model2_name, self.model1_name),
+        )
+
+        # Cleanup: unload both models with correct (no) header
+        for name in [self.model1_name, self.model2_name]:
+            requests.delete("{}/{}".format(self.url_mme_, name))
+            time.sleep(3)
 
     def test_sm_6_ensemble_model(self):
         # Load ensemble model
