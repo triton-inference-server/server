@@ -82,6 +82,11 @@ DEFAULT_TRITON_VERSION_MAP = {
     "rhel_py_version": "3.12.3",
 }
 
+# Minimum CUDA compute capability Triton will load models for. Used as the
+# default for --min-compute-capability when neither that flag nor
+# --cuda-arch-list is given.
+DEFAULT_MIN_COMPUTE_CAPABILITY = "6.0"
+
 CORE_BACKENDS = ["ensemble"]
 
 FLAGS = None
@@ -663,7 +668,12 @@ def onnxruntime_cmake_args(images, library_paths):
             else FLAGS.ort_version,
         )
     ]
-
+    if FLAGS.build_parallel_was_explicit:
+        cargs.append(
+            cmake_backend_arg(
+                "onnxruntime", "TRITON_BUILD_PARALLEL", None, FLAGS.build_parallel
+            )
+        )
     # TRITON_ENABLE_GPU is already set for all backends in backend_cmake_args()
     if FLAGS.enable_gpu:
         # TODO: TPRD-712 TensorRT is not currently supported by our RHEL build for SBSA.
@@ -1714,7 +1724,18 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         if not FLAGS.no_container_interactive:
             runargs += ["-it"]
 
-        runargs += ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
+        runargs += docker_runargs()
+        # If --github-organization is a local directory (a repo mirror), mount
+        # it too. The org propagates into every nested component configure
+        # (TRITON_REPO_ORGANIZATION), so pointing it at a local mirror is the
+        # only way to resolve deeply-nested clones (e.g. core -> common)
+        # offline; FETCHCONTENT_SOURCE_DIR overrides do not reach those builds.
+        # FLAGS.github_organization is already normalized as an absolute path
+        if FLAGS.github_organization and os.path.isdir(FLAGS.github_organization):
+            runargs += [
+                "-v",
+                f"{FLAGS.github_organization}:{FLAGS.github_organization}",
+            ]
         if FLAGS.use_user_docker_config:
             if os.path.exists(FLAGS.use_user_docker_config):
                 runargs += [
@@ -1742,6 +1763,11 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         for var in ("CI_PIPELINE_ID", "NVIDIA_UPSTREAM_VERSION", "NVIDIA_BUILD_ID"):
             if os.environ.get(var):
                 runargs += ["-e", f"{var}={os.environ[var]}"]
+
+        # Forward the CUDA arch list into the buildbase container so nested
+        # backend builds honor --cuda-arch-list.
+        if FLAGS.cuda_arch_list is not None:
+            runargs += ["-e", f'"CUDA_ARCH_LIST={FLAGS.cuda_arch_list}"']
 
         runargs += ["tritonserver_buildbase"]
 
@@ -2208,6 +2234,56 @@ def finalize_build(cmake_script, install_dir, ci_dir):
     cmake_script.cmd(f"chmod -R u+rwX,go+rX,go-w {ci_dir}")
 
 
+def min_cuda_arch(arch_list_str):
+    # Lowest compute capability in a CUDA_ARCH_LIST-style string, as a decimal
+    # string ("8.6"). Accepts the space/semicolon-separated forms used across
+    # the Triton build: "8.6", "86", "75-real", "100f", "PTX". Tokens that don't
+    # parse are skipped. Returns None if no token parses.
+    if not arch_list_str:
+        return None
+    arch_list_str = arch_list_str.replace("PTX", "")
+    mins = []
+    for tok in re.split(r"[;\s]+", arch_list_str):
+        tok = tok.strip()
+        if not tok:
+            continue
+        tok = tok.rstrip("f").removesuffix("-real").removesuffix("-ptx")
+        try:
+            val = float(tok)
+        except ValueError:
+            continue
+        # "86" means 8.6; "8.6" stays; "100" means 10.0
+        if val >= 100:
+            val = val / 10.0
+        elif val >= 20 and val.is_integer():
+            val = val / 10.0
+        mins.append(val)
+    return f"{min(mins):.1f}" if mins else None
+
+
+def docker_runargs():
+    # Docker run args for the host-mounted build container: how to reach the
+    # daemon socket, and whether the host network is needed.
+    #
+    # DOCKER_HOST unset → system docker; mount the default socket. The default
+    # bridge has DNS, so no `--network host`.
+    #
+    # DOCKER_HOST set → rootless or remote daemon. Forward the env var so the
+    # in-container `docker build` reaches the same daemon. Rootless's default
+    # bridge has no DNS, so add `--network host` to let FetchContent resolve
+    # github.com. (We don't probe `docker info --format .Rootless` because if
+    # DOCKER_HOST is set we're already in the rootless/remote-daemon case.)
+    docker_host = os.getenv("DOCKER_HOST")
+    if docker_host is None:
+        return ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
+
+    runargs = ["--network", "host", "-e", f"DOCKER_HOST={docker_host}"]
+    if docker_host.startswith("unix://"):
+        socket_path = docker_host[len("unix://") :]
+        runargs += ["-v", f"{socket_path}:{socket_path}"]
+    return runargs
+
+
 def enable_all():
     all_backends = [
         "ensemble",
@@ -2480,8 +2556,22 @@ if __name__ == "__main__":
         "--min-compute-capability",
         type=str,
         required=False,
-        default="6.0",
-        help="Minimum CUDA compute capability supported by server.",
+        default=None,
+        help=(
+            f"Minimum CUDA compute capability supported by server (runtime gate). "
+            f"Defaults to {DEFAULT_MIN_COMPUTE_CAPABILITY}, or to the lowest arch in "
+            f"--cuda-arch-list when that is given."
+        ),
+    )
+    parser.add_argument(
+        "--cuda-arch-list",
+        type=str,
+        required=False,
+        default=None,
+        help=(
+            "CUDA architectures to pass to nested backend builds (ONNX Runtime, "
+            "triton-backend kernel_library)."
+        ),
     )
 
     parser.add_argument(
@@ -2669,6 +2759,12 @@ if __name__ == "__main__":
     if FLAGS.build_secret is None:
         FLAGS.build_secret = []
 
+    # When --github-organization is a local directory, resolve it to an absolute
+    # path, so nested clones and CMake's TRITON_REPO_ORGANIZATION properly reference it.
+    # Absolute values and remote URLs are left unchanged.
+    if FLAGS.github_organization and os.path.isdir(FLAGS.github_organization):
+        FLAGS.github_organization = os.path.abspath(FLAGS.github_organization)
+
     FLAGS.boost_url = os.getenv(
         "TRITON_BOOST_URL",
         "https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz",
@@ -2723,8 +2819,29 @@ if __name__ == "__main__":
     elif re.match(r"^\d+\.\d+\.\d+$", FLAGS.version):
         os.environ.setdefault("TRITON_RELEASE_VERSION", FLAGS.version)
 
+    FLAGS.build_parallel_was_explicit = FLAGS.build_parallel is not None
     if FLAGS.build_parallel is None:
         FLAGS.build_parallel = default_build_parallel()
+
+    # CUDA arch list: export into the environment so every nested build that
+    # reads $CUDA_ARCH_LIST directly picks up the requested restriction --
+    # triton-backend's define.cuda_architectures.cmake and the ONNX Runtime
+    # backend's gen_ort_dockerfile.py.
+    if FLAGS.cuda_arch_list is not None:
+        os.environ["CUDA_ARCH_LIST"] = FLAGS.cuda_arch_list
+
+    # Min compute capability defaults to the baseline, but when a CUDA arch
+    # list is given the runtime gate should match the lowest compiled arch so
+    # models built for those arches aren't rejected at load time. An explicit
+    # --min-compute-capability always wins.
+    if FLAGS.min_compute_capability is None:
+        if FLAGS.cuda_arch_list is not None:
+            derived = min_cuda_arch(FLAGS.cuda_arch_list)
+            FLAGS.min_compute_capability = (
+                derived if derived is not None else DEFAULT_MIN_COMPUTE_CAPABILITY
+            )
+        else:
+            FLAGS.min_compute_capability = DEFAULT_MIN_COMPUTE_CAPABILITY
 
     log("Building Triton Inference Server")
     log("platform {}".format(target_platform()))
