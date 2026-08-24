@@ -199,22 +199,41 @@ def build_target(url, path, name, properties):
 
 
 def upload_archive(
-    target, payload, token, sha256=None, timeout=300, retries=DEFAULT_RETRIES
+    target, source, token, sha256=None, timeout=300, retries=DEFAULT_RETRIES
 ):
-    """PUT one archive. Returns the parsed response, or raises UploadError."""
-    request = urllib.request.Request(target, data=payload, method="PUT")
-    request.add_header("Authorization", "Bearer {}".format(token))
-    request.add_header("Content-Type", "application/octet-stream")
-    if sha256:
-        # Artifactory verifies this against the body it received and fails the
-        # upload on a mismatch, which is what makes a partial PUT loud.
-        request.add_header("X-Checksum-Sha256", sha256)
+    """PUT one archive, streamed from disk.
+
+    Returns the parsed response, or raises UploadError. `source` is a path
+    rather than bytes: an archive is as large as the models it holds, and
+    reading it whole pinned that much memory for the length of the upload --
+    across every retry, since the request outlived the attempt that used it.
+    """
+    source = pathlib.Path(source)
+    try:
+        size = source.stat().st_size
+    except OSError as error:
+        raise UploadError(str(error))
 
     last = None
     for attempt in range(1, max(1, retries) + 1):
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
-                body = response.read().decode("utf-8", "replace")
+            # Reopened per attempt. A file object is consumed by the attempt
+            # that sends it, so a request built once outside this loop would
+            # replay an exhausted stream on every retry after the first.
+            with open(str(source), "rb") as body_stream:
+                request = urllib.request.Request(target, data=body_stream, method="PUT")
+                request.add_header("Authorization", "Bearer {}".format(token))
+                request.add_header("Content-Type", "application/octet-stream")
+                # Required, not cosmetic: urllib cannot size a file object, so
+                # without this it falls back to chunked transfer encoding.
+                request.add_header("Content-Length", str(size))
+                if sha256:
+                    # Artifactory verifies this against the body it received and
+                    # fails the upload on a mismatch, which is what makes a
+                    # partial PUT loud.
+                    request.add_header("X-Checksum-Sha256", sha256)
+                with urllib.request.urlopen(request, timeout=timeout) as response:
+                    body = response.read().decode("utf-8", "replace")
             try:
                 return json.loads(body)
             except ValueError:
@@ -394,7 +413,7 @@ def main(argv=None):
             uploaded += 1
             continue
         try:
-            payload = source.read_bytes()
+            size = source.stat().st_size
         except OSError as error:
             _log("FAILED {}: {}".format(name, error))
             failed += 1
@@ -402,7 +421,7 @@ def main(argv=None):
         try:
             upload_archive(
                 target,
-                payload,
+                source,
                 args.token,
                 entry.get("sha256"),
                 retries=args.retries,
@@ -416,7 +435,7 @@ def main(argv=None):
         # run published anything should not have to reconstruct the path from
         # the flags. Properties are left off -- there are up to two dozen, and
         # they are on the artifact for anyone who queries it.
-        _log("  {} -> {} ({} B)".format(name, target.split(";", 1)[0], len(payload)))
+        _log("  {} -> {} ({} B)".format(name, target.split(";", 1)[0], size))
 
     _log(
         "{} {} archive(s), {} failed".format(
