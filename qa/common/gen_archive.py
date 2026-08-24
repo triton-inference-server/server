@@ -55,7 +55,6 @@ import argparse
 import collections
 import gzip
 import hashlib
-import io
 import json
 import os
 import pathlib
@@ -244,29 +243,94 @@ def _members(model_dir):
     return sorted(root.rglob("*"), key=lambda p: str(p.relative_to(root)))
 
 
-def build_bundle_bytes(model_dirs, tree, compress=False):
-    """Pack a framework's model directories into archive bytes."""
-    raw = io.BytesIO()
-    with tarfile.open(fileobj=raw, mode="w", format=tarfile.GNU_FORMAT) as tar:
-        for model_dir in sorted(model_dirs, key=str):
-            arcname = str(archive_member_path(model_dir, tree))
-            tar.add(model_dir, arcname=arcname, recursive=False, filter=_normalise)
-            for path in _members(model_dir):
-                tar.add(
-                    path,
-                    arcname="{}/{}".format(arcname, path.relative_to(model_dir)),
-                    recursive=False,
-                    filter=_normalise,
-                )
-    data = raw.getvalue()
-    if not compress:
-        return data
+class _MeasuringWriter:
+    """Passes writes through, keeping a running size and digest.
+
+    The digest is of whatever reaches this object, so it belongs *outside* the
+    gzip layer: a compressed bundle must hash to its compressed bytes, which is
+    what a consumer downloads and what Artifactory checks against.
+    """
+
+    def __init__(self, stream):
+        self._stream = stream
+        self._digest = hashlib.sha256()
+        self.bytes_written = 0
+
+    def write(self, chunk):
+        self._digest.update(chunk)
+        self.bytes_written += len(chunk)
+        return self._stream.write(chunk)
+
+    def flush(self):
+        self._stream.flush()
+
+    def tell(self):
+        # tarfile tracks its own offset from the sink's, and refuses a fileobj
+        # without this. Write-only and starting at zero, so the running count
+        # is the position.
+        return self.bytes_written
+
+    def hexdigest(self):
+        return self._digest.hexdigest()
+
+
+class _DiscardingStream:
+    """Accepts writes and drops them, for --dry-run.
+
+    A dry run still reports archive_bytes and sha256, so the pack has to happen;
+    only the output is unwanted.
+    """
+
+    def __init__(self):
+        self._position = 0
+
+    def write(self, chunk):
+        self._position += len(chunk)
+        return len(chunk)
+
+    def flush(self):
+        pass
+
+    def tell(self):
+        return self._position
+
+
+def write_bundle(model_dirs, tree, stream, compress=False):
+    """Pack a framework's model directories into `stream`.
+
+    Returns (bytes_written, sha256). Streamed rather than buffered: a framework
+    bundle is as large as the models it holds -- onnx_model_store2 alone is
+    ~13 GiB -- and materialising that in memory cost several archive-sized
+    allocations at once, which no runner should have to size for.
+    """
+    measured = _MeasuringWriter(stream)
     # mtime=0: gzip stamps the current time in its header otherwise, which would
     # defeat reproducibility even with a deterministic tar inside.
-    out = io.BytesIO()
-    with gzip.GzipFile(fileobj=out, mode="wb", compresslevel=6, mtime=EPOCH) as gz:
-        gz.write(data)
-    return out.getvalue()
+    packer = (
+        gzip.GzipFile(fileobj=measured, mode="wb", compresslevel=6, mtime=EPOCH)
+        if compress
+        else None
+    )
+    try:
+        with tarfile.open(
+            fileobj=packer or measured, mode="w", format=tarfile.GNU_FORMAT
+        ) as tar:
+            for model_dir in sorted(model_dirs, key=str):
+                arcname = str(archive_member_path(model_dir, tree))
+                tar.add(model_dir, arcname=arcname, recursive=False, filter=_normalise)
+                for path in _members(model_dir):
+                    tar.add(
+                        path,
+                        arcname="{}/{}".format(arcname, path.relative_to(model_dir)),
+                        recursive=False,
+                        filter=_normalise,
+                    )
+    finally:
+        # After the tar, never before: closing it writes the trailing padding,
+        # which still has to reach the gzip layer.
+        if packer is not None:
+            packer.close()
+    return measured.bytes_written, measured.hexdigest()
 
 
 def create_framework_bundle(
@@ -275,12 +339,35 @@ def create_framework_bundle(
     """Write one framework's archive and its manifest. Returns a dict."""
     model_dirs = [model_dir for model_dir, _ in entries]
     manifests = [loaded for _, loaded in entries if loaded]
-    try:
-        data = build_bundle_bytes(model_dirs, tree, compress)
-    except OSError as error:
-        raise ArchiveError("cannot pack {}: {}".format(framework, error))
-
     archive = resolve_archive_name(framework, stamp, compress)
+    destination = pathlib.Path(dest_root)
+
+    if dry_run:
+        try:
+            archive_bytes, sha256 = write_bundle(
+                model_dirs, tree, _DiscardingStream(), compress
+            )
+        except OSError as error:
+            raise ArchiveError("cannot pack {}: {}".format(framework, error))
+    else:
+        destination.mkdir(parents=True, exist_ok=True)
+        target = destination / archive
+        # Packed under a partial name and renamed once complete. Streaming
+        # writes as it goes, so a failure half way through would otherwise
+        # leave a truncated archive sitting where a valid one belongs -- and
+        # the upload step trusts what it finds on disk.
+        partial = target.with_name(target.name + ".partial")
+        try:
+            with open(partial, "wb") as handle:
+                archive_bytes, sha256 = write_bundle(model_dirs, tree, handle, compress)
+        except OSError as error:
+            try:
+                partial.unlink()
+            except OSError:
+                pass
+            raise ArchiveError("cannot pack {}: {}".format(framework, error))
+        os.replace(str(partial), str(target))
+
     properties = common_properties(manifests)
     models = sorted(str(archive_member_path(d, tree)) for d in model_dirs)
     total = sum(
@@ -293,8 +380,8 @@ def create_framework_bundle(
         "kind": KIND,
         "framework": framework,
         "archive": archive,
-        "archive_bytes": len(data),
-        "sha256": hashlib.sha256(data).hexdigest(),
+        "archive_bytes": archive_bytes,
+        "sha256": sha256,
         "model_count": len(model_dirs),
         "model_bytes": total,
         # Flat on purpose: these become Artifactory properties verbatim, and a
@@ -304,9 +391,6 @@ def create_framework_bundle(
     }
 
     if not dry_run:
-        destination = pathlib.Path(dest_root)
-        destination.mkdir(parents=True, exist_ok=True)
-        (destination / archive).write_bytes(data)
         (destination / manifest_name(framework)).write_text(
             json.dumps(bundle, indent=2) + "\n"
         )
