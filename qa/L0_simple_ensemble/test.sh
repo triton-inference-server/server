@@ -35,7 +35,7 @@ TEST_MODEL_DIR="`pwd`/models"
 BACKPRESSURE_TEST_MODEL_DIR="`pwd`/backpressure_test_models"
 TEST_RESULT_FILE='test_results.txt'
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=${TEST_MODEL_DIR}"
+SERVER_ARGS="--model-repository=${TEST_MODEL_DIR} --log-verbose=1"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -214,7 +214,7 @@ SERVER_LOG="./ensemble_step_max_queue_size_test_server.log"
 CLIENT_LOG="./ensemble_step_max_queue_size_test_client.log"
 rm -f $SERVER_LOG $CLIENT_LOG
 
-SERVER_ARGS="--model-repository=${MAX_QUEUE_SIZE_TEST_MODEL_DIR}"
+SERVER_ARGS="--model-repository=${MAX_QUEUE_SIZE_TEST_MODEL_DIR} --log-verbose=1"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -380,7 +380,7 @@ SERVER_LOG="./ensemble_parallel_failed_enqueue_test_server.log"
 CLIENT_LOG="./ensemble_parallel_failed_enqueue_test_client.log"
 rm -f $SERVER_LOG $CLIENT_LOG
 
-SERVER_ARGS="--model-repository=${PARALLEL_FAILED_ENQUEUE_MODEL_DIR}"
+SERVER_ARGS="--model-repository=${PARALLEL_FAILED_ENQUEUE_MODEL_DIR} --log-verbose=1"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -428,7 +428,7 @@ rm -rf ${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR}
 TEST_NAME="EnsembleBackpressureTest"
 SERVER_LOG="./ensemble_backpressure_test_server.log"
 CLIENT_LOG="./ensemble_backpressure_test_client.log"
-SERVER_ARGS="--model-repository=${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR}"
+SERVER_ARGS="--model-repository=${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR} --log-verbose=1"
 rm -f $SERVER_LOG $CLIENT_LOG
 
 # Step 1 - decoupled_producer (batch size 2)
@@ -558,7 +558,7 @@ wait $SERVER_PID
 
 ######## Test invalid values for 'max_inflight_requests' config option ########
 INVALID_PARAM_MODEL_DIR="`pwd`/invalid_param_test_models"
-SERVER_ARGS="--model-repository=${INVALID_PARAM_MODEL_DIR}"
+SERVER_ARGS="--model-repository=${INVALID_PARAM_MODEL_DIR} --log-verbose=1"
 SERVER_LOG="./invalid_max_inflight_requests_server.log"
 rm -rf $SERVER_LOG ${INVALID_PARAM_MODEL_DIR}
 
