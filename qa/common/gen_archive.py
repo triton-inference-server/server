@@ -364,6 +364,10 @@ def create_framework_bundle(
             try:
                 partial.unlink()
             except OSError:
+                # Tidying up after a failure that is about to be reported
+                # anyway. If the partial cannot be removed it stays behind
+                # under a name nothing consumes, which is not worth masking
+                # the original packing error with.
                 pass
             raise ArchiveError("cannot pack {}: {}".format(framework, error))
         os.replace(str(partial), str(target))
