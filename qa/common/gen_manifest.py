@@ -574,6 +574,9 @@ def _read_root_mount_source():
                 if len(fields) > 4 and fields[4] == "/":
                     return fields[3]
     except OSError:
+        # No procfs, or it is not readable -- neither is an error here. The
+        # backing path is descriptive metadata, and "" is the honest answer
+        # when it cannot be determined.
         pass
     return ""
 
@@ -685,6 +688,9 @@ def _probe_gpu_cuda_python():
             details["cuda_runtime"] = str(version)
             details["cuda_version"] = format_cuda_version(version)
         except Exception:
+            # Enrichment only. The details gathered above already describe the
+            # GPU, so a bindings failure leaves the two CUDA fields at their
+            # None defaults rather than discarding the rest.
             pass
 
     # The display driver version is an NVML concept; cuda-python does not
@@ -698,6 +704,10 @@ def _probe_gpu_cuda_python():
             finally:
                 nvml.nvmlShutdown()
         except Exception:
+            # pynvml is importable but unusable -- no driver loaded, or no
+            # permission to talk to it. driver_version stays absent, which is
+            # preferable to recording a value from a different source that
+            # means something else.
             pass
 
     return details

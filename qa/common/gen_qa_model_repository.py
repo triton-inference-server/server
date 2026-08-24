@@ -1121,6 +1121,9 @@ class EnrootRuntime(Runtime):
                 try:
                     os.unlink(sqsh)
                 except OSError:
+                    # Best-effort cleanup: the image may already be gone, or
+                    # sit on a read-only mount. Neither is worth failing a run
+                    # whose actual work has already completed.
                     pass
 
 
