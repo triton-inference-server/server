@@ -309,18 +309,21 @@ def build_stages(ctx):
         prelude=[],
         setup=[
             "export DEBIAN_FRONTEND=noninteractive",
+            # Explicit '+' rather than adjacent literals: inside a list, an
+            # implicit concatenation is indistinguishable from a forgotten
+            # comma, and reads as one to a linter as much as to a person.
             "apt-get update && \\\n"
-            "    apt-get install -y --no-install-recommends \\\n"
-            "        build-essential \\\n"
-            "        cmake \\\n"
-            "        libprotobuf-dev \\\n"
-            "        protobuf-compiler \\\n"
-            "        python3 \\\n"
-            "        python3-dev \\\n"
-            "        python3-pip \\\n"
-            "        wget \\\n"
-            "        gnupg2 \\\n"
-            "        software-properties-common",
+            + "    apt-get install -y --no-install-recommends \\\n"
+            + "        build-essential \\\n"
+            + "        cmake \\\n"
+            + "        libprotobuf-dev \\\n"
+            + "        protobuf-compiler \\\n"
+            + "        python3 \\\n"
+            + "        python3-dev \\\n"
+            + "        python3-pip \\\n"
+            + "        wget \\\n"
+            + "        gnupg2 \\\n"
+            + "        software-properties-common",
             "ln -s /usr/bin/python3 /usr/bin/python",
             'pip3 install "numpy<=1.23.5" setuptools "ml_dtypes<=0.5.4"',
             "pip3 install openvino=={}".format(ctx.openvino_version),
@@ -350,9 +353,9 @@ def build_stages(ctx):
         setup=[
             "export DEBIAN_FRONTEND=noninteractive",
             "apt-get update && \\\n"
-            "        apt-get install -y --no-install-recommends build-essential cmake"
-            " libprotobuf-dev \\\n"
-            "                protobuf-compiler python3 python3-dev python3-pip",
+            + "        apt-get install -y --no-install-recommends build-essential"
+            + " cmake libprotobuf-dev \\\n"
+            + "                protobuf-compiler python3 python3-dev python3-pip",
             "ln -s /usr/bin/python3 /usr/bin/python",
             # TODO: Remove the pins, DLIS-3838. Kept verbatim for parity: the
             # protobuf cap contradicts onnx's own protobuf>=4.25.1 and is
@@ -360,7 +363,7 @@ def build_stages(ctx):
             # cp312 wheel, so both only survive because the default image is
             # ubuntu:22.04 with Python 3.10.
             'pip3 install "protobuf<=3.20.1" "numpy<=1.23.5" "ml_dtypes<=0.5.4"'
-            "  # TODO: Remove current line DLIS-3838",
+            + "  # TODO: Remove current line DLIS-3838",
             "pip3 install --upgrade onnx=={}".format(ctx.onnx_version),
         ],
         steps=[
@@ -735,7 +738,7 @@ def render_stage_script(stage, ctx, final=False):
         "# Make all generated files accessible outside of container",
         "umask 0000",
         "nvidia-smi --query-gpu=compute_cap,compute_mode,driver_version,name,index"
-        " --format=csv || true",
+        + " --format=csv || true",
         "nvidia-smi || true",
         'echo -e "{}Generating {} models{}"'.format(
             SH_COLOR_INFO, stage.title, SH_COLOR_RESET
@@ -751,7 +754,7 @@ def render_stage_script(stage, ctx, final=False):
         lines += [
             "",
             "# Phase 2: sizes are only final once every stage has written its"
-            " artifacts.",
+            + " artifacts.",
             # The summary lands at the root of the tree, not inside a model, so
             # it travels with the tree and no walk of it picks the file up.
             "python3 {src}/gen_manifest.py --tree {root} --update-sizes"
