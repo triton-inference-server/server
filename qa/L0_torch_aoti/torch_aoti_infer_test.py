@@ -29,14 +29,14 @@ import sys
 
 sys.path.append("../common")
 
-import unittest
-from concurrent.futures import ThreadPoolExecutor
+import unittest  # noqa: E402
+from concurrent.futures import ThreadPoolExecutor  # noqa: E402
 
-import numpy as np
-import test_util as tu
-import torch
-import tritonclient.http as http
-from tritonclient.utils import InferenceServerException
+import numpy as np  # noqa: E402
+import test_util as tu  # noqa: E402
+import torch  # noqa: E402
+import tritonclient.http as http  # noqa: E402
+from tritonclient.utils import InferenceServerException  # noqa: E402
 
 
 class TorchAotiTest(tu.TestResultCollector):
