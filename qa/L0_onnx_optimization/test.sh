@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -131,6 +131,14 @@ for MODEL in \
             parameters { key: \"trt_cuda_graph_enable\" value: \"1\" } \
             parameters { key: \"trt_engine_cache_path\" value: \"${CACHE_PATH}\" } }]}}" \
             >> config.pbtxt) && \
+    # TRT execution accelerators with trt_op_types_to_exclude (must be accepted, not unknown)
+    cp -r models/${MODEL}_test models/${MODEL}_trt_exclude && \
+    (cd models/${MODEL}_trt_exclude && \
+            sed -i 's/_float32_test/_float32_trt_exclude/' \
+                config.pbtxt && \
+            echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\" \
+            parameters { key: \"trt_op_types_to_exclude\" value: \"Identity\" } }]}}" \
+            >> config.pbtxt) && \
     # TRT execution accelerators with unknown parameters
     cp -r models/${MODEL}_test models/${MODEL}_trt_unknown_param && \
     (cd models/${MODEL}_trt_unknown_param && \
@@ -186,6 +194,18 @@ for MODEL in \
     grep "TensorRT Execution Accelerator is set for '${MODEL}_trt_cache_on'" $SERVER_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set for '${MODEL}_trt_cache_on'\n***"
+        RET=1
+    fi
+
+    grep "TensorRT Execution Accelerator is set for '${MODEL}_trt_exclude'" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set for '${MODEL}_trt_exclude'\n***"
+        RET=1
+    fi
+
+    grep "unknown parameter 'trt_op_types_to_exclude'" $SERVER_LOG
+    if [ $? -eq 0 ]; then
+        echo -e "\n***\n*** Failed. trt_op_types_to_exclude should be accepted, not unknown\n***"
         RET=1
     fi
 
