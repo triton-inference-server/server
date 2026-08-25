@@ -342,21 +342,50 @@ class TorchAotiTest(tu.TestResultCollector):
         # backend, where out-of-order arguments underflowed uint64 and
         # reported ~1.8e19ns compute_infer durations (issue #8874).
         MODEL_NAME = "torch_aoti_float32_float32"
-        for _ in range(5):
+        NUM_REQUESTS = 5
+        PHASES = ("compute_input", "compute_infer", "compute_output")
+
+        def stats_snapshot():
+            with http.InferenceServerClient("localhost:8000") as client:
+                model_stats = client.get_inference_statistics(model_name=MODEL_NAME)[
+                    "model_stats"
+                ][0]
+            inference_stats = model_stats["inference_stats"]
+            batch_ns = {phase: 0 for phase in PHASES}
+            for batch_stats in model_stats["batch_stats"]:
+                for phase in PHASES:
+                    batch_ns[phase] += int(batch_stats[phase]["ns"])
+            return {
+                "count": int(inference_stats["success"]["count"]),
+                "request_ns": int(inference_stats["success"]["ns"]),
+                "phase_ns": {
+                    phase: int(inference_stats[phase]["ns"]) for phase in PHASES
+                },
+                "batch_ns": batch_ns,
+            }
+
+        def delta(after, before):
+            # The reported counters are cumulative uint64 sums, so a backend
+            # reporting out-of-order timestamps wraps them modulo 2**64 on
+            # every request. Normalize the difference the same way, or a wrap
+            # between the two snapshots would hide as a small (or negative)
+            # delta and mask the regression.
+            return (after - before) % 2**64
+
+        # Diff two snapshots so traffic from earlier tests cannot dilute the
+        # sample: the assertions cover exactly the requests sent here.
+        before = stats_snapshot()
+        for _ in range(NUM_REQUESTS):
             self._infer_one_row(MODEL_NAME)
+        after = stats_snapshot()
 
-        with http.InferenceServerClient("localhost:8000") as client:
-            stats = client.get_inference_statistics(model_name=MODEL_NAME)
-
-        model_stats = stats["model_stats"][0]
-        inference_stats = model_stats["inference_stats"]
-        self.assertGreater(int(inference_stats["success"]["count"]), 0)
-        request_ns = int(inference_stats["success"]["ns"])
+        self.assertEqual(after["count"] - before["count"], NUM_REQUESTS)
+        request_ns = delta(after["request_ns"], before["request_ns"])
         self.assertGreater(request_ns, 0)
 
         phase_ns = {
-            phase: int(inference_stats[phase]["ns"])
-            for phase in ("compute_input", "compute_infer", "compute_output")
+            phase: delta(after["phase_ns"][phase], before["phase_ns"][phase])
+            for phase in PHASES
         }
         self.assertLessEqual(
             sum(phase_ns.values()),
@@ -368,14 +397,16 @@ class TorchAotiTest(tu.TestResultCollector):
         # Batch statistics are reported through a separate call with the same
         # timestamp-ordering hazard; batch compute windows are bounded by the
         # request durations that contain them.
-        for batch_stats in model_stats["batch_stats"]:
-            for phase in ("compute_input", "compute_infer", "compute_output"):
-                self.assertLessEqual(
-                    int(batch_stats[phase]["ns"]),
-                    request_ns,
-                    f"batch {phase} duration exceeds the total request "
-                    "duration; timestamps reported out of order",
-                )
+        batch_phase_ns = {
+            phase: delta(after["batch_ns"][phase], before["batch_ns"][phase])
+            for phase in PHASES
+        }
+        self.assertLessEqual(
+            sum(batch_phase_ns.values()),
+            request_ns,
+            f"batch compute phase durations {batch_phase_ns} sum past the "
+            "total request duration; timestamps reported out of order",
+        )
 
     def test_multi_instance(self):
         # Concurrent requests against a 2-instance model must all be correct.
