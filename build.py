@@ -1236,6 +1236,23 @@ RUN apt-get update \\
             os.getenv("CCACHE_REMOTE_STORAGE")
         )
 
+    # Authenticate GitHub clones. cmake_build clones the component and backend
+    # repositories while running inside this container, not while the image is
+    # being built, so a docker build secret cannot reach it. Configure a
+    # credential helper instead: it holds no credential itself, only a
+    # reference to GITHUB_TOKEN, so it is safe in a layer and in the pushed
+    # build base image. The value is supplied by 'docker run -e GITHUB_TOKEN'.
+    #
+    # The helper exits without printing anything when GITHUB_TOKEN is empty,
+    # which leaves git to fall back to unauthenticated access rather than
+    # offering an empty password and failing a clone that used to work.
+    df += """
+RUN git config --global credential."https://github.com".helper \\
+      '!f() { test -n "${GITHUB_TOKEN}" || exit 0; \\
+              echo username=x-access-token; \\
+              echo "password=${GITHUB_TOKEN}"; }; f'
+"""
+
     # Copy in the triton source. We remove existing contents first in
     # case the FROM container has something there already.
     df += """
@@ -1849,6 +1866,13 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         # or explicit --release-version). Dev / pre-release builds leave it
         # unset so build_wheel.py reads the in-tree TRITON_VERSION file and
         # takes the PEP 817 variant path.
+        # Forward the GitHub token to the clones cmake_build performs in this
+        # container. Passed by name rather than as NAME=value: 'docker run -e
+        # VAR' takes the value from the ambient environment, so the token stays
+        # out of this script, which CI publishes as a build artifact.
+        if os.environ.get("GITHUB_TOKEN"):
+            runargs += ["-e", "GITHUB_TOKEN"]
+
         if "TRITON_RELEASE_VERSION" in os.environ:
             runargs += [
                 "-e",
