@@ -966,30 +966,25 @@ def apt_sources_secret_mount():
     return ""
 
 
-def mount_apt_sources_secret(df, skip=0):
-    """Prefix each 'RUN apt-get update' in df with the Artifactory source-list
-    secret mount, leaving the first 'skip' occurrences untouched.
+def mount_apt_sources_secret(df):
+    """Prefix every 'RUN apt-get update' in df with the apt source list mount.
 
-    A secret mount is scoped to a single RUN instruction, so every apt block
-    that should resolve through Artifactory needs its own mount. The build base
-    skips its first block: that block bootstraps ca-certificates from the
-    distribution repositories, and a base image without CA certificates
-    (ubuntu:24.04 ships none) cannot complete a TLS handshake with Artifactory
-    until it has finished.
+    A secret mount is scoped to a single RUN instruction, so every apt step
+    that should resolve through the mirror needs its own.
+
+    The first step of the build base is included even though it is the step
+    that installs ca-certificates. On a base image that already carries them
+    the step resolves through the mirror like any other. On one that does not,
+    apt reports the failed TLS handshake, still exits 0, and installs from the
+    distribution repositories, so the step behaves as it did before the mount
+    was added.
     """
     mount = apt_sources_secret_mount()
     if not mount:
         return df
 
     marker = "RUN apt-get update"
-    chunks = df.split(marker)
-    result = chunks[0]
-    for i, chunk in enumerate(chunks[1:]):
-        if i < skip:
-            result += marker + chunk
-        else:
-            result += "RUN " + mount + "apt-get update" + chunk
-    return result
+    return df.replace(marker, "RUN " + mount + "apt-get update")
 
 
 def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap):
@@ -1262,7 +1257,7 @@ COPY . .
 ENTRYPOINT []
 """
 
-    df = mount_apt_sources_secret(df, skip=1)
+    df = mount_apt_sources_secret(df)
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)

@@ -200,15 +200,19 @@ Dockerfile rather than the build command, so build.py removes it before
 invoking docker and applies it when generating the Dockerfile.
 
 The id `apt_sources` has an additional meaning. Its secret is mounted for the
-duration of each apt step in the generated Dockerfile and Dockerfile.buildbase,
+duration of every apt step in the generated Dockerfile and Dockerfile.buildbase,
 so package installs resolve through the mirror the list names. It lands on
 target when the spec sets one, and on
-/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list otherwise. The first apt
-step of Dockerfile.buildbase is deliberately excluded, because it installs
-ca-certificates and a base image without them cannot complete a TLS handshake
-with the mirror until that install finishes. When the secret is omitted the
-generated Dockerfiles are unchanged and apt uses the distribution
-repositories.
+/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list otherwise. When the
+secret is omitted the generated Dockerfiles are unchanged and apt uses the
+distribution repositories.
+
+This includes the first step of Dockerfile.buildbase, which is also the step
+that installs ca-certificates. On a base image that already carries them the
+step resolves through the mirror like any other. On one that does not, apt
+reports the failed TLS handshake, still exits 0, and installs from the
+distribution repositories, so the step behaves as it did before the mount was
+added.
 
 #### Authenticating Clones From GitHub
 
