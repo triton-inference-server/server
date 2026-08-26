@@ -180,7 +180,8 @@ ARG TRITON_CORE_REPO_TAG
 ARG TARGETPLATFORM
 ARG TRITON_ENABLE_GPU
 
-RUN apt-get update && \
+RUN --mount=type=secret,id=apt_sources,target=/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list,required=false \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
             curl \
             default-jdk \
