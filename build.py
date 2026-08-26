@@ -888,10 +888,12 @@ DOCKER_BUILD_SECRET_KEYS = ("id", "src", "source", "env", "type")
 APT_SOURCES_SECRET_ID = "apt_sources"
 APT_SOURCES_DEFAULT_TARGET = "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list"
 
-# Variables through which git reads configuration straight from the environment.
-# The build container is given these so its clones authenticate without a file,
-# which a bind mount could not deliver across the docker daemon boundary.
-GIT_CONFIG_ENV_VARS = ("GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0")
+# Variable holding a git config, and where the build container writes it out.
+# The container is handed the contents rather than the file because docker
+# resolves a bind mount source on the daemon, which need not share a filesystem
+# with this script, and silently mounts a directory when it finds nothing there.
+GIT_CONFIG_CONTENT_ENV = "TRITON_GITCONFIG"
+GIT_CONFIG_CONTAINER_PATH = "/tmp/gitconfig"
 
 
 def parse_secret_spec(spec):
@@ -1854,14 +1856,13 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         # reach it, and a bind mount cannot either: docker resolves the source
         # path on the daemon, which need not share the filesystem this script
         # runs on, and silently creates a directory when it does not find it.
-        # git reads configuration straight from the environment instead.
+        # Hand the container the contents instead and let it write the file.
         #
-        # Passed by name rather than as NAME=value, so the values, one of which
-        # carries the credential, stay out of this script, which CI publishes as
-        # a build artifact.
-        for var in GIT_CONFIG_ENV_VARS:
-            if os.environ.get(var):
-                runargs += ["-e", var]
+        # Passed by name rather than as NAME=value, so the contents, which carry
+        # a credential, stay out of this script, which CI publishes as a build
+        # artifact.
+        if os.environ.get(GIT_CONFIG_CONTENT_ENV):
+            runargs += ["-e", GIT_CONFIG_CONTENT_ENV]
 
         if "TRITON_RELEASE_VERSION" in os.environ:
             runargs += [
@@ -1879,7 +1880,23 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
 
         runargs += ["tritonserver_buildbase"]
 
-        runargs += ["./cmake_build"]
+        # Write the git config out inside the container, where the contents
+        # arrived as an environment variable, and point git at it for the build
+        # only. Single quoted so the outer shell leaves the expansion to the
+        # container, whose environment is the one holding the value.
+        if os.environ.get(GIT_CONFIG_CONTENT_ENV):
+            runargs += [
+                "bash",
+                "-c",
+                '\'printf "%s" "${}" > {} && export GIT_CONFIG_GLOBAL={} && '
+                "./cmake_build'".format(
+                    GIT_CONFIG_CONTENT_ENV,
+                    GIT_CONFIG_CONTAINER_PATH,
+                    GIT_CONFIG_CONTAINER_PATH,
+                ),
+            ]
+        else:
+            runargs += ["./cmake_build"]
 
         # Remove existing tritonserver_builder container...
         docker_script._file.write(
