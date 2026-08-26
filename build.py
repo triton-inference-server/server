@@ -878,17 +878,43 @@ RUN curl -o /tmp/cuda-keyring.deb \\
                 )
 
 
-def secret_spec_id(spec):
-    """Return the 'id' of a Docker --secret spec, or "" when it has none.
+# Keys that 'docker build --secret' accepts. A spec may also carry keys that
+# only the Dockerfile side understands ('target', 'required', 'mode', ...);
+# passing those to the build command is an error, so they are filtered out.
+DOCKER_BUILD_SECRET_KEYS = ("id", "src", "source", "env", "type")
 
-    Docker does not require 'id' to come first, so the fields are scanned
-    rather than indexed.
+# Id whose secret is mounted over the apt source list, and where it lands when
+# the spec does not say.
+APT_SOURCES_SECRET_ID = "apt_sources"
+APT_SOURCES_DEFAULT_TARGET = "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list"
+
+
+def parse_secret_spec(spec):
+    """Split a Docker secret spec into ordered (key, value) pairs.
+
+    Docker does not require any particular field order, so callers look up
+    keys by name rather than by position.
     """
+    fields = []
     for field in spec.split(","):
         key, _, value = field.partition("=")
-        if key.strip() == "id":
-            return value.strip()
+        key = key.strip()
+        if key:
+            fields.append((key, value.strip()))
+    return fields
+
+
+def secret_spec_value(spec, name):
+    """Return the value of one field of a secret spec, or "" when unset."""
+    for key, value in parse_secret_spec(spec):
+        if key == name:
+            return value
     return ""
+
+
+def secret_spec_id(spec):
+    """Return the 'id' of a Docker secret spec, or "" when it has none."""
+    return secret_spec_value(spec, "id")
 
 
 def declared_secret_specs():
@@ -904,28 +930,40 @@ def declared_secret_ids():
 def secret_build_args():
     """Return the '--secret' arguments to forward to 'docker build'.
 
-    Specs are passed through untouched, so anything 'docker build --secret'
-    accepts works here.
+    Only the keys the build command understands are forwarded. Keys that
+    belong to the Dockerfile mount are dropped here and applied where the
+    Dockerfile is generated instead.
     """
-    return ["--secret {}".format(spec) for spec in declared_secret_specs()]
+    args = []
+    for spec in declared_secret_specs():
+        fields = [
+            "{}={}".format(key, value)
+            for key, value in parse_secret_spec(spec)
+            if key in DOCKER_BUILD_SECRET_KEYS
+        ]
+        if fields:
+            args.append("--secret {}".format(",".join(fields)))
+    return args
 
 
 def apt_sources_secret_mount():
-    """Return the RUN mount flag that overlays the NVIDIA Artifactory apt
-    source list, or an empty string when the secret was not requested.
+    """Return the RUN mount flag that overlays the apt source list, or an
+    empty string when no such secret was requested.
 
-    The secret is supplied either as '--secret id=apt_sources,src=<path>' or
-    as '--build-secret apt_sources <path>'. When it is absent this returns ""
-    and the generated Dockerfiles are byte-identical to a build without this
-    feature, so the default path is unchanged.
+    The mount point comes from the spec's 'target' when it has one, so
+    '--docker-build-secret id=apt_sources,src=<path>,target=<path>' controls
+    where the list lands. Without a 'target' it defaults to the NVIDIA
+    Artifactory source list. When the secret is absent this returns "" and the
+    generated Dockerfiles are byte-identical to a build without this feature.
     """
-    if "apt_sources" not in declared_secret_ids():
-        return ""
-    return (
-        "--mount=type=secret,id=apt_sources,"
-        "target=/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list,"
-        "required=false "
-    )
+    for spec in declared_secret_specs():
+        if secret_spec_id(spec) != APT_SOURCES_SECRET_ID:
+            continue
+        target = secret_spec_value(spec, "target") or APT_SOURCES_DEFAULT_TARGET
+        return "--mount=type=secret,id={},target={},required=false ".format(
+            APT_SOURCES_SECRET_ID, target
+        )
+    return ""
 
 
 def mount_apt_sources_secret(df, skip=0):
@@ -2709,11 +2747,14 @@ if __name__ == "__main__":
         "  - 'id=<id>'             read the environment variable of the same name\n\n"
         "May be repeated. The secret is available to a Dockerfile step that mounts it with "
         "'RUN --mount=type=secret,id=<id>', and never becomes part of an image layer.\n\n"
-        "The id 'apt_sources' carries extra meaning: it is also mounted over "
-        "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list for the duration of each apt step in the "
-        "generated Dockerfile and Dockerfile.buildbase, so package installs resolve through the NVIDIA "
-        "Artifactory mirror. When it is omitted the generated Dockerfiles are unchanged and apt uses the "
-        "distribution repositories.",
+        "A spec may additionally carry 'target=<path>'. Docker rejects that key on the command line "
+        "because it belongs to the Dockerfile mount, so it is stripped from the build command and "
+        "applied where the Dockerfile is generated.\n\n"
+        "The id 'apt_sources' carries extra meaning: it is also mounted for the duration of each apt step "
+        "in the generated Dockerfile and Dockerfile.buildbase, so package installs resolve through a "
+        "package mirror. It lands on 'target' when the spec sets one, and on "
+        "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list otherwise. When the secret is omitted the "
+        "generated Dockerfiles are unchanged and apt uses the distribution repositories.",
     )
     parser.add_argument(
         "--triton-wheels-dependencies-group",
