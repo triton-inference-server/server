@@ -224,7 +224,7 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
           /* The X-Amzn-SageMaker-Target-Model header, when present, must name
            * the same model that was registered under this URL hash. Honoring a
            * mismatched header would let a request authorized for one model run
-           * inference against another loaded model (TRI-1563, confused deputy /
+           * inference against another loaded model (confused deputy /
            * CWE-863). Reject rather than silently switching models. */
           const char* target_model_header =
               evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
@@ -235,14 +235,11 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
                 << target_model_header
                 << "' does not match the model registered under URL hash '"
                 << multi_model_name << "'";
-            TRITONSERVER_Error* err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INVALID_ARG,
-                "X-Amzn-SageMaker-Target-Model header does not match the model "
-                "requested in the URL");
-            EVBufferAddErrorJson(req->buffer_out, err);
-            evhtp_send_reply(req, EVHTP_RES_BADREQ); /* 400 */
-            TRITONSERVER_ErrorDelete(err);
-            return;
+            HTTP_RESPOND_IF_ERR(
+                req, TRITONSERVER_ErrorNew(
+                         TRITONSERVER_ERROR_INVALID_ARG,
+                         "X-Amzn-SageMaker-Target-Model header does not match "
+                         "the model requested in the URL"));
           }
 
           LOG_INFO << "Invoking SageMaker TargetModel: " << target_model;
@@ -732,7 +729,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
   /* Always act on the model registered under this hash at load time, never on a
    * name supplied with the unload request. If a header is present it must
    * match; otherwise a request authorized for one model could unload a
-   * different loaded model and corrupt the registry (TRI-1563, confused deputy
+   * different loaded model and corrupt the registry (confused deputy
    * / CWE-863). */
   const std::string target_model = model_it->second.target_model;
   const std::string repo_parent_path = model_it->second.repo_path;
@@ -743,14 +740,11 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
               << target_model_header
               << "' does not match the model registered under URL hash '"
               << model_name_hash << "'";
-    TRITONSERVER_Error* err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        "X-Amzn-SageMaker-Target-Model header does not match the model "
-        "requested in the URL");
-    EVBufferAddErrorJson(req->buffer_out, err);
-    evhtp_send_reply(req, EVHTP_RES_BADREQ); /* 400 */
-    TRITONSERVER_ErrorDelete(err);
-    return;
+    HTTP_RESPOND_IF_ERR(
+        req, TRITONSERVER_ErrorNew(
+                 TRITONSERVER_ERROR_INVALID_ARG,
+                 "X-Amzn-SageMaker-Target-Model header does not match the "
+                 "model requested in the URL"));
   }
 
   LOG_INFO << "Unloading SageMaker TargetModel: " << target_model << std::endl;
@@ -1158,8 +1152,8 @@ SagemakerAPIServer::SageMakerMMELoadModel(
 
     /* Use model name hash as the key, as expected in the SageMaker MME
      * contract, and remember the target_model the repository was actually
-     * loaded under so invoke/unload can validate the request header against it
-     * (TRI-1563). */
+     * loaded under so invoke/unload can validate the request header against
+     * it. */
     sagemaker_models_list_.emplace(
         model_name_hash, SageMakerModelInfo{repo_parent_path, target_model});
     evhtp_send_reply(req, EVHTP_RES_OK);

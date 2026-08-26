@@ -174,11 +174,11 @@ class SagemakerAPIServer : public HTTPAPIServer {
   struct SageMakerModelInfo {
     // Parent path of the registered model repository
     // (e.g. /opt/ml/models/<hash>). Needed to unregister the repo on unload.
-    std::string repo_path;
+    const std::string repo_path;
     // The archive/model name the model was actually loaded under in Triton,
     // captured from X-Amzn-SageMaker-Target-Model at load time. Invoke and
     // unload must act on THIS value, never on a header supplied later.
-    std::string target_model;
+    const std::string target_model;
   };
 
   /* Maintain list of loaded models, keyed by model-name hash */

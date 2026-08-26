@@ -25,20 +25,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import json
+import os
 import sys
+import time
+import unittest
+
+import numpy as np
+import requests
+import tritonclient.http as httpclient
 
 sys.path.append("../common")
 
-import json  # noqa: E402
-import os  # noqa: E402
-import sys  # noqa: E402
-import time  # noqa: E402
-import unittest  # noqa: E402
-
-import numpy as np  # noqa: E402
-import requests  # noqa: E402
 import test_util as tu  # noqa: E402
-import tritonclient.http as httpclient  # noqa: E402
 
 
 class SageMakerMultiModelTest(tu.TestResultCollector):
@@ -320,11 +319,12 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
             "Expected status code 404, received {}".format(r.status_code),
         )
 
-    def test_sm_5b_identity_confusion_poc(self):
-        """TRI-1563 PoC: URL hash and X-Amzn-SageMaker-Target-Model header must refer
-        to the same model. Sending a mismatched header must NOT silently run or unload
-        the wrong model. Before the fix this test demonstrates the vulnerability;
-        after the fix it confirms the server rejects the mismatch."""
+    def test_sm_5b_target_model_header_mismatch(self):
+        """Runs after test_sm_5 (unload). Regression test: the URL model hash and the
+        X-Amzn-SageMaker-Target-Model header must refer to the same model. A request
+        whose header names a different model than the URL must be rejected (on both
+        invoke and unload) rather than silently acting on the wrong model, and the
+        victim model must stay loaded."""
 
         # --- Setup: load both models fresh (re-load in case test_sm_5 already unloaded) ---
         for name, url in [
@@ -344,7 +344,7 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
                 "Setup: failed to load {} — status {}".format(name, r.status_code),
             )
 
-        # --- PoC 1: INVOKE with mismatched header ---
+        # --- Case 1: INVOKE with mismatched header ---
         # URL says model1_name (authorized), header says model2_name (different model).
         # BEFORE fix: server runs model2 and returns its response (wrong model executed).
         # AFTER fix:  server must return 4xx (mismatch rejected).
@@ -377,7 +377,7 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         self.assertEqual(
             r.status_code,
             400,
-            "TRI-1563 PoC: INVOKE with a mismatched X-Amzn-SageMaker-Target-Model "
+            "INVOKE with a mismatched X-Amzn-SageMaker-Target-Model "
             "header must be rejected with 400 (got {}). Body: {}".format(
                 r.status_code, r.text
             ),
@@ -385,11 +385,11 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         self.assertIn(
             "does not match",
             r.text,
-            "TRI-1563 PoC: INVOKE 400 must be the target-model mismatch rejection; "
+            "INVOKE 400 must be the target-model mismatch rejection; "
             "got body: {}".format(r.text),
         )
 
-        # --- PoC 2: UNLOAD with mismatched header ---
+        # --- Case 2: UNLOAD with mismatched header ---
         # URL says model1_name (authorized), header says model2_name (victim).
         # BEFORE fix: model2 is evicted and model1's map entry is erased (state corruption).
         # AFTER fix:  server must return 4xx (mismatch rejected).
@@ -400,7 +400,7 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         self.assertEqual(
             r.status_code,
             400,
-            "TRI-1563 PoC: UNLOAD with a mismatched X-Amzn-SageMaker-Target-Model "
+            "UNLOAD with a mismatched X-Amzn-SageMaker-Target-Model "
             "header must be rejected with 400 (got {}). Body: {}".format(
                 r.status_code, r.text
             ),
@@ -408,7 +408,7 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         self.assertIn(
             "does not match",
             r.text,
-            "TRI-1563 PoC: UNLOAD 400 must be the target-model mismatch rejection; "
+            "UNLOAD 400 must be the target-model mismatch rejection; "
             "got body: {}".format(r.text),
         )
 
@@ -417,7 +417,7 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         self.assertEqual(
             r.status_code,
             200,
-            "TRI-1563 PoC: {} was evicted by a mismatched unload targeting {} — "
+            "{} was evicted by a mismatched unload targeting {} — "
             "state corruption confirmed.".format(self.model2_name, self.model1_name),
         )
 
