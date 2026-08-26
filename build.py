@@ -863,6 +863,50 @@ RUN curl -o /tmp/cuda-keyring.deb \\
                 )
 
 
+def apt_sources_secret_mount():
+    """Return the RUN mount flag that overlays the NVIDIA Artifactory apt
+    source list, or an empty string when the secret was not requested.
+
+    The secret is supplied as '--build-secret apt_sources <path>'. When it is
+    absent this returns "" and the generated Dockerfiles are byte-identical to
+    a build without this feature, so the default path is unchanged.
+    """
+    secrets = dict(getattr(FLAGS, "build_secret", None) or [])
+    if not secrets.get("apt_sources"):
+        return ""
+    return (
+        "--mount=type=secret,id=apt_sources,"
+        "target=/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list,"
+        "required=false "
+    )
+
+
+def mount_apt_sources_secret(df, skip=0):
+    """Prefix each 'RUN apt-get update' in df with the Artifactory source-list
+    secret mount, leaving the first 'skip' occurrences untouched.
+
+    A secret mount is scoped to a single RUN instruction, so every apt block
+    that should resolve through Artifactory needs its own mount. The build base
+    skips its first block: that block bootstraps ca-certificates from the
+    distribution repositories, and a base image without CA certificates
+    (ubuntu:24.04 ships none) cannot complete a TLS handshake with Artifactory
+    until it has finished.
+    """
+    mount = apt_sources_secret_mount()
+    if not mount:
+        return df
+
+    marker = "RUN apt-get update"
+    chunks = df.split(marker)
+    result = chunks[0]
+    for i, chunk in enumerate(chunks[1:]):
+        if i < skip:
+            result += marker + chunk
+        else:
+            result += "RUN " + mount + "apt-get update" + chunk
+    return result
+
+
 def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap):
     df = """
 ARG TRITON_VERSION={}
@@ -1114,6 +1158,8 @@ COPY . .
 ENTRYPOINT []
 """
 
+    df = mount_apt_sources_secret(df, skip=1)
+
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -1242,6 +1288,8 @@ RUN ldconfig && \\
     ldconfig
 
 """
+    df = mount_apt_sources_secret(df)
+
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -1666,6 +1714,11 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
 
         baseargs += ["--cache-from={}".format(k) for k in cachefrommap]
 
+        if secrets.get("apt_sources"):
+            baseargs += [
+                "--secret id=apt_sources,src={}".format(secrets["apt_sources"]),
+            ]
+
         baseargs += ["."]
 
         docker_script.cwd(THIS_SCRIPT_DIR)
@@ -1768,13 +1821,17 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             "docker",
             "build",
         ]
-        if secrets:
+        if secrets.get("req"):
             finalargs += [
                 f"--secret id=req,src={requirements}",
                 "--secret id=VLLM_INDEX_URL",
                 "--secret id=PYTORCH_TRITON_URL",
                 "--secret id=NVPL_SLIM_URL",
                 f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
+            ]
+        if secrets.get("apt_sources"):
+            finalargs += [
+                "--secret id=apt_sources,src={}".format(secrets["apt_sources"]),
             ]
         finalargs += [
             "-t",
@@ -2596,7 +2653,11 @@ if __name__ == "__main__":
         metavar=("key", "value"),
         help="Add build secrets in the form of <key> <value>. These secrets are used during the build process for vllm. The secrets are passed to the Docker build step as `--secret id=<key>`. The following keys are expected and their purposes are described below:\n\n"
         "  - 'req': A file containing a list of dependencies for pip (e.g., requirements.txt).\n"
-        "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n\n"
+        "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n"
+        "  - 'apt_sources': A file mounted at /etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list for the\n"
+        "    duration of each apt step, so package installs resolve through the NVIDIA Artifactory mirror. It\n"
+        "    holds credentials, so it is passed as a secret and never written to an image layer. When omitted\n"
+        "    the generated Dockerfiles are unchanged and apt uses the distribution repositories.\n\n"
         "Ensure that the required environment variables for these secrets are set before running the build.",
     )
     parser.add_argument(
