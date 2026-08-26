@@ -888,6 +888,12 @@ DOCKER_BUILD_SECRET_KEYS = ("id", "src", "source", "env", "type")
 APT_SOURCES_SECRET_ID = "apt_sources"
 APT_SOURCES_DEFAULT_TARGET = "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list"
 
+# Id whose secret is a git config authenticating GitHub, and where it is mounted.
+# git is pointed at it with GIT_CONFIG_GLOBAL rather than by installing it at the
+# default path, so nothing outside the step that mounts it picks it up.
+GIT_CONFIG_SECRET_ID = "gitconfig"
+GIT_CONFIG_TARGET = "/run/secrets/gitconfig"
+
 
 def parse_secret_spec(spec):
     """Split a Docker secret spec into ordered (key, value) pairs.
@@ -925,6 +931,18 @@ def declared_secret_specs():
 def declared_secret_ids():
     """Ids of every secret supplied with --docker-build-secret."""
     return {i for i in (secret_spec_id(s) for s in declared_secret_specs()) if i}
+
+
+def secret_source_path(secret_id):
+    """Return the host path a declared secret reads from, or "" when it has none.
+
+    Only a file-backed secret has a path. One sourced from the environment has
+    nothing to bind into a container, so callers that need a file skip it.
+    """
+    for spec in declared_secret_specs():
+        if secret_spec_id(spec) == secret_id:
+            return secret_spec_value(spec, "src") or secret_spec_value(spec, "source")
+    return ""
 
 
 def secret_build_args():
@@ -1230,23 +1248,6 @@ RUN apt-get update \\
 """.format(
             os.getenv("CCACHE_REMOTE_STORAGE")
         )
-
-    # Authenticate GitHub clones. cmake_build clones the component and backend
-    # repositories while running inside this container, not while the image is
-    # being built, so a docker build secret cannot reach it. Configure a
-    # credential helper instead: it holds no credential itself, only a
-    # reference to GITHUB_TOKEN, so it is safe in a layer and in the pushed
-    # build base image. The value is supplied by 'docker run -e GITHUB_TOKEN'.
-    #
-    # The helper exits without printing anything when GITHUB_TOKEN is empty,
-    # which leaves git to fall back to unauthenticated access rather than
-    # offering an empty password and failing a clone that used to work.
-    df += """
-RUN git config --global credential."https://github.com".helper \\
-      '!f() { test -n "${GITHUB_TOKEN}" || exit 0; \\
-              echo username=x-access-token; \\
-              echo "password=${GITHUB_TOKEN}"; }; f'
-"""
 
     # Copy in the triton source. We remove existing contents first in
     # case the FROM container has something there already.
@@ -1861,12 +1862,20 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         # or explicit --release-version). Dev / pre-release builds leave it
         # unset so build_wheel.py reads the in-tree TRITON_VERSION file and
         # takes the PEP 817 variant path.
-        # Forward the GitHub token to the clones cmake_build performs in this
-        # container. Passed by name rather than as NAME=value: 'docker run -e
-        # VAR' takes the value from the ambient environment, so the token stays
-        # out of this script, which CI publishes as a build artifact.
-        if os.environ.get("GITHUB_TOKEN"):
-            runargs += ["-e", "GITHUB_TOKEN"]
+        # Authenticate the GitHub clones cmake_build performs in this container.
+        # It runs the build rather than an image build, so a build secret cannot
+        # reach it: bind the same git config read only instead, and point git at
+        # it by environment rather than installing it at the default path. Only
+        # the host path reaches this script, which CI publishes as a build
+        # artifact, so the credential the config carries stays out of it.
+        git_config_src = secret_source_path(GIT_CONFIG_SECRET_ID)
+        if git_config_src:
+            runargs += [
+                "-v",
+                "{}:{}:ro".format(git_config_src, GIT_CONFIG_TARGET),
+                "-e",
+                "GIT_CONFIG_GLOBAL={}".format(GIT_CONFIG_TARGET),
+            ]
 
         if "TRITON_RELEASE_VERSION" in os.environ:
             runargs += [

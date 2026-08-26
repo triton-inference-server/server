@@ -218,22 +218,33 @@ added.
 
 Source from several other repos is fetched during the build, as described
 above. Those clones are unauthenticated by default, which is subject to
-GitHub's rate limits and cannot reach a private repo. Set GITHUB_TOKEN in the
-environment to authenticate them.
+GitHub's rate limits and cannot reach a private repo. Supply a git config that
+rewrites the GitHub URL to an authenticated one, as the `gitconfig` build
+secret.
 
 ```bash
-$ export GITHUB_TOKEN=<token>
-$ ./build.py ...
+$ cat > /tmp/gitconfig <<EOF
+[url "https://x-access-token:<token>@github.com/"]
+	insteadOf = https://github.com/
+EOF
+$ chmod 600 /tmp/gitconfig
+$ ./build.py ... --docker-build-secret id=gitconfig,src=/tmp/gitconfig
 ```
 
-This is not a build secret. The component and backend repos are cloned while
-the build runs inside the container, not while an image is being built, so a
-build secret cannot reach them. build.py instead configures a git credential
-helper in the build base image and forwards the token to the build container
-when the variable is set. The helper holds no credential of its own, only a
-reference to GITHUB_TOKEN, so it is safe in an image layer, and it keeps the
-token out of .git/config, which an authenticated clone URL would not. When
-GITHUB_TOKEN is unset the clones stay unauthenticated.
+The token has to appear in the file. git does not expand environment variables
+inside `url.<base>.insteadOf`, so a config that refers to one is stored
+literally and silently fails to authenticate.
+
+build.py mounts the config on each step that clones and points git at it with
+GIT_CONFIG_GLOBAL rather than installing it at the default path, so nothing
+outside those steps picks it up. Steps that run while an image is being built
+receive it as a build secret. cmake_build clones while the build runs inside
+the container rather than while an image is built, where a build secret cannot
+reach it, so there the same file is bind mounted read only instead. Either way
+the config is never part of an image layer, and only its path reaches the
+generated build scripts.
+
+When the secret is omitted the clones stay unauthenticated.
 
 #### Experimental: Build Presets
 

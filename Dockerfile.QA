@@ -176,19 +176,10 @@ RUN mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp tritonbuild/tritonserver/backends/dyna_sequence/libtriton_dyna_sequence.so \
         qa/custom_models/custom_dyna_sequence_int32/1/.
 
-# Authenticate the GitHub clones cmake performs for the component repos. The
-# helper stores no credential, only a reference to GITHUB_TOKEN, so it is safe
-# in a layer and in the pushed image. Each step that clones supplies the value
-# with --mount=type=secret,id=github_token. The helper prints nothing when the
-# token is absent, leaving git to clone anonymously as before.
-RUN git config --global credential."https://github.com".helper \
-      '!f() { test -n "${GITHUB_TOKEN}" || exit 0; \
-              echo username=x-access-token; \
-              echo "password=${GITHUB_TOKEN}"; }; f'
-
 # L0_lifecycle needs No-GPU build of identity backend.
 WORKDIR  /workspace/tritonbuild/identity
-RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN,required=false \
+RUN --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=false \
+    export GIT_CONFIG_GLOBAL=/run/secrets/gitconfig && \
     rm -rf install build && mkdir build && cd build && \
     cmake -DTRITON_ENABLE_GPU=OFF \
         -DCMAKE_INSTALL_PREFIX:PATH=/workspace/tritonbuild/identity/install \
@@ -202,7 +193,8 @@ RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN,required=false \
 # L0_backend_python test require triton_shm_monitor
 ARG TRITON_BOOST_URL="https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz"
 WORKDIR /workspace/tritonbuild/python
-RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN,required=false \
+RUN --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=false \
+    export GIT_CONFIG_GLOBAL=/run/secrets/gitconfig && \
     rm -rf install build && mkdir build && cd build && \
     cmake -DCMAKE_INSTALL_PREFIX:PATH=/workspace/tritonbuild/python/install \
         -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
