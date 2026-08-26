@@ -888,11 +888,10 @@ DOCKER_BUILD_SECRET_KEYS = ("id", "src", "source", "env", "type")
 APT_SOURCES_SECRET_ID = "apt_sources"
 APT_SOURCES_DEFAULT_TARGET = "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list"
 
-# Id whose secret is a git config authenticating GitHub, and where it is mounted.
-# git is pointed at it with GIT_CONFIG_GLOBAL rather than by installing it at the
-# default path, so nothing outside the step that mounts it picks it up.
-GIT_CONFIG_SECRET_ID = "gitconfig"
-GIT_CONFIG_TARGET = "/run/secrets/gitconfig"
+# Variables through which git reads configuration straight from the environment.
+# The build container is given these so its clones authenticate without a file,
+# which a bind mount could not deliver across the docker daemon boundary.
+GIT_CONFIG_ENV_VARS = ("GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0")
 
 
 def parse_secret_spec(spec):
@@ -931,18 +930,6 @@ def declared_secret_specs():
 def declared_secret_ids():
     """Ids of every secret supplied with --docker-build-secret."""
     return {i for i in (secret_spec_id(s) for s in declared_secret_specs()) if i}
-
-
-def secret_source_path(secret_id):
-    """Return the host path a declared secret reads from, or "" when it has none.
-
-    Only a file-backed secret has a path. One sourced from the environment has
-    nothing to bind into a container, so callers that need a file skip it.
-    """
-    for spec in declared_secret_specs():
-        if secret_spec_id(spec) == secret_id:
-            return secret_spec_value(spec, "src") or secret_spec_value(spec, "source")
-    return ""
 
 
 def secret_build_args():
@@ -1864,23 +1851,17 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         # takes the PEP 817 variant path.
         # Authenticate the GitHub clones cmake_build performs in this container.
         # It runs the build rather than an image build, so a build secret cannot
-        # reach it: bind the same git config read only instead, and point git at
-        # it by environment rather than installing it at the default path. Only
-        # the path reaches this script, which CI publishes as a build artifact,
-        # so the credential the config carries stays out of it.
+        # reach it, and a bind mount cannot either: docker resolves the source
+        # path on the daemon, which need not share the filesystem this script
+        # runs on, and silently creates a directory when it does not find it.
+        # git reads configuration straight from the environment instead.
         #
-        # docker resolves the source path on the daemon rather than here, so the
-        # config has to sit somewhere the daemon also sees. A path under /tmp is
-        # not such a place when the runner has a private one: docker finds no
-        # file and silently mounts a new directory in its place.
-        git_config_src = secret_source_path(GIT_CONFIG_SECRET_ID)
-        if git_config_src:
-            runargs += [
-                "-v",
-                "{}:{}:ro".format(git_config_src, GIT_CONFIG_TARGET),
-                "-e",
-                "GIT_CONFIG_GLOBAL={}".format(GIT_CONFIG_TARGET),
-            ]
+        # Passed by name rather than as NAME=value, so the values, one of which
+        # carries the credential, stay out of this script, which CI publishes as
+        # a build artifact.
+        for var in GIT_CONFIG_ENV_VARS:
+            if os.environ.get(var):
+                runargs += ["-e", var]
 
         if "TRITON_RELEASE_VERSION" in os.environ:
             runargs += [
