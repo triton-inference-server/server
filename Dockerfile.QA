@@ -52,7 +52,8 @@ ARG IGPU_BUILD
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && \
+RUN --mount=type=secret,id=apt_sources,target=/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list,required=false \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
             build-essential \
             libarchive-dev \
@@ -328,7 +329,8 @@ ARG TARGETPLATFORM
 ENV DEBIAN_FRONTEND=noninteractive
 
 # install platform specific packages
-RUN if grep -qE '^VERSION_ID="(18\.04|20\.04|22\.04|24\.04)' /etc/os-release; then \
+RUN --mount=type=secret,id=apt_sources,target=/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list,required=false \
+    if grep -qE '^VERSION_ID="(18\.04|20\.04|22\.04|24\.04)' /etc/os-release; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
                 libpng-dev && \
@@ -341,7 +343,8 @@ RUN if grep -qE '^VERSION_ID="(18\.04|20\.04|22\.04|24\.04)' /etc/os-release; th
 
 # CI/QA for memcheck requires valgrind
 # libarchive-dev is required by Python backend
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN --mount=type=secret,id=apt_sources,target=/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list,required=false \
+    apt-get update && apt-get install -y --no-install-recommends \
                               curl \
                               gdb \
                               libarchive-dev \
