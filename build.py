@@ -876,24 +876,23 @@ def secret_spec_id(spec):
     return ""
 
 
-def secret_build_args():
-    """Return the '--secret' arguments to forward to 'docker build'.
-
-    Specs given with --secret are passed through untouched. Pairs given with
-    the older --build-secret are rendered into the equivalent Docker spec.
-    """
-    args = ["--secret {}".format(spec) for spec in getattr(FLAGS, "secret", None) or []]
-    for key, value in getattr(FLAGS, "build_secret", None) or []:
-        if key == "apt_sources" and value:
-            args.append("--secret id={},src={}".format(key, value))
-    return args
+def declared_secret_specs():
+    """Every --docker-build-secret spec, in the order it was given."""
+    return [spec for spec in getattr(FLAGS, "docker_build_secret", None) or [] if spec]
 
 
 def declared_secret_ids():
-    """Ids of every secret supplied with --secret or --build-secret."""
-    ids = {secret_spec_id(spec) for spec in getattr(FLAGS, "secret", None) or []}
-    ids |= {key for key, value in getattr(FLAGS, "build_secret", None) or [] if value}
-    return {i for i in ids if i}
+    """Ids of every secret supplied with --docker-build-secret."""
+    return {i for i in (secret_spec_id(s) for s in declared_secret_specs()) if i}
+
+
+def secret_build_args():
+    """Return the '--secret' arguments to forward to 'docker build'.
+
+    Specs are passed through untouched, so anything 'docker build --secret'
+    accepts works here.
+    """
+    return ["--secret {}".format(spec) for spec in declared_secret_specs()]
 
 
 def apt_sources_secret_mount():
@@ -1851,14 +1850,6 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             "docker",
             "build",
         ]
-        if secrets.get("req"):
-            finalargs += [
-                f"--secret id=req,src={requirements}",
-                "--secret id=VLLM_INDEX_URL",
-                "--secret id=PYTORCH_TRITON_URL",
-                "--secret id=NVPL_SLIM_URL",
-                f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
-            ]
         finalargs += secret_build_args()
         finalargs += [
             "-t",
@@ -2673,7 +2664,7 @@ if __name__ == "__main__":
         help="This flag sets the DCGM version for Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
-        "--secret",
+        "--docker-build-secret",
         action="append",
         required=False,
         metavar="spec",
@@ -2684,26 +2675,11 @@ if __name__ == "__main__":
         "  - 'id=<id>'             read the environment variable of the same name\n\n"
         "May be repeated. The secret is available to a Dockerfile step that mounts it with "
         "'RUN --mount=type=secret,id=<id>', and never becomes part of an image layer.\n\n"
-        "A secret with id 'apt_sources' is also mounted automatically over "
+        "The id 'apt_sources' carries extra meaning: it is also mounted over "
         "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list for the duration of each apt step in the "
         "generated Dockerfile and Dockerfile.buildbase, so package installs resolve through the NVIDIA "
         "Artifactory mirror. When it is omitted the generated Dockerfiles are unchanged and apt uses the "
         "distribution repositories.",
-    )
-    parser.add_argument(
-        "--build-secret",
-        action="append",
-        required=False,
-        nargs=2,
-        metavar=("key", "value"),
-        help="Add build secrets in the form of <key> <value>. These secrets are used during the build process for vllm. The secrets are passed to the Docker build step as `--secret id=<key>`. The following keys are expected and their purposes are described below:\n\n"
-        "  - 'req': A file containing a list of dependencies for pip (e.g., requirements.txt).\n"
-        "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n"
-        "  - 'apt_sources': A file mounted at /etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list for the\n"
-        "    duration of each apt step, so package installs resolve through the NVIDIA Artifactory mirror. It\n"
-        "    holds credentials, so it is passed as a secret and never written to an image layer. When omitted\n"
-        "    the generated Dockerfiles are unchanged and apt uses the distribution repositories.\n\n"
-        "Ensure that the required environment variables for these secrets are set before running the build.",
     )
     parser.add_argument(
         "--triton-wheels-dependencies-group",
@@ -2738,10 +2714,8 @@ if __name__ == "__main__":
         FLAGS.override_backend_cmake_arg = []
     if FLAGS.extra_backend_cmake_arg is None:
         FLAGS.extra_backend_cmake_arg = []
-    if FLAGS.build_secret is None:
-        FLAGS.build_secret = []
-    if FLAGS.secret is None:
-        FLAGS.secret = []
+    if FLAGS.docker_build_secret is None:
+        FLAGS.docker_build_secret = []
 
     FLAGS.boost_url = os.getenv(
         "TRITON_BOOST_URL",
@@ -2850,12 +2824,6 @@ if __name__ == "__main__":
                 )
             )
             backends["python"] = backends["vllm"]
-
-    secrets = dict(getattr(FLAGS, "build_secret", []))
-    if secrets:
-        requirements = secrets.get("req", "")
-        build_public_vllm = secrets.get("build_public_vllm", "true")
-        log('Build Arg for BUILD_PUBLIC_VLLM: "{}"'.format(build_public_vllm))
 
     # Initialize map of repo agents to build and repo-tag for each.
     repoagents = {}
