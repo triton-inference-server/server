@@ -878,16 +878,49 @@ RUN curl -o /tmp/cuda-keyring.deb \\
                 )
 
 
+def secret_spec_id(spec):
+    """Return the 'id' of a Docker --secret spec, or "" when it has none.
+
+    Docker does not require 'id' to come first, so the fields are scanned
+    rather than indexed.
+    """
+    for field in spec.split(","):
+        key, _, value = field.partition("=")
+        if key.strip() == "id":
+            return value.strip()
+    return ""
+
+
+def secret_build_args():
+    """Return the '--secret' arguments to forward to 'docker build'.
+
+    Specs given with --secret are passed through untouched. Pairs given with
+    the older --build-secret are rendered into the equivalent Docker spec.
+    """
+    args = ["--secret {}".format(spec) for spec in getattr(FLAGS, "secret", None) or []]
+    for key, value in getattr(FLAGS, "build_secret", None) or []:
+        if key == "apt_sources" and value:
+            args.append("--secret id={},src={}".format(key, value))
+    return args
+
+
+def declared_secret_ids():
+    """Ids of every secret supplied with --secret or --build-secret."""
+    ids = {secret_spec_id(spec) for spec in getattr(FLAGS, "secret", None) or []}
+    ids |= {key for key, value in getattr(FLAGS, "build_secret", None) or [] if value}
+    return {i for i in ids if i}
+
+
 def apt_sources_secret_mount():
     """Return the RUN mount flag that overlays the NVIDIA Artifactory apt
     source list, or an empty string when the secret was not requested.
 
-    The secret is supplied as '--build-secret apt_sources <path>'. When it is
-    absent this returns "" and the generated Dockerfiles are byte-identical to
-    a build without this feature, so the default path is unchanged.
+    The secret is supplied either as '--secret id=apt_sources,src=<path>' or
+    as '--build-secret apt_sources <path>'. When it is absent this returns ""
+    and the generated Dockerfiles are byte-identical to a build without this
+    feature, so the default path is unchanged.
     """
-    secrets = dict(getattr(FLAGS, "build_secret", None) or [])
-    if not secrets.get("apt_sources"):
+    if "apt_sources" not in declared_secret_ids():
         return ""
     return (
         "--mount=type=secret,id=apt_sources,"
@@ -1731,10 +1764,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
 
         baseargs += ["--cache-from={}".format(k) for k in cachefrommap]
 
-        if secrets.get("apt_sources"):
-            baseargs += [
-                "--secret id=apt_sources,src={}".format(secrets["apt_sources"]),
-            ]
+        baseargs += secret_build_args()
 
         baseargs += ["."]
 
@@ -1846,10 +1876,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
                 "--secret id=NVPL_SLIM_URL",
                 f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
             ]
-        if secrets.get("apt_sources"):
-            finalargs += [
-                "--secret id=apt_sources,src={}".format(secrets["apt_sources"]),
-            ]
+        finalargs += secret_build_args()
         finalargs += [
             "-t",
             "tritonserver",
@@ -2680,6 +2707,24 @@ if __name__ == "__main__":
         help="This flag sets the Python version for RHEL platform of Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
+        "--secret",
+        action="append",
+        required=False,
+        metavar="spec",
+        help="Pass a build secret to 'docker build' using Docker's own syntax. The spec is forwarded "
+        "unchanged, so every form 'docker build --secret' accepts is supported:\n\n"
+        "  - 'id=<id>,src=<path>'  read the secret from a file (source= is an accepted alias)\n"
+        "  - 'id=<id>,env=<var>'   read the secret from an environment variable\n"
+        "  - 'id=<id>'             read the environment variable of the same name\n\n"
+        "May be repeated. The secret is available to a Dockerfile step that mounts it with "
+        "'RUN --mount=type=secret,id=<id>', and never becomes part of an image layer.\n\n"
+        "A secret with id 'apt_sources' is also mounted automatically over "
+        "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list for the duration of each apt step in the "
+        "generated Dockerfile and Dockerfile.buildbase, so package installs resolve through the NVIDIA "
+        "Artifactory mirror. When it is omitted the generated Dockerfiles are unchanged and apt uses the "
+        "distribution repositories.",
+    )
+    parser.add_argument(
         "--build-secret",
         action="append",
         required=False,
@@ -2729,6 +2774,8 @@ if __name__ == "__main__":
         FLAGS.extra_backend_cmake_arg = []
     if FLAGS.build_secret is None:
         FLAGS.build_secret = []
+    if FLAGS.secret is None:
+        FLAGS.secret = []
 
     FLAGS.boost_url = os.getenv(
         "TRITON_BOOST_URL",
