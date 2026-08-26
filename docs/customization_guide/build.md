@@ -237,12 +237,23 @@ literally and silently fails to authenticate.
 
 build.py mounts the config on each step that clones and points git at it with
 GIT_CONFIG_GLOBAL rather than installing it at the default path, so nothing
-outside those steps picks it up. Steps that run while an image is being built
-receive it as a build secret. cmake_build clones while the build runs inside
-the container rather than while an image is built, where a build secret cannot
-reach it, so there the same file is bind mounted read only instead. Either way
-the config is never part of an image layer, and only its path reaches the
-generated build scripts.
+outside those steps picks it up. The config is never part of an image layer,
+and only its path reaches the generated build scripts.
+
+cmake_build clones while the build runs inside the container rather than while
+an image is built, so no build secret reaches it, and neither does a bind mount:
+docker resolves the source path on the daemon, which need not share the
+filesystem build.py runs on, and silently creates a directory when it does not
+find it. Set the configuration in the environment for that case instead, and
+build.py forwards the variables to the build container by name, keeping the
+value that carries the token out of the generated build scripts.
+
+```bash
+$ export GIT_CONFIG_COUNT=1
+$ export GIT_CONFIG_KEY_0="url.https://x-access-token:<token>@github.com/.insteadOf"
+$ export GIT_CONFIG_VALUE_0="https://github.com/"
+$ ./build.py ...
+```
 
 When the secret is omitted the clones stay unauthenticated.
 
