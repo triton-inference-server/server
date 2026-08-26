@@ -180,6 +180,57 @@ you have a branch called "mybranch" in the
 repo that you want to use in the build, you would specify
 --backend=onnxruntime:mybranch.
 
+#### Build Secrets
+
+Some builds need a credential, for example an apt source list naming an
+authenticated package mirror. Pass these with --docker-build-secret, which
+takes a Docker build secret spec and forwards it to `docker build --secret`
+unchanged. Every form Docker accepts works and the flag may be repeated.
+
+```bash
+$ ./build.py ... --docker-build-secret id=<id>,src=<path> --docker-build-secret id=<id>,env=<variable>
+```
+
+A secret is mounted only for the duration of the build step that uses it and
+never becomes part of an image layer.
+
+A spec may also carry target=`<path>`, which selects where the secret is
+mounted. Docker rejects that key on the command line because it belongs to the
+Dockerfile rather than the build command, so build.py removes it before
+invoking docker and applies it when generating the Dockerfile.
+
+The id `apt_sources` has an additional meaning. Its secret is mounted for the
+duration of each apt step in the generated Dockerfile and Dockerfile.buildbase,
+so package installs resolve through the mirror the list names. It lands on
+target when the spec sets one, and on
+/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list otherwise. The first apt
+step of Dockerfile.buildbase is deliberately excluded, because it installs
+ca-certificates and a base image without them cannot complete a TLS handshake
+with the mirror until that install finishes. When the secret is omitted the
+generated Dockerfiles are unchanged and apt uses the distribution
+repositories.
+
+#### Authenticating Clones From GitHub
+
+Source from several other repos is fetched during the build, as described
+above. Those clones are unauthenticated by default, which is subject to
+GitHub's rate limits and cannot reach a private repo. Set GITHUB_TOKEN in the
+environment to authenticate them.
+
+```bash
+$ export GITHUB_TOKEN=<token>
+$ ./build.py ...
+```
+
+This is not a build secret. The component and backend repos are cloned while
+the build runs inside the container, not while an image is being built, so a
+build secret cannot reach them. build.py instead configures a git credential
+helper in the build base image and forwards the token to the build container
+when the variable is set. The helper holds no credential of its own, only a
+reference to GITHUB_TOKEN, so it is safe in an image layer, and it keeps the
+token out of .git/config, which an authenticated clone URL would not. When
+GITHUB_TOKEN is unset the clones stay unauthenticated.
+
 #### Experimental: Build Presets
 
 > **Experimental.** This feature is gated behind the
