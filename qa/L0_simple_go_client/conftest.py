@@ -35,6 +35,7 @@ import os
 import shutil
 import signal
 import subprocess
+import time
 import urllib.error
 import urllib.request
 
@@ -61,6 +62,7 @@ REPO_ORGANIZATION = _env(
     "TRITON_REPO_ORGANIZATION", "http://github.com/triton-inference-server"
 )
 COMMON_REPO_TAG = _env("TRITON_COMMON_REPO_TAG", "main")
+SERVER_BRANCH_NAME = _env("TRITON_SERVER_BRANCH_NAME", "main")
 # Exported by the CI template alongside the tags above, but the client clone
 # below does not pass -b yet, so this is currently read and not used. Kept so
 # that wiring it up is a one-line change rather than a rediscovery.
@@ -68,6 +70,13 @@ CLIENT_REPO_TAG = _env("TRITON_CLIENT_REPO_TAG", "main")
 
 GO_CLIENT_DIR = os.path.join(TEST_DIR, "client", "src", "grpc_generated", "go")
 STUB_PACKAGE_DIR = os.path.join(GO_CLIENT_DIR, "grpc-client")
+
+SERVER_CLONE_DIR = os.path.join(TEST_DIR, "server")
+MODEL_REPOSITORY = os.path.join(TEST_DIR, "model_repository")
+EXAMPLE_MODEL = "simple"
+EXAMPLE_MODEL_SRC = os.path.join(
+    SERVER_CLONE_DIR, "docs", "examples", "model_repository", EXAMPLE_MODEL
+)
 
 SERVER = "/opt/tritonserver/bin/tritonserver"
 SERVER_LOG = os.path.join(TEST_DIR, "inference_server.log")
@@ -106,6 +115,12 @@ def _wait_for_server_ready(proc, timeout_secs):
     for _ in range(timeout_secs):
         if proc.poll() is not None:
             return False
+        # Sleep before polling, as util.sh does. Without this the loop is not
+        # rate limited: while nothing is listening yet urlopen fails on
+        # connection refused immediately, so all timeout_secs iterations are
+        # consumed in a fraction of a second and the wait effectively becomes
+        # zero rather than timeout_secs.
+        time.sleep(1)
         try:
             with urllib.request.urlopen(READY_URL, timeout=1) as response:
                 if response.status == 200:
@@ -116,12 +131,44 @@ def _wait_for_server_ready(proc, timeout_secs):
 
 
 @pytest.fixture(scope="session")
-def triton_server():
-    """Start tritonserver against ./models and stop it when the run ends."""
+def model_repository():
+    """Build a model repository holding the 'simple' example model.
+
+    The model is taken from the server repo rather than from a models/
+    directory staged by Dockerfile.QA, so the test provisions everything it
+    needs and runs identically in CI and standalone.
+    """
+    shutil.rmtree(SERVER_CLONE_DIR, ignore_errors=True)
+    _run_checked(
+        [
+            "git",
+            "clone",
+            "--single-branch",
+            "--depth=1",
+            "-b",
+            SERVER_BRANCH_NAME,
+            f"{REPO_ORGANIZATION}/server.git",
+        ],
+        cwd=TEST_DIR,
+        message="failed to clone server repo",
+    )
+    assert os.path.isdir(
+        EXAMPLE_MODEL_SRC
+    ), f"missing example model: {EXAMPLE_MODEL_SRC}"
+
+    shutil.rmtree(MODEL_REPOSITORY, ignore_errors=True)
+    os.makedirs(MODEL_REPOSITORY)
+    shutil.copytree(EXAMPLE_MODEL_SRC, os.path.join(MODEL_REPOSITORY, EXAMPLE_MODEL))
+    return MODEL_REPOSITORY
+
+
+@pytest.fixture(scope="session")
+def triton_server(model_repository):
+    """Start tritonserver against the provisioned model repository."""
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     assert os.path.isfile(SERVER), f"{SERVER} does not exist"
 
-    args = [SERVER, f"--model-repository={os.path.join(TEST_DIR, 'models')}"]
+    args = [SERVER, f"--model-repository={model_repository}"]
     print(f"=== Running {' '.join(args)}", flush=True)
     with open(SERVER_LOG, "wb") as log:
         proc = subprocess.Popen(
