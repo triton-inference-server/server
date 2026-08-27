@@ -336,11 +336,7 @@ class TorchAotiTest(tu.TestResultCollector):
         self.assertLess(executions, num_requests)
 
     def test_inference_statistics_sanity(self):
-        # The compute phase durations partition the execution window, so
-        # their sum can never exceed the total successful request time.
-        # Guards against ReportStatistics timestamp-ordering bugs in the PT2
-        # backend, where out-of-order arguments underflowed uint64 and
-        # reported ~1.8e19ns compute_infer durations (issue #8874).
+        # Compute phase durations can never exceed total request time.
         MODEL_NAME = "torch_aoti_float32_float32"
         NUM_REQUESTS = 5
         PHASES = ("compute_input", "compute_infer", "compute_output")
@@ -365,15 +361,9 @@ class TorchAotiTest(tu.TestResultCollector):
             }
 
         def delta(after, before):
-            # The reported counters are cumulative uint64 sums, so a backend
-            # reporting out-of-order timestamps wraps them modulo 2**64 on
-            # every request. Normalize the difference the same way, or a wrap
-            # between the two snapshots would hide as a small (or negative)
-            # delta and mask the regression.
+            # Cumulative uint64 counters wrap; mod 2**64 keeps wraps visible.
             return (after - before) % 2**64
 
-        # Diff two snapshots so traffic from earlier tests cannot dilute the
-        # sample: the assertions cover exactly the requests sent here.
         before = stats_snapshot()
         for _ in range(NUM_REQUESTS):
             self._infer_one_row(MODEL_NAME)
@@ -394,9 +384,7 @@ class TorchAotiTest(tu.TestResultCollector):
             f"duration {request_ns}ns; timestamps reported out of order",
         )
 
-        # Batch statistics are reported through a separate call with the same
-        # timestamp-ordering hazard; batch compute windows are bounded by the
-        # request durations that contain them.
+        # Same bound for the separately reported batch statistics.
         batch_phase_ns = {
             phase: delta(after["batch_ns"][phase], before["batch_ns"][phase])
             for phase in PHASES
