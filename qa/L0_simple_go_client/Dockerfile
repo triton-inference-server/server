@@ -24,12 +24,17 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Runtime image for L0_simple_go_client.
+# Self-contained runtime image for L0_simple_go_client.
 #
-# In CI the pipeline overrides BASE_IMAGE with the devel image it just
-# built, so the tritonserver binary, Go toolchain and protoc all come from
-# the pipeline rather than being pinned here. The default below is only for
-# running this test standalone on a workstation.
+# This image installs everything the test needs on top of a plain Triton
+# runtime image: the Go toolchain, protoc and both protoc-gen-go plugins,
+# and pytest. It deliberately does NOT depend on Dockerfile.QA having
+# provided any of them, so the test runs the same way in CI and on a
+# workstation. conftest.py likewise provisions its own model repository
+# rather than relying on the models/ directory Dockerfile.QA stages.
+#
+# In CI the pipeline overrides BASE_IMAGE with the image it just built. The
+# default below is only for running this test standalone.
 
 ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:26.08-py3
 
@@ -49,16 +54,36 @@ ENV TRITON_SERVER_BRANCH_NAME=${TRITON_SERVER_BRANCH_NAME}
 ENV TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG}
 ENV TRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG}
 
-# pytest is not part of the devel image contract. Pin it so a broken
-# upstream release cannot change what this job runs.
-RUN python3 -m pip install --no-cache-dir "pytest==8.3.5"
+ARG GO_VERSION=1.25.14
+ARG PYTEST_VERSION=8.3.5
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ca-certificates curl git protobuf-compiler \
+ && rm -rf /var/lib/apt/lists/*
+
+# dpkg's architecture names (amd64, arm64) match the Go release tarballs.
+RUN GOARCH="$(dpkg --print-architecture)" \
+ && curl -sSL "https://go.dev/dl/go${GO_VERSION}.linux-${GOARCH}.tar.gz" \
+    | tar -C /usr/local -xz
+
+ENV PATH=/usr/local/go/bin:/root/go/bin:${PATH}
+# The client module pins a patch-level go directive; allow the toolchain to
+# upgrade itself rather than failing the build when the pin moves ahead.
+ENV GOTOOLCHAIN=auto
+
+# gen_go_stubs.sh invokes protoc with --go_out and --go-grpc_out, so both
+# plugins are required. Left unpinned so the generated code stays compatible
+# with whatever protobuf runtime the client module resolves at test time.
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest \
+ && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+RUN python3 -m pip install --no-cache-dir "pytest==${PYTEST_VERSION}"
 
 WORKDIR /opt/tritonserver/qa/L0_simple_go_client
 
-# For standalone use only. CI mounts the qa-tests volume over
-# /opt/tritonserver/qa, so these files are shadowed there and the mounted
-# copy is what runs. Note the model repository is not in the build context;
-# a standalone run still needs ./models supplied.
+# For standalone use. CI mounts the qa-tests volume over /opt/tritonserver/qa,
+# so these files are shadowed there and the mounted copy is what runs.
 COPY . .
 
 CMD ["python3", "run_tests.py"]
