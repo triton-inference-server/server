@@ -90,14 +90,52 @@ READY_URL = f"http://{SERVER_IPADDR}:8000/v2/health/ready"
 
 
 def _run(cmd, cwd=None, log=None):
-    """Run cmd, echoing it first. Returns the CompletedProcess."""
-    print(f"=== Running {' '.join(cmd)}", flush=True)
+    """Run cmd, echoing the command and its exit status.
+
+    Output is not captured, so each sub-action streams into the job log the
+    way it did under `bash -ex ./test.sh`. pytest.ini disables capturing so
+    this stays visible on a passing run too, not only on failure.
+    """
+    print(
+        f"=== Running {' '.join(cmd)}" + (f"  (cwd {cwd})" if cwd else ""), flush=True
+    )
     if log is None:
-        return subprocess.run(cmd, cwd=cwd, check=False)
-    with open(log, "ab") as handle:
-        return subprocess.run(
-            cmd, cwd=cwd, check=False, stdout=handle, stderr=subprocess.STDOUT
+        result = subprocess.run(cmd, cwd=cwd, check=False)
+    else:
+        with open(log, "ab") as handle:
+            result = subprocess.run(
+                cmd, cwd=cwd, check=False, stdout=handle, stderr=subprocess.STDOUT
+            )
+    print(f"=== Exit {result.returncode}: {cmd[0]}", flush=True)
+    return result
+
+
+def _gdb_backtrace(pid):
+    """Dump a backtrace of a server that started but never became ready.
+
+    Ports the "Server Hang" half of gdb_helper() in qa/common/util.sh, which
+    run_server called on a readiness timeout. The core-dump half is omitted:
+    the CI template runs the container with --ulimit core=0, so there are no
+    core files to load. The log is written beside the test so the CI log
+    collector picks it up.
+    """
+    if shutil.which("gdb") is None:
+        print("=== WARNING: gdb not installed", flush=True)
+        return
+    gdb_log = os.path.join(TEST_DIR, f"gdb_bt.{pid}.log")
+    print(
+        f"=== WARNING: SERVER HANG DETECTED, DUMPING GDB BACKTRACE TO [{gdb_log}] ===",
+        flush=True,
+    )
+    with open(gdb_log, "wb") as handle:
+        subprocess.run(
+            ["gdb", "-batch", "-ex", "thread apply all bt", "-p", str(pid)],
+            check=False,
+            stdout=handle,
+            stderr=subprocess.STDOUT,
         )
+    with open(gdb_log, errors="replace") as handle:
+        print(handle.read(), flush=True)
 
 
 def _run_checked(cmd, cwd=None, message=""):
@@ -177,6 +215,8 @@ def triton_server(model_repository):
 
     if not _wait_for_server_ready(proc, SERVER_TIMEOUT):
         if proc.poll() is None:
+            # Still running but never became ready: capture why before killing.
+            _gdb_backtrace(proc.pid)
             proc.send_signal(signal.SIGINT)
             proc.wait(timeout=60)
         with open(SERVER_LOG) as log:
@@ -255,6 +295,13 @@ def go_client_run(triton_server, go_stubs):
     """
     if os.path.exists(CLIENT_LOG):
         os.unlink(CLIENT_LOG)
-    return _run(
+    result = _run(
         ["go", "run", "grpc_simple_client.go"], cwd=GO_CLIENT_DIR, log=CLIENT_LOG
     )
+    # The client's own output only reaches client.log, which sits too deep for
+    # the CI log collector to pick up. Echo it so the inference results are
+    # visible in the job log whether the run passed or failed.
+    if os.path.exists(CLIENT_LOG):
+        with open(CLIENT_LOG, errors="replace") as log:
+            print(f"=== {CLIENT_LOG}\n{log.read()}", flush=True)
+    return result
