@@ -26,22 +26,39 @@
 
 # Runtime image for L0_simple_go_client.
 #
-# Adds only what the pytest conversion needs on top of the image the
-# pipeline already built. The test files themselves are deliberately NOT
-# copied in: CI mounts the qa-tests volume over /opt/tritonserver/qa, so a
-# COPY to that path would be masked at run time and would only mislead.
-#
-# BASE_IMAGE must be the same devel image the job would otherwise have run
-# against, so the tritonserver binary, Go toolchain and protoc all come
-# from the pipeline build rather than being pinned here.
+# In CI the pipeline overrides BASE_IMAGE with the devel image it just
+# built, so the tritonserver binary, Go toolchain and protoc all come from
+# the pipeline rather than being pinned here. The default below is only for
+# running this test standalone on a workstation.
 
-ARG BASE_IMAGE
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:26.08-py3
+
 FROM ${BASE_IMAGE}
 
-# pytest is not part of the devel image contract. Install it explicitly and
-# pin it so a broken upstream release cannot change what this job runs.
+# These must be re-declared after FROM: an ARG given before FROM is in scope
+# only for the FROM line itself, so referencing it in ENV below would bake in
+# an empty string -- which is worse than leaving the variable unset, because
+# conftest.py would then have to treat "" as a value.
+ARG TRITON_SERVER_BRANCH_NAME=main
+ARG TRITON_COMMON_REPO_TAG=main
+ARG TRITON_CLIENT_REPO_TAG=main
+
+# Baked-in defaults for standalone runs. CI passes the same names with -e,
+# which takes precedence over image ENV.
+ENV TRITON_SERVER_BRANCH_NAME=${TRITON_SERVER_BRANCH_NAME}
+ENV TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG}
+ENV TRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG}
+
+# pytest is not part of the devel image contract. Pin it so a broken
+# upstream release cannot change what this job runs.
 RUN python3 -m pip install --no-cache-dir "pytest==8.3.5"
 
 WORKDIR /opt/tritonserver/qa/L0_simple_go_client
+
+# For standalone use only. CI mounts the qa-tests volume over
+# /opt/tritonserver/qa, so these files are shadowed there and the mounted
+# copy is what runs. Note the model repository is not in the build context;
+# a standalone run still needs ./models supplied.
+COPY . .
 
 CMD ["python3", "run_tests.py"]
