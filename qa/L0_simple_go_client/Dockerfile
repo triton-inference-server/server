@@ -26,12 +26,14 @@
 
 # Self-contained runtime image for L0_simple_go_client.
 #
-# This image installs everything the test needs on top of a plain Triton
-# runtime image: the Go toolchain, protoc and both protoc-gen-go plugins,
-# and pytest. It deliberately does NOT depend on Dockerfile.QA having
-# provided any of them, so the test runs the same way in CI and on a
-# workstation. conftest.py likewise provisions its own model repository
-# rather than relying on the models/ directory Dockerfile.QA stages.
+# This image installs the build tooling the test needs on top of a plain
+# Triton runtime image: the Go toolchain, protoc and both protoc-gen-go
+# plugins. pytest is the one thing it does not install -- the test runs
+# against whatever version the base image ships. It deliberately does NOT
+# depend on Dockerfile.QA having provided any of this, so the test runs the
+# same way in CI and on a workstation. conftest.py likewise provisions its
+# own model repository rather than relying on the models/ directory
+# Dockerfile.QA stages.
 #
 # In CI the pipeline overrides BASE_IMAGE with the image it just built. The
 # default below is only for running this test standalone.
@@ -55,7 +57,6 @@ ENV TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG}
 ENV TRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG}
 
 ARG GO_VERSION=1.25.14
-ARG PYTEST_VERSION=8.3.5
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -78,7 +79,10 @@ ENV GOTOOLCHAIN=auto
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest \
  && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
-RUN python3 -m pip install --no-cache-dir "pytest==${PYTEST_VERSION}"
+# pytest is taken from the base image rather than installed or pinned here, so
+# the test runs against the same version the image ships. Fail the build, not
+# the test run, if the base image does not provide it.
+RUN python3 -m pytest --version
 
 WORKDIR /opt/tritonserver/qa/L0_simple_go_client
 
