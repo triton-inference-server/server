@@ -29,10 +29,13 @@
 import argparse
 import os
 from builtins import range
+from typing import List, Tuple
 
 import gen_ensemble_model_utils as emu
+import gen_manifest
 import numpy as np
 from gen_common import (
+    create_general_modelconfig,
     np_to_model_dtype,
     np_to_onnx_dtype,
     np_to_trt_dtype,
@@ -42,7 +45,6 @@ from gen_common import (
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
-from typing import List, Tuple
 
 
 def create_ensemble_modelfile(
@@ -144,7 +146,7 @@ def create_onnx_modelconfig(models_dir, io_cnt, max_batch, dtype, shape):
     )
     config_dir = os.path.join(models_dir, model_name)
 
-    config = emu.create_general_modelconfig(
+    config = create_general_modelconfig(
         model_name,
         "onnxruntime_onnx",
         max_batch,
@@ -1110,6 +1112,10 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     if FLAGS.onnx:
         import onnx
     if FLAGS.libtorch:
@@ -1155,3 +1161,6 @@ if __name__ == "__main__":
         model_version = 1
         create_libtorch_linalg_modelconfig(FLAGS.models_dir)
         create_libtorch_linalg_modelfile(FLAGS.models_dir, model_version)
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

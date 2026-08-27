@@ -1,4 +1,4 @@
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 import argparse
 import os
 
+import gen_manifest
 import torch
 from torch import nn
 
@@ -117,8 +118,15 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(args.model_directory)
+
     model_directory = os.path.join(args.model_directory, args.model_name)
     os.makedirs(model_directory, exist_ok=True)
 
     generate_model(model_dir=os.path.join(model_directory, args.version))
     generate_config(model_directory)
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(args.model_directory, manifest_baseline)

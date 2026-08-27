@@ -30,6 +30,7 @@ import argparse
 import os
 import sys
 
+import gen_manifest
 import torch
 import torchvision
 
@@ -120,5 +121,12 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     create_resnet50_torchtrt(FLAGS.models_dir, 128)
     create_resnet50_torchtrt_modelconfig(FLAGS.models_dir, 128)
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)
