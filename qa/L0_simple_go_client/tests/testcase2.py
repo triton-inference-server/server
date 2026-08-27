@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright (c) 2019-2026, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,15 +24,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# This test is implemented in pytest -- see run_tests.py, conftest.py and
-# tests/. This script remains the entry point because the shared CI
-# template defaults to TEST_SCRIPT="./test.sh"; keeping it lets the pytest
-# conversion land in the server repo independently of the pipeline change
-# in the tritonserver repo, in either merge order.
-#
-# conftest.py reads all configuration from the environment, so the
-# variables the CI template exports (TRITON_REPO_ORGANIZATION,
-# TRITON_COMMON_REPO_TAG, TRITON_CLIENT_REPO_TAG, TRITONSERVER_IPADDR,
-# SERVER_TIMEOUT, ...) pass straight through.
+"""Client exit status.
 
-exec python3 ./run_tests.py "$@"
+Equivalent to the `if [ $? -ne 0 ]; then RET=1; fi` check in test.sh.
+"""
+
+import os
+
+
+def test_go_client_exits_zero(go_client_run, client_log):
+    """`go run grpc_simple_client.go` completed successfully."""
+    if go_client_run.returncode != 0 and os.path.exists(client_log):
+        with open(client_log) as log:
+            print(log.read(), flush=True)
+    assert (
+        go_client_run.returncode == 0
+    ), f"go run grpc_simple_client.go exited {go_client_run.returncode}"

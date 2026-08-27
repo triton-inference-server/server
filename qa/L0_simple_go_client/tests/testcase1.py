@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright (c) 2019-2026, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,15 +24,25 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# This test is implemented in pytest -- see run_tests.py, conftest.py and
-# tests/. This script remains the entry point because the shared CI
-# template defaults to TEST_SCRIPT="./test.sh"; keeping it lets the pytest
-# conversion land in the server repo independently of the pipeline change
-# in the tritonserver repo, in either merge order.
-#
-# conftest.py reads all configuration from the environment, so the
-# variables the CI template exports (TRITON_REPO_ORGANIZATION,
-# TRITON_COMMON_REPO_TAG, TRITON_CLIENT_REPO_TAG, TRITONSERVER_IPADDR,
-# SERVER_TIMEOUT, ...) pass straight through.
+"""Stub generation.
 
-exec python3 ./run_tests.py "$@"
+In test.sh this was an unchecked side effect of gen_go_stubs.sh; a broken
+generator surfaced only later as a confusing 'go run' failure.
+"""
+
+import os
+
+EXPECTED_STUBS = (
+    "grpc_service.pb.go",
+    "grpc_service_grpc.pb.go",
+    "model_config.pb.go",
+)
+
+
+def test_stubs_generated(go_stubs):
+    """gen_go_stubs.sh produced the Go package the example imports."""
+    assert os.path.isdir(go_stubs), f"stub package dir missing: {go_stubs}"
+    missing = [
+        f for f in EXPECTED_STUBS if not os.path.isfile(os.path.join(go_stubs, f))
+    ]
+    assert not missing, f"missing generated stubs: {missing}"
