@@ -42,15 +42,29 @@ import pytest
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
+
+def _env(name, default):
+    """Read name, falling back to default when unset *or empty*.
+
+    The CI template passes these through unconditionally, e.g.
+    -e TRITON_COMMON_REPO_TAG="${TRITON_COMMON_REPO_TAG}", so an unset
+    pipeline variable arrives as an empty string rather than as an absent
+    one. os.environ.get's default would not apply, and 'git clone -b ""'
+    fails. The shell version used ${VAR:="main"}, which substitutes on
+    unset or empty; this keeps that behaviour.
+    """
+    return os.environ.get(name) or default
+
+
 # Matches the defaults in the shell version of this test.
-REPO_ORGANIZATION = os.environ.get(
+REPO_ORGANIZATION = _env(
     "TRITON_REPO_ORGANIZATION", "http://github.com/triton-inference-server"
 )
-COMMON_REPO_TAG = os.environ.get("TRITON_COMMON_REPO_TAG", "main")
+COMMON_REPO_TAG = _env("TRITON_COMMON_REPO_TAG", "main")
 # Exported by the CI template alongside the tags above, but the client clone
 # below does not pass -b yet, so this is currently read and not used. Kept so
 # that wiring it up is a one-line change rather than a rediscovery.
-CLIENT_REPO_TAG = os.environ.get("TRITON_CLIENT_REPO_TAG", "main")
+CLIENT_REPO_TAG = _env("TRITON_CLIENT_REPO_TAG", "main")
 
 GO_CLIENT_DIR = os.path.join(TEST_DIR, "client", "src", "grpc_generated", "go")
 STUB_PACKAGE_DIR = os.path.join(GO_CLIENT_DIR, "grpc-client")
@@ -60,8 +74,8 @@ SERVER_LOG = os.path.join(TEST_DIR, "inference_server.log")
 CLIENT_LOG = os.path.join(GO_CLIENT_DIR, "client.log")
 
 # util.sh: SERVER_IPADDR=${TRITONSERVER_IPADDR:=localhost}, SERVER_TIMEOUT=120.
-SERVER_IPADDR = os.environ.get("TRITONSERVER_IPADDR", "localhost")
-SERVER_TIMEOUT = int(os.environ.get("SERVER_TIMEOUT", "120"))
+SERVER_IPADDR = _env("TRITONSERVER_IPADDR", "localhost")
+SERVER_TIMEOUT = int(_env("SERVER_TIMEOUT", "120"))
 
 READY_URL = f"http://{SERVER_IPADDR}:8000/v2/health/ready"
 
