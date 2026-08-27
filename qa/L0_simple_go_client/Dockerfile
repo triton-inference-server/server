@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright (c) 2019-2026, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,15 +24,24 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# This test is implemented in pytest -- see run_tests.py, conftest.py and
-# tests/. This script remains the entry point because the shared CI
-# template defaults to TEST_SCRIPT="./test.sh"; keeping it lets the pytest
-# conversion land in the server repo independently of the pipeline change
-# in the tritonserver repo, in either merge order.
+# Runtime image for L0_simple_go_client.
 #
-# conftest.py reads all configuration from the environment, so the
-# variables the CI template exports (TRITON_REPO_ORGANIZATION,
-# TRITON_COMMON_REPO_TAG, TRITON_CLIENT_REPO_TAG, TRITONSERVER_IPADDR,
-# SERVER_TIMEOUT, ...) pass straight through.
+# Adds only what the pytest conversion needs on top of the image the
+# pipeline already built. The test files themselves are deliberately NOT
+# copied in: CI mounts the qa-tests volume over /opt/tritonserver/qa, so a
+# COPY to that path would be masked at run time and would only mislead.
+#
+# BASE_IMAGE must be the same devel image the job would otherwise have run
+# against, so the tritonserver binary, Go toolchain and protoc all come
+# from the pipeline build rather than being pinned here.
 
-exec python3 ./run_tests.py "$@"
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+# pytest is not part of the devel image contract. Install it explicitly and
+# pin it so a broken upstream release cannot change what this job runs.
+RUN python3 -m pip install --no-cache-dir "pytest==8.3.5"
+
+WORKDIR /opt/tritonserver/qa/L0_simple_go_client
+
+CMD ["python3", "run_tests.py"]

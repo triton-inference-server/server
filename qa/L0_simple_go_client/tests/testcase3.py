@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright (c) 2019-2026, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,15 +24,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# This test is implemented in pytest -- see run_tests.py, conftest.py and
-# tests/. This script remains the entry point because the shared CI
-# template defaults to TEST_SCRIPT="./test.sh"; keeping it lets the pytest
-# conversion land in the server repo independently of the pipeline change
-# in the tritonserver repo, in either merge order.
-#
-# conftest.py reads all configuration from the environment, so the
-# variables the CI template exports (TRITON_REPO_ORGANIZATION,
-# TRITON_COMMON_REPO_TAG, TRITON_CLIENT_REPO_TAG, TRITONSERVER_IPADDR,
-# SERVER_TIMEOUT, ...) pass straight through.
+"""Inference output marker.
 
-exec python3 ./run_tests.py "$@"
+Equivalent to the `grep -c "Checking Inference Outputs" client.log != 1`
+check in test.sh -- the count must be exactly one, not merely non-zero.
+"""
+
+import os
+
+MARKER = "Checking Inference Outputs"
+
+
+def test_inference_marker_present_once(go_client_run, client_log):
+    """The client reached the inference-output stage exactly once."""
+    assert os.path.exists(client_log), f"{client_log} was not produced"
+    with open(client_log) as log:
+        count = log.read().count(MARKER)
+    assert count == 1, f"expected {MARKER!r} exactly once, found {count}"

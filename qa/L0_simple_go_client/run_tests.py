@@ -1,5 +1,5 @@
-#!/bin/bash
-# Copyright (c) 2019-2026, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+# Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,15 +25,30 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# This test is implemented in pytest -- see run_tests.py, conftest.py and
-# tests/. This script remains the entry point because the shared CI
-# template defaults to TEST_SCRIPT="./test.sh"; keeping it lets the pytest
-# conversion land in the server repo independently of the pipeline change
-# in the tritonserver repo, in either merge order.
-#
-# conftest.py reads all configuration from the environment, so the
-# variables the CI template exports (TRITON_REPO_ORGANIZATION,
-# TRITON_COMMON_REPO_TAG, TRITON_CLIENT_REPO_TAG, TRITONSERVER_IPADDR,
-# SERVER_TIMEOUT, ...) pass straight through.
+"""Entry point for the Go gRPC client example test.
 
-exec python3 ./run_tests.py "$@"
+This file must NOT be named pytest.py: a module of that name in the test
+directory shadows the installed pytest package (sys.path[0] is the script
+directory), which breaks both `import pytest` and `python -m pytest`.
+
+The JUnit report is written next to this file rather than into a logs/
+subdirectory because the CI log collector copies *.xml out of the test
+working directory itself (ci/templates/utility/template.docker.gitlab-ci.yml).
+"""
+
+import os
+import sys
+
+import pytest
+
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+JUNIT_REPORT = os.path.join(TEST_DIR, "report.xml")
+
+
+def main():
+    args = [f"--junitxml={JUNIT_REPORT}", *sys.argv[1:]]
+    return pytest.main(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
