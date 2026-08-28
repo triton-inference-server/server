@@ -46,7 +46,15 @@ JUNIT_REPORT = os.path.join(TEST_DIR, "report.xml")
 
 
 def main():
-    args = [f"--junitxml={JUNIT_REPORT}", *sys.argv[1:]]
+    args = [f"--junitxml={JUNIT_REPORT}"]
+    # pytest defaults to --color=auto, which disables colour without a TTY --
+    # and the GitLab runner gives the job none, even though GitLab renders
+    # ANSI in job logs. Force it on in CI unless the caller said otherwise.
+    if os.environ.get("PY_COLORS") is None and (
+        os.environ.get("GITLAB_CI") or os.environ.get("CI")
+    ):
+        args.append("--color=yes")
+    args.extend(sys.argv[1:])
     return pytest.main(args)
 
 
