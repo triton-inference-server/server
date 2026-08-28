@@ -35,6 +35,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -42,6 +43,29 @@ import urllib.request
 import pytest
 
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _color_enabled():
+    """Whether to emit ANSI colour.
+
+    The GitLab runner gives the job no TTY, so an isatty() check alone would
+    always be false there even though GitLab renders ANSI in job logs. Honour
+    PY_COLORS (pytest's own override) and fall back to detecting CI.
+    """
+    override = os.environ.get("PY_COLORS")
+    if override is not None:
+        return override == "1"
+    if os.environ.get("GITLAB_CI") or os.environ.get("CI"):
+        return True
+    return sys.stdout.isatty()
+
+
+COLOR = _color_enabled()
+GREEN, RED, CYAN, RESET = "\033[32m", "\033[31m", "\033[36m", "\033[0m"
+
+
+def _paint(text, code):
+    return f"{code}{text}{RESET}" if COLOR else text
 
 
 def _env(name, default):
@@ -96,9 +120,8 @@ def _run(cmd, cwd=None, log=None):
     way it did under `bash -ex ./test.sh`. pytest.ini disables capturing so
     this stays visible on a passing run too, not only on failure.
     """
-    print(
-        f"=== Running {' '.join(cmd)}" + (f"  (cwd {cwd})" if cwd else ""), flush=True
-    )
+    banner = f"=== Running {' '.join(cmd)}" + (f"  (cwd {cwd})" if cwd else "")
+    print(_paint(banner, CYAN), flush=True)
     if log is None:
         result = subprocess.run(cmd, cwd=cwd, check=False)
     else:
@@ -106,7 +129,8 @@ def _run(cmd, cwd=None, log=None):
             result = subprocess.run(
                 cmd, cwd=cwd, check=False, stdout=handle, stderr=subprocess.STDOUT
             )
-    print(f"=== Exit {result.returncode}: {cmd[0]}", flush=True)
+    status = f"=== Exit {result.returncode}: {cmd[0]}"
+    print(_paint(status, GREEN if result.returncode == 0 else RED), flush=True)
     return result
 
 
