@@ -87,9 +87,6 @@ REPO_ORGANIZATION = _env(
 )
 COMMON_REPO_TAG = _env("TRITON_COMMON_REPO_TAG", "main")
 SERVER_BRANCH_NAME = _env("TRITON_SERVER_BRANCH_NAME", "main")
-# Exported by the CI template alongside the tags above, but the client clone
-# below does not pass -b yet, so this is currently read and not used. Kept so
-# that wiring it up is a one-line change rather than a rediscovery.
 CLIENT_REPO_TAG = _env("TRITON_CLIENT_REPO_TAG", "main")
 
 GO_CLIENT_DIR = os.path.join(TEST_DIR, "client", "src", "grpc_generated", "go")
@@ -262,15 +259,25 @@ def triton_server(model_repository):
 def go_stubs():
     """Clone the client and common repos and generate the Go stubs.
 
-    The clone commands are carried over verbatim from test.sh, including
-    the fact that client.git is cloned without a branch flag and so always
-    resolves to the remote default branch.
+    Both clones are pinned to a branch. test.sh cloned client.git with no
+    -b, so it always resolved to the remote default branch and could never
+    exercise a feature branch even though the CI template already exported
+    TRITON_CLIENT_REPO_TAG. The default is "main", so an unset variable
+    behaves as before.
     """
     for stale in ("client", "common"):
         shutil.rmtree(os.path.join(TEST_DIR, stale), ignore_errors=True)
 
     _run_checked(
-        ["git", "clone", f"{REPO_ORGANIZATION}/client.git"],
+        [
+            "git",
+            "clone",
+            "--single-branch",
+            "--depth=1",
+            "-b",
+            CLIENT_REPO_TAG,
+            f"{REPO_ORGANIZATION}/client.git",
+        ],
         cwd=TEST_DIR,
         message="failed to clone client repo",
     )
