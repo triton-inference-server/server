@@ -49,6 +49,8 @@ def infer_test_environment(tool_call_parser):
         backend = "vllm"
         if tool_call_parser == "mistral":
             model = "mistral-nemo-instruct-2407"
+        elif tool_call_parser == "hermes":
+            model = "llama-3.1-8b-instruct"  # Use llama model for hermes testing
         else:
             model = "llama-3.1-8b-instruct"
         return backend, model
@@ -70,6 +72,10 @@ def infer_test_environment(tool_call_parser):
 def infer_test_model_repository(backend, tool_call_parser):
     if tool_call_parser == "mistral":
         model_repository = str(Path(__file__).parent / f"{backend}_mistral_models")
+    elif tool_call_parser == "hermes":
+        model_repository = str(
+            Path(__file__).parent / f"{backend}_models"
+        )  # Use default models for hermes
     else:
         model_repository = str(Path(__file__).parent / f"{backend}_models")
     return model_repository
