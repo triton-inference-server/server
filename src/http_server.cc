@@ -46,6 +46,7 @@
 #define TRITONJSON_STATUSRETURN(M) \
   return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
 #define TRITONJSON_STATUSSUCCESS nullptr
+#include "triton/common/model_config.h"
 #include "triton/common/triton_json.h"
 
 namespace triton { namespace server {
@@ -2699,14 +2700,13 @@ HTTPAPIServer::ParseJsonTritonIO(
               memory_type_id));
         }
       } else {
-        const int64_t element_cnt = GetElementCount(shape_vec);
+        const int64_t element_cnt = triton::common::GetElementCount(shape_vec);
 
         if (element_cnt == 0) {
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
               irequest, input_name, nullptr, 0 /* byte_size */,
               TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
-        } else if (element_cnt == -2) {
-          // -2 indicates invalid dimension
+        } else if (element_cnt == triton::common::INVALID_SIZE) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INVALID_ARG,
               std::string(
@@ -2714,8 +2714,7 @@ HTTPAPIServer::ParseJsonTritonIO(
                   "': shape " + ShapeToString(shape_vec) +
                   " contains one or more invalid dimensions")
                   .c_str());
-        } else if (element_cnt == -3) {
-          // -3 indicates integer overflow
+        } else if (element_cnt == triton::common::OVERFLOW_SIZE) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INVALID_ARG,
               std::string(
@@ -2723,6 +2722,15 @@ HTTPAPIServer::ParseJsonTritonIO(
                   "': shape " + ShapeToString(shape_vec) +
                   " causes total element count to exceed maximum size of " +
                   std::to_string(INT64_MAX))
+                  .c_str());
+        } else if (element_cnt == triton::common::WILDCARD_SIZE) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              std::string(
+                  "invalid shape for input '" + std::string(input_name) +
+                  "': shape " + ShapeToString(shape_vec) +
+                  " contains one or more variable-size dimensions (-1); cannot "
+                  "determine element count for JSON input")
                   .c_str());
         } else {
           // JSON... presence of "data" already validated but still
