@@ -26,6 +26,7 @@
 
 
 import json
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -664,14 +665,79 @@ class TestStreamingToolParseLimit:
         finish_reasons, _ = self._stream(client, "big-tool-args", with_tools=True)
         # Once the accumulated tool-call text passes the cap, the stream will be terminated with finish_reason="length".
         assert finish_reasons[-1] == "length"
+        _, status = self._stream(client, "cancellation-status", with_tools=False)
+        assert status == "cancelled"
 
     def test_not_truncated_within_limit(self, client):
         finish_reasons, _ = self._stream(client, "small tool call", with_tools=True)
         # A short tool call stays under the cap and completes normally.
         assert "length" not in finish_reasons
+        _, status = self._stream(client, "cancellation-status", with_tools=False)
+        assert status == "not-cancelled"
 
     def test_limit_ignored_without_tools(self, client):
         finish_reasons, text = self._stream(client, "big-tool-args", with_tools=False)
         # Plain streaming does not enter the tool parser, so the cap never fires.
         assert "length" not in finish_reasons
         assert len(text) > self.LIMIT_BYTES
+
+    def test_cancellation_failure_is_not_silent(self, caplog):
+        from engine.triton_engine import TritonLLMEngine
+
+        class FailingResponseIterator:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                raise StopAsyncIteration
+
+            def cancel(self):
+                raise RuntimeError("cancel failed")
+
+        with caplog.at_level(logging.ERROR):
+            TritonLLMEngine._cancel_inference(
+                FailingResponseIterator(), "test-request", "test"
+            )
+
+        records = [r for r in caplog.records if "test-request" in r.getMessage()]
+        assert len(records) == 1
+        record = records[0]
+        assert record.levelno == logging.ERROR
+        assert record.exc_info and record.exc_info[0] is RuntimeError
+
+    @pytest.mark.asyncio
+    async def test_abandoned_chat_stream_cancels_backend_inference(self, client):
+        from schemas.openai import CreateChatCompletionRequest
+
+        request = CreateChatCompletionRequest(
+            model=self.MODEL,
+            messages=[{"role": "user", "content": "big-tool-args"}],
+            stream=True,
+            max_completion_tokens=4096,
+        )
+        stream = await client.app.engine.chat(request)
+        # The first chat chunk only establishes the assistant role. Consume a
+        # backend-produced chunk as well so cancellation is observed in execute().
+        await stream.__anext__()
+        await stream.__anext__()
+        await stream.aclose()
+
+        _, status = self._stream(client, "cancellation-status", with_tools=False)
+        assert status == "cancelled"
+
+    @pytest.mark.asyncio
+    async def test_abandoned_completion_stream_cancels_backend_inference(self, client):
+        from schemas.openai import CreateCompletionRequest
+
+        request = CreateCompletionRequest(
+            model=self.MODEL,
+            prompt="big-tool-args",
+            stream=True,
+            max_tokens=4096,
+        )
+        stream = await client.app.engine.completion(request)
+        await stream.__anext__()
+        await stream.aclose()
+
+        _, status = self._stream(client, "cancellation-status", with_tools=False)
+        assert status == "cancelled"
