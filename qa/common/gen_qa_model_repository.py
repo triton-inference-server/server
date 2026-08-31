@@ -708,10 +708,11 @@ def build_stages(ctx):
                 "    rm -rf build && mkdir build && cd build && cmake .. &&"
                 " make -j && \\\n"
                 "    cp libcustomHardmaxPlugin.so " + plugin_root + "/.\n"
-                # `run_step env VAR=...` rather than a `VAR=... run_step`
-                # prefix: bash keeps an assignment made in front of a *shell
-                # function* in effect after the call, which would leak
-                # LD_PRELOAD into everything after this step.
+                # `run_step env VAR=...` keeps the assignment attached to
+                # the command run_step exec's, which is what needs it. A
+                # `VAR=... run_step` prefix would set it for the function call
+                # itself and rely on that reaching the exec'd child -- true in
+                # bash, but a level of indirection to reason about for nothing.
                 "  run_step env"
                 " LD_PRELOAD=" + plugin_root + "/libcustomHardmaxPlugin.so \\\n"
                 "    python3 " + ctx.source_dir + "/gen_qa_trt_plugin_models.py \\\n"
@@ -742,10 +743,16 @@ def build_stages(ctx):
 # --------------------------------------------------------------------------
 
 
-STEP_LOG = "/tmp/triton-model-gen-step.log"
+# Named inside the build directory, not in /tmp. The enroot runtime bind-mounts
+# the host's /tmp into the container, so a fixed /tmp path is shared by every
+# concurrent job on the node -- two of them would tee into one file and each
+# could read the other's output when classifying a failure. build_dir is
+# already per-job on both runtimes (mount_root + job id), which is the same
+# reason the enroot image and container name carry the job id.
+STEP_LOG_NAME = ".gen-step.log"
 
 
-def render_step_wrapper():
+def render_step_wrapper(ctx):
     """The shell function every generator invocation is run through.
 
     TensorRT refusing the GPU it is running on is the one generator failure
@@ -768,7 +775,7 @@ def render_step_wrapper():
     """
     return [
         "",
-        "TRITON_STEP_LOG=" + STEP_LOG,
+        "TRITON_STEP_LOG={}/{}".format(ctx.build_dir, STEP_LOG_NAME),
         "run_step() {",
         "  local status",
         '  "$@" 2>&1 | tee "${TRITON_STEP_LOG}"',
@@ -818,7 +825,7 @@ def render_stage_script(stage, ctx, final=False):
     ]
     lines += list(stage.prelude)
     lines.append("set -e")
-    lines += render_step_wrapper()
+    lines += render_step_wrapper(ctx)
     lines += list(stage.setup)
     lines.append("")
     for step in stage.steps:
