@@ -136,6 +136,82 @@ class TestScheduler(unittest.TestCase):
             saturate_thread_1.result()
             saturate_thread_2.result()
 
+    def _get_inputs_with_value(self, batch_size, value):
+        shape = [batch_size, 8]
+        inputs = [grpcclient.InferInput("INPUT0", shape, "FP32")]
+        inputs[0].set_data_from_numpy(np.full(shape, value, dtype=np.float32))
+        return inputs
+
+    # Test queued requests can be cancelled on a model with no batcher, where
+    # the request waits on the rate limiter for a model instance
+    def test_no_batcher_queued_request_cancellation(self):
+        model_name = "no_batching"
+        initial_metrics_value = self._metrics_before_test(model_name, "CANCELED")
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            # Occupy the single model instance
+            saturate_thread = pool.submit(
+                self._triton.infer, model_name, self._get_inputs(batch_size=1)
+            )
+            time.sleep(2)  # ensure the instance is busy
+            # The next request waits on the rate limiter for an instance
+            callback, response = self._generate_callback_and_response_pair()
+            queue_future = self._triton.async_infer(
+                model_name, self._get_inputs(batch_size=1), callback
+            )
+            time.sleep(2)  # ensure the request is waiting
+            self.assertFalse(response["responded"])
+            # Cancel the waiting request
+            queue_future.cancel()
+            time.sleep(2)  # ensure the cancellation is delivered
+            # Join the saturating thread so the instance is released
+            saturate_thread.result()
+            time.sleep(2)  # ensure the cancelled request has been responded to
+            self._assert_response_is_cancelled(response)
+        expected_count_increase = 1
+        self._assert_metrics(
+            model_name,
+            "CANCELED",
+            expected_count_increase,
+            initial_metrics_value,
+        )
+
+    # Test a cancelled response is not written to the response cache, which
+    # would serve it as a successful hit to a later matching request
+    def test_no_batcher_cancelled_response_is_not_cached(self):
+        model_name = "no_batching_cache"
+        cancelled_value = 2.0
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            # Use a different input so the cancelled request cannot hit the
+            # entry cached by this one
+            saturate_thread = pool.submit(
+                self._triton.infer,
+                model_name,
+                self._get_inputs_with_value(batch_size=1, value=1.0),
+            )
+            time.sleep(2)  # ensure the instance is busy
+            callback, response = self._generate_callback_and_response_pair()
+            queue_future = self._triton.async_infer(
+                model_name,
+                self._get_inputs_with_value(batch_size=1, value=cancelled_value),
+                callback,
+            )
+            time.sleep(2)  # ensure the request is waiting
+            self.assertFalse(response["responded"])
+            queue_future.cancel()
+            time.sleep(2)  # ensure the cancellation is delivered
+            saturate_thread.result()
+            time.sleep(2)  # ensure the cancelled request has been responded to
+            self._assert_response_is_cancelled(response)
+        # The same inputs must still be computed by the model
+        result = self._triton.infer(
+            model_name, self._get_inputs_with_value(batch_size=1, value=cancelled_value)
+        )
+        output = result.as_numpy("OUTPUT0")
+        self.assertIsNotNone(output, "cancelled response was served from the cache")
+        np.testing.assert_allclose(
+            output, np.full([1, 8], cancelled_value, dtype=np.float32)
+        )
+
     # Test backlogged requests on sequence batch scheduler can be cancelled
     def test_sequence_batch_scheduler_backlog_request_cancellation(self):
         model_name = "sequence_direct"
