@@ -804,6 +804,12 @@ def render_step_wrapper(ctx):
         + " continues."
         + SH_COLOR_RESET
         + '" >&2',
+        # The generator got as far as creating the model directory and opening
+        # model.plan before the null plan raised, so a config.pbtxt beside a
+        # zero-byte engine is sitting there. Left alone it would be archived
+        # and published as a real model. The step's own arguments carry the
+        # --models_dir to clean up under.
+        "    python3 " + ctx.source_dir + '/prune_partial_models.py "$@"',
         "    return 0",
         "  fi",
         '  return "${status}"',
