@@ -746,9 +746,12 @@ def build_stages(ctx):
 # Named inside the build directory, not in /tmp. The enroot runtime bind-mounts
 # the host's /tmp into the container, so a fixed /tmp path is shared by every
 # concurrent job on the node -- two of them would tee into one file and each
-# could read the other's output when classifying a failure. build_dir is
-# already per-job on both runtimes (mount_root + job id), which is the same
-# reason the enroot image and container name carry the job id.
+# could read the other's output when classifying a failure. Left to itself
+# build_dir is mount_root plus the job id on either runtime, which is the same
+# reason the enroot image and the container name carry that id. A caller who
+# passes --build-dir supplies the whole path and owns that distinction: point
+# two concurrent jobs at one directory and they share this log again, along
+# with the model tree it sits beside.
 STEP_LOG_NAME = ".gen-step.log"
 
 
