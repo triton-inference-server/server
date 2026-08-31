@@ -53,15 +53,111 @@ NUM_REQUESTS = 16
 NUM_RESPONSES_PER_REQUEST = 8
 
 
+# ---------------------------------------------------------------------------
+# Debug instrumentation
+#
+# The concurrent backpressure test intermittently fails with "expected 8
+# responses, got 0", but that assertion masks *why* Triton ended the stream
+# early. The helpers below record, for every streamed message, whether it was a
+# data response, an empty final-only response, or an error (with its gRPC
+# status/message), plus timing and a full per-stream timeline -- so a failing
+# run tells us the actual reason the response came back from the server.
+#
+# Set TRITON_TEST_DEBUG=0 to silence the extra logging.
+# ---------------------------------------------------------------------------
+_DEBUG_ENABLED = os.environ.get("TRITON_TEST_DEBUG", "1") != "0"
+_DEBUG_T0 = time.time()
+_DEBUG_LOCK = threading.Lock()
+
+
+def _dbg(tag, msg):
+    """Thread-safe, timestamped debug line to stderr (captured in the client log)."""
+    if not _DEBUG_ENABLED:
+        return
+    now = time.time()
+    line = f"[DBG {now:.6f} +{now - _DEBUG_T0:8.3f}s tid={threading.get_ident()} {tag}] {msg}"
+    with _DEBUG_LOCK:
+        print(line, file=sys.stderr, flush=True)
+
+
+def _final_flag(response):
+    """bool value of the triton_final_response parameter, or None if absent/unreadable."""
+    try:
+        final = response.parameters.get("triton_final_response")
+        return bool(final.bool_param) if final is not None else None
+    except Exception:
+        return None
+
+
+def _describe_error(error):
+    """Human-readable reason string for an InferenceServerException from Triton."""
+    try:
+        return f"ERROR status={error.status()!r} msg={error.message()!r} full={str(error)!r}"
+    except Exception as exc:
+        return f"ERROR (undecodable: {exc!r}) raw={error!r}"
+
+
+def _describe_result(result):
+    """Human-readable summary of a data / empty-final response from Triton."""
+    try:
+        response = result.get_response()
+        n_out = len(response.outputs)
+        out_names = [o.name for o in response.outputs]
+        value = None
+        if n_out > 0:
+            try:
+                arr = result.as_numpy("OUT")
+                value = None if arr is None else float(np.squeeze(arr))
+            except Exception:
+                value = "<unreadable>"
+        return (
+            f"RESPONSE id={response.id!r} outputs={n_out} names={out_names} "
+            f"final={_final_flag(response)} OUT={value}"
+        )
+    except Exception as exc:
+        return f"RESPONSE (undecodable: {exc!r})"
+
+
+def _errs_brief(errors):
+    """Compact (status, message) list for use in assertion messages."""
+    brief = []
+    for err in errors:
+        try:
+            brief.append((str(err.status()), err.message()))
+        except Exception:
+            brief.append(("<undecodable>", repr(err)))
+    return brief
+
+
 class UserData:
-    def __init__(self):
+    def __init__(self, tag=None):
         self._response_queue = queue.Queue()
+        # Debug context: a label for this stream and a full timeline of what
+        # Triton sent back, so a failure can be explained after the fact.
+        self.tag = tag
+        self.events = []  # list of (elapsed_s, kind, description)
+        self._start = time.time()
 
 
 def callback(user_data, result, error):
-    if error:
+    now = time.time()
+    elapsed = now - getattr(user_data, "_start", _DEBUG_T0)
+    tag = getattr(user_data, "tag", None)
+    if error is not None:
+        desc = _describe_error(error)
+        _dbg(f"CB {tag}", f"t+{elapsed:7.3f}s {desc}")
+        try:
+            user_data.events.append((round(elapsed, 3), "error", desc))
+        except Exception:
+            pass
         user_data._response_queue.put(error)
     else:
+        desc = _describe_result(result)
+        _dbg(f"CB {tag}", f"t+{elapsed:7.3f}s {desc}")
+        try:
+            user_data.events.append((round(elapsed, 3), "response", desc))
+        except Exception:
+            pass
         user_data._response_queue.put(result)
 
 
@@ -82,30 +178,77 @@ def prepare_infer_args(input_value, enable_batching=False):
 def collect_responses(user_data, timeout=DEFAULT_RESPONSE_TIMEOUT):
     """
     Collect responses from user_data until the final response flag is seen.
+
+    Returns (errors, responses); the signature is unchanged so existing callers
+    keep working. Rich per-message diagnostics (empty-final vs data vs error,
+    latency, and the full timeline) are emitted via _dbg so we can see WHY Triton
+    ended a stream.
     """
+    tag = getattr(user_data, "tag", None)
     errors = []
     responses = []
+    saw_empty_final = False
+    first_latency = None
+    t_start = time.time()
+    msg_idx = 0
+
     while True:
         try:
             result = user_data._response_queue.get(timeout=timeout)
         except queue.Empty:
-            raise Exception(f"No response received within {timeout} seconds.")
+            # No message arrived within `timeout`s. This is the fingerprint of a
+            # stalled/starved stream (vs. an immediate error or empty final).
+            _dbg(
+                f"COLLECT {tag}",
+                f"TIMEOUT after {timeout}s waiting for msg #{msg_idx + 1}; "
+                f"so far responses={len(responses)} errors={len(errors)} "
+                f"saw_empty_final={saw_empty_final}; timeline={user_data.events}",
+            )
+            raise Exception(
+                f"[{tag}] No response received within {timeout} seconds "
+                f"(got {len(responses)} data responses, {len(errors)} errors so far). "
+                f"timeline={user_data.events}"
+            )
+
+        msg_idx += 1
+        if first_latency is None:
+            first_latency = time.time() - t_start
 
         if isinstance(result, InferenceServerException):
             errors.append(result)
+            _dbg(
+                f"COLLECT {tag}",
+                f"msg#{msg_idx} is ERROR -> stream terminates: {_describe_error(result)}",
+            )
             # error responses are final - stream terminates
             break
 
         response = result.get_response()
+        n_out = len(response.outputs)
+        final = _final_flag(response)
         # Add response to list if it has data (not empty final-only response)
-        if len(response.outputs) > 0:
+        if n_out > 0:
             responses.append(result)
+        elif final:
+            saw_empty_final = True
+        _dbg(
+            f"COLLECT {tag}",
+            f"msg#{msg_idx} outputs={n_out} final={final} kept={len(responses)} "
+            f"saw_empty_final={saw_empty_final}",
+        )
 
         # Check if this is the final response
-        final = response.parameters.get("triton_final_response")
-        if final and final.bool_param:
+        if final:
             break
 
+    total = time.time() - t_start
+    _dbg(
+        f"COLLECT {tag}",
+        f"DONE responses={len(responses)} errors={len(errors)} "
+        f"saw_empty_final={saw_empty_final} "
+        f"first_latency={None if first_latency is None else round(first_latency, 3)} "
+        f"total={round(total, 3)}s",
+    )
     return errors, responses
 
 
@@ -115,25 +258,56 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
     """
 
     def _run_inference(
-        self, model_name, expected_responses_per_request, num_concurrent_requests=1
+        self,
+        model_name,
+        expected_responses_per_request,
+        num_concurrent_requests=1,
+        stream_timeout=None,
+        channel_args=None,
     ):
         """
         Send num_concurrent_requests streaming requests to model_name, each expecting
         expected_responses_per_request responses. Verify all complete with correct data.
+
+        stream_timeout (seconds) is forwarded to start_stream; None (the default)
+        means no client-side stream timeout, matching the original test.
+        channel_args (list of (name, value)) is forwarded to each client's gRPC
+        channel; None (the default) matches the original test. Passing
+        [("grpc.use_local_subchannel_pool", 1)] gives every client its own TCP
+        connection instead of sharing pooled connections.
         """
-        user_datas = [UserData() for _ in range(num_concurrent_requests)]
+        # Tag each stream so the debug timeline identifies which request is which.
+        user_datas = [
+            UserData(tag=f"{model_name}#req{i}")
+            for i in range(num_concurrent_requests)
+        ]
 
         with ExitStack() as stack:
             clients = [
-                stack.enter_context(grpcclient.InferenceServerClient(SERVER_URL))
+                stack.enter_context(
+                    grpcclient.InferenceServerClient(
+                        SERVER_URL, channel_args=channel_args
+                    )
+                )
                 for _ in range(num_concurrent_requests)
             ]
 
             inputs, outputs = prepare_infer_args(expected_responses_per_request, True)
 
+            _dbg(
+                "RUN",
+                f"model={model_name} concurrent={num_concurrent_requests} "
+                f"expected_per_request={expected_responses_per_request} "
+                f"stream_timeout={stream_timeout} channel_args={channel_args} "
+                f"-> starting streams at wall={time.time():.6f}",
+            )
+
             # Start all concurrent requests
             for i in range(num_concurrent_requests):
-                clients[i].start_stream(callback=partial(callback, user_datas[i]))
+                clients[i].start_stream(
+                    callback=partial(callback, user_datas[i]),
+                    stream_timeout=stream_timeout,
+                )
                 clients[i].async_stream_infer(
                     model_name=model_name, inputs=inputs, outputs=outputs
                 )
@@ -141,13 +315,28 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
             # Collect and verify responses for all requests
             for i, ud in enumerate(user_datas):
                 errors, responses = collect_responses(ud)
+
+                # One combined diagnostic so a failure never hides the real reason
+                # (error status, empty final, or missing data) or the timing.
+                diag = (
+                    f"[{ud.tag}] responses={len(responses)} "
+                    f"errors={_errs_brief(errors)} timeline={ud.events}"
+                )
+                if len(responses) != expected_responses_per_request or errors:
+                    _dbg("RUN", f"MISMATCH {diag}")
+
+                # Check errors FIRST: if Triton returned an error, surface its
+                # gRPC status/message instead of the misleading "got 0" count.
+                self.assertEqual(
+                    len(errors),
+                    0,
+                    f"Request {i}: Triton returned error(s) {_errs_brief(errors)}. {diag}",
+                )
                 self.assertEqual(
                     len(responses),
                     expected_responses_per_request,
-                    f"Request {i}: expected {expected_responses_per_request} responses, got {len(responses)}",
-                )
-                self.assertEqual(
-                    len(errors), 0, f"Request {i}: unexpected errors: {errors}"
+                    f"Request {i}: expected {expected_responses_per_request} responses, "
+                    f"got {len(responses)}. {diag}",
                 )
                 # Verify correctness of responses
                 for idx, resp in enumerate(responses):
@@ -165,6 +354,67 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
             # Stop all streams
             for client in clients:
                 client.stop_stream()
+
+    # ------------------------------------------------------------------
+    # Experiment probes (diagnostic; remove once root cause is confirmed).
+    # These isolate WHY the concurrent test's tail requests are cancelled
+    # at ~30s.
+    # ------------------------------------------------------------------
+    def test_probe_a_reduced_load(self):
+        """
+        Probe A - root-cause check. Same 16-way concurrency, but only 2
+        responses per request, so the throttled workload finishes well
+        within the ~30s cancellation window. If this PASSES while the
+        8-response concurrent test FAILS, the failure is a throughput-vs-
+        time-budget effect (the limiter starves the tail past a
+        server-side cancellation), not a correctness bug.
+        """
+        for model_name in ("ensemble_limit_4", "ensemble_limit_1"):
+            with self.subTest(probe="A-reduced-load", model=model_name):
+                _dbg("PROBE-A", f"reduced load: {NUM_REQUESTS} x 2 responses, {model_name}")
+                self._run_inference(
+                    model_name=model_name,
+                    expected_responses_per_request=2,
+                    num_concurrent_requests=NUM_REQUESTS,
+                )
+                _dbg("PROBE-A", f"{model_name}: all {NUM_REQUESTS} requests completed")
+
+    def test_probe_b_explicit_stream_timeout(self):
+        """
+        Probe B - cancellation-source check. Full 16x8 load, but with an
+        explicit large client stream_timeout (120s). The client default is
+        None (no timeout), so if the ~30s CANCELLED still fires WITH a 120s
+        stream timeout set, the cancellation is server/transport-side, not
+        the client's stream timeout.
+        """
+        with self.subTest(probe="B-stream-timeout-120", model="ensemble_limit_4"):
+            _dbg("PROBE-B", "full load 16 x 8 with explicit stream_timeout=120s")
+            self._run_inference(
+                model_name="ensemble_limit_4",
+                expected_responses_per_request=NUM_RESPONSES_PER_REQUEST,
+                num_concurrent_requests=NUM_REQUESTS,
+                stream_timeout=120,
+            )
+            _dbg("PROBE-B", "completed without ~30s cancel (would mean client stream timeout)")
+
+    def test_probe_c_own_connection(self):
+        """
+        Mechanism check: full 16x8 load, but every client gets its OWN TCP
+        connection (defeat gRPC subchannel pooling). If all 16 now succeed, the
+        ~30s CANCELLED was caused by too many long-lived streams sharing pooled
+        connection(s) -- confirming the root cause is client-side transport, not
+        the ensemble limiter. If it still cancels, the cause is a per-call client
+        transport deadline instead.
+        """
+        with self.subTest(probe="C-own-connection", model="ensemble_limit_4"):
+            _dbg("PROBE-C", "full load 16 x 8 with per-client connections (no subchannel pooling)")
+            self._run_inference(
+                model_name="ensemble_limit_4",
+                expected_responses_per_request=NUM_RESPONSES_PER_REQUEST,
+                num_concurrent_requests=NUM_REQUESTS,
+                channel_args=[("grpc.use_local_subchannel_pool", 1)],
+            )
+            _dbg("PROBE-C", "all 16 completed -> pooling/transport was the cause")
 
     def test_single_request_with_different_limits(self):
         """
