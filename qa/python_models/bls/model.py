@@ -372,8 +372,8 @@ class PBBLSTest(unittest.TestCase):
         self.assertEqual(rc_after_dlpack_output1 - rc_before_dlpack_output1, 1)
 
         # Make sure that reference count decreases after destroying the DLPack
-        output0_dlpack = None  # noqa: F841
-        output1_dlpack = None  # noqa: F841
+        del output0_dlpack
+        del output1_dlpack
         rc_after_del_dlpack_output0 = sys.getrefcount(output0)
         rc_after_del_dlpack_output1 = sys.getrefcount(output1)
         self.assertEqual(rc_after_del_dlpack_output0 - rc_after_dlpack_output0, -1)
