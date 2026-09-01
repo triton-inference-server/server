@@ -33,14 +33,14 @@ import sys
 import gen_manifest
 import torch
 import torchvision
+from check_tensorrt_target import compute_capability, unsupported_target_reason, warn
 
 try:
     import torch_tensorrt
 except ImportError:
-    print(
-        "WARNING: torch_tensorrt is not available in this environment. "
-        "Skipping Torch-TensorRT model generation.",
-        file=sys.stderr,
+    warn(
+        "torch_tensorrt is not available in this environment. "
+        "Skipping Torch-TensorRT model generation."
     )
     sys.exit(0)
 
@@ -120,6 +120,18 @@ if __name__ == "__main__":
         "--models_dir", type=str, required=True, help="Top-level model directory"
     )
     FLAGS, unparsed = parser.parse_known_args()
+
+    # Asked before the weights download and the trace: on a GPU this TensorRT
+    # has no kernels for, every one of those is wasted and the compile ends the
+    # whole PyTorch stage, which runs under `set -e`.
+    reason = unsupported_target_reason()
+    if reason:
+        capability = compute_capability()
+        warn(
+            "Skipping Torch-TensorRT model generation on compute capability"
+            " {}: {}".format(capability or "unknown", reason)
+        )
+        sys.exit(0)
 
     # Fingerprint the tree first, so emit_manifests() below stamps only the
     # models this script creates rather than relabelling every other stage's.
