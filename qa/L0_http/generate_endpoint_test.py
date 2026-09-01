@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@ import sys
 
 sys.path.append("../common")
 
+import base64
 import json
 import threading
 import time
@@ -273,6 +274,37 @@ class GenerateEndpointTest(tu.TestResultCollector):
         for inputs, error_msg in invalid_type_inputs:
             self.generate_expect_failure(self._model_name, inputs, error_msg)
             self.generate_stream_expect_failure(self._model_name, inputs, error_msg)
+
+    def test_json_dtype_size_expansion_exceeds_limit_error(self):
+        """
+        Test that when the client sends a JSON input of byte[], that when it
+        expands to dtype[], it exceeds the maximum allowed input size and
+        returns an appropriate error message. The test sends a large base64
+        encoded string as input, which simulates a byte[] input that would
+        expand to a much larger dtype[] input on the server side when
+        `sizeof(dtype) > 1`.
+        The test checks that the error message indicates that the input size
+        exceeds the limit.
+        This is important to prevent clients from sending inputs that could
+        cause excessive memory usage on the server.
+        """
+
+        input_data = [1] * (
+            64 * 1024 * 1024
+        )  # 64MB input, which is large but still reasonable for HTTP request body
+        input_bytes = bytes(input_data)
+        input_str = base64.b64encode(input_bytes).decode("utf-8")
+        inputs = {"PROMPT": input_str, "STREAM": False}
+        error_msg = " bytes exceeds the maximum allowed input size of "
+        self.generate_expect_failure(self._model_name, inputs, error_msg)
+
+        inputs = {
+            "INPUT0": input_str[0 : (len(input_str) // 2)],
+            "INPUT1": input_str[(len(input_str) // 2) :],
+            "STREAM": False,
+        }
+        error_msg = " bytes exceeds the maximum allowed input size of "
+        self.generate_expect_failure(self._model_name, inputs, error_msg)
 
     def test_duplicate_inputs(self):
         dupe_prompt = "input 'PROMPT' already exists in request"

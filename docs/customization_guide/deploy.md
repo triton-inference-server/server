@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,7 +38,9 @@ standalone process.  This guide is intended to provide some key points
 and best practices that users deploying Triton based solutions should
 consider.
 
-| [Deploying Behind a Secure Gateway or Proxy](#deploying-behind-a-secure-proxy-or-gateway) | [Running with Least Privilege](#running-with-least-privilege) |
+| [Deploying Behind a Secure Proxy or Gateway](#deploying-behind-a-secure-proxy-or-gateway) |
+[Securing Model and Backend Code](#securing-model-and-backend-code) |
+[Running with Least Privilege](#running-with-least-privilege) |
 
 > [!IMPORTANT]
 > Ultimately the security of a solution based on Triton
@@ -83,6 +85,31 @@ as an "Application" or "Service" within the trusted internal network.
 * [https://istio.io/latest/docs/concepts/security/]
 * [https://konghq.com/blog/enterprise/envoy-service-mesh]
 * [https://www.solo.io/topics/envoy-proxy/]
+
+## Securing Model and Backend Code
+
+> [!WARNING]
+> Some Triton backends execute code loaded from the model repository.
+> Depending on the backend, this code may run in the Triton server
+> process or in a separate process managed by the backend. It can
+> exercise the operating-system privileges and access available to that
+> process, including filesystem access, available credentials, and
+> network access. Triton does not provide a security sandbox for
+> arbitrary model or backend code.
+
+Only deploy executable model and backend code from trusted sources.
+Restrict write access to model repositories and backend directories,
+restrict model control APIs to trusted operators when they are enabled,
+and review executable code before deployment.
+
+Even when a caller is authenticated and authorized, treat
+request-derived values as untrusted until they have been validated for
+their intended use. Before using these values in outbound network
+requests, filesystem operations, subprocess invocations,
+deserialization, or media decoding, validate them against an explicit
+policy and enforce limits on input size, execution time, concurrency,
+and other resource use. Use deployment-level controls, such as outbound
+network restrictions, to limit the impact of validation failures.
 
 ## Running with Least Privilege
 
@@ -226,6 +253,10 @@ for more information.
 > [!Note]
 > Restricting access can be used to limit exposure to model
 > control APIs to trusted users.
+> When Vertex AI endpoint support is enabled, this setting also
+> applies to redirected Vertex AI requests.
+> If Triton is built without `TRITON_ENABLE_HTTP`, Vertex AI uses
+> default unrestricted API settings.
 
 ##### `--allow-sagemaker <boolean> default False`
 
@@ -275,18 +306,6 @@ Directory where cache shared libraries are found.
 > must be access controlled. Adding untrusted files
 > can lead to arbitrarty code execution.
 
-##### `backend-config=<backend>,additional-dependency-dirs=<string>`
-
-This is an optional Windows feature that enables Triton to search custom
-dependency directories when loading a specific backend. The user can input
-these directories as a string of semicolon-separated paths (including a
-trailing semicolon). These directories are programmatically prepended to
-the process's PATH and are removed when the backend is loaded successfully.
-Windows will search PATH last in its search sequence, so be cautious that
-no untrusted files of same name exist in a location of higher search priority
-(e.g., System32). It is still recommended to add backend-specific dependencies
-to their corresponding backend folder when possible.
-
 # GRPC server options
 Triton Inference Server's gRPC inference handlers internally use states to manage inference requests and response queues. Each state consists of one inference request and one response queue. The response queue within a state can hold multiple response objects. These states remain allocated for reuse to optimize performance by minimizing dynamic allocations.
 
@@ -301,7 +320,11 @@ Specifies the maximum number of states (inference request/response queues) that 
 Specifies the maximum number of inference response objects that can remain allocated in each response queue at any given time. This option is particularly useful in decoupled mode, where multiple responses are generated for a single request. By default, this value is set to `INT_MAX`.
 
 > [!Warning]
+> Operators exposing decoupled gRPC streaming to untrusted clients should
+> explicitly configure `--grpc-max-response-pool-size` to a bounded value
+> appropriate for their workload, rather than relying on the default
+> `INT_MAX`. Choose a value based on model behavior (decoupled vs
+> non-decoupled), expected concurrency, and available memory.
+
+> [!Warning]
 > Setting this value too low may negatively impact performance.
-
-
-

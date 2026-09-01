@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,6 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Local test modules are imported after adjusting sys.path for ../common.
+# flake8: noqa: E402
 import sys
 
 sys.path.append("../common")
@@ -364,15 +366,52 @@ class HttpTest(tu.TestResultCollector):
         try:
             error_message = response.json().get("error", "")
             self.assertIn(
-                "Request JSON size",
+                "request JSON size",
                 error_message,
             )
             self.assertIn(
-                "exceeds the maximum allowed value",
+                " exceeds the maximum allowed input size",
                 error_message,
             )
         except ValueError:
             self.fail("Response is not valid JSON")
+
+    def test_load_oversized_file_parameter(self):
+        # Single path component longer than NAME_MAX (255 on typical Linux) must
+        # be rejected without terminating the server (filesystem_error handled).
+        long_path = "file:" + ("A" * 256)
+        payload = {
+            "parameters": {
+                long_path: "YQ==",
+                "config": "{}",
+            }
+        }
+        headers = {"Content-Type": "application/json"}
+        response = requests.post(
+            self._get_load_model_url("onnx_zero_1_float32"),
+            headers=headers,
+            json=payload,
+        )
+        # TODO: [TRI-958] Status code 400 is more appropriate here
+        self.assertEqual(
+            500,
+            response.status_code,
+            "Expected 500 for oversized file parameter; got {}".format(
+                response.status_code
+            ),
+        )
+        try:
+            self.assertIn(
+                "failed to poll from model repository", response.json().get("error", "")
+            )
+        except ValueError:
+            self.fail("Response is not valid JSON")
+        health = requests.get("http://localhost:8000/v2/health/ready", timeout=10)
+        self.assertEqual(
+            200,
+            health.status_code,
+            "server must stay up after rejected load",
+        )
 
     def test_json_recursion_depth_limit(self):
         """Test that server properly handles and rejects deeply nested JSON."""
@@ -422,6 +461,103 @@ class HttpTest(tu.TestResultCollector):
                         )
                     except ValueError:
                         self.fail("Response is not valid JSON")
+
+    def test_duplicate_output_names(self):
+        """Test that duplicate output names are rejected"""
+        model = "onnx_zero_1_float32"
+        input_data = np.arange(8, dtype=np.float32).flatten().tolist()
+
+        num_duplicates = 2
+        payload = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "datatype": "FP32",
+                    "shape": [1, 8],
+                    "data": [input_data],
+                }
+            ],
+            "outputs": [{"name": "OUTPUT0"} for _ in range(num_duplicates)],
+        }
+
+        headers = {"Content-Type": "application/json"}
+        r = requests.post(self._get_infer_url(model), json=payload, headers=headers)
+        self.assertEqual(
+            400,
+            r.status_code,
+            "Expected error code 400 for duplicate output names; got: {}".format(
+                r.status_code
+            ),
+        )
+        error_message = r.json().get("error", "")
+        self.assertIn("output 'OUTPUT0' already exists in request", error_message)
+
+        # Verify server is still healthy after the bad request
+        health_url = "http://localhost:8000/v2/health/live"
+        health_r = requests.get(health_url)
+        self.assertEqual(
+            200,
+            health_r.status_code,
+            "Server is not healthy after duplicate output request",
+        )
+
+    def test_repository_index_deeply_nested_json(self):
+        """Test for deeply nested JSON on model repository index."""
+        depth = 250000
+        nested = ("[" * depth) + "true" + ("]" * depth)
+        payload = '{"ready":' + nested + "}"
+
+        # Keep request below default --http-max-input-size so parsing path is exercised.
+        self.assertLess(len(payload), 64 * 1024 * 1024)
+
+        response = requests.post(
+            "http://localhost:8000/v2/repository/index",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=60,
+        )
+        self.assertEqual(
+            400,
+            response.status_code,
+            "Expected repository index request to fail on invalid 'ready' type.",
+        )
+        self.assertIn(
+            "Invalid value for 'ready': expected a boolean",
+            response.json()["error"],
+        )
+
+        live_response = requests.get("http://localhost:8000/v2/health/live", timeout=10)
+        self.assertEqual(
+            200,
+            live_response.status_code,
+            "Expected server to remain live after deeply nested JSON request.",
+        )
+
+    def test_inference_header_content_length_out_of_range(self):
+        """Inference-Header-Content-Length value exceeding INT_MAX triggers
+        std::out_of_range in std::stoi. Before the fix this crashed the server
+        process via std::terminate(); now it must return 400 and leave the
+        server alive."""
+        model = "onnx_zero_1_float32"
+        headers = {"Inference-Header-Content-Length": "99999999999"}
+        r = requests.post(
+            self._get_infer_url(model),
+            json={"inputs": []},
+            headers=headers,
+        )
+        self.assertEqual(
+            400,
+            r.status_code,
+            "Expected 400 for out-of-range Inference-Header-Content-Length; "
+            "got: {}".format(r.status_code),
+        )
+        # Server must still be alive — a crash would make this fail.
+        health = requests.get("http://localhost:8000/v2/health/live")
+        self.assertEqual(
+            200,
+            health.status_code,
+            "Server is not live after out-of-range Inference-Header-Content-Length request",
+        )
 
 
 if __name__ == "__main__":

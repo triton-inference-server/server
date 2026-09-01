@@ -28,13 +28,12 @@
 ### Helpers ###
 
 function download_tensorrt_llm_models {
-    TENSORRTLLM_VERSION="$1"
-    TENSORRTLLM_DIR="$2"
+    TENSORRTLLM_DIR="$1"
     rm -rf ${TENSORRTLLM_DIR} && mkdir ${TENSORRTLLM_DIR}
     git clone --filter=blob:none --no-checkout https://github.com/triton-inference-server/TensorRT-LLM.git ${TENSORRTLLM_DIR}
     pushd ${TENSORRTLLM_DIR}
     git sparse-checkout set triton_backend/all_models
-    git checkout ${TENSORRTLLM_VERSION}
+    git checkout ${TENSORRTLLM_REPO_TAG}
     popd
 }
 
@@ -51,8 +50,7 @@ function install_deps() {
     if [ "${IMAGE_KIND}" == "TRTLLM" ]; then
         # TODO: Remove this when the next stable version of TRT-LLM is available
         TENSORRTLLM_DIR="/workspace/TensorRT-LLM"
-        TENSORRTLLM_VERSION="v1.2.0rc2"
-        download_tensorrt_llm_models ${TENSORRTLLM_VERSION} ${TENSORRTLLM_DIR}
+        download_tensorrt_llm_models ${TENSORRTLLM_DIR}
 
         prepare_tensorrtllm meta-llama/Meta-Llama-3.1-8B-Instruct tests/tensorrtllm_models /tmp/engines/llama/3.1-8b-instruct/ ${TENSORRTLLM_DIR}
         prepare_tensorrtllm mistralai/Mistral-Nemo-Instruct-2407 tests/tensorrtllm_mistral_models /tmp/engines/mistral/nemo-instruct-2407/ ${TENSORRTLLM_DIR}
@@ -125,12 +123,13 @@ function pre_test() {
 function run_test() {
     pushd openai/
     TEST_LOG="test_openai.log"
+    TEST_XML="test_openai.xml"
+    TEST_LOG_MISTRAL="test_openai_mistral.log"
+    TEST_XML_MISTRAL="test_openai_mistral.xml"
 
-    # Capture error code without exiting to allow log collection
     set +e
-    pytest -s -v --junitxml=test_openai.xml tests/ 2>&1 > ${TEST_LOG}
-    if [ $? -ne 0 ]; then
-        cat ${TEST_LOG}
+    pytest -s -v --junitxml=${TEST_XML} tests/ 2>&1 | tee ${TEST_LOG}
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
@@ -139,9 +138,9 @@ function run_test() {
     if [ "$RET" == "0" ]; then
         # rerun the tool calling tests with mistral model to cover the mistral tool call parser
         set +e
-        TEST_TOOL_CALL_PARSER="mistral" TEST_TOKENIZER="mistralai/Mistral-Nemo-Instruct-2407" pytest -s -v --junitxml=test_openai.xml tests/test_tool_calling.py 2>&1 > ${TEST_LOG}
-        if [ $? -ne 0 ]; then
-            cat ${TEST_LOG}
+        TEST_TOOL_CALL_PARSER="mistral" TEST_TOKENIZER="mistralai/Mistral-Nemo-Instruct-2407" \
+            pytest -s -v --junitxml=${TEST_XML_MISTRAL} tests/test_tool_calling.py 2>&1 | tee ${TEST_LOG_MISTRAL}
+        if [ ${PIPESTATUS[0]} -ne 0 ]; then
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         fi

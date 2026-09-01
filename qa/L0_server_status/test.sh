@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -71,13 +71,13 @@ rm -f $CLIENT_LOG
 python $SERVER_STATUS_TEST ServerMetadataTest >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** ServerMetadataTest Failed\n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS_SMDT
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        echo -e "\n***\n*** ServerMetadataTest Result Verification Failed\n***"
         RET=1
     fi
 fi
@@ -100,13 +100,13 @@ set +e
 python $SERVER_STATUS_TEST ModelMetadataTest >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** ModelMetadataTest Failed\n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS_MMDT
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        echo -e "\n***\n*** ModelMetadataTest Result Verification Failed\n***"
         RET=1
     fi
 fi

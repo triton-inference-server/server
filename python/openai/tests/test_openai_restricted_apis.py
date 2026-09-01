@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,6 +31,7 @@ from typing import Dict, List, Optional
 
 import pytest
 import requests
+from frontend.fastapi.middleware.api_restriction import RestrictedFeatures
 from tests.utils import OpenAIServer
 
 
@@ -40,7 +41,7 @@ def assert_response_success(
     """Assert that a response was successful."""
     assert (
         response.status_code == expected_status
-    ), f"{description} should return {expected_status}, got {response.status_code}"
+    ), f"{description} should return {expected_status}, got {response.status_code} {response.text}"
 
 
 def assert_response_unauthorized(
@@ -49,7 +50,44 @@ def assert_response_unauthorized(
     """Assert that a response was unauthorized."""
     assert (
         response.status_code == expected_status
-    ), f"{description} should be unauthorized with {expected_status}, got {response.status_code}"
+    ), f"{description} should be unauthorized with {expected_status}, got {response.status_code} {response.text}"
+
+
+def test_restricted_feature_summary_omits_header_values():
+    restricted = RestrictedFeatures(
+        [["inference", "synthetic-header", "synthetic-secret-value"]]
+    )
+
+    assert restricted.RestrictionSummary() == {"inference": "synthetic-header"}
+    assert "synthetic-secret-value" not in str(restricted.RestrictionSummary())
+
+
+def test_startup_log_does_not_leak_restriction_header_values(capsys):
+    """Regression test for the startup log line that announces enabled API
+    restrictions. The line must not contain configured header values, but
+    must still surface the API group names and header names so operators can
+    verify the configuration that was applied."""
+    from frontend.fastapi_frontend import FastApiFrontend
+
+    secret_value = "do-not-log-this-restriction-value-XYZ"
+    FastApiFrontend(
+        engine=None,
+        restricted_apis=[["inference", "x-syn-key", secret_value]],
+    )
+
+    captured = capsys.readouterr().out
+    assert (
+        secret_value not in captured
+    ), "Startup log leaks the configured restriction header value"
+    assert (
+        "API restrictions enabled" in captured
+    ), "Startup log line is missing entirely"
+    assert (
+        "inference" in captured
+    ), "Startup log should still surface the API group name"
+    assert (
+        "x-syn-key" in captured
+    ), "Startup log should still surface the configured header name"
 
 
 def make_get_request(
@@ -129,6 +167,7 @@ def verify_inference_endpoints(
 def verify_model_repository_endpoints(
     base_url, model, headers, expected_success, description_prefix
 ):
+    # Verify model repository endpoints
     response = make_get_request(base_url, "/v1/models", headers=headers)
     if expected_success:
         assert_response_success(
@@ -148,6 +187,22 @@ def verify_model_repository_endpoints(
         assert_response_unauthorized(
             response, description=f"{description_prefix} Specific model endpoint"
         )
+
+    # Verify model management endpoints
+    for endpoint in ["unload", "load"]:
+        response = requests.post(
+            f"{base_url}/v1/models/{model}/{endpoint}", headers=headers
+        )
+        if expected_success:
+            assert_response_success(
+                response,
+                description=f"{description_prefix} - Model {endpoint} endpoint",
+            )
+        else:
+            assert_response_unauthorized(
+                response,
+                description=f"{description_prefix} - Model {endpoint} endpoint",
+            )
 
 
 def verify_metrics_endpoint(base_url, headers, expected_success, description_prefix):
@@ -288,6 +343,10 @@ class TestOpenAIServerRestrictedAPIs:
             tokenizer_model,
             "--backend",
             backend,
+            "--model-control-mode",
+            "explicit",
+            "--load-model",
+            "*",
             "--openai-restricted-api",
             "inference,model-repository",
             "admin-key",
@@ -345,6 +404,10 @@ class TestOpenAIServerMultipleRestrictions:
             tokenizer_model,
             "--backend",
             backend,
+            "--model-control-mode",
+            "explicit",
+            "--load-model",
+            "*",
             "--openai-restricted-api",
             "model-repository",
             "model-key",

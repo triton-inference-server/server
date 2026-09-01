@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,8 +42,10 @@ export CUDA_VISIBLE_DEVICES=0
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
+CANCEL_LOG_LINE="Cancellation notification received for "
 
 RET=0
+rm -f *.log
 
 #
 # Unit tests
@@ -66,7 +68,7 @@ if [ $? -ne 0 ]; then
 fi
 
 #
-# gRPC cancellation tests
+# Python gRPC cancellation tests
 #
 rm -rf models && mkdir models
 mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
@@ -121,7 +123,7 @@ for TEST_CASE in "test_grpc_async_infer" \
         RET=1
     fi
 
-    count=$(grep -o "Cancellation notification received for" $SERVER_LOG | wc -l)
+    count=$(grep -o "$CANCEL_LOG_LINE" $SERVER_LOG | wc -l)
     if [ $count == 0 ]; then
         echo -e "\n***\n*** Cancellation not received by server on $TEST_CASE\n***"
         cat $SERVER_LOG
@@ -167,6 +169,80 @@ for TEST_CASE in "test_grpc_async_infer" \
     elif [ "$TEST_CASE" == "test_grpc_async_infer_cancellation_before_response_complete_and_process_after_final_response" ]; then
         unset TRITONSERVER_DELAY_GRPC_NOTIFICATION
         unset TRITONSERVER_DELAY_RESPONSE_COMPLETE_EXEC
+    fi
+done
+
+#
+# C++ gRPC cancellation tests
+#
+# allow_timeout_override disables queue prefetching, keeping requests queued
+# long enough for the "Queued" cancellation tests to cancel them before
+# forwarding to the rate limiter. This saves overall test time.
+cat >> models/custom_identity_int32/config.pbtxt <<'EOF'
+dynamic_batching {
+  default_queue_policy {
+    allow_timeout_override: true
+  }
+}
+EOF
+
+GRPC_CANCELLATION_TEST_CPP=../clients/grpc_cancellation_test
+
+for ENTRY in "TestGrpcAsyncInferCancelExecutingRequest 1" \
+             "TestGrpcAsyncInferCancelQueuedRequest 2" \
+             "TestGrpcAsyncInferCancelAfterCompletionIsNoOp 0" \
+             "TestGrpcAsyncInferWithoutContextStillCompletes 0" \
+             "TestGrpcAsyncInferMultiCancelExecutingRequests 2" \
+             "TestGrpcAsyncInferMultiCancelQueuedRequest 2" \
+             "TestGrpcStreamInferCancelExecutingRequest 1" \
+             "TestGrpcStreamInferCancelQueuedRequest 1" \
+             "TestGrpcStreamCancelWithoutInfer 1" \
+             "TestGrpcStreamCancelThenRestart 1"; do
+    read -r TEST_CASE EXPECTED_CANCEL_COUNT <<< "$ENTRY"
+
+    TEST_LOG="./grpc_cancellation_test_cpp.$TEST_CASE.log"
+    SERVER_LOG="./grpc_cancellation_test_cpp.$TEST_CASE.server.log"
+
+    # AsyncInferMulti fans out N concurrent requests; bump to 3 CPU instances
+    # so each can execute in parallel. Every other test uses the default
+    # single-instance config.
+    if [ "$TEST_CASE" == "TestGrpcAsyncInferMultiCancelExecutingRequests" ]; then
+        sed -i 's|instance_group .*|instance_group [{ count: 3, kind: KIND_CPU }]|' \
+            models/custom_identity_int32/config.pbtxt
+    fi
+
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+    LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH \
+        $GRPC_CANCELLATION_TEST_CPP \
+            --gtest_filter="GrpcCancellationTest.$TEST_CASE" > $TEST_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** C++ gRPC Cancellation Tests Failed on $TEST_CASE\n***"
+        cat $TEST_LOG
+        RET=1
+    fi
+
+    cancel_count=$(grep -c "$CANCEL_LOG_LINE" $SERVER_LOG || true)
+    if [ $cancel_count -ne $EXPECTED_CANCEL_COUNT ]; then
+        echo -e "\n***\n*** Unexpected cancellation count on $TEST_CASE. Expected $EXPECTED_CANCEL_COUNT but received $cancel_count.\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    if [ "$TEST_CASE" == "TestGrpcAsyncInferMultiCancelExecutingRequests" ]; then
+        sed -i 's|instance_group .*|instance_group [{ kind: KIND_CPU }]|' \
+            models/custom_identity_int32/config.pbtxt
     fi
 done
 

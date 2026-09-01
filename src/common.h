@@ -1,4 +1,4 @@
-// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,10 +25,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <array>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <typeinfo>
 #include <unordered_map>
 #include <variant>
@@ -44,6 +46,11 @@ constexpr char kAcceptEncodingHTTPHeader[] = "Accept-Encoding";
 constexpr char kContentEncodingHTTPHeader[] = "Content-Encoding";
 constexpr char kContentTypeHeader[] = "Content-Type";
 constexpr char kContentLengthHeader[] = "Content-Length";
+
+// The error message for client shared memory is disabled by default.
+constexpr char kClientShmDisabledErrorStr[] =
+    "Client shared memory is disabled. Start the server with "
+    "'--allow-client-shm=true' to enable.";
 
 // This prefix is reserved for shm regions created internally by Triton
 constexpr char kTritonSharedMemoryRegionPrefix[] =
@@ -61,7 +68,15 @@ constexpr int32_t HTTP_MAX_JSON_NESTING_DEPTH = 100;
 // Default maximum allowed HTTP request input size in bytes (64MB)
 constexpr size_t HTTP_DEFAULT_MAX_INPUT_SIZE = 1 << 26;
 
-/// Request parameter keys that start with a "triton_" prefix for internal use
+/// Reserved parameter keys for Triton usage (also HTTP/gRPC header forward).
+/// Other locations:
+/// - client/src/python/library/tritonclient/utils/__init__.py
+/// - server/docs/protocol/extension_parameters.md
+constexpr std::array<std::string_view, 7> kReservedParameterKeys{
+    "sequence_id", "sequence_start", "sequence_end",      "priority",
+    "timeout",     "headers",        "binary_data_output"};
+
+// Request parameter keys that start with a "triton_" prefix for internal use
 const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{
     "triton_enable_empty_final_response"};
 

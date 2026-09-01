@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -65,7 +65,7 @@ function_install_python38() {
 
     # Install test script dependencies
     pip3 install --upgrade wheel setuptools boofuzz==0.3.0 "numpy<2" pillow attrdict future grpcio requests gsutil \
-                            awscli six grpcio-channelz prettytable virtualenv
+                            awscli six grpcio-channelz prettytable virtualenv ml_dtypes
 }
 function_install_python38
 

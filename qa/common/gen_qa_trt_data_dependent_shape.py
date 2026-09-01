@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@
 import argparse
 import os
 
+import gen_manifest
 import numpy as np
 import tensorrt as trt
 import test_util as tu
@@ -86,11 +87,17 @@ def create_data_dependent_modelfile(
 
     # serialized model
     engine_bytes = builder.build_serialized_network(network, config)
+    if engine_bytes is None:
+        print(
+            f"warning: Skipping {model_name}: TRT engine build failed "
+            f"(NonZero op may not be supported on this GPU/TRT version)"
+        )
+        return
 
     model_version_dir = models_dir + "/" + model_name + "/1"
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -129,7 +136,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -142,6 +149,10 @@ if __name__ == "__main__":
         "--models_dir", type=str, required=True, help="Top-level model directory"
     )
     FLAGS, unparsed = parser.parse_known_args()
+
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
 
     # Fixed input shape
     create_data_dependent_modelfile(
@@ -158,3 +169,6 @@ if __name__ == "__main__":
     create_data_dependent_modelconfig(
         FLAGS.models_dir, "plan_nobatch_nonzero_dynamic", (-1, -1)
     )
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

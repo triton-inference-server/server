@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,15 +29,21 @@
 import argparse
 import os
 
+import gen_manifest
 import numpy as np
-from gen_common import np_to_model_dtype, np_to_onnx_dtype, np_to_trt_dtype
+from gen_common import (
+    np_to_model_dtype,
+    np_to_onnx_dtype,
+    np_to_trt_dtype,
+    trt_set_dynamic_range,
+)
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
 
 
 def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_dyna_sequence_model_name(
@@ -246,14 +252,14 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
 
-def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+def create_onnx_modelconfig(models_dir, max_batch, dtype, shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_dyna_sequence_model_name(
@@ -348,7 +354,7 @@ instance_group [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -388,7 +394,10 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
     not_start = network.add_elementwise(
         constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB
     )
-    not_start.set_output_type(0, trt_dtype)
+    # set_output_type was removed from all layers in TensorRT 11; the
+    # elementwise output already has trt_dtype, so this was a no-op.
+    if hasattr(not_start, "set_output_type"):
+        not_start.set_output_type(0, trt_dtype)
 
     input_state_cond_temp = network.add_elementwise(
         ready0, not_start.get_output(0), trt.ElementWiseOperation.SUM
@@ -485,7 +494,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -527,7 +536,10 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     not_start = network.add_elementwise(
         constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB
     )
-    not_start.set_output_type(0, trt_dtype)
+    # set_output_type was removed from all layers in TensorRT 11; the
+    # elementwise output already has trt_dtype, so this was a no-op.
+    if hasattr(not_start, "set_output_type"):
+        not_start.set_output_type(0, trt_dtype)
 
     input_state_cond_temp = network.add_elementwise(
         ready0, not_start.get_output(0), trt.ElementWiseOperation.SUM
@@ -552,11 +564,19 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
     out0.get_output(0).name = "OUTPUT"
     network.mark_output(out0.get_output(0))
-    out0.get_output(0).dtype = trt_dtype
+    # ITensor.dtype setter removed in TRT 11; elementwise output already has
+    # trt_dtype.
+    try:
+        out0.get_output(0).dtype = trt_dtype
+    except AttributeError:
+        pass  # ITensor.dtype setter removed in TensorRT 11+
 
     out0_state.get_output(0).name = "OUTPUT_STATE"
     network.mark_output(out0_state.get_output(0))
-    out0_state.get_output(0).dtype = trt_dtype
+    try:
+        out0_state.get_output(0).dtype = trt_dtype
+    except AttributeError:
+        pass  # ITensor.dtype setter removed in TensorRT 11+
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     in_state0.allowed_formats = 1 << int(trt_memory_format)
@@ -566,20 +586,23 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     out0_state.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
     if trt_dtype == trt.int8:
-        in0.dynamic_range = (-128.0, 127.0)
-        in_state0.dynamic_range = (-128.0, 127.0)
-        out0.dynamic_range = (-128.0, 127.0)
-        out0_state.dynamic_range = (-128.0, 127.0)
-        start0.dynamic_range = (-128.0, 127.0)
-        ready0.dynamic_range = (-128.0, 127.0)
-
+        trt_set_dynamic_range(in0, -128.0, 127.0)
+        trt_set_dynamic_range(in_state0, -128.0, 127.0)
+        trt_set_dynamic_range(out0, -128.0, 127.0)
+        trt_set_dynamic_range(out0_state, -128.0, 127.0)
+        trt_set_dynamic_range(start0, -128.0, 127.0)
+        trt_set_dynamic_range(ready0, -128.0, 127.0)
     flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
-    flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
-    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+    # TensorRT 11 removed PREFER_PRECISION_CONSTRAINTS / INT8 / FP16
+    # BuilderFlags (strongly-typed networks). Older TRT still has them.
+    if hasattr(trt.BuilderFlag, "PREFER_PRECISION_CONSTRAINTS"):
+        flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
+        flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
-    if trt_dtype == trt.int8:
+    if trt_dtype == trt.int8 and hasattr(trt.BuilderFlag, "INT8"):
         flags |= 1 << int(trt.BuilderFlag.INT8)
-    elif trt_dtype == trt.float16:
+    elif trt_dtype == trt.float16 and hasattr(trt.BuilderFlag, "FP16"):
         flags |= 1 << int(trt.BuilderFlag.FP16)
 
     config = builder.create_builder_config()
@@ -649,7 +672,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -657,7 +680,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
 def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
-    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype):
         return
 
     if dtype != np.float32:
@@ -666,8 +689,8 @@ def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
         create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
-def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):
-    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
+def create_plan_modelconfig(models_dir, max_batch, dtype, shape):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_dyna_sequence_model_name(
@@ -762,7 +785,7 @@ instance_group [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -773,20 +796,20 @@ def create_models(models_dir, dtype, shape, no_batch=True):
     model_version = 1
 
     if FLAGS.onnx:
-        create_onnx_modelconfig(models_dir, model_version, 8, dtype, shape)
+        create_onnx_modelconfig(models_dir, 8, dtype, shape)
         create_onnx_modelfile(models_dir, model_version, 8, dtype, shape)
         if no_batch:
-            create_onnx_modelconfig(models_dir, model_version, 0, dtype, shape)
+            create_onnx_modelconfig(models_dir, 0, dtype, shape)
             create_onnx_modelfile(models_dir, model_version, 0, dtype, shape)
 
     if FLAGS.tensorrt:
         if dtype == bool:
             return
 
-        create_plan_modelconfig(models_dir, model_version, 8, dtype, shape)
+        create_plan_modelconfig(models_dir, 8, dtype, shape)
         create_plan_models(models_dir, model_version, 8, dtype, shape)
         if no_batch:
-            create_plan_modelconfig(models_dir, model_version, 0, dtype, shape)
+            create_plan_modelconfig(models_dir, 0, dtype, shape)
             create_plan_models(models_dir, model_version, 0, dtype, shape)
 
 
@@ -837,6 +860,10 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     if FLAGS.onnx:
         import onnx
 
@@ -865,3 +892,6 @@ if __name__ == "__main__":
             ],
             False,
         )
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

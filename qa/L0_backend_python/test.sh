@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -65,9 +65,6 @@ export PYTHON_ENV_VERSION=${PYTHON_ENV_VERSION:="12"}
 export PYTHON_BACKEND_REPO_TAG=$PYTHON_BACKEND_REPO_TAG
 
 BASE_SERVER_ARGS="--model-repository=${MODELDIR}/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-# Set the default byte size to 5MBs to avoid going out of shared memory. The
-# environment that this job runs on has only 1GB of shared-memory available.
-SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
 
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
@@ -77,6 +74,9 @@ source ../common/util.sh
 source ./common.sh
 
 rm -fr *.log ./models
+
+# Remove orphaned Python backend shm regions from previous runs
+rm -f /dev/shm/triton_python_backend_shm_region_* 2>/dev/null || true
 
 python3 --version | grep "3.12" > /dev/null
 if [ $? -ne 0 ]; then
@@ -177,6 +177,9 @@ fi
 
 pip3 install pytest requests virtualenv
 
+# Set the default byte size to 5MBs to avoid going out of shared memory. The
+# environment that this job runs on has only 1GB of shared-memory available.
+SERVER_ARGS="$BASE_SERVER_ARGS --allow-client-shm=true --backend-config=python,shm-default-byte-size=5242880"
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -205,6 +208,7 @@ and shared memory pages after starting triton equals to $current_num_pages \n***
     RET=1
 fi
 
+SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
 prev_num_pages=`get_shm_pages`
 # Triton non-graceful exit
 run_server
@@ -351,6 +355,11 @@ cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbt
 shm_default_byte_size=$((1024*1024*4))
 SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=$shm_default_byte_size"
 
+# Record existing Python backend shm regions before starting the server.
+# This prevents stale regions from previous runs from being misidentified
+# as regions created by this server, ensuring accurate verification.
+shm_pages_before=" $(ls /dev/shm/ 2>/dev/null | grep '^triton_python_backend_shm' | tr '\n' ' ') "
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
@@ -360,6 +369,10 @@ fi
 
 for shm_page in `ls /dev/shm/`; do
     if [[ $shm_page !=  triton_python_backend_shm* ]]; then
+        continue
+    fi
+    # Only validate regions created by this server
+    if [[ "$shm_pages_before" == *" $shm_page "* ]]; then
         continue
     fi
     page_size=`ls -l /dev/shm/$shm_page 2>&1 | awk '{print $5}'`

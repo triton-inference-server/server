@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -27,15 +27,56 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
+import os
 import unittest
 
+import ml_dtypes
 import numpy as np
 
 _last_request_id = 0
 
 # Numpy does not support the BF16 datatype natively.
-# We use this dummy dtype as a representative for BF16.
-np_dtype_bfloat16 = np.dtype([("bf16", object)])
+# We use ml_dtypes.bfloat16 for BF16.
+np_dtype_bfloat16 = ml_dtypes.bfloat16
+
+MIB = 2**20  # 1 MIB = 1,048,576 bytes
+GIB = 2**30  # 1 GIB = 1,073,741,824 bytes
+
+
+def get_server_process_from_env(env_var="SERVER_PID"):
+    """
+    Return a psutil.Process for the tritonserver under test.
+    """
+    import psutil
+
+    pid_str = os.environ.get(env_var)
+    if not pid_str:
+        raise AssertionError(f"{env_var} env var is not set")
+    try:
+        return psutil.Process(int(pid_str))
+    except (ValueError, psutil.NoSuchProcess) as e:
+        raise AssertionError(f"Invalid or stale {env_var}={pid_str!r}: {e}")
+
+
+def wait_for_stable_rss(server, rss_tolerance_bytes=0.1 * MIB, stable_threshold=10):
+    """
+    Wait until the RSS of the server is stable.
+    """
+    import time
+
+    last_rss = None
+    stable_count = 0
+    while True:
+        rss = server.memory_info().rss
+        if last_rss is not None and abs(rss - last_rss) < rss_tolerance_bytes:
+            stable_count += 1
+        else:
+            stable_count = 0
+        last_rss = rss
+        if stable_count >= stable_threshold:
+            break
+        time.sleep(0.1)
+    return
 
 
 def shape_element_count(shape):
@@ -75,7 +116,13 @@ def shape_to_dims_str(shape):
 
 
 def validate_for_trt_model(
-    input_dtype, output0_dtype, output1_dtype, input_shape, output0_shape, output1_shape
+    input_dtype,
+    output0_dtype,
+    output1_dtype,
+    # Unused arguments for consistency with validate_for_libtorch_model
+    input_shape=None,
+    output0_shape=None,
+    output1_shape=None,
 ):
     """Return True if input and output dtypes are supported by a TRT model."""
     supported_datatypes = [
@@ -90,6 +137,12 @@ def validate_for_trt_model(
     # FIXME: Remove this check when jetson supports TRT 8.5 (DLIS-4256)
     if not support_trt_uint8():
         supported_datatypes.remove(np.uint8)
+    # TRT 11+ removed the implicit-precision INT8 path (BuilderFlag.INT8
+    # + dynamic_range); strongly-typed networks require explicit QDQ which
+    # the QA generators don't emit. Exclude int8 plan models on TRT 11+.
+    if not support_trt_int8_implicit_precision():
+        if np.int8 in supported_datatypes:
+            supported_datatypes.remove(np.int8)
     if not input_dtype in supported_datatypes:
         return False
     if not output0_dtype in supported_datatypes:
@@ -113,9 +166,6 @@ def validate_for_ensemble_model(
     input_dtype,
     output0_dtype,
     output1_dtype,
-    input_shape,
-    output0_shape,
-    output1_shape,
 ):
     """Return True if input and output dtypes are supported by the ensemble type."""
 
@@ -148,7 +198,13 @@ def validate_for_ensemble_model(
 
 
 def validate_for_onnx_model(
-    input_dtype, output0_dtype, output1_dtype, input_shape, output0_shape, output1_shape
+    input_dtype,
+    output0_dtype,
+    output1_dtype,
+    # Unused arguments for consistency with validate_for_libtorch_model
+    input_shape=None,
+    output0_shape=None,
+    output1_shape=None,
 ):
     """Return True if input and output dtypes are supported by a Onnx model."""
 
@@ -227,7 +283,10 @@ def validate_for_libtorch_model(
 
 
 def validate_for_openvino_model(
-    input_dtype, output0_dtype, output1_dtype, input_shape, output0_shape, output1_shape
+    input_dtype,
+    output0_dtype,
+    output1_dtype,
+    input_shape,
 ):
     """Return True if input and output dtypes are supported by an OpenVino model."""
 
@@ -266,12 +325,15 @@ def get_dtype_name(dtype):
 
 
 def get_model_name(pf, input_dtype, output0_dtype, output1_dtype):
-    return "{}_{}_{}_{}".format(
-        pf,
-        get_dtype_name(input_dtype),
-        get_dtype_name(output0_dtype),
-        get_dtype_name(output1_dtype),
-    )
+    if output1_dtype is None:
+        return f"{pf}_{get_dtype_name(input_dtype)}_{get_dtype_name(output0_dtype)}"
+    else:
+        return "{}_{}_{}_{}".format(
+            pf,
+            get_dtype_name(input_dtype),
+            get_dtype_name(output0_dtype),
+            get_dtype_name(output1_dtype),
+        )
 
 
 def get_sequence_model_name(pf, dtype):
@@ -299,6 +361,17 @@ def support_trt_uint8():
     return hasattr(trt, "uint8")
 
 
+def support_trt_int8_implicit_precision():
+    """Return True if the installed TensorRT supports the implicit-precision
+    INT8 path (BuilderFlag.INT8 + per-tensor dynamic_range). Removed in
+    TensorRT 11+ where strongly-typed networks are mandatory."""
+    try:
+        import tensorrt as trt
+    except ImportError:
+        return False
+    return hasattr(trt.BuilderFlag, "INT8")
+
+
 def check_gpus_compute_capability(min_capability):
     """
     Check if all GPUs have a compute capability greater than or equal to the given value.
@@ -313,16 +386,13 @@ def check_gpus_compute_capability(min_capability):
     import importlib.util
 
     if importlib.util.find_spec("cuda") is not None:
-        import cuda.core.experimental as cuda_core_experimental
+        from cuda.core import Device
 
-        devices = cuda_core_experimental.system.devices
-
+        devices = Device.get_all_devices()
         for device in devices:
-            compute_capability = (
-                device.compute_capability.major + device.compute_capability.minor / 10.0
-            )
-
-            if compute_capability < min_capability:
+            cc = device.compute_capability
+            compute_capability_value = cc.major + cc.minor / 10.0
+            if compute_capability_value < min_capability:
                 return False
 
     elif importlib.util.find_spec("pycuda") is not None:

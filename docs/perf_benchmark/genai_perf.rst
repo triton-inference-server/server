@@ -1,5 +1,5 @@
 ..
-.. Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+.. Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 ..
 .. Redistribution and use in source and binary forms, with or without
 .. modification, are permitted provided that the following conditions
@@ -28,13 +28,12 @@
 ####
 GenAI Performance Analyzer
 ####
-.. include:: genai-perf-README.rst
-
 
 .. toctree::
    :maxdepth: 1
    :hidden:
 
+   Overview <../perf_analyzer/genai-perf/README.md>
    Large language models <../perf_analyzer/genai-perf/docs/tutorial.md>
    Visual language models <../perf_analyzer/genai-perf/docs/multi_modal.md>
    Embedding models <../perf_analyzer/genai-perf/docs/embeddings.md>

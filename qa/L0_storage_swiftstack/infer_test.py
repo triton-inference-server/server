@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -87,9 +87,6 @@ class InferTest(tu.TestResultCollector):
             input_dtype,
             output0_dtype,
             output1_dtype,
-            (input_size, 1, 1),
-            (input_size, 1, 1),
-            (input_size, 1, 1),
         ):
             if input_dtype == np.int8:
                 _infer_exact_helper(
@@ -122,9 +119,6 @@ class InferTest(tu.TestResultCollector):
             input_dtype,
             output0_dtype,
             output1_dtype,
-            (input_size,),
-            (input_size,),
-            (input_size,),
         ):
             _infer_exact_helper(
                 self,

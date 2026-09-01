@@ -42,11 +42,12 @@ The following parameters are reserved for Triton's usage and should not be
 used as custom parameters:
 
 - sequence_id
-- priority
-- timeout
 - sequence_start
 - sequence_end
+- priority
+- timeout
 - headers
+- binary_data_output
 - All the keys that start with `"triton_"` prefix. Some examples used today:
   - `"triton_enable_empty_final_response"` request parameter
   - `"triton_final_response"` response parameter

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,7 +33,9 @@ sys.path.append("../common")
 import json
 import unittest
 
+import mlflow.onnx
 import numpy as np
+import onnx
 import test_util as tu
 from mlflow.deployments import get_deploy_client
 
@@ -45,7 +47,7 @@ class PluginTest(tu.TestResultCollector):
     def _validate_deployment(self, model_name):
         # create
         self.client_.create_deployment(
-            model_name, "models:/{}/1".format(model_name), flavor="onnx"
+            model_name, f"models:/{model_name}/1", flavor="onnx"
         )
 
         # list
@@ -79,8 +81,6 @@ class PluginTest(tu.TestResultCollector):
 
     def test_onnx_flavor(self):
         # Log the ONNX model to MLFlow
-        import mlflow.onnx
-        import onnx
 
         model = onnx.load(
             "./mlflow-triton-plugin/examples/onnx_float32_int32_int32/1/model.onnx"
@@ -92,8 +92,6 @@ class PluginTest(tu.TestResultCollector):
 
     def test_onnx_flavor_with_files(self):
         # Log the ONNX model and additional Triton config file to MLFlow
-        import mlflow.onnx
-        import onnx
 
         model = onnx.load(
             "./mlflow-triton-plugin/examples/onnx_float32_int32_int32/1/model.onnx"
@@ -115,6 +113,65 @@ class PluginTest(tu.TestResultCollector):
         self.assertTrue(
             filecmp.cmp(config_path, "./models/onnx_model_with_files/config.pbtxt")
         )
+
+    def test_model_name(self):
+        EMPTY_MODEL_NAMES = [
+            "",
+            "     ",
+            " ",
+            "\n",
+            "\t",
+            "\r",
+            "\v",
+            "\f",
+        ]
+        INVALID_PATH_TRAVERSAL_NAMES = [
+            "/opt/sys/",
+            "../../etc/passwd",
+            "../outside/repo",
+            "test_models/../identity_py",
+            "..",
+        ]
+        VALID_MODEL_NAMES = [
+            "model123",
+            # "model  OAI",   TRI-769: Fix this test case
+            "model.version1",
+            "...",
+            "..my_model",
+            "model..1",
+            "model....1",
+        ]
+
+        for model_name in EMPTY_MODEL_NAMES:
+            model_uri = f"models:/{model_name}/1"
+            with self.assertRaises(Exception) as e:
+                self.client_.create_deployment(model_name, model_uri, flavor="onnx")
+            self.assertIn(
+                "Model name cannot be empty. Please enter a valid name to deploy.",
+                str(e.exception),
+            )
+
+        for model_name in INVALID_PATH_TRAVERSAL_NAMES:
+            model_uri = f"models:/{model_name}/1"
+            with self.assertRaises(Exception) as e:
+                self.client_.create_deployment(model_name, model_uri, flavor="onnx")
+            self.assertIn(
+                f"Path traversal is not allowed in model's name: {model_name}",
+                str(e.exception),
+            )
+
+        for model_name in VALID_MODEL_NAMES:
+            model = onnx.load(
+                "./mlflow-triton-plugin/examples/onnx_float32_int32_int32/1/model.onnx"
+            )
+
+            # Use a different name to ensure the plugin operates on correct model
+            mlflow.onnx.log_model(
+                model, "triton", registered_model_name=f"{model_name}"
+            )
+
+            # Validate deployment functionalities - create, list, get, predict, delete
+            self._validate_deployment(model_name)
 
 
 if __name__ == "__main__":

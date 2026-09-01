@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -255,7 +255,7 @@ class LifecycleTest(unittest.TestCase):
             callback=partial(callback, user_data), headers=metadata
         )
         stream_end = False
-        for i in range(number_of_requests):
+        for _ in range(number_of_requests):
             input_data = np.random.randn(*shape).astype(np.float32)
             inputs = [
                 grpcclient.InferInput(
@@ -347,6 +347,68 @@ class LifecycleTest(unittest.TestCase):
             True,
             "This should always pass as cancellation should succeed without any exception",
         )
+
+    # Regression test for a segfault when a decoupled model sends an error
+    # response followed by a delayed FINAL flag with "triton_grpc_error" enabled.
+    # The error triggers stream closure, and the late FINAL callback must not
+    # crash by accessing a released state.
+    def test_triton_grpc_error_decoupled_delayed_final(self):
+        model_name = "decoupled_grpc_error"
+        shape = [2]
+        user_data = UserData()
+        metadata = {"triton_grpc_error": "true"}
+
+        for mode in [
+            "MODE_ERROR_ONLY",
+            "MODE_ERROR_FINAL",
+            "MODE_ERROR_WITH_DELAYED_FINAL",
+        ]:
+            triton_client = grpcclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8001"
+            )
+            triton_client.start_stream(
+                callback=partial(callback, user_data), headers=metadata
+            )
+
+            input_data = np.random.randn(*shape).astype(np.float32)
+            mode_data = np.array([bytes(mode, "utf-8")], dtype=object)
+            inputs = [
+                grpcclient.InferInput(
+                    "IN", input_data.shape, np_to_triton_dtype(input_data.dtype)
+                ),
+                grpcclient.InferInput("MODE", mode_data.shape, "BYTES"),
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            inputs[1].set_data_from_numpy(mode_data)
+            triton_client.async_stream_infer(model_name=model_name, inputs=inputs)
+
+            # The first response is always identical to the input data.
+            result = user_data._completed_requests.get()
+            output_data = result.as_numpy("OUT")
+            self.assertIsNotNone(output_data, "error: expected 'OUT'")
+            self.assertTrue(
+                np.array_equal(output_data, input_data),
+                "error: expected output {} to match input {}".format(
+                    output_data, input_data
+                ),
+            )
+
+            # The second response is the error response.
+            result = user_data._completed_requests.get()
+            self.assertIsInstance(result, InferenceServerException)
+            self.assertEqual(str(result.status()), "StatusCode.INTERNAL")
+
+            # Should not receive any subsequent responses.
+            with self.assertRaises(queue.Empty):
+                # Wait for the delayed FINAL flag (model sleeps 0.5s) plus buffer.
+                # Before the fix, the server would SIGSEGV here.
+                user_data._completed_requests.get(timeout=2)
+
+            # Verify the server is still alive after the delayed FINAL flag.
+            triton_client2 = grpcclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8001"
+            )
+            self.assertTrue(triton_client2.is_server_live())
 
     # Test grpc stream behavior when triton_grpc_error is set to false
     # and subsequent stream is NOT closed when error is reported from CORE

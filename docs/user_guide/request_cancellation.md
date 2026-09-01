@@ -28,14 +28,14 @@
 
 # Request Cancellation
 
-Starting from r23.10, Triton supports handling request cancellation received
-from the gRPC client or a C API user. Long running inference requests such
-as for auto generative large language models may run for an indeterminate
-amount of time or indeterminate number of steps. Additionally clients may
-enqueue a large number of requests as part of a sequence or request stream
-and later determine the results are no longer needed. Continuing to process
-requests whose results are no longer required can significantly impact server
-resources.
+Triton supports handling request cancellation received from the gRPC Python
+client or a C API user (since r23.10), and C++ client (since r26.05).
+Long running inference requests such as for auto generative large language
+models may run for an indeterminate amount of time or indeterminate number of
+steps. Additionally clients may enqueue a large number of requests as part of
+a sequence or request stream and later determine the results are no longer
+needed. Continuing to process requests whose results are no longer required can
+significantly impact server resources.
 
 ## Issuing Request Cancellation
 
@@ -51,8 +51,7 @@ about the APIs in [tritonserver.h](https://github.com/triton-inference-server/co
 
 In addition, [gRPC endpoint](../customization_guide/inference_protocols.md#httprest-and-grpc-protocols) can
 now detect cancellation from the client and attempt to terminate request.
-At present, only gRPC python client supports issuing request cancellation
-to the server endpoint. See [request-cancellation](https://github.com/triton-inference-server/client#request-cancellation)
+See [request-cancellation](https://github.com/triton-inference-server/client#request-cancellation)
 for more details on how to issue requests from the client-side.
 See gRPC guide on RPC [cancellation](https://grpc.io/docs/guides/cancellation/) for
 finer details.

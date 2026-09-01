@@ -1,4 +1,4 @@
-// Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -35,10 +35,25 @@
 #include <string>
 #include <vector>
 
+#include "model_config_utils.h"
+#undef RETURN_IF_ERROR  // core (Status) vs backend (TRITONSERVER_Error*); avoid
+                        // redefinition
 #include "triton/backend/backend_common.h"
-#include "triton/core/tritonserver.h"
+#include "triton/common/model_config.h"
 
 namespace tb = triton::backend;
+namespace tc = triton::common;
+namespace tcore = triton::core;
+
+// Core's linker script hides C++ symbols from libtritonserver.so.
+// Provide the small set of definitions the header-only templates need.
+const tcore::Status tcore::Status::Success(tcore::Status::Code::SUCCESS);
+
+inference::DataType
+tcore::TritonToDataType(const TRITONSERVER_DataType dtype)
+{
+  return static_cast<inference::DataType>(dtype);
+}
 
 namespace {
 
@@ -76,9 +91,11 @@ TRITONSERVER_ErrorMessage(TRITONSERVER_Error* error)
 namespace {
 
 enum class ErrorCode {
-  kInvalidDim = -2,
-  kOverflow = -3,
+  kInvalidDim = tc::INVALID_SIZE,
+  kOverflow = tc::OVERFLOW_SIZE,
 };
+
+static const std::string kTensorName{"input0"};
 
 void
 assert_get_element_count_success(
@@ -87,16 +104,25 @@ assert_get_element_count_success(
   int64_t cnt;
   TRITONSERVER_Error* err;
 
-  // assert old APIs
+  // Backend (old APIs)
   ASSERT_EQ(expected_cnt, tb::GetElementCount(shape.data(), shape.size()));
   ASSERT_EQ(expected_cnt, tb::GetElementCount(shape));
 
-  // assert new APIs
+  // Backend (new APIs)
   err = tb::GetElementCount(shape.data(), shape.size(), &cnt);
   ASSERT_EQ(err, nullptr);
   ASSERT_EQ(cnt, expected_cnt);
   err = tb::GetElementCount(shape, &cnt);
   ASSERT_EQ(err, nullptr);
+  ASSERT_EQ(cnt, expected_cnt);
+
+  // Common
+  ASSERT_EQ(tc::GetElementCount(shape), expected_cnt);
+
+  // Core
+  cnt = 0;
+  auto status = tcore::GetElementCount(shape, kTensorName, &cnt);
+  ASSERT_TRUE(status.IsOk()) << status.Message();
   ASSERT_EQ(cnt, expected_cnt);
 }
 
@@ -108,13 +134,13 @@ assert_get_element_count_error(
   int64_t cnt;
   TRITONSERVER_Error* err;
 
-  // assert old APIs
+  // Backend (old APIs)
   ASSERT_EQ(
       static_cast<int>(error_code),
       tb::GetElementCount(shape.data(), shape.size()));
   ASSERT_EQ(static_cast<int>(error_code), tb::GetElementCount(shape));
 
-  // assert new APIs
+  // Backend (new APIs)
   err = tb::GetElementCount(shape.data(), shape.size(), &cnt);
   ASSERT_NE(err, nullptr);
   ASSERT_EQ(TRITONSERVER_ERROR_INVALID_ARG, TRITONSERVER_ErrorCode(err));
@@ -123,23 +149,50 @@ assert_get_element_count_error(
   ASSERT_NE(err, nullptr);
   ASSERT_EQ(TRITONSERVER_ERROR_INVALID_ARG, TRITONSERVER_ErrorCode(err));
   ASSERT_STREQ(error_msg.c_str(), TRITONSERVER_ErrorMessage(err));
+
+  // Common
+  ASSERT_EQ(tc::GetElementCount(shape), static_cast<int64_t>(error_code));
+
+  // Core
+  cnt = 0;
+  auto status = tcore::GetElementCount(shape, kTensorName, &cnt);
+  ASSERT_FALSE(status.IsOk());
+  ASSERT_EQ(status.StatusCode(), triton::core::Status::Code::INVALID_ARG);
+  ASSERT_TRUE(
+      std::string(status.Message())
+          .find(
+              error_code == ErrorCode::kInvalidDim
+                  ? "invalid dimension"
+                  : "exceeds maximum size") != std::string::npos);
 }
 
 void
 assert_get_byte_size_success(
     TRITONSERVER_DataType dtype, std::vector<int64_t>& shape,
-    int64_t expected_size)
+    int64_t expected_size, bool test_core = true)
 {
   int64_t size;
   TRITONSERVER_Error* err;
 
-  // assert old API
+  // Backend (old API)
   ASSERT_EQ(expected_size, tb::GetByteSize(dtype, shape));
 
-  // assert new API
+  // Backend (new API)
   err = tb::GetByteSize(dtype, shape, &size);
   ASSERT_EQ(err, nullptr);
   ASSERT_EQ(expected_size, size);
+
+  // Common
+  inference::DataType core_dtype = tcore::TritonToDataType(dtype);
+  ASSERT_EQ(tc::GetByteSize(core_dtype, shape), expected_size);
+
+  // Core
+  if (test_core) {
+    size = 0;
+    auto status = tcore::GetByteSize(core_dtype, shape, kTensorName, &size);
+    ASSERT_TRUE(status.IsOk()) << status.Message();
+    ASSERT_EQ(size, expected_size);
+  }
 }
 
 void
@@ -150,14 +203,33 @@ assert_get_byte_size_error(
   int64_t size;
   TRITONSERVER_Error* err;
 
-  // assert old API
+  // Backend (old API)
   ASSERT_EQ(static_cast<int>(error_code), tb::GetByteSize(dtype, shape));
 
-  // assert new API
+  // Backend (new API)
   err = tb::GetByteSize(dtype, shape, &size);
   ASSERT_NE(err, nullptr);
   ASSERT_EQ(TRITONSERVER_ERROR_INVALID_ARG, TRITONSERVER_ErrorCode(err));
   ASSERT_EQ(error_msg, TRITONSERVER_ErrorMessage(err));
+
+  // Common
+  inference::DataType core_dtype = tcore::TritonToDataType(dtype);
+  ASSERT_EQ(
+      tc::GetByteSize(core_dtype, shape), error_code == ErrorCode::kInvalidDim
+                                              ? tc::INVALID_SIZE
+                                              : tc::OVERFLOW_SIZE);
+
+  // Core
+  size = 0;
+  auto status = tcore::GetByteSize(core_dtype, shape, kTensorName, &size);
+  ASSERT_FALSE(status.IsOk());
+  ASSERT_EQ(status.StatusCode(), triton::core::Status::Code::INVALID_ARG);
+  ASSERT_TRUE(
+      std::string(status.Message())
+          .find(
+              error_code == ErrorCode::kInvalidDim
+                  ? "invalid dimension"
+                  : "exceeds maximum size") != std::string::npos);
 }
 
 class GetElementCountTest : public ::testing::Test {
@@ -186,10 +258,10 @@ TEST_F(GetElementCountTest, GetElementCount)
   assert_get_element_count_success(shape, expected_cnt);
 }
 
-TEST_F(GetElementCountTest, GetElementCountNegative)
+TEST_F(GetElementCountTest, GetElementCountWildcard)
 {
   std::vector<int64_t> shape;
-  int64_t expected_cnt = -1;
+  int64_t expected_cnt = tc::WILDCARD_SIZE;
 
   // Test 1: -1 dim
   shape = {-1};
@@ -221,7 +293,6 @@ TEST_F(GetElementCountTest, GetElementCountZero)
   shape = {1, 8, 0};
   assert_get_element_count_success(shape, expected_cnt);
 
-  // Test 2: one 0 dim
   shape = {0, 1, 8};
   assert_get_element_count_success(shape, expected_cnt);
 
@@ -307,11 +378,11 @@ TEST_F(GetByteSizeTest, GetByteSize)
   assert_get_byte_size_success(dtype, shape, expected_size);
 }
 
-TEST_F(GetByteSizeTest, GetByteSizeNegative)
+TEST_F(GetByteSizeTest, GetByteSizeWildcard)
 {
   TRITONSERVER_DataType dtype;
   std::vector<int64_t> shape;
-  int64_t expected_size = -1;
+  int64_t expected_size = tc::WILDCARD_SIZE;
 
   // Test 1: invalid dtype
   dtype = TRITONSERVER_TYPE_INVALID;
@@ -321,7 +392,14 @@ TEST_F(GetByteSizeTest, GetByteSizeNegative)
   // Test 2: bytes dtype
   dtype = TRITONSERVER_TYPE_BYTES;
   shape = {8, 8};
-  assert_get_byte_size_success(dtype, shape, expected_size);
+  assert_get_byte_size_success(dtype, shape, expected_size, false);
+  // test core explicitly as it treats string dtype size as 4
+  int64_t size = 0;
+  inference::DataType core_dtype = tcore::TritonToDataType(dtype);
+  auto status = tcore::GetByteSize(core_dtype, shape, kTensorName, &size);
+  ASSERT_TRUE(status.IsOk()) << status.Message();
+  ASSERT_EQ(size, sizeof(int32_t) * 8 * 8);
+
 
   // Test 3: invalid shape and element count overflows
   dtype = TRITONSERVER_TYPE_INVALID;
@@ -348,7 +426,6 @@ TEST_F(GetByteSizeTest, GetByteSizeZero)
   shape = {1, 8, 0};
   assert_get_byte_size_success(dtype, shape, expected_cnt);
 
-  // Test 2: one 0 dim
   shape = {0, 1, 8};
   assert_get_byte_size_success(dtype, shape, expected_cnt);
 
@@ -403,6 +480,7 @@ TEST_F(GetByteSizeTest, GetByteSizeOverflow)
   error_msg = "unexpected integer overflow while calculating byte size.";
   assert_get_byte_size_error(dtype, shape, ErrorCode::kOverflow, error_msg);
 }
+
 }  // namespace
 
 int

@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,7 +36,7 @@ OWNED_BY = "Triton Inference Server"
 
 
 @router.get("/v1/models", response_model=ListModelsResponse, tags=["Models"])
-def list_models(request: Request) -> ListModelsResponse:
+async def list_models(request: Request) -> ListModelsResponse:
     """
     Lists the currently available models, and provides basic information about each one such as the owner and availability.
     """
@@ -50,7 +50,7 @@ def list_models(request: Request) -> ListModelsResponse:
 
 
 @router.get("/v1/models/{model_name}", response_model=Model, tags=["Models"])
-def retrieve_model(request: Request, model_name: str) -> Model:
+async def retrieve_model(request: Request, model_name: str) -> Model:
     """
     Retrieves a model instance, providing basic information about the model such as the owner and permissioning.
     """

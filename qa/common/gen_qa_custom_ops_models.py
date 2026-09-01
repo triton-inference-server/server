@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,6 +28,8 @@
 
 import argparse
 import os
+
+import gen_manifest
 
 FLAGS = None
 
@@ -68,13 +70,13 @@ def create_moduloop_modelfile(models_dir, model_version):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     traced.save(model_version_dir + "/model.pt")
 
 
-def create_moduloop_modelconfig(models_dir, model_version):
+def create_moduloop_modelconfig(models_dir):
     model_name = "libtorch_modulo"
     config_dir = models_dir + "/" + model_name
     config = """
@@ -106,7 +108,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -132,13 +134,13 @@ def create_visionop_modelfile(models_dir, model_version):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     scripted.save(model_version_dir + "/model.pt")
 
 
-def create_visionop_modelconfig(models_dir, model_version):
+def create_visionop_modelconfig(models_dir):
     model_name = "libtorch_visionop"
     config_dir = models_dir + "/" + model_name
     config = """
@@ -170,7 +172,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -181,7 +183,7 @@ def create_modulo_op_models(models_dir):
     model_version = 1
 
     if FLAGS.libtorch:
-        create_moduloop_modelconfig(models_dir, model_version)
+        create_moduloop_modelconfig(models_dir)
         create_moduloop_modelfile(models_dir, model_version)
 
 
@@ -189,7 +191,7 @@ def create_vision_op_models(models_dir):
     model_version = 1
 
     if FLAGS.libtorch:
-        create_visionop_modelconfig(models_dir, model_version)
+        create_visionop_modelconfig(models_dir)
         create_visionop_modelfile(models_dir, model_version)
 
 
@@ -227,6 +229,10 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     if FLAGS.libtorch:
         import torch
         import torch.utils.cpp_extension
@@ -235,3 +241,6 @@ if __name__ == "__main__":
 
         create_modulo_op_models(FLAGS.models_dir)
         create_vision_op_models(FLAGS.models_dir)
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

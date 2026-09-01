@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,8 +37,6 @@ fi
 if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
-
-pip3 install perf_analyzer
 
 # Use "--request-count" throughout the test to PA stability criteria and
 # reduce flaky failures from PA unstable measurements.

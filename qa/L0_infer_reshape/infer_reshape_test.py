@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,9 +50,7 @@ class InferReshapeTest(tu.TestResultCollector):
             output_shapes = input_shapes
 
         # For validation assume any shape can be used...
-        if tu.validate_for_onnx_model(
-            dtype, dtype, dtype, input_shapes[0], input_shapes[0], input_shapes[0]
-        ):
+        if tu.validate_for_onnx_model(dtype, dtype, dtype):
             # model that supports batching
             for bs in (1, 8):
                 full_shapes = [
@@ -155,9 +153,6 @@ class InferReshapeTest(tu.TestResultCollector):
                 dtype,
                 dtype,
                 dtype,
-                input_shapes[0],
-                input_shapes[0],
-                input_shapes[0],
             ):
                 # model that supports batching
                 for bs in (1, 8):
@@ -203,9 +198,7 @@ class InferReshapeTest(tu.TestResultCollector):
         if output_shapes is None:
             output_shapes = input_shapes
 
-        if tu.validate_for_trt_model(
-            dtype, dtype, dtype, input_shapes[0], input_shapes[0], input_shapes[0]
-        ):
+        if tu.validate_for_trt_model(dtype, dtype, dtype):
             # model that supports batching
             for bs in (1, 8):
                 full_shapes = [

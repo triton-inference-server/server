@@ -1,5 +1,5 @@
 ..
-.. Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+.. Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 ..
 .. Redistribution and use in source and binary forms, with or without
 .. modification, are permitted provided that the following conditions
@@ -29,14 +29,16 @@
 Performance Analyzer
 ####
 
-.. include:: perf-analyzer-README.rst
-
 .. toctree::
    :maxdepth: 1
    :hidden:
 
-   ../perf_analyzer/docs/install.md
-   ../perf_analyzer/docs/CLI.md
-   ../perf_analyzer/docs/inference_load_modes.md
-   ../perf_analyzer/docs/input_data.md
-   ../perf_analyzer/docs/measurements_metrics.md
+   Overview <../perf_analyzer/README.md>
+   Documentation <../perf_analyzer/docs/README.md>
+   Quick Start <../perf_analyzer/docs/quick_start.md>
+   Installation <../perf_analyzer/docs/install.md>
+   CLI Reference <../perf_analyzer/docs/cli.md>
+   Inference Load Modes <../perf_analyzer/docs/inference_load_modes.md>
+   Input Data <../perf_analyzer/docs/input_data.md>
+   Measurement Modes <../perf_analyzer/docs/measurements_metrics.md>
+   Benchmarking <../perf_analyzer/docs/benchmarking.md>

@@ -1,4 +1,4 @@
-// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -1421,6 +1421,9 @@ class InferHandler : public HandlerBase {
     std::vector<std::shared_ptr<const SharedMemoryManager::SharedMemoryInfo>>
         shm_regions_info_;
     std::shared_ptr<SharedMemoryManager> shm_manager_;
+    // For triton_grpc_error mode
+    const bool triton_grpc_error_;
+    std::atomic<bool> grpc_stream_closed_{false};
 
     ResponseReleasePayload(
         State* state,
@@ -1429,7 +1432,9 @@ class InferHandler : public HandlerBase {
             shm_regions_info,
         const std::shared_ptr<SharedMemoryManager>& shm_manager)
         : state_(state), shm_regions_info_(std::move(shm_regions_info)),
-          shm_manager_(shm_manager)
+          shm_manager_(shm_manager),
+          triton_grpc_error_(
+              state->context_->gRPCErrorTracker_->triton_grpc_error_)
     {
     }
 
@@ -1725,11 +1730,22 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
     for (const auto& pair : metadata) {
       auto& key = pair.first;
       auto& value = pair.second;
-      std::string param_key = std::string(key.begin(), key.end());
-      if (RE2::PartialMatch(param_key, header_forward_regex_)) {
-        std::string param_value = std::string(value.begin(), value.end());
+      std::string header_key = std::string(key.begin(), key.end());
+      if (RE2::PartialMatch(header_key, header_forward_regex_)) {
+        if (std::find(
+                kReservedParameterKeys.begin(), kReservedParameterKeys.end(),
+                header_key) != kReservedParameterKeys.end() ||
+            header_key.rfind("triton_", 0) == 0) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              ("Header '" + header_key +
+               "' is reserved for Triton usage and cannot be forwarded.")
+                  .c_str());
+        }
+
+        std::string header_value = std::string(value.begin(), value.end());
         err = TRITONSERVER_InferenceRequestSetStringParameter(
-            irequest, param_key.c_str(), param_value.c_str());
+            irequest, header_key.c_str(), header_value.c_str());
         if (err != nullptr) {
           break;
         }

@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2025-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,18 +23,23 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
 import json
-import os
+import logging
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import openai
 import pytest
+from fastapi.testclient import TestClient
 from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionMessageToolCall,
     ChatCompletionNamedToolChoiceParam,
     ChatCompletionToolParam,
 )
+from tests.utils import setup_fastapi_app, setup_server
 
 # resources for testing the tool callings
 WEATHER_TOOL: ChatCompletionToolParam = {
@@ -175,7 +180,15 @@ class TestAsyncClientToolCalling:
         assert parsed_arguments.get("unit") == "fahrenheit"
 
     @pytest.mark.asyncio
-    async def test_tool_call_and_choice(self, client: openai.AsyncOpenAI, model: str):
+    async def test_tool_call_and_choice(
+        self, client: openai.AsyncOpenAI, model: str, backend: str
+    ):
+        # FIXME: [TRI-992] Maybe an issue on TRT-LLM but unverified.
+        if backend == "vllm" and model == "mistral-nemo-instruct-2407":
+            pytest.skip(
+                reason="Mistral model tool calling is not triggered with tool_choice=auto (default)."
+            )
+
         chat_completion = await client.chat.completions.create(
             messages=MESSAGES_ASKING_FOR_TOOLS,
             temperature=0,
@@ -584,3 +597,147 @@ class TestAsyncClientToolCalling:
                 tools=[],
                 logprobs=False,
             )
+
+
+class TestStreamingToolParseLimit:
+    """
+    Test the streaming tool-call parse-size limit. Utilizes the
+    tool_parser_models/tool_stream_py model, which streams a Mistral-format
+    tool call in small fragments. A prompt containing "big-tool-args" produces
+    an argument large enough to exceed the configured limit, and any other prompt
+    results in an argument that remains within the limit.
+    """
+
+    MODEL = "tool_stream_py"
+    # Small enough that a single tool call can deterministically exceed it.
+    LIMIT_BYTES = 512
+
+    @pytest.fixture(scope="class")
+    def client(self, tokenizer_model: str):
+        model_repository = str(Path(__file__).parent / "tool_parser_models")
+        server = setup_server(model_repository)
+        app = setup_fastapi_app(
+            tokenizer=tokenizer_model,
+            server=server,
+            backend=None,
+            tool_call_parser="mistral",
+            max_tool_call_parse_bytes=self.LIMIT_BYTES,
+        )
+        with TestClient(app) as test_client:
+            yield test_client
+        server.stop()
+
+    def _stream(self, client, content, with_tools):
+        """Streams a chat completion
+        returns (finish_reasons, streamed_text)."""
+        payload = {
+            "model": self.MODEL,
+            "messages": [{"role": "user", "content": content}],
+            "stream": True,
+            "max_completion_tokens": 4096,
+        }
+        if with_tools:
+            payload["tools"] = [WEATHER_TOOL]
+
+        finish_reasons: List[str] = []
+        text = ""
+        with client.stream("POST", "/v1/chat/completions", json=payload) as response:
+            assert response.status_code == 200
+            for line in response.iter_lines():
+                if not line.startswith("data: "):
+                    continue
+                data = line[len("data: ") :]
+                if data.strip() == "[DONE]":
+                    break
+                choice = json.loads(data)["choices"][0]
+                if choice.get("finish_reason"):
+                    finish_reasons.append(choice["finish_reason"])
+                delta = choice.get("delta") or {}
+                if delta.get("content"):
+                    text += delta["content"]
+                for tool_call in delta.get("tool_calls") or []:
+                    arguments = (tool_call.get("function") or {}).get("arguments")
+                    if arguments:
+                        text += arguments
+        return finish_reasons, text
+
+    def test_truncated_when_tool_call_exceeds_limit(self, client):
+        finish_reasons, _ = self._stream(client, "big-tool-args", with_tools=True)
+        # Once the accumulated tool-call text passes the cap, the stream will be terminated with finish_reason="length".
+        assert finish_reasons[-1] == "length"
+        _, status = self._stream(client, "cancellation-status", with_tools=False)
+        assert status == "cancelled"
+
+    def test_not_truncated_within_limit(self, client):
+        finish_reasons, _ = self._stream(client, "small tool call", with_tools=True)
+        # A short tool call stays under the cap and completes normally.
+        assert "length" not in finish_reasons
+        _, status = self._stream(client, "cancellation-status", with_tools=False)
+        assert status == "not-cancelled"
+
+    def test_limit_ignored_without_tools(self, client):
+        finish_reasons, text = self._stream(client, "big-tool-args", with_tools=False)
+        # Plain streaming does not enter the tool parser, so the cap never fires.
+        assert "length" not in finish_reasons
+        assert len(text) > self.LIMIT_BYTES
+
+    def test_cancellation_failure_is_not_silent(self, caplog):
+        from engine.triton_engine import TritonLLMEngine
+
+        class FailingResponseIterator:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                raise StopAsyncIteration
+
+            def cancel(self):
+                raise RuntimeError("cancel failed")
+
+        with caplog.at_level(logging.ERROR):
+            TritonLLMEngine._cancel_inference(
+                FailingResponseIterator(), "test-request", "test"
+            )
+
+        records = [r for r in caplog.records if "test-request" in r.getMessage()]
+        assert len(records) == 1
+        record = records[0]
+        assert record.levelno == logging.ERROR
+        assert record.exc_info and record.exc_info[0] is RuntimeError
+
+    @pytest.mark.asyncio
+    async def test_abandoned_chat_stream_cancels_backend_inference(self, client):
+        from schemas.openai import CreateChatCompletionRequest
+
+        request = CreateChatCompletionRequest(
+            model=self.MODEL,
+            messages=[{"role": "user", "content": "big-tool-args"}],
+            stream=True,
+            max_completion_tokens=4096,
+        )
+        stream = await client.app.engine.chat(request)
+        # The first chat chunk only establishes the assistant role. Consume a
+        # backend-produced chunk as well so cancellation is observed in execute().
+        await stream.__anext__()
+        await stream.__anext__()
+        await stream.aclose()
+
+        _, status = self._stream(client, "cancellation-status", with_tools=False)
+        assert status == "cancelled"
+
+    @pytest.mark.asyncio
+    async def test_abandoned_completion_stream_cancels_backend_inference(self, client):
+        from schemas.openai import CreateCompletionRequest
+
+        request = CreateCompletionRequest(
+            model=self.MODEL,
+            prompt="big-tool-args",
+            stream=True,
+            max_tokens=4096,
+        )
+        stream = await client.app.engine.completion(request)
+        await stream.__anext__()
+        await stream.aclose()
+
+        _, status = self._stream(client, "cancellation-status", with_tools=False)
+        assert status == "cancelled"

@@ -42,9 +42,15 @@ from frontend.fastapi_frontend import FastApiFrontend
 
 
 # TODO: Cleanup, refactor, mock, etc.
-def setup_server(model_repository: str):
+def setup_server(
+    model_repository: str,
+    model_control_mode: tritonserver.ModelControlMode = tritonserver.ModelControlMode.NONE,
+    load_models: Optional[List[str]] = None,
+):
     server: tritonserver.Server = tritonserver.Server(
         model_repository=model_repository,
+        model_control_mode=model_control_mode,
+        startup_models=load_models or [],
         log_verbose=0,
         log_info=True,
         log_warn=True,
@@ -58,12 +64,19 @@ def setup_fastapi_app(
     server: tritonserver.Server,
     backend: str,
     default_max_tokens: int = 16,
+    tool_call_parser: Optional[str] = None,
+    max_tool_call_parse_bytes: Optional[int] = None,
 ):
+    engine_kwargs = {}
+    if max_tool_call_parse_bytes is not None:
+        engine_kwargs["max_tool_call_parse_bytes"] = max_tool_call_parse_bytes
     engine: TritonLLMEngine = TritonLLMEngine(
         server=server,
         tokenizer=tokenizer,
         backend=backend,
         default_max_tokens=default_max_tokens,
+        tool_call_parser=tool_call_parser,
+        **engine_kwargs,
     )
     frontend: FastApiFrontend = FastApiFrontend(engine=engine)
     return frontend.app

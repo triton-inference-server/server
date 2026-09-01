@@ -31,9 +31,11 @@
 #include "http_server.h"
 
 #include <event2/buffer.h>
+#include <event2/bufferevent.h>
 #include <re2/re2.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <list>
 #include <regex>
 #include <thread>
@@ -47,6 +49,11 @@
 #include "triton/common/triton_json.h"
 
 namespace triton { namespace server {
+
+// Transfer-Encoding: chunked — count non-empty chunks per request (worker
+// thread). Increment in ChunkCountIncrement. Caps evbuffer fan-out / RSS.
+constexpr uint64_t kMaxChunkedChunks =
+    1 << 16;  // reject on chunk count > kMaxChunkedChunks (65536)
 
 #define RETURN_AND_CALLBACK_IF_ERR(X, CALLBACK) \
   do {                                          \
@@ -289,8 +296,43 @@ HTTPServer::NewConnection(evhtp_connection_t* conn, void* arg)
     server->conn_cnt_++;
   }
   evhtp_connection_set_hook(
+      conn, evhtp_hook_on_new_chunk,
+      (evhtp_hook)(void*)HTTPServer::ChunkCountIncrement, arg);
+  evhtp_connection_set_hook(
       conn, evhtp_hook_on_connection_fini,
       (evhtp_hook)(void*)HTTPServer::EndConnection, arg);
+  return EVHTP_RES_OK;
+}
+
+evhtp_res
+HTTPServer::ChunkCountIncrement(
+    evhtp_request_t* req, uint64_t chunk_len, void* arg)
+{
+  (void)arg;
+  if ((req->flags & EVHTP_REQ_FLAG_FINISHED) != 0) {
+    return EVHTP_RES_OK;
+  }
+
+  if (chunk_len == 0) {
+    return EVHTP_RES_OK;
+  }
+  if (++req->chunk_count > kMaxChunkedChunks) {
+    AddContentTypeHeader(req, "application/json");
+    const std::string msg =
+        std::string("Chunked request body exceeds maximum of ") +
+        std::to_string(kMaxChunkedChunks) +
+        " non-empty chunks. Send fewer or larger HTTP chunks.";
+    EVBufferAddErrorJson(req->buffer_out, msg.c_str());
+    // Force connection close after flushing this error response.
+    req->flags &= ~EVHTP_REQ_FLAG_KEEPALIVE;
+    if ((req->conn != nullptr) && (req->conn->bev != nullptr)) {
+      // Stop ingesting request bytes once over limit so memory won't keep
+      // growing while we flush the error response.
+      bufferevent_disable(req->conn->bev, EV_READ);
+    }
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return EVHTP_RES_OK;
+  }
   return EVHTP_RES_OK;
 }
 
@@ -478,6 +520,11 @@ ReadDataFromJsonHelper(
     triton::common::TritonJson::Value& tensor_data, int* counter,
     int64_t expected_cnt, int current_depth = 0)
 {
+  if (!base) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "Failed to parse 'data' field: output buffer unavailable");
+  }
   // FIXME should move 'switch' statement outside the recursive function and
   // pass in a read data callback once data type is confirmed.
   // Currently 'switch' is performed on each element even through all elements
@@ -501,6 +548,10 @@ ReadDataFromJsonHelper(
           base, dtype, el, counter, expected_cnt, current_depth + 1));
     }
   } else {
+    if (!counter) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL, "Invalid counter provided");
+    }
     // Check if writing to 'serialized' is overrunning the expected byte_size
     if (*counter < 0 || static_cast<int64_t>(*counter) >= expected_cnt) {
       return TRITONSERVER_ErrorNew(
@@ -618,7 +669,7 @@ ReadDataFromJsonHelper(
         if (actual_cnt < 0 || actual_cnt > expected_cnt) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
-              "Shape does not match true shape of 'data' field");
+              "shape does not match true shape of 'data' field");
         }
         memcpy(
             base + *counter, reinterpret_cast<char*>(&len), sizeof(uint32_t));
@@ -668,6 +719,11 @@ ReadDataFromJson(
               .c_str());
 
     default:
+      if (!base) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INTERNAL,
+            "Failed to parse 'data' field: output buffer unavailable");
+      }
       RETURN_MSG_IF_ERR(
           ReadDataFromJsonHelper(
               base, dtype, tensor_data, &counter, expected_cnt),
@@ -679,8 +735,7 @@ ReadDataFromJson(
   if (counter != expected_cnt) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
-        "Unable to parse 'data': Shape does not match true shape of 'data' "
-        "field");
+        "Failed to parse 'data' field: shape does not match true shape");
   }
 
   return nullptr;
@@ -695,7 +750,8 @@ WriteDataToJsonCheck(
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
         std::string(
-            "output tensor shape does not match size of output for '" +
+            "Failed to write 'data' field: output tensor shape does not match "
+            "size of output for '" +
             output_name + "'")
             .c_str());
   }
@@ -716,7 +772,8 @@ WriteDataToJson(
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INTERNAL,
             std::string(
-                "output tensor shape does not match size of output for '" +
+                "Failed to write 'data' field: output tensor shape does not "
+                "match size of output for '" +
                 output_name + "'")
                 .c_str());
       }
@@ -1398,7 +1455,13 @@ HTTPAPIServer::HandleRepositoryIndex(
   if (buffer_len > 0) {
     triton::common::TritonJson::Value ready_json;
     if (index_request.Find("ready", &ready_json)) {
-      err = ready_json.AsBool(&ready);
+      if (!ready_json.IsBool()) {
+        err = TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "Invalid value for 'ready': expected a boolean");
+      } else {
+        err = ready_json.AsBool(&ready);
+      }
     }
   }
 
@@ -2189,7 +2252,10 @@ HTTPAPIServer::HandleSystemSharedMemory(
       }
     }
   } else if (action == "register") {
-    if (region_name.empty()) {
+    if (!shm_manager_->AllowClientSharedMemory()) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
+    } else if (region_name.empty()) {
       err = TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           "'region name' is necessary to register system shared memory region");
@@ -2236,7 +2302,10 @@ HTTPAPIServer::HandleSystemSharedMemory(
       }
     }
   } else if (action == "unregister") {
-    if (region_name.empty()) {
+    if (!shm_manager_->AllowClientSharedMemory()) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
+    } else if (region_name.empty()) {
       err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_CPU);
     } else {
       err = shm_manager_->Unregister(region_name, TRITONSERVER_MEMORY_CPU);
@@ -2278,7 +2347,10 @@ HTTPAPIServer::HandleCudaSharedMemory(
       }
     }
   } else if (action == "register") {
-    if (region_name.empty()) {
+    if (!shm_manager_->AllowClientSharedMemory()) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
+    } else if (region_name.empty()) {
       err = TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           "'region name' is necessary to register cuda shared memory region");
@@ -2340,7 +2412,10 @@ HTTPAPIServer::HandleCudaSharedMemory(
 #endif  // TRITON_ENABLE_GPU
     }
   } else if (action == "unregister") {
-    if (region_name.empty()) {
+    if (!shm_manager_->AllowClientSharedMemory()) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED, kClientShmDisabledErrorStr);
+    } else if (region_name.empty()) {
       err = shm_manager_->UnregisterAll(TRITONSERVER_MEMORY_GPU);
     } else {
       err = shm_manager_->Unregister(region_name, TRITONSERVER_MEMORY_GPU);
@@ -2365,7 +2440,7 @@ HTTPAPIServer::GetContentLength(
         evhtp_kv_find(req->headers_in, kContentLengthHeader);
     if (content_length_c_str != nullptr) {
       try {
-        lcontent_length = std::atoi(content_length_c_str);
+        lcontent_length = std::stoi(content_length_c_str);
       }
       catch (const std::invalid_argument& ia) {
         err = TRITONSERVER_ErrorNew(
@@ -2409,7 +2484,7 @@ HTTPAPIServer::GetInferenceHeaderLength(
   if (header_length_c_str != NULL) {
     int parsed_value;
     try {
-      parsed_value = std::atoi(header_length_c_str);
+      parsed_value = std::stoi(header_length_c_str);
     }
     catch (const std::invalid_argument& ia) {
       return TRITONSERVER_ErrorNew(
@@ -2417,6 +2492,16 @@ HTTPAPIServer::GetInferenceHeaderLength(
                                            kInferHeaderContentLengthHTTPHeader +
                                            ", got: " + header_length_c_str)
                                               .c_str());
+    }
+    catch (const std::out_of_range& oor) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          (std::string("Unable to parse ") +
+           kInferHeaderContentLengthHTTPHeader + ", value is out of range [ " +
+           std::to_string(std::numeric_limits<std::int32_t>::min()) + ", " +
+           std::to_string(std::numeric_limits<std::int32_t>::max()) +
+           " ], got: " + header_length_c_str)
+              .c_str());
     }
 
     // Check if the content length is in proper range
@@ -2855,8 +2940,7 @@ HTTPAPIServer::ParseJsonTritonParams(
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             ("parameter keys starting with 'triton_' are reserved for Triton "
-             "usage "
-             "and should not be specified."));
+             "usage and should not be specified."));
       } else {
         RETURN_IF_ERR(SetTritonParameterFromJsonParameter(
             parameter, params_json, irequest));
@@ -3086,8 +3170,8 @@ HTTPAPIServer::EVBufferToJson(
   if (length > max_input_size_) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
-        ("Request JSON size of " + std::to_string(length) +
-         " bytes exceeds the maximum allowed value of " +
+        ("request JSON size of " + std::to_string(length) +
+         " bytes exceeds the maximum allowed input size of " +
          std::to_string(max_input_size_) +
          " bytes. Use --http-max-input-size to increase the limit.")
             .c_str());
@@ -3159,14 +3243,25 @@ struct HeaderSearchPayload {
 int
 ForEachHeader(evhtp_header_t* header, void* arg)
 {
-  HeaderSearchPayload* header_search_payload =
-      reinterpret_cast<HeaderSearchPayload*>(arg);
+  auto* header_search_payload = reinterpret_cast<HeaderSearchPayload*>(arg);
 
   TRITONSERVER_InferenceRequest* request = header_search_payload->request_;
   const re2::RE2& regex = header_search_payload->regex_;
+  std::string header_key{header->key};
 
-  std::string matched_string;
-  if (RE2::PartialMatch(std::string(header->key), regex)) {
+  if (RE2::PartialMatch(header_key, regex)) {
+    if (std::find(
+            kReservedParameterKeys.begin(), kReservedParameterKeys.end(),
+            header_key) != kReservedParameterKeys.end() ||
+        header_key.rfind("triton_", 0) == 0) {
+      header_search_payload->error_ = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          ("Header '" + header_key +
+           "' is reserved for Triton usage and cannot be forwarded.")
+              .c_str());
+      return 1;
+    }
+
     header_search_payload->error_ =
         TRITONSERVER_InferenceRequestSetStringParameter(
             request, header->key, header->val);
@@ -3225,15 +3320,15 @@ HTTPAPIServer::StartTrace(
 
 TRITONSERVER_Error*
 HTTPAPIServer::DecompressBuffer(
-    evhtp_request_t* req, evbuffer** decompressed_buffer)
+    evhtp_request_t* req, EvbufferUniquePtr& decompressed_buffer)
 {
   auto compression_type = GetRequestCompressionType(req);
   switch (compression_type) {
     case DataCompressor::Type::DEFLATE:
     case DataCompressor::Type::GZIP: {
-      *decompressed_buffer = evbuffer_new();
+      decompressed_buffer.reset(evbuffer_new());
       RETURN_IF_ERR(DataCompressor::DecompressData(
-          compression_type, req->buffer_in, *decompressed_buffer,
+          compression_type, req->buffer_in, decompressed_buffer.get(),
           max_input_size_));
       break;
     }
@@ -3361,12 +3456,12 @@ HTTPAPIServer::HandleGenerate(
         server_.get(), req, GetResponseCompressionType(req),
         generate_stream_request_schema_.get(),
         generate_stream_response_schema_.get(), streaming, irequest_shared,
-        shm_manager_));
+        shm_manager_, max_input_size_));
   } else {
     generate_request.reset(new GenerateRequestClass(
         server_.get(), req, GetResponseCompressionType(req),
         generate_request_schema_.get(), generate_response_schema_.get(),
-        streaming, irequest_shared, shm_manager_));
+        streaming, irequest_shared, shm_manager_, max_input_size_));
   }
   generate_request->trace_ = trace;
 
@@ -3513,13 +3608,16 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
   std::vector<std::string> members;
   RETURN_IF_ERR(generate_request.Members(&members));
 
+  size_t consumed_input_size{0};
+
   for (const auto& m : members) {
     auto it = schema->children_.find(m);
     if (it != schema->children_.end()) {
       switch (it->second->kind_) {
         case MappingSchema::Kind::EXACT_MAPPING: {
           // Read meta data
-          RETURN_IF_ERR(ExactMappingInput(m, generate_request, input_metadata));
+          RETURN_IF_ERR(ExactMappingInput(
+              m, generate_request, input_metadata, consumed_input_size));
           break;
         }
         case MappingSchema::Kind::MAPPING_SCHEMA: {
@@ -3549,7 +3647,8 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
       }
     } else if (schema->allow_unspecified_) {
       // Unspecified key follows EXACT_MAPPING
-      RETURN_IF_ERR(ExactMappingInput(m, generate_request, input_metadata));
+      RETURN_IF_ERR(ExactMappingInput(
+          m, generate_request, input_metadata, consumed_input_size));
     } else {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNSUPPORTED,
@@ -3563,7 +3662,8 @@ TRITONSERVER_Error*
 HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
     const std::string& name,
     triton::common::TritonJson::Value& generate_request,
-    std::map<std::string, triton::common::TritonJson::Value>& input_metadata)
+    std::map<std::string, triton::common::TritonJson::Value>& input_metadata,
+    size_t& consumed_input_byte_size)
 {
   auto it = input_metadata.find(name);
   if (it == input_metadata.end()) {
@@ -3587,14 +3687,58 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
               .c_str());
     }
 
+    size_t byte_size{0};
     size_t element_cnt = tensor_data.IsArray() ? tensor_data.ArraySize() : 1;
 
-    size_t byte_size = 0;
     if (dtype == TRITONSERVER_TYPE_BYTES) {
       RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
     } else {
-      byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
+      size_t element_size = TRITONSERVER_DataTypeByteSize(dtype);
+      if (element_size == 0) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("input '") + name + "' has unsupported datatype " +
+             value)
+                .c_str());
+      }
+
+      // Ensure that we do not have an integer overflow when calculating
+      // byte_size = element_cnt * element_size.
+      if (element_cnt > (SIZE_MAX / element_size)) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("input '") + name +
+             "' has too many elements of datatype " + value)
+                .c_str());
+      }
+
+      byte_size = element_cnt * element_size;
     }
+
+    // For zero-size input, we can skip the rest of the validation and just add
+    // it as an empty input.
+    if (byte_size == 0) {
+      RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(
+          triton_request_.get(), name.c_str(), dtype, nullptr, 0));
+      return nullptr;
+    }
+
+    // Ensure that the resulting array size in bytes does not exceed the maximum
+    // allowed input size.
+    if (byte_size + consumed_input_byte_size > max_input_size_ ||
+        byte_size + consumed_input_byte_size < consumed_input_byte_size) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          (std::string("request size of ") +
+           std::to_string(consumed_input_byte_size) + " bytes with input '" +
+           name + "' of size " + std::to_string(byte_size) +
+           " bytes exceeds the maximum allowed input size of " +
+           std::to_string(max_input_size_) +
+           ". Use --http-max-input-size to increase the limit.")
+              .c_str());
+    }
+
+    consumed_input_byte_size += byte_size;
 
     std::vector<int64_t> shape_vec;
     {
@@ -3607,11 +3751,13 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
              name)
                 .c_str());
       }
+
       for (size_t i = 0; i < value.ArraySize(); ++i) {
         int64_t d = 0;
         RETURN_IF_ERR(value.IndexAsInt(i, &d));
         shape_vec.push_back(d);
       }
+
       // Because generate request don't carry too much shape information, using
       // a two-pass process to pad the request value to match input shape.
       // 1. iterate shape for fixed dimension to distribute 'element_cnt'.
@@ -3629,12 +3775,14 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
           element_cnt /= *rit;
         }
       }
+
       for (auto rit = shape_vec.rbegin(); rit != shape_vec.rend(); ++rit) {
         if (*rit == -1) {
           *rit = element_cnt;
           element_cnt = 1;
         }
       }
+
       if (element_cnt != 1) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
@@ -3649,10 +3797,10 @@ HTTPAPIServer::GenerateRequestClass::ExactMappingInput(
     serialized_data_.emplace_back();
     std::vector<char>& serialized = serialized_data_.back();
     serialized.resize(byte_size);
+
     RETURN_IF_ERR(ReadDataFromJson(
         name.c_str(), tensor_data, &serialized[0], dtype,
         dtype == TRITONSERVER_TYPE_BYTES ? byte_size : element_cnt));
-
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAddInput(
         triton_request_.get(), name.c_str(), dtype, &shape_vec[0],
         shape_vec.size()));
@@ -3691,13 +3839,13 @@ HTTPAPIServer::HandleInfer(
   }
 
   // Decompress request body if it is compressed in supported type
-  evbuffer* decompressed_buffer = nullptr;
-  RETURN_AND_RESPOND_IF_ERR(req, DecompressBuffer(req, &decompressed_buffer));
+  EvbufferUniquePtr decompressed_buffer;
+  RETURN_AND_RESPOND_IF_ERR(req, DecompressBuffer(req, decompressed_buffer));
 
   // Get content length as a default header_length if no header specified
   int32_t content_length = 0;
   RETURN_AND_RESPOND_IF_ERR(
-      req, GetContentLength(req, decompressed_buffer, &content_length));
+      req, GetContentLength(req, decompressed_buffer.get(), &content_length));
 
   // Get the header length
   size_t header_length = 0;
@@ -3749,8 +3897,8 @@ HTTPAPIServer::HandleInfer(
   // Parse EV request and fill Triton request fields from it
   RETURN_AND_CALLBACK_IF_ERR(
       EVRequestToTritonRequest(
-          req, model_name, irequest, decompressed_buffer, infer_request.get(),
-          header_length),
+          req, model_name, irequest, decompressed_buffer.get(),
+          infer_request.get(), header_length),
       error_callback);
 
   // Get request ID for logging in case of error.
@@ -3765,7 +3913,7 @@ HTTPAPIServer::HandleInfer(
   RETURN_AND_CALLBACK_IF_ERR(ForwardHeaders(req, irequest), error_callback);
 
   auto request_release_payload = std::make_unique<RequestReleasePayload>(
-      irequest_shared, decompressed_buffer);
+      irequest_shared, decompressed_buffer.release());
   RETURN_AND_CALLBACK_IF_ERR(
       TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestClass::InferRequestComplete,

@@ -1,4 +1,4 @@
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,7 +36,10 @@ ENDPOINT_MAPPING = {
         "POST /v1/completions",
         "POST /v1/embeddings",
     ],
-    "model-repository": ["GET /v1/models"],
+    "model-repository": [
+        "GET /v1/models",
+        "POST /v1/models/",
+    ],
     "metrics": ["GET /metrics"],
     "health": ["GET /health/ready"],
 }
@@ -98,6 +101,18 @@ class RestrictedFeatures:
             dict: Copy of the restrictions mapping API names to (header_key, header_value) tuples
         """
         return self._restrictions.copy()
+
+    def RestrictionSummary(self) -> dict[str, str]:
+        """
+        Get a log-safe copy of the restrictions dictionary.
+
+        Returns:
+            dict: Mapping of API names to header names without secret values.
+        """
+        return {
+            api: header_name
+            for api, (header_name, _header_value) in self._restrictions.items()
+        }
 
     def Insert(self, api: str, restriction: tuple[str, str]):
         """

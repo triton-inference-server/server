@@ -1,4 +1,4 @@
-// Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -240,6 +240,9 @@ struct TritonServerParameters {
   std::string vertex_ai_default_model_{};
 #endif  // TRITON_ENABLE_VERTEX_AI
 
+  // Shared memory access control
+  bool allow_client_shm_{false};
+
   // [FIXME] who should call this function?
   void CheckPortCollision();
   using ManagedTritonServerOptionPtr = std::unique_ptr<
@@ -350,6 +353,7 @@ class TritonParser {
   std::vector<Option> cache_options_;
   std::vector<Option> rate_limiter_options_;
   std::vector<Option> memory_device_options_;
+  std::vector<Option> shared_memory_options_;
   // Group deprecated options to keep preferred options more succinct
   std::vector<Option> deprecated_options_;
 };

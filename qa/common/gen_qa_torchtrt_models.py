@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,10 +28,21 @@
 
 import argparse
 import os
+import sys
 
+import gen_manifest
 import torch
-import torch_tensorrt
 import torchvision
+from check_tensorrt_target import compute_capability, unsupported_target_reason, warn
+
+try:
+    import torch_tensorrt
+except ImportError:
+    warn(
+        "torch_tensorrt is not available in this environment. "
+        "Skipping Torch-TensorRT model generation."
+    )
+    sys.exit(0)
 
 
 def create_resnet50_torchtrt(models_dir, max_batch):
@@ -61,7 +72,7 @@ def create_resnet50_torchtrt(models_dir, max_batch):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     torch.jit.save(trt_ts_module, model_version_dir + "/model.pt")
@@ -96,7 +107,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -110,5 +121,24 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Asked before the weights download and the trace: on a GPU this TensorRT
+    # has no kernels for, every one of those is wasted and the compile ends the
+    # whole PyTorch stage, which runs under `set -e`.
+    reason = unsupported_target_reason()
+    if reason:
+        capability = compute_capability()
+        warn(
+            "Skipping Torch-TensorRT model generation on compute capability"
+            " {}: {}".format(capability or "unknown", reason)
+        )
+        sys.exit(0)
+
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     create_resnet50_torchtrt(FLAGS.models_dir, 128)
     create_resnet50_torchtrt_modelconfig(FLAGS.models_dir, 128)
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

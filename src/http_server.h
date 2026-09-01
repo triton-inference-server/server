@@ -1,4 +1,4 @@
-// Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -104,6 +104,10 @@ class HTTPServer {
   virtual void Handle(evhtp_request_t* req) = 0;
 
   static void StopCallback(evutil_socket_t sock, short events, void* arg);
+
+  // Transfer-Encoding: chunked — increment count per non-empty chunk (capped).
+  static evhtp_res ChunkCountIncrement(
+      evhtp_request_t* req, uint64_t chunk_len, void* arg);
 
   static evhtp_res NewConnection(evhtp_connection_t* conn, void* arg);
   static evhtp_res EndConnection(evhtp_connection_t* conn, void* arg);
@@ -388,12 +392,13 @@ class HTTPAPIServer : public HTTPServer {
         const MappingSchema* request_schema,
         const MappingSchema* response_schema, bool streaming,
         const std::shared_ptr<TRITONSERVER_InferenceRequest>& triton_request,
-        const std::shared_ptr<SharedMemoryManager>& shm_manager)
+        const std::shared_ptr<SharedMemoryManager>& shm_manager,
+        const size_t max_input_size)
         : InferRequestClass(
               server, req, response_compression_type, triton_request,
               shm_manager),
           request_schema_(request_schema), response_schema_(response_schema),
-          streaming_(streaming)
+          streaming_(streaming), max_input_size_(max_input_size)
     {
     }
     virtual ~GenerateRequestClass();
@@ -443,7 +448,8 @@ class HTTPAPIServer : public HTTPServer {
     TRITONSERVER_Error* ExactMappingInput(
         const std::string& name, triton::common::TritonJson::Value& value,
         std::map<std::string, triton::common::TritonJson::Value>&
-            input_metadata);
+            input_metadata,
+        size_t& consumed_input_byte_size);
 
     // [DLIS-5551] currently always performs basic conversion, only maps schema
     // of EXACT_MAPPING kind. MAPPING_SCHEMA and upcoming kinds are for
@@ -461,6 +467,7 @@ class HTTPAPIServer : public HTTPServer {
     const MappingSchema* request_schema_{nullptr};
     const MappingSchema* response_schema_{nullptr};
     const bool streaming_{false};
+    const size_t max_input_size_{0};
     // Placeholder to completing response, this class does not own
     // the response.
     TRITONSERVER_InferenceResponse* triton_response_{nullptr};
@@ -471,6 +478,17 @@ class HTTPAPIServer : public HTTPServer {
     std::queue<evbuffer*> pending_http_responses_;
     bool end_{false};
   };
+
+  struct ReleaseEvbuffer {
+    // Custom deleter for evbuffer
+    void operator()(evbuffer* b) const noexcept
+    {
+      if (b != nullptr) {
+        evbuffer_free(b);
+      }
+    }
+  };
+  using EvbufferUniquePtr = std::unique_ptr<evbuffer, ReleaseEvbuffer>;
 
   // Simple structure that carries the userp payload needed for
   // request release callback.
@@ -532,7 +550,7 @@ class HTTPAPIServer : public HTTPServer {
       evhtp_request_t* req, evbuffer* decompressed_buffer,
       int32_t* content_length);
   TRITONSERVER_Error* DecompressBuffer(
-      evhtp_request_t* req, evbuffer** decompressed_buffer);
+      evhtp_request_t* req, EvbufferUniquePtr& decompressed_buffer);
   TRITONSERVER_Error* CheckTransactionPolicy(
       evhtp_request_t* req, const std::string& model_name,
       int64_t requested_model_version);

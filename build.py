@@ -32,6 +32,7 @@ import os
 import os.path
 import pathlib
 import platform
+import re
 import stat
 import subprocess
 import sys
@@ -71,14 +72,13 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.67.0dev",
-    "triton_container_version": "26.03dev",
-    "upstream_container_version": "26.01",
-    "ort_version": "1.24.1",
-    "ort_openvino_version": "2025.4.1",
-    "standalone_openvino_version": "2025.4.1",
-    "dcgm_version": "4.5.2-1",
-    "vllm_version": "0.13.0",
+    "release_version": "2.73.0dev",
+    "triton_container_version": "26.09dev",
+    "upstream_container_version": "26.07",
+    "ort_version": "1.27.0",
+    "ort_openvino_version": "2026.2.0",
+    "standalone_openvino_version": "2026.2.0",
+    "dcgm_version": "4.5.3-1",
     "rhel_py_version": "3.12.3",
 }
 
@@ -106,6 +106,51 @@ def log_verbose(msg):
         log(msg, force=True)
 
 
+def usable_cpu_count():
+    # Honor CPU affinity / cgroup pinning where available (Linux); fall back to
+    # the logical core count on platforms without sched_getaffinity.
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:
+        return multiprocessing.cpu_count() or 1
+
+
+def available_memory_gb():
+    # Best-effort available RAM in GiB, or None if it cannot be determined.
+    # Reads MemAvailable from /proc/meminfo (Linux); returns None elsewhere so
+    # callers fall back to a CPU-only parallelism default.
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) / (1024 * 1024)
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
+def default_build_parallel():
+    # Triton is memory-heavy C++/CUDA: template-dense translation units routinely
+    # peak at 1-2+ GB RAM per compiler process, so blindly using N (or 2*N) cores
+    # can invoke the OOM killer. Cap parallelism so each job has ~2 GB headroom.
+    mem_gb_per_job = 2.0
+    jobs = usable_cpu_count()
+
+    mem_gb = available_memory_gb()
+    if mem_gb is not None:
+        mem_cap = max(1, int(mem_gb // mem_gb_per_job))
+        if mem_cap < jobs:
+            log(
+                "Limiting build parallelism to {} (from {} usable cores) so each "
+                "compile job has ~{:.0f} GB of RAM; {:.1f} GB available.".format(
+                    mem_cap, jobs, mem_gb_per_job, mem_gb
+                )
+            )
+        jobs = min(jobs, mem_cap)
+
+    return max(1, jobs)
+
+
 def fail(msg):
     fail_if(True, msg)
 
@@ -119,6 +164,8 @@ def fail_if(p, msg):
 def target_platform():
     # When called by compose.py, FLAGS will be None
     if FLAGS and FLAGS.target_platform is not None:
+        if FLAGS.target_platform == "windows":
+            fail("Windows is no longer a supported target platform.")
         return FLAGS.target_platform
     platform_string = platform.system().lower()
     if platform_string == "linux":
@@ -129,6 +176,8 @@ def target_platform():
             return "linux"
         else:
             return "rhel"
+    elif platform_string == "windows":
+        fail("Windows is no longer a supported target platform.")
     else:
         return platform_string
 
@@ -168,13 +217,6 @@ class BuildScript:
 
     def close(self):
         if self._file is not None:
-            if target_platform() == "windows":
-                self.blankln()
-                self._file.write("}\n")
-                self._file.write("catch {\n")
-                self._file.write("    $_;\n")
-                self._file.write("    ExitWithCode 1;\n")
-                self._file.write("}\n")
             """Close the file"""
             self._file.close()
             self._file = None
@@ -202,8 +244,7 @@ class BuildScript:
             self.comment(msg)
 
     def header(self, desc=None):
-        if target_platform() != "windows":
-            self._file.write("#!/usr/bin/env bash\n\n")
+        self._file.write("#!/usr/bin/env bash\n\n")
 
         if desc is not None:
             self.comment()
@@ -212,27 +253,12 @@ class BuildScript:
             self.blankln()
 
         self.comment("Exit script immediately if any command fails")
-        if target_platform() == "windows":
-            self._file.write("$UseStructuredOutput = $false\n")
-            self.blankln()
-            self._file.write("function ExitWithCode($exitcode) {\n")
-            self._file.write("    $host.SetShouldExit($exitcode)\n")
-            self._file.write("    exit $exitcode\n")
-            self._file.write("}\n")
-            self.blankln()
-            if self._verbose:
-                self._file.write("Set-PSDebug -Trace 1\n")
-            self.blankln()
-            self._file.write("try {\n")
-        else:
-            self._file.write("set -e\n")
-            if self._verbose:
-                self._file.write("set -x\n")
+        self._file.write("set -e\n")
+        if self._verbose:
+            self._file.write("set -x\n")
         self.blankln()
 
     def envvar_ref(self, v):
-        if target_platform() == "windows":
-            return f"${{env:{v}}}"
         return f"${{{v}}}"
 
     def cmd(self, clist, check_exitcode=False):
@@ -243,54 +269,23 @@ class BuildScript:
                 self._file.write(f"{c} ")
             self.blankln()
 
-        if check_exitcode:
-            if target_platform() == "windows":
-                self._file.write("if ($LASTEXITCODE -ne 0) {\n")
-                self._file.write(
-                    '  Write-Output "exited with status code $LASTEXITCODE";\n'
-                )
-                self._file.write("  ExitWithCode 1;\n")
-                self._file.write("}\n")
-
     def cwd(self, path):
-        if target_platform() == "windows":
-            self.cmd(f"Set-Location -EV Err -EA Stop {path}")
-        else:
-            self.cmd(f"cd {path}")
+        self.cmd(f"cd {path}")
 
     def cp(self, src, dest):
-        if target_platform() == "windows":
-            self.cmd(f"Copy-Item -EV Err -EA Stop {src} -Destination {dest}")
-        else:
-            self.cmd(f"cp {src} {dest}")
+        self.cmd(f"cp {src} {dest}")
 
     def mkdir(self, path):
-        if target_platform() == "windows":
-            self.cmd(
-                f"New-Item -EV Err -EA Stop -ItemType Directory -Force -Path {path}"
-            )
-        else:
-            self.cmd(f"mkdir -p {pathlib.Path(path)}")
+        self.cmd(f"mkdir -p {pathlib.Path(path)}")
 
     def rmdir(self, path):
-        if target_platform() == "windows":
-            self.cmd(f"if (Test-Path -Path {path}) {{")
-            self.cmd(f"  Remove-Item -EV Err -EA Stop -Recurse -Force {path}")
-            self.cmd("}")
-        else:
-            self.cmd(f"rm -fr {pathlib.Path(path)}")
+        self.cmd(f"rm -fr {pathlib.Path(path)}")
 
     def cpdir(self, src, dest):
-        if target_platform() == "windows":
-            self.cmd(f"Copy-Item -EV Err -EA Stop -Recurse {src} -Destination {dest}")
-        else:
-            self.cmd(f"cp -r {src} {dest}")
+        self.cmd(f"cp -r {src} {dest}")
 
     def tar(self, subdir, tar_filename):
-        if target_platform() == "windows":
-            fail("unsupported operation: tar")
-        else:
-            self.cmd(f"tar zcf {tar_filename} {subdir}")
+        self.cmd(f"tar zcf {tar_filename} {subdir}")
 
     def cmake(self, args):
         # Pass some additional envvars into cmake...
@@ -310,10 +305,7 @@ class BuildScript:
         if not FLAGS.no_force_clone:
             self.rmdir(clone_dir)
 
-        if target_platform() == "windows":
-            self.cmd(f"if (-Not (Test-Path -Path {clone_dir})) {{")
-        else:
-            self.cmd(f"if [[ ! -e {clone_dir} ]]; then")
+        self.cmd(f"if [[ ! -e {clone_dir} ]]; then")
 
         # FIXME [DLIS-4045 - Currently the tag starting with "pull/" is not
         # working with "--repo-tag" as the option is not forwarded to the
@@ -326,16 +318,16 @@ class BuildScript:
                 f"  git clone --recursive --depth=1 {org}/{repo}.git {subdir}; git --git-dir {subdir}/.git log --oneline -1",
                 check_exitcode=True,
             )
-            self.cmd("}" if target_platform() == "windows" else "fi")
+            self.cmd("fi")
             self.cwd(subdir)
             self.cmd(f"git fetch origin {tag}:tritonbuildref", check_exitcode=True)
-            self.cmd(f"git checkout tritonbuildref", check_exitcode=True)
+            self.cmd("git checkout tritonbuildref", check_exitcode=True)
         else:
             self.cmd(
                 f"  git clone --recursive --single-branch --depth=1 -b {tag} {org}/{repo}.git {subdir}; git --git-dir {subdir}/.git log --oneline -1",
                 check_exitcode=True,
             )
-            self.cmd("}" if target_platform() == "windows" else "fi")
+            self.cmd("fi")
 
 
 def cmake_core_arg(name, type, value):
@@ -605,14 +597,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         cmake_backend_enable(be, "TRITON_ENABLE_METRICS", FLAGS.enable_metrics)
     )
 
-    # [DLIS-4950] always enable below once Windows image is updated with CUPTI
-    # cargs.append(cmake_backend_enable(be, 'TRITON_ENABLE_MEMORY_TRACKER', True))
-    if (target_platform() == "windows") and (not FLAGS.no_container_build):
-        print(
-            "Warning: Detected docker build is used for Windows, backend utility 'device memory tracker' will be disabled due to missing library in CUDA Windows docker image."
-        )
-        cargs.append(cmake_backend_enable(be, "TRITON_ENABLE_MEMORY_TRACKER", False))
-    elif target_platform() == "igpu":
+    if target_platform() == "igpu":
         print(
             "Warning: Detected iGPU build, backend utility 'device memory tracker' will be disabled as iGPU doesn't contain required version of the library."
         )
@@ -691,59 +676,51 @@ def onnxruntime_cmake_args(images, library_paths):
                 )
             )
 
-    if target_platform() == "windows":
-        if "base" in images:
-            cargs.append(
-                cmake_backend_arg(
-                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
-                )
+    if "base" in images:
+        cargs.append(
+            cmake_backend_arg(
+                "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
             )
+        )
     else:
-        if "base" in images:
-            cargs.append(
-                cmake_backend_arg(
-                    "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
-                )
+        cargs.append(
+            cmake_backend_arg(
+                "onnxruntime",
+                "TRITON_BUILD_CONTAINER_VERSION",
+                None,
+                FLAGS.upstream_container_version,
             )
-        else:
-            cargs.append(
-                cmake_backend_arg(
-                    "onnxruntime",
-                    "TRITON_BUILD_CONTAINER_VERSION",
-                    None,
-                    FLAGS.upstream_container_version,
-                )
-            )
+        )
 
-        # TODO: TPRD-333 OpenVino extension is not currently supported by our manylinux build
-        if (
-            (target_machine() != "aarch64")
-            and (target_platform() != "rhel")
-            and (FLAGS.ort_openvino_version is not None)
-        ):
-            cargs.append(
-                cmake_backend_enable(
-                    "onnxruntime", "TRITON_ENABLE_ONNXRUNTIME_OPENVINO", True
-                )
+    # TODO: TPRD-333 OpenVino extension is not currently supported by our manylinux build
+    if (
+        (target_machine() != "aarch64")
+        and (target_platform() != "rhel")
+        and (FLAGS.ort_openvino_version is not None)
+    ):
+        cargs.append(
+            cmake_backend_enable(
+                "onnxruntime", "TRITON_ENABLE_ONNXRUNTIME_OPENVINO", True
             )
-            cargs.append(
-                cmake_backend_arg(
-                    "onnxruntime",
-                    "TRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION",
-                    None,
-                    FLAGS.ort_openvino_version,
-                )
+        )
+        cargs.append(
+            cmake_backend_arg(
+                "onnxruntime",
+                "TRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION",
+                None,
+                FLAGS.ort_openvino_version,
             )
+        )
 
-        if (target_platform() == "igpu") or (target_platform() == "rhel"):
-            cargs.append(
-                cmake_backend_arg(
-                    "onnxruntime",
-                    "TRITON_BUILD_TARGET_PLATFORM",
-                    None,
-                    target_platform(),
-                )
+    if (target_platform() == "igpu") or (target_platform() == "rhel"):
+        cargs.append(
+            cmake_backend_arg(
+                "onnxruntime",
+                "TRITON_BUILD_TARGET_PLATFORM",
+                None,
+                target_platform(),
             )
+        )
 
     return cargs
 
@@ -757,29 +734,21 @@ def openvino_cmake_args():
             FLAGS.standalone_openvino_version,
         )
     ]
-    if target_platform() == "windows":
-        if "base" in images:
-            cargs.append(
-                cmake_backend_arg(
-                    "openvino", "TRITON_BUILD_CONTAINER", None, images["base"]
-                )
+    if "base" in images:
+        cargs.append(
+            cmake_backend_arg(
+                "openvino", "TRITON_BUILD_CONTAINER", None, images["base"]
             )
+        )
     else:
-        if "base" in images:
-            cargs.append(
-                cmake_backend_arg(
-                    "openvino", "TRITON_BUILD_CONTAINER", None, images["base"]
-                )
+        cargs.append(
+            cmake_backend_arg(
+                "openvino",
+                "TRITON_BUILD_CONTAINER_VERSION",
+                None,
+                FLAGS.upstream_container_version,
             )
-        else:
-            cargs.append(
-                cmake_backend_arg(
-                    "openvino",
-                    "TRITON_BUILD_CONTAINER_VERSION",
-                    None,
-                    FLAGS.upstream_container_version,
-                )
-            )
+        )
     return cargs
 
 
@@ -787,12 +756,6 @@ def tensorrt_cmake_args():
     cargs = [
         cmake_backend_enable("tensorrt", "TRITON_ENABLE_NVTX", FLAGS.enable_nvtx),
     ]
-    if target_platform() == "windows":
-        cargs.append(
-            cmake_backend_arg(
-                "tensorrt", "TRITON_TENSORRT_INCLUDE_PATHS", None, "c:/TensorRT/include"
-            )
-        )
 
     return cargs
 
@@ -915,6 +878,122 @@ RUN curl -o /tmp/cuda-keyring.deb \\
                 )
 
 
+# Keys that 'docker build --secret' accepts. A spec may also carry keys that
+# only the Dockerfile side understands ('target', 'required', 'mode', ...);
+# passing those to the build command is an error, so they are filtered out.
+DOCKER_BUILD_SECRET_KEYS = ("id", "src", "source", "env", "type")
+
+# Id whose secret is mounted over the apt source list, and where it lands when
+# the spec does not say.
+APT_SOURCES_SECRET_ID = "apt_sources"
+APT_SOURCES_DEFAULT_TARGET = "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list"
+
+# Variable holding a git config, and where the build container writes it out.
+# The container is handed the contents rather than the file because docker
+# resolves a bind mount source on the daemon, which need not share a filesystem
+# with this script, and silently mounts a directory when it finds nothing there.
+GIT_CONFIG_CONTENT_ENV = "TRITON_GITCONFIG"
+GIT_CONFIG_CONTAINER_PATH = "/tmp/gitconfig"
+
+
+def parse_secret_spec(spec):
+    """Split a Docker secret spec into ordered (key, value) pairs.
+
+    Docker does not require any particular field order, so callers look up
+    keys by name rather than by position.
+    """
+    fields = []
+    for field in spec.split(","):
+        key, _, value = field.partition("=")
+        key = key.strip()
+        if key:
+            fields.append((key, value.strip()))
+    return fields
+
+
+def secret_spec_value(spec, name):
+    """Return the value of one field of a secret spec, or "" when unset."""
+    for key, value in parse_secret_spec(spec):
+        if key == name:
+            return value
+    return ""
+
+
+def secret_spec_id(spec):
+    """Return the 'id' of a Docker secret spec, or "" when it has none."""
+    return secret_spec_value(spec, "id")
+
+
+def declared_secret_specs():
+    """Every --docker-build-secret spec, in the order it was given."""
+    return [spec for spec in getattr(FLAGS, "docker_build_secret", None) or [] if spec]
+
+
+def declared_secret_ids():
+    """Ids of every secret supplied with --docker-build-secret."""
+    return {i for i in (secret_spec_id(s) for s in declared_secret_specs()) if i}
+
+
+def secret_build_args():
+    """Return the '--secret' arguments to forward to 'docker build'.
+
+    Only the keys the build command understands are forwarded. Keys that
+    belong to the Dockerfile mount are dropped here and applied where the
+    Dockerfile is generated instead.
+    """
+    args = []
+    for spec in declared_secret_specs():
+        fields = [
+            "{}={}".format(key, value)
+            for key, value in parse_secret_spec(spec)
+            if key in DOCKER_BUILD_SECRET_KEYS
+        ]
+        if fields:
+            args.append("--secret {}".format(",".join(fields)))
+    return args
+
+
+def apt_sources_secret_mount():
+    """Return the RUN mount flag that overlays the apt source list, or an
+    empty string when no such secret was requested.
+
+    The mount point comes from the spec's 'target' when it has one, so
+    '--docker-build-secret id=apt_sources,src=<path>,target=<path>' controls
+    where the list lands. Without a 'target' it defaults to the NVIDIA
+    Artifactory source list. When the secret is absent this returns "" and the
+    generated Dockerfiles are byte-identical to a build without this feature.
+    """
+    for spec in declared_secret_specs():
+        if secret_spec_id(spec) != APT_SOURCES_SECRET_ID:
+            continue
+        target = secret_spec_value(spec, "target") or APT_SOURCES_DEFAULT_TARGET
+        return "--mount=type=secret,id={},target={},required=false ".format(
+            APT_SOURCES_SECRET_ID, target
+        )
+    return ""
+
+
+def mount_apt_sources_secret(df):
+    """Prefix every 'RUN apt-get update' in df with the apt source list mount.
+
+    A secret mount is scoped to a single RUN instruction, so every apt step
+    that should resolve through the mirror needs its own.
+
+    The first step of the build base is included even though it is the step
+    that installs ca-certificates. On a base image that already carries them
+    the step resolves through the mirror like any other. On one that does not,
+    apt reports the failed TLS handshake, still exits 0, and installs from the
+    distribution repositories, so the step behaves as it did before the mount
+    was added.
+    """
+    mount = apt_sources_secret_mount()
+    if not mount:
+        return df
+
+    marker = "RUN apt-get update"
+    return df.replace(marker, "RUN " + mount + "apt-get update")
+
+
 def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap):
     df = """
 ARG TRITON_VERSION={}
@@ -973,6 +1052,13 @@ RUN yum install -y \\
             xz-devel \\
             zlib-devel
 """
+    if argmap["NVIDIA_BUILD_ID"] is not None:
+        df += """
+ENV BUILD_NUMBER={}
+""".format(
+            argmap["NVIDIA_BUILD_ID"]
+        )
+
     if os.getenv("CCACHE_REMOTE_ONLY") and os.getenv("CCACHE_REMOTE_STORAGE"):
         df += """
 RUN curl -k -s -L https://github.com/ccache/ccache/archive/refs/tags/v4.10.2.tar.gz -o /tmp/ccache.tar.gz \\
@@ -997,6 +1083,7 @@ RUN ccache -p
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
+          auditwheel \\
           build \\
           wheel \\
           setuptools \\
@@ -1050,15 +1137,13 @@ ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 ENV PIP_BREAK_SYSTEM_PACKAGES=1 CMAKE_POLICY_VERSION_MINIMUM=3.5
 """
-    # Install the windows- or linux-specific buildbase dependencies
-    if target_platform() == "windows":
+    if argmap["NVIDIA_BUILD_ID"] is not None:
         df += """
-RUN python3 -m pip install build
-
-SHELL ["cmd", "/S", "/C"]
-"""
-    else:
-        df += """
+ENV BUILD_NUMBER={}
+""".format(
+            argmap["NVIDIA_BUILD_ID"]
+        )
+    df += """
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -1112,14 +1197,16 @@ RUN apt-get update \\
       && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade \\
+          auditwheel \\
           build \\
           docker \\
           virtualenv \\
           patchelf==0.17.2 \\
-          cmake==4.0.3
+          cmake==4.0.3 \\
+          pybind11[global]
 """
 
-        df += f"""
+    df += f"""
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
 RUN wget -O /tmp/boost.tar.gz {FLAGS.boost_url} \\
@@ -1128,8 +1215,8 @@ RUN wget -O /tmp/boost.tar.gz {FLAGS.boost_url} \\
       && mv /tmp/boost_1_80_0/boost /usr/include/boost
 """
 
-        if FLAGS.enable_gpu:
-            df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine())
+    if FLAGS.enable_gpu:
+        df += install_dcgm_libraries(argmap["DCGM_VERSION"], target_machine())
 
     df += """
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
@@ -1153,19 +1240,14 @@ RUN apt-get update \\
 
     # Copy in the triton source. We remove existing contents first in
     # case the FROM container has something there already.
-    if target_platform() == "windows":
-        df += """
-WORKDIR /workspace
-RUN rmdir /S/Q * || exit 0
-COPY . .
-"""
-    else:
-        df += """
+    df += """
 WORKDIR /workspace
 RUN rm -fr *
 COPY . .
 ENTRYPOINT []
 """
+
+    df = mount_apt_sources_secret(df)
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -1207,12 +1289,19 @@ def create_dockerfile_linux(
     df = """
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
-ARG BASE_IMAGE={}
-
 """.format(
         argmap["TRITON_VERSION"],
         argmap["TRITON_CONTAINER_VERSION"],
-        argmap["BASE_IMAGE"],
+    )
+    if "vllm" in backends and argmap["INFERENCE_IMAGE"] is None:
+        argmap[
+            "INFERENCE_IMAGE"
+        ] = f"nvcr.io/nvidia/vllm:{FLAGS.upstream_container_version}-py3"
+    df += """ARG BASE_IMAGE={}
+""".format(
+        argmap["INFERENCE_IMAGE"]
+        if argmap["INFERENCE_IMAGE"] is not None
+        else argmap["BASE_IMAGE"],
     )
 
     # PyTorch backends need extra CUDA and other
@@ -1244,14 +1333,25 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
     df += f"""
 WORKDIR /opt
-COPY --chown=1000:1000 build/install tritonserver
+COPY build/install tritonserver
 
 WORKDIR /opt/tritonserver
-COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
-RUN find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonserver-*.whl" | xargs -I {{}} pip install --upgrade {{}}[{FLAGS.triton_wheels_dependencies_group}] && \\
-    find /opt/tritonserver/python -maxdepth 1 -type f -name \\
-    "tritonfrontend-*.whl" | xargs -I {{}} pip install --upgrade {{}}[{FLAGS.triton_wheels_dependencies_group}]
+COPY NVIDIA_Deep_Learning_Container_License.pdf .
+# TRI-1118 — fail fast if either tritonserver or tritonfrontend wheel is
+# missing from /opt/tritonserver/python. The legacy `find | xargs -I` is
+# a silent no-op when find returns zero matches: xargs runs the command
+# zero times and the layer succeeds, masking the gap until something
+# downstream (a wheel publish job, or pip install tritonfrontend)
+# discovers nothing was actually installed. Check existence first.
+RUN set -e; \\
+    for pkg in tritonserver tritonfrontend; do \\
+      wheels=$(find /opt/tritonserver/python -maxdepth 1 -type f -name "${{pkg}}-*.whl"); \\
+      if [ -z "$wheels" ]; then \\
+        echo "ERROR: ${{pkg}}-*.whl missing from /opt/tritonserver/python -- build did not stage the wheel into the image" >&2; \\
+        exit 1; \\
+      fi; \\
+      printf '%s\\n' "$wheels" | xargs -I {{}} pip install --upgrade "{{}}[{FLAGS.triton_wheels_dependencies_group}]"; \\
+    done
 
 RUN pip3 install -r python/openai/requirements.txt
 
@@ -1262,7 +1362,7 @@ RUN pip3 install -r python/openai/requirements.txt
             df += """
 LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
 LABEL com.amazonaws.sagemaker.capabilities.multi-models=true
-COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
+COPY docker/sagemaker/serve /usr/bin/.
 """
     # This is required since libcublasLt.so is not present during the build
     # stage of the PyTorch backend
@@ -1272,22 +1372,13 @@ RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.13 backends
 """
     if "tensorrtllm" in backends:
         df += """
-# Install required packages for TRT-LLM models
-# Remove contents that are not needed in runtime
-# Setuptools has breaking changes in version 70.0.0, so fix it to 69.5.1
-# The generated code in grpc_service_pb2_grpc.py depends on grpcio>=1.64.0, so fix it to 1.64.0
 RUN ldconfig && \\
-    ARCH="$(uname -i)" && \\
-    rm -fr ${TRT_ROOT}/bin ${TRT_ROOT}/targets/${ARCH}-linux-gnu/bin ${TRT_ROOT}/data && \\
-    rm -fr ${TRT_ROOT}/doc ${TRT_ROOT}/onnx_graphsurgeon ${TRT_ROOT}/python && \\
-    rm -fr ${TRT_ROOT}/samples ${TRT_ROOT}/targets/${ARCH}-linux-gnu/samples && \\
-    pip3 install --no-cache-dir transformers && \\
-    find /usr -name libtensorrt_llm.so -exec dirname {} \\; > /etc/ld.so.conf.d/tensorrt-llm.conf && \\
-    find /opt/tritonserver -name libtritonserver.so -exec dirname {} \\; > /etc/ld.so.conf.d/triton-tensorrtllm-worker.conf && \\
-    pip3 install --no-cache-dir  grpcio-tools==1.64.0 && \\
-    pip3 uninstall -y setuptools
-ENV LD_LIBRARY_PATH=/usr/local/tensorrt/lib/:/opt/tritonserver/backends/tensorrtllm:$LD_LIBRARY_PATH
+    find /opt/tritonserver -name lib*so -exec dirname {} \\; > /etc/ld.so.conf.d/tritonserver.conf && \\
+    ldconfig
+
 """
+    df = mount_apt_sources_secret(df)
+
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -1336,8 +1427,9 @@ ENV TF_AUTOTUNE_THRESHOLD       2
 ENV TRITON_SERVER_GPU_ENABLED    {gpu_enabled}
 
 # Create a user that can be used to run triton as
-# non-root. Make sure that this user to given ID 1000. All server
-# artifacts copied below are assign to this user.
+# non-root. Make sure that this user is given ID 1000. Server
+# artifacts copied below remain owned by root; the triton-server
+# user reads and executes them via standard group/other permissions.
 ENV TRITON_SERVER_USER=triton-server
 RUN userdel tensorrt-server > /dev/null 2>&1 || true \\
       && userdel ubuntu > /dev/null 2>&1 || true \\
@@ -1363,7 +1455,7 @@ RUN yum install -y \\
         libb64-devel \\
         gperftools-devel \\
         wget \\
-        python3-pip \\
+        python3.12-pip \\
         numactl-devel
 
 RUN pip3 install patchelf==0.17.2
@@ -1388,6 +1480,7 @@ RUN apt-get update \\
               libgoogle-perftools-dev \\
               libjemalloc-dev \\
               libnuma-dev \\
+              libssl-dev \\
               wget \\
               {backend_dependencies} \\
               python3-pip \\
@@ -1464,44 +1557,6 @@ RUN apt-get update \\
             \"numpy<2\" \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
-"""
-
-    if "vllm" in backends:
-        df += f"""
-# Install required packages for vLLM models
-ARG BUILD_PUBLIC_VLLM="true"
-RUN --mount=type=secret,id=req,target=/run/secrets/requirements \\
-    --mount=type=secret,id=VLLM_INDEX_URL,env=VLLM_INDEX_URL \\
-    --mount=type=secret,id=PYTORCH_TRITON_URL,env=PYTORCH_TRITON_URL \\
-    --mount=type=secret,id=NVPL_SLIM_URL,env=NVPL_SLIM_URL \\
-    if [ "$BUILD_PUBLIC_VLLM" = "false" ]; then \\
-        if [ "$(uname -m)" = "x86_64" ]; then \\
-            pip3 install --no-cache-dir \\
-                mkl==2021.1.1 \\
-                mkl-include==2021.1.1 \\
-                mkl-devel==2021.1.1; \\
-        elif [ "$(uname -m)" = "aarch64" ]; then \\
-            echo "Downloading NVPL from: $NVPL_SLIM_URL" && \\
-            cd /tmp && \\
-            wget -O nvpl_slim_24.04.tar $NVPL_SLIM_URL && \\
-            tar -xf nvpl_slim_24.04.tar && \\
-            cp -r nvpl_slim_24.04/lib/* /usr/local/lib && \\
-            cp -r nvpl_slim_24.04/include/* /usr/local/include && \\
-            rm -rf nvpl_slim_24.04.tar nvpl_slim_24.04; \\
-        fi \\
-        && pip3 install --no-cache-dir --extra-index-url $VLLM_INDEX_URL -r /run/secrets/requirements \\
-        # Need to install in-house build of pytorch-triton to support triton_key definition used by torch 2.5.1
-        && cd /tmp \\
-        && wget $PYTORCH_TRITON_URL \\
-        && pip install --no-cache-dir /tmp/pytorch_triton-*.whl \\
-        && rm /tmp/pytorch_triton-*.whl; \\
-    else \\
-        # public vLLM needed for vLLM backend
-        pip3 install vllm=={DEFAULT_TRITON_VERSION_MAP["vllm_version"]}; \\
-    fi
-
-ARG PYVER=3.12
-ENV LD_LIBRARY_PATH /usr/local/lib:/usr/local/lib/python${{PYVER}}/dist-packages/torch/lib:${{LD_LIBRARY_PATH}}
 """
     if "tensorrtllm" in backends or "vllm" in backends:
         df += """
@@ -1643,55 +1698,6 @@ ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
     return df
 
 
-def create_dockerfile_windows(
-    ddir, dockerfile_name, argmap, backends, repoagents, caches
-):
-    df = """
-ARG TRITON_VERSION={}
-ARG TRITON_CONTAINER_VERSION={}
-ARG BASE_IMAGE={}
-
-############################################################################
-##  Production stage: Create container with just inference server executable
-############################################################################
-FROM ${{BASE_IMAGE}}
-
-ARG TRITON_VERSION
-ARG TRITON_CONTAINER_VERSION
-
-ENV TRITON_SERVER_VERSION=${{TRITON_VERSION}}
-ENV NVIDIA_TRITON_SERVER_VERSION=${{TRITON_CONTAINER_VERSION}}
-LABEL com.nvidia.tritonserver.version="${{TRITON_SERVER_VERSION}}"
-
-RUN setx path "%path%;C:\\opt\\tritonserver\\bin"
-
-""".format(
-        argmap["TRITON_VERSION"],
-        argmap["TRITON_CONTAINER_VERSION"],
-        argmap["BASE_IMAGE"],
-    )
-    df += """
-WORKDIR /opt
-RUN rmdir /S/Q tritonserver || exit 0
-COPY --chown=1000:1000 build/install tritonserver
-
-WORKDIR /opt/tritonserver
-COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
-
-"""
-    df += """
-ENTRYPOINT []
-ENV NVIDIA_BUILD_ID {}
-LABEL com.nvidia.build.id={}
-LABEL com.nvidia.build.ref={}
-""".format(
-        argmap["NVIDIA_BUILD_ID"], argmap["NVIDIA_BUILD_ID"], argmap["NVIDIA_BUILD_REF"]
-    )
-
-    with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
-        dfile.write(df)
-
-
 def create_build_dockerfiles(
     container_build_dir, images, backends, repoagents, caches, endpoints
 ):
@@ -1701,8 +1707,6 @@ def create_build_dockerfiles(
             print(
                 "warning: RHEL is not an officially supported target and you will probably experience errors attempting to build this container."
             )
-    elif target_platform() == "windows":
-        base_image = "mcr.microsoft.com/dotnet/framework/sdk:4.8"
     elif target_platform() == "rhel":
         raise KeyError("A base image must be specified when targeting RHEL")
     elif FLAGS.enable_gpu:
@@ -1712,22 +1716,24 @@ def create_build_dockerfiles(
     else:
         base_image = "ubuntu:24.04"
 
+    if "inference" in images:
+        inference_image = images["inference"]
+    else:
+        inference_image = None
+
     dockerfileargmap = {
         "NVIDIA_BUILD_REF": "" if FLAGS.build_sha is None else FLAGS.build_sha,
         "NVIDIA_BUILD_ID": "<unknown>" if FLAGS.build_id is None else FLAGS.build_id,
         "TRITON_VERSION": FLAGS.version,
         "TRITON_CONTAINER_VERSION": FLAGS.container_version,
         "BASE_IMAGE": base_image,
+        "INFERENCE_IMAGE": inference_image,
         "DCGM_VERSION": FLAGS.dcgm_version,
     }
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
     # since we are using PyTorch containers that are not CPU-only.
-    if (
-        not FLAGS.enable_gpu
-        and ("pytorch" in backends)
-        and (target_platform() != "windows")
-    ):
+    if not FLAGS.enable_gpu and ("pytorch" in backends):
         if "gpu-base" in images:
             gpu_base_image = images["gpu-base"]
         else:
@@ -1745,25 +1751,15 @@ def create_build_dockerfiles(
             FLAGS.build_dir, "Dockerfile.buildbase", dockerfileargmap
         )
 
-    if target_platform() == "windows":
-        create_dockerfile_windows(
-            FLAGS.build_dir,
-            "Dockerfile",
-            dockerfileargmap,
-            backends,
-            repoagents,
-            caches,
-        )
-    else:
-        create_dockerfile_linux(
-            FLAGS.build_dir,
-            "Dockerfile",
-            dockerfileargmap,
-            backends,
-            repoagents,
-            caches,
-            endpoints,
-        )
+    create_dockerfile_linux(
+        FLAGS.build_dir,
+        "Dockerfile",
+        dockerfileargmap,
+        backends,
+        repoagents,
+        caches,
+        endpoints,
+    )
 
     # Dockerfile used for the creating the CI base image.
     create_dockerfile_cibase(FLAGS.build_dir, "Dockerfile.cibase", dockerfileargmap)
@@ -1805,14 +1801,9 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
                 "--pull",
             ]
 
-        # Windows docker runs in a VM and memory needs to be specified
-        # explicitly (at least for some configurations of docker).
-        if target_platform() == "windows":
-            if FLAGS.container_memory:
-                baseargs += ["--memory", FLAGS.container_memory]
+        baseargs += ["--cache-from={}".format(k) for k in cachefrommap]
 
-        if target_platform() != "windows":
-            baseargs += ["--cache-from={}".format(k) for k in cachefrommap]
+        baseargs += secret_build_args()
 
         baseargs += ["."]
 
@@ -1845,35 +1836,72 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         if not FLAGS.no_container_interactive:
             runargs += ["-it"]
 
-        if target_platform() == "windows":
-            if FLAGS.container_memory:
-                runargs += ["--memory", FLAGS.container_memory]
-            runargs += ["-v", "\\\\.\\pipe\\docker_engine:\\\\.\\pipe\\docker_engine"]
-        else:
-            runargs += ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
-            if FLAGS.use_user_docker_config:
-                if os.path.exists(FLAGS.use_user_docker_config):
-                    runargs += [
-                        "-v",
-                        os.path.expanduser(
-                            FLAGS.use_user_docker_config + ":/root/.docker/config.json"
-                        ),
-                    ]
+        runargs += ["-v", "/var/run/docker.sock:/var/run/docker.sock"]
+        if FLAGS.use_user_docker_config:
+            if os.path.exists(FLAGS.use_user_docker_config):
+                runargs += [
+                    "-v",
+                    os.path.expanduser(
+                        FLAGS.use_user_docker_config + ":/root/.docker/config.json"
+                    ),
+                ]
+
+        # TRI-1118 — propagate TRITON_RELEASE_VERSION into the wheel build
+        # only when it was actually set in main() (release-semantic version
+        # or explicit --release-version). Dev / pre-release builds leave it
+        # unset so build_wheel.py reads the in-tree TRITON_VERSION file and
+        # takes the PEP 817 variant path.
+        # Authenticate the GitHub clones cmake_build performs in this container.
+        # It runs the build rather than an image build, so a build secret cannot
+        # reach it, and a bind mount cannot either: docker resolves the source
+        # path on the daemon, which need not share the filesystem this script
+        # runs on, and silently creates a directory when it does not find it.
+        # Hand the container the contents instead and let it write the file.
+        #
+        # Passed by name rather than as NAME=value, so the contents, which carry
+        # a credential, stay out of this script, which CI publishes as a build
+        # artifact.
+        if os.environ.get(GIT_CONFIG_CONTENT_ENV):
+            runargs += ["-e", GIT_CONFIG_CONTENT_ENV]
+
+        if "TRITON_RELEASE_VERSION" in os.environ:
+            runargs += [
+                "-e",
+                f"TRITON_RELEASE_VERSION={os.environ['TRITON_RELEASE_VERSION']}",
+            ]
+        # TRI-1118 — forward PEP 427 build-tag and PEP 817 nv-part inputs so
+        # build_wheel.py inside the buildbase container can emit pipeline-correct
+        # wheel filenames. CUDA_VERSION is deliberately NOT forwarded -- the
+        # container's own CUDA base image defines it; host CUDA may differ
+        # (see core/python/build_wheel.py:_detect_cuda_version).
+        for var in ("CI_PIPELINE_ID", "NVIDIA_UPSTREAM_VERSION", "NVIDIA_BUILD_ID"):
+            if os.environ.get(var):
+                runargs += ["-e", f"{var}={os.environ[var]}"]
 
         runargs += ["tritonserver_buildbase"]
 
-        if target_platform() == "windows":
-            runargs += ["powershell.exe", "-noexit", "-File", "./cmake_build.ps1"]
+        # Write the git config out inside the container, where the contents
+        # arrived as an environment variable, and point git at it for the build
+        # only. Single quoted so the outer shell leaves the expansion to the
+        # container, whose environment is the one holding the value.
+        if os.environ.get(GIT_CONFIG_CONTENT_ENV):
+            runargs += [
+                "bash",
+                "-c",
+                '\'printf "%s" "${}" > {} && export GIT_CONFIG_GLOBAL={} && '
+                "./cmake_build'".format(
+                    GIT_CONFIG_CONTENT_ENV,
+                    GIT_CONFIG_CONTAINER_PATH,
+                    GIT_CONFIG_CONTAINER_PATH,
+                ),
+            ]
         else:
             runargs += ["./cmake_build"]
 
         # Remove existing tritonserver_builder container...
-        if target_platform() == "windows":
-            docker_script.cmd(["docker", "rm", "tritonserver_builder"])
-        else:
-            docker_script._file.write(
-                'if [ "$(docker ps -a | grep tritonserver_builder)" ]; then  docker rm -f tritonserver_builder; fi\n'
-            )
+        docker_script._file.write(
+            'if [ "$(docker ps -a | grep tritonserver_builder)" ]; then  docker rm -f tritonserver_builder; fi\n'
+        )
 
         docker_script.cmd(runargs, check_exitcode=True)
 
@@ -1908,14 +1936,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             "docker",
             "build",
         ]
-        if secrets:
-            finalargs += [
-                f"--secret id=req,src={requirements}",
-                f"--secret id=VLLM_INDEX_URL",
-                f"--secret id=PYTORCH_TRITON_URL",
-                f"--secret id=NVPL_SLIM_URL",
-                f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
-            ]
+        finalargs += secret_build_args()
         finalargs += [
             "-t",
             "tritonserver",
@@ -1964,21 +1985,7 @@ def core_build(
     )
     cmake_script.makeinstall()
 
-    if target_platform() == "windows":
-        cmake_script.mkdir(os.path.join(install_dir, "bin"))
-        cmake_script.cp(
-            os.path.join(repo_install_dir, "bin", "tritonserver.exe"),
-            os.path.join(install_dir, "bin"),
-        )
-        cmake_script.cp(
-            os.path.join(repo_install_dir, "bin", "tritonserver.dll"),
-            os.path.join(install_dir, "bin"),
-        )
-        cmake_script.cp(
-            os.path.join(repo_install_dir, "lib", "tritonserver.lib"),
-            os.path.join(install_dir, "bin"),
-        )
-    elif target_platform() == "rhel":
+    if target_platform() == "rhel":
         cmake_script.mkdir(os.path.join(install_dir, "bin"))
         cmake_script.cp(
             os.path.join(repo_install_dir, "bin", "tritonserver"),
@@ -2003,6 +2010,18 @@ def core_build(
     # [FIXME] Placing the tritonserver and tritonfrontend wheel files in 'python' for now,
     # should be uploaded to pip registry to be able to install directly
     cmake_script.mkdir(os.path.join(install_dir, "python"))
+    # TRI-1118 — tritonfrontend wheel is built by the triton-server
+    # sub-build's `frontend-server-wheel` target, but its CMake
+    # `install(DIRECTORY ${WHEEL_OUT_DIR})` rule doesn't traverse the
+    # outer install pass, so the wheel never lands in
+    # repo_install_dir/python/ alongside the core's tritonserver wheel.
+    # Pull it in from the build tree directly so the subsequent
+    # `triton*.whl` glob picks it up. Safe no-op when the wheel is
+    # absent (e.g. downstream builds that disable the frontend).
+    cmake_script.cmd(
+        f"find {repo_build_dir} -path '*/wheel/dist/tritonfrontend-*.whl' "
+        f"-exec cp {{}} {os.path.join(repo_install_dir, 'python')}/ \\;"
+    )
     cmake_script.cp(
         os.path.join(repo_install_dir, "python", "triton*.whl"),
         os.path.join(install_dir, "python"),
@@ -2021,25 +2040,22 @@ def core_build(
     cmake_script.cp(os.path.join(repo_dir, "LICENSE"), install_dir)
     cmake_script.cp(os.path.join(repo_dir, "TRITON_VERSION"), install_dir)
 
-    # If requested, package the source code for all OSS used to build
-    # For windows, Triton is not delivered as a container so skip for
-    # windows platform.
-    if target_platform() != "windows":
-        if (
-            (not FLAGS.no_container_build)
-            and (not FLAGS.no_core_build)
-            and (not FLAGS.no_container_source)
-        ):
-            cmake_script.mkdir(os.path.join(install_dir, "third-party-src"))
-            cmake_script.cwd(repo_build_dir)
-            cmake_script.tar(
-                "third-party-src",
-                os.path.join(install_dir, "third-party-src", "src.tar.gz"),
-            )
-            cmake_script.cp(
-                os.path.join(repo_dir, "docker", "README.third-party-src"),
-                os.path.join(install_dir, "third-party-src", "README"),
-            )
+    # If requested, package the source code for all OSS used to build.
+    if (
+        (not FLAGS.no_container_build)
+        and (not FLAGS.no_core_build)
+        and (not FLAGS.no_container_source)
+    ):
+        cmake_script.mkdir(os.path.join(install_dir, "third-party-src"))
+        cmake_script.cwd(repo_build_dir)
+        cmake_script.tar(
+            "third-party-src",
+            os.path.join(install_dir, "third-party-src", "src.tar.gz"),
+        )
+        cmake_script.cp(
+            os.path.join(repo_dir, "docker", "README.third-party-src"),
+            os.path.join(install_dir, "third-party-src", "README"),
+        )
 
     cmake_script.comment()
     cmake_script.comment("end Triton core library and tritonserver executable")
@@ -2249,11 +2265,6 @@ def cibase_build(
 
     cmake_script.mkdir(ci_dir)
 
-    # On windows we are not yet using a CI/QA docker image for
-    # testing, so don't do anything...
-    if target_platform() == "windows":
-        return
-
     # The core build produces some artifacts that are needed for CI
     # testing, so include those in the install.
     cmake_script.cpdir(os.path.join(repo_dir, "qa"), ci_dir)
@@ -2282,12 +2293,9 @@ def cibase_build(
     cmake_script.mkdir(os.path.join(ci_dir, "backends"))
     for be in ("identity", "repeat", "square"):
         be_install_dir = os.path.join(build_dir, be, "install", "backends", be)
-        if target_platform() == "windows":
-            cmake_script.cmd(f"if (Test-Path -Path {be_install_dir}) {{")
-        else:
-            cmake_script.cmd(f"if [[ -e {be_install_dir} ]]; then")
+        cmake_script.cmd(f"if [[ -e {be_install_dir} ]]; then")
         cmake_script.cpdir(be_install_dir, os.path.join(ci_dir, "backends"))
-        cmake_script.cmd("}" if target_platform() == "windows" else "fi")
+        cmake_script.cmd("fi")
 
     # Some of the unit-test built backends are needed for CI testing
     cmake_script.mkdir(os.path.join(ci_dir, "tritonbuild", "tritonserver", "backends"))
@@ -2300,15 +2308,12 @@ def cibase_build(
         "iterative_sequence",
     ):
         be_install_dir = os.path.join(repo_install_dir, "backends", be)
-        if target_platform() == "windows":
-            cmake_script.cmd(f"if (Test-Path -Path {be_install_dir}) {{")
-        else:
-            cmake_script.cmd(f"if [[ -e {be_install_dir} ]]; then")
+        cmake_script.cmd(f"if [[ -e {be_install_dir} ]]; then")
         cmake_script.cpdir(
             be_install_dir,
             os.path.join(ci_dir, "tritonbuild", "tritonserver", "backends"),
         )
-        cmake_script.cmd("}" if target_platform() == "windows" else "fi")
+        cmake_script.cmd("fi")
 
     # The onnxruntime_backend build produces some artifacts that
     # are needed for CI testing.
@@ -2324,9 +2329,6 @@ def cibase_build(
                 os.path.join(ort_install_dir, "test", "custom_op_test.onnx"),
                 os.path.join(ci_dir, "qa", "L0_custom_ops"),
             )
-        # [WIP] other way than wildcard?
-        backend_tests = os.path.join(build_dir, "onnxruntime", "test", "*")
-        cmake_script.cpdir(backend_tests, os.path.join(ci_dir, "qa"))
 
     # Need the build area for some backends so that they can be
     # rebuilt with specific options.
@@ -2346,57 +2348,37 @@ def cibase_build(
 
 
 def finalize_build(cmake_script, install_dir, ci_dir):
-    cmake_script.cmd(f"chmod -R a+rw {install_dir}")
-    cmake_script.cmd(f"chmod -R a+rw {ci_dir}")
+    cmake_script.cmd(f"chmod -R u+rwX,go+rX,go-w {install_dir}")
+    cmake_script.cmd(f"chmod -R u+rwX,go+rX,go-w {ci_dir}")
 
 
 def enable_all():
-    if target_platform() != "windows":
-        all_backends = [
-            "ensemble",
-            "identity",
-            "square",
-            "repeat",
-            "onnxruntime",
-            "python",
-            "dali",
-            "pytorch",
-            "openvino",
-            "fil",
-            "tensorrt",
-        ]
-        all_repoagents = ["checksum"]
-        all_caches = ["local", "redis"]
-        all_filesystems = ["gcs", "s3", "azure_storage"]
-        all_endpoints = ["http", "grpc", "sagemaker", "vertex-ai"]
+    all_backends = [
+        "ensemble",
+        "identity",
+        "square",
+        "repeat",
+        "onnxruntime",
+        "python",
+        "dali",
+        "pytorch",
+        "openvino",
+        "fil",
+        "tensorrt",
+    ]
+    all_repoagents = ["checksum"]
+    all_caches = ["local", "redis"]
+    all_filesystems = ["gcs", "s3", "azure_storage"]
+    all_endpoints = ["http", "grpc", "sagemaker", "vertex-ai"]
 
-        FLAGS.enable_logging = True
-        FLAGS.enable_stats = True
-        FLAGS.enable_metrics = True
-        FLAGS.enable_gpu_metrics = True
-        FLAGS.enable_cpu_metrics = True
-        FLAGS.enable_tracing = True
-        FLAGS.enable_nvtx = True
-        FLAGS.enable_gpu = True
-    else:
-        all_backends = [
-            "ensemble",
-            "identity",
-            "square",
-            "repeat",
-            "onnxruntime",
-            "openvino",
-            "tensorrt",
-        ]
-        all_repoagents = ["checksum"]
-        all_caches = ["local", "redis"]
-        all_filesystems = []
-        all_endpoints = ["http", "grpc"]
-
-        FLAGS.enable_logging = True
-        FLAGS.enable_stats = True
-        FLAGS.enable_tracing = True
-        FLAGS.enable_gpu = True
+    FLAGS.enable_logging = True
+    FLAGS.enable_stats = True
+    FLAGS.enable_metrics = True
+    FLAGS.enable_gpu_metrics = True
+    FLAGS.enable_cpu_metrics = True
+    FLAGS.enable_tracing = True
+    FLAGS.enable_nvtx = True
+    FLAGS.enable_gpu = True
 
     requested_backends = []
     for be in FLAGS.backend:
@@ -2481,16 +2463,10 @@ if __name__ == "__main__":
         help="Do not use Docker --pull argument when building container.",
     )
     parser.add_argument(
-        "--container-memory",
-        default=None,
-        required=False,
-        help="Value for Docker --memory argument. Used only for windows builds.",
-    )
-    parser.add_argument(
         "--target-platform",
         required=False,
         default=None,
-        help='Target platform for build, can be "linux", "rhel", "windows" or "igpu". If not specified, build targets the current platform.',
+        help='Target platform for build, can be "linux", "rhel" or "igpu". If not specified, build targets the current platform.',
     )
     parser.add_argument(
         "--target-machine",
@@ -2553,7 +2529,9 @@ if __name__ == "__main__":
         type=int,
         required=False,
         default=None,
-        help="Build parallelism. Defaults to 2 * number-of-cores.",
+        help="Build parallelism. Defaults to the usable core count, "
+        "capped so each parallel compile job has ~2 GB of RAM headroom "
+        "to avoid out-of-memory build failures.",
     )
 
     parser.add_argument(
@@ -2723,10 +2701,28 @@ if __name__ == "__main__":
         help="Override specified backend CMake argument in the build as <backend>:<name>=<value>. The argument is passed to CMake as -D<name>=<value>. This flag only impacts CMake arguments that are used by build.py. To unconditionally add a CMake argument to the backend build use --extra-backend-cmake-arg.",
     )
     parser.add_argument(
+        "--build-presets-file",
+        type=str,
+        required=False,
+        default=None,
+        help="(EXPERIMENTAL; requires TRITON_BUILD_EXPERIMENTAL=1) Path to a build "
+        "presets JSON file that pins per-component cmake flags (tag, cmake_args, "
+        "extra_cmake_args, library_path) for core/backends/repoagents/caches. "
+        "Command-line flags take precedence over the file. With --dryrun, a "
+        "provenance-annotated snapshot of every resolved cmake flag (labeled "
+        "cli/preset/default) is written to build_presets.json in the build "
+        "directory; that file can be loaded back with this flag. See "
+        "tools/build/build_presets.py for the schema.",
+    )
+    parser.add_argument(
         "--release-version",
         required=False,
-        default=DEFAULT_TRITON_VERSION_MAP["release_version"],
-        help="This flag sets the release version for Triton Inference Server to be built. Default: the latest released version.",
+        default=None,
+        help="Override the wheel base version (TRI-1118). When set, exported "
+        "as TRITON_RELEASE_VERSION so build_wheel.py uses it as the bare "
+        "PEP 440 version. When unset, build.py falls back to --version when "
+        "it matches X.Y.Z release-semantic, otherwise leaves the env var "
+        "unset and lets the in-tree TRITON_VERSION file rule (PEP 817 path).",
     )
     parser.add_argument(
         "--triton-container-version",
@@ -2765,27 +2761,31 @@ if __name__ == "__main__":
         help="This flag sets the DCGM version for Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
-        "--vllm-version",
-        required=False,
-        default=DEFAULT_TRITON_VERSION_MAP["vllm_version"],
-        help="This flag sets the vLLM version for Triton Inference Server to be built. Default: the latest supported version.",
-    )
-    parser.add_argument(
         "--rhel-py-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["rhel_py_version"],
         help="This flag sets the Python version for RHEL platform of Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
-        "--build-secret",
+        "--docker-build-secret",
         action="append",
         required=False,
-        nargs=2,
-        metavar=("key", "value"),
-        help="Add build secrets in the form of <key> <value>. These secrets are used during the build process for vllm. The secrets are passed to the Docker build step as `--secret id=<key>`. The following keys are expected and their purposes are described below:\n\n"
-        "  - 'req': A file containing a list of dependencies for pip (e.g., requirements.txt).\n"
-        "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n\n"
-        "Ensure that the required environment variables for these secrets are set before running the build.",
+        metavar="spec",
+        help="Pass a build secret to 'docker build' using Docker's own syntax. The spec is forwarded "
+        "unchanged, so every form 'docker build --secret' accepts is supported:\n\n"
+        "  - 'id=<id>,src=<path>'  read the secret from a file (source= is an accepted alias)\n"
+        "  - 'id=<id>,env=<var>'   read the secret from an environment variable\n"
+        "  - 'id=<id>'             read the environment variable of the same name\n\n"
+        "May be repeated. The secret is available to a Dockerfile step that mounts it with "
+        "'RUN --mount=type=secret,id=<id>', and never becomes part of an image layer.\n\n"
+        "A spec may additionally carry 'target=<path>'. Docker rejects that key on the command line "
+        "because it belongs to the Dockerfile mount, so it is stripped from the build command and "
+        "applied where the Dockerfile is generated.\n\n"
+        "The id 'apt_sources' carries extra meaning: it is also mounted for the duration of each apt step "
+        "in the generated Dockerfile and Dockerfile.buildbase, so package installs resolve through a "
+        "package mirror. It lands on 'target' when the spec sets one, and on "
+        "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list otherwise. When the secret is omitted the "
+        "generated Dockerfiles are unchanged and apt uses the distribution repositories.",
     )
     parser.add_argument(
         "--triton-wheels-dependencies-group",
@@ -2820,8 +2820,8 @@ if __name__ == "__main__":
         FLAGS.override_backend_cmake_arg = []
     if FLAGS.extra_backend_cmake_arg is None:
         FLAGS.extra_backend_cmake_arg = []
-    if FLAGS.build_secret is None:
-        FLAGS.build_secret = []
+    if FLAGS.docker_build_secret is None:
+        FLAGS.docker_build_secret = []
 
     FLAGS.boost_url = os.getenv(
         "TRITON_BOOST_URL",
@@ -2861,8 +2861,24 @@ if __name__ == "__main__":
     if FLAGS.version is None:
         FLAGS.version = DEFAULT_TRITON_VERSION_MAP["release_version"]
 
+    # TRI-1118 — choose whether to export TRITON_RELEASE_VERSION based on
+    # the resolved Triton version:
+    #   - --release-version explicitly passed     -> use it (override)
+    #   - FLAGS.version matches X.Y.Z             -> propagate FLAGS.version
+    #   - anything else (dev / pre-release / etc) -> leave unset so the
+    #                                                wheel build reads the
+    #                                                in-tree TRITON_VERSION
+    #                                                file (PEP 817 variant).
+    # The container build forwards this env var via `docker run -e`
+    # (create_docker_build_script). For --no-container-build, the
+    # cmake_build subprocess inherits the host env directly.
+    if FLAGS.release_version is not None:
+        os.environ.setdefault("TRITON_RELEASE_VERSION", FLAGS.release_version)
+    elif re.match(r"^\d+\.\d+\.\d+$", FLAGS.version):
+        os.environ.setdefault("TRITON_RELEASE_VERSION", FLAGS.version)
+
     if FLAGS.build_parallel is None:
-        FLAGS.build_parallel = multiprocessing.cpu_count() * 2
+        FLAGS.build_parallel = default_build_parallel()
 
     log("Building Triton Inference Server")
     log("platform {}".format(target_platform()))
@@ -2915,12 +2931,6 @@ if __name__ == "__main__":
             )
             backends["python"] = backends["vllm"]
 
-    secrets = dict(getattr(FLAGS, "build_secret", []))
-    if secrets:
-        requirements = secrets.get("req", "")
-        build_public_vllm = secrets.get("build_public_vllm", "true")
-        log('Build Arg for BUILD_PUBLIC_VLLM: "{}"'.format(build_public_vllm))
-
     # Initialize map of repo agents to build and repo-tag for each.
     repoagents = {}
     for be in FLAGS.repoagent:
@@ -2947,7 +2957,7 @@ if __name__ == "__main__":
             len(parts) != 2, "--image must specify <image-name>,<full-image-registry>"
         )
         fail_if(
-            parts[0] not in ["base", "gpu-base", "pytorch"],
+            parts[0] not in ["base", "gpu-base", "pytorch", "inference"],
             "unsupported value for --image",
         )
         log('image "{}": "{}"'.format(parts[0], parts[1]))
@@ -3022,6 +3032,45 @@ if __name__ == "__main__":
             OVERRIDE_BACKEND_CMAKE_FLAGS[be] = {}
         OVERRIDE_BACKEND_CMAKE_FLAGS[be][parts[0]] = parts[1]
 
+    # Per-backend clone-organization overrides. Empty unless the experimental
+    # --build-presets-file supplies a TRITON_REPO_ORGANIZATION for a backend, in
+    # which case the backend build loop below clones from that organization.
+    backend_org_overrides = {}
+
+    # Snapshots captured BEFORE applying a preset, so the --dryrun dump can tell
+    # which values came from the CLI vs the preset file vs build.py defaults.
+    _bp_before_backends = dict(backends)
+    _bp_before_repoagents = dict(repoagents)
+    _bp_before_caches = dict(caches)
+    _bp_cli_extra_be = {be: set(m) for be, m in EXTRA_BACKEND_CMAKE_FLAGS.items()}
+    _bp_cli_override_be = {be: set(m) for be, m in OVERRIDE_BACKEND_CMAKE_FLAGS.items()}
+    _bp_cli_core = set(EXTRA_CORE_CMAKE_FLAGS) | set(OVERRIDE_CORE_CMAKE_FLAGS)
+
+    # Experimental: apply a build preset (all load/validate/precedence logic lives
+    # in tools/build/build_presets.py). Command-line flags win over the file.
+    if FLAGS.build_presets_file is not None:
+        from tools.build import build_presets
+
+        try:
+            for msg in build_presets.apply(
+                FLAGS.build_presets_file,
+                backends=backends,
+                repoagents=repoagents,
+                caches=caches,
+                cli_backend_specs=FLAGS.backend,
+                cli_repoagent_specs=FLAGS.repoagent,
+                cli_cache_specs=FLAGS.cache,
+                library_paths=library_paths,
+                extra_backend_flags=EXTRA_BACKEND_CMAKE_FLAGS,
+                override_backend_flags=OVERRIDE_BACKEND_CMAKE_FLAGS,
+                extra_core_flags=EXTRA_CORE_CMAKE_FLAGS,
+                override_core_flags=OVERRIDE_CORE_CMAKE_FLAGS,
+                backend_org_overrides=backend_org_overrides,
+            ):
+                log(msg)
+        except build_presets.BuildPresetError as e:
+            fail(str(e))
+
     # Initialize map of common components and repo-tag for each.
     components = {
         "common": default_repo_tag,
@@ -3050,24 +3099,70 @@ if __name__ == "__main__":
     script_install_dir = script_ci_dir = FLAGS.install_dir
     script_cmake_dir = FLAGS.cmake_dir
     if not FLAGS.no_container_build:
-        # FLAGS.tmp_dir may be specified with "\" on Windows, adjust
-        # to "/" for docker usage.
-        script_build_dir = os.path.normpath(
-            os.path.join(FLAGS.tmp_dir, "tritonbuild").replace("\\", "/")
-        )
+        script_build_dir = os.path.normpath(os.path.join(FLAGS.tmp_dir, "tritonbuild"))
         script_install_dir = os.path.normpath(os.path.join(script_build_dir, "install"))
         script_ci_dir = os.path.normpath(os.path.join(script_build_dir, "ci"))
-        if target_platform() == "windows":
-            script_repo_dir = script_cmake_dir = os.path.normpath("c:/workspace")
-        else:
-            script_repo_dir = script_cmake_dir = "/workspace"
+        script_repo_dir = script_cmake_dir = "/workspace"
 
     script_name = "cmake_build"
-    if target_platform() == "windows":
-        script_name += ".ps1"
 
     # Write the build script that invokes cmake for the core, backends, repo-agents, and caches.
     pathlib.Path(FLAGS.build_dir).mkdir(parents=True, exist_ok=True)
+
+    # Experimental: on a --dryrun, emit a provenance-annotated snapshot of the
+    # fully-resolved cmake configuration -- every -D each component receives, as
+    # in cmake_build -- to <build-dir>/build_presets.json, labeling each value's
+    # source (cli / preset / default). The file can be loaded back with
+    # --build-presets-file to pin every flag. Gated behind
+    # TRITON_BUILD_EXPERIMENTAL=1.
+    if FLAGS.dryrun and os.getenv("TRITON_BUILD_EXPERIMENTAL") == "1":
+        from tools.build import build_presets
+
+        _bp_be = [b for b in backends if b not in CORE_BACKENDS]
+        try:
+            for msg in build_presets.write_snapshot(
+                os.path.join(FLAGS.build_dir, "build_presets.json"),
+                parser=parser,
+                argv=sys.argv,
+                core_args=core_cmake_args(
+                    components, backends, script_cmake_dir, script_install_dir
+                ),
+                backend_args={
+                    be: backend_cmake_args(
+                        images, components, be, script_install_dir, library_paths
+                    )
+                    for be in _bp_be
+                },
+                repoagent_args={
+                    ra: repoagent_cmake_args(images, components, ra, script_install_dir)
+                    for ra in repoagents
+                },
+                cache_args={
+                    ca: cache_cmake_args(images, components, ca, script_install_dir)
+                    for ca in caches
+                },
+                backends=backends,
+                repoagents=repoagents,
+                caches=caches,
+                before_backends=_bp_before_backends,
+                before_repoagents=_bp_before_repoagents,
+                before_caches=_bp_before_caches,
+                cli_backend_specs=FLAGS.backend,
+                cli_repoagent_specs=FLAGS.repoagent,
+                cli_cache_specs=FLAGS.cache,
+                cli_extra_be=_bp_cli_extra_be,
+                cli_override_be=_bp_cli_override_be,
+                cli_core=_bp_cli_core,
+                extra_backend_flags=EXTRA_BACKEND_CMAKE_FLAGS,
+                override_backend_flags=OVERRIDE_BACKEND_CMAKE_FLAGS,
+                extra_core_flags=EXTRA_CORE_CMAKE_FLAGS,
+                override_core_flags=OVERRIDE_CORE_CMAKE_FLAGS,
+                library_paths=library_paths,
+            ):
+                log(msg)
+        except build_presets.BuildPresetError as e:
+            fail(str(e))
+
     with BuildScript(
         os.path.join(FLAGS.build_dir, script_name),
         verbose=FLAGS.verbose,
@@ -3101,7 +3196,9 @@ if __name__ == "__main__":
             if be == "armnn_tflite":
                 github_organization = "https://gitlab.com/arm-research/smarter/"
             else:
-                github_organization = FLAGS.github_organization
+                github_organization = backend_org_overrides.get(
+                    be, FLAGS.github_organization
+                )
 
             if be == "vllm":
                 backend_clone(
@@ -3165,8 +3262,7 @@ if __name__ == "__main__":
             # written to the build-dir while running the docker container
             # may have root ownership, so give them permissions to be
             # managed by all users on the host system.
-            if target_platform() != "windows":
-                finalize_build(cmake_script, script_install_dir, script_ci_dir)
+            finalize_build(cmake_script, script_install_dir, script_ci_dir)
 
     # If --no-container-build is not specified then we perform the
     # actual build within a docker container and from that create the
@@ -3175,8 +3271,6 @@ if __name__ == "__main__":
     # the build process.
     if not FLAGS.no_container_build:
         script_name = "docker_build"
-        if target_platform() == "windows":
-            script_name += ".ps1"
 
         create_build_dockerfiles(
             script_build_dir, images, backends, repoagents, caches, FLAGS.endpoint
@@ -3187,12 +3281,6 @@ if __name__ == "__main__":
     # container-based build is requested use 'docker_build' script,
     # otherwise build directly on this system using cmake script.
     if not FLAGS.dryrun:
-        if target_platform() == "windows":
-            p = subprocess.Popen(
-                ["powershell.exe", "-noexit", "-File", f"./{script_name}"],
-                cwd=FLAGS.build_dir,
-            )
-        else:
-            p = subprocess.Popen([f"./{script_name}"], cwd=FLAGS.build_dir)
+        p = subprocess.Popen([f"./{script_name}"], cwd=FLAGS.build_dir)
         p.wait()
         fail_if(p.returncode != 0, "build failed")

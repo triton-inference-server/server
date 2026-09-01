@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -140,9 +140,6 @@ class InferVariableTest(tu.TestResultCollector):
                 input_dtype,
                 output0_dtype,
                 output1_dtype,
-                input_shape,
-                input_shape,
-                input_shape,
             ):
                 ensemble_prefix.append(prefix)
 
@@ -150,9 +147,6 @@ class InferVariableTest(tu.TestResultCollector):
             input_dtype,
             output0_dtype,
             output1_dtype,
-            input_shape,
-            output0_shape,
-            output1_shape,
         ):
             for prefix in ensemble_prefix:
                 if input_dtype == np.int8:
@@ -186,9 +180,6 @@ class InferVariableTest(tu.TestResultCollector):
             input_dtype,
             output0_dtype,
             output1_dtype,
-            input_shape,
-            output0_shape,
-            output1_shape,
         ):
             # No basic ensemble models are created against custom models [TODO]
             _infer_exact_helper(

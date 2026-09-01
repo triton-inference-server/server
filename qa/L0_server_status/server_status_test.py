@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -428,6 +428,9 @@ class ServerMetadataTest(tu.TestResultCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
 
+EXPECTED_MODEL_STATS: int = 144
+
+
 class ModelMetadataTest(tu.TestResultCollector):
     """
     These tests must be run after the ServerMetadataTest. See test.sh
@@ -723,8 +726,8 @@ class ModelMetadataTest(tu.TestResultCollector):
                     stats = infer_stats.model_stats
                 self.assertEqual(
                     len(stats),
-                    125,
-                    "expected 125 infer stats for all ready versions of all model",
+                    EXPECTED_MODEL_STATS,
+                    f"expected {EXPECTED_MODEL_STATS} infer stats for all ready versions of all model",
                 )
 
         except InferenceServerException as ex:

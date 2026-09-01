@@ -1,4 +1,4 @@
-// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -291,8 +291,8 @@ SetInferenceRequestMetadata(
             TRITONSERVER_ERROR_INVALID_ARG,
             (std::string(
                  "parameter keys starting with 'triton_' are reserved for "
-                 "Triton "
-                 "usage. Only the following keys starting with 'triton_' are "
+                 "Triton usage. Only the following keys starting with "
+                 "'triton_' are "
                  "allowed: ") +
              Join(TRITON_RESERVED_REQUEST_PARAMS, " "))
                 .c_str());
@@ -587,7 +587,16 @@ InferGRPCToInput(
           serialized_data->emplace_back();
           auto& serialized = serialized_data->back();
 
-          // Serialize the output tensor strings. Each string is
+          // Pre-compute the total serialized byte size and reserve once to
+          // avoid repeated std::string reallocations and heap fragmentation
+          // when 'bytes_contents' carries a large number of elements.
+          size_t serialized_byte_size = 0;
+          for (const auto& element : io.contents().bytes_contents()) {
+            serialized_byte_size += sizeof(uint32_t) + element.size();
+          }
+          serialized.reserve(serialized_byte_size);
+
+          // Serialize the input tensor strings. Each string is
           // serialized as a 4-byte length followed by the string itself
           // with no null-terminator.
           for (const auto& element : io.contents().bytes_contents()) {

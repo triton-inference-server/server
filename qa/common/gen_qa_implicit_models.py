@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,13 +30,16 @@ import argparse
 import os
 from typing import List, Tuple
 
-import gen_ensemble_model_utils as emu
+import gen_manifest
 import numpy as np
 from gen_common import (
+    create_general_modelconfig,
+    dtype_str,
     np_to_model_dtype,
     np_to_onnx_dtype,
     np_to_torch_dtype,
     np_to_trt_dtype,
+    trt_set_dynamic_range,
 )
 
 FLAGS = None
@@ -46,7 +49,7 @@ np_dtype_string = np.dtype(object)
 def create_onnx_modelfile_wo_initial_state(
     models_dir, model_version, max_batch, dtype, shape
 ):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -249,7 +252,7 @@ def create_onnx_modelfile_wo_initial_state(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
@@ -258,7 +261,7 @@ def create_onnx_modelfile_wo_initial_state(
 def create_onnx_modelfile_with_initial_state(
     models_dir, model_version, max_batch, dtype, shape
 ):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -363,7 +366,7 @@ def create_onnx_modelfile_with_initial_state(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
@@ -439,7 +442,7 @@ def create_libtorch_modelfile_wo_initial_state(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     traced.save(model_version_dir + "/model.pt")
@@ -499,7 +502,7 @@ def create_libtorch_modelfile_with_initial_state(
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     traced.save(model_version_dir + "/model.pt")
@@ -519,9 +522,7 @@ def create_libtorch_modelfile(
         )
 
 
-def create_libtorch_modelconfig(
-    models_dir, model_version, max_batch, dtype, shape, initial_state
-):
+def create_libtorch_modelconfig(models_dir, max_batch, dtype, shape, initial_state):
     if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
@@ -554,14 +555,14 @@ max_batch_size: {max_batch}
 input [
   {{
     name: "INPUT__0"
-    data_type: {emu.dtype_str(dtype)}
+    data_type: {dtype_str(dtype)}
     dims: [ {tu.shape_to_dims_str(shape)} ]
   }}
 ]
 output [
   {{
     name: "OUTPUT__0"
-    data_type: {emu.dtype_str(dtype)}
+    data_type: {dtype_str(dtype)}
     dims: [ {tu.shape_to_dims_str(shape)} ]
   }}
 ]
@@ -612,7 +613,7 @@ output [
     """.format(
             type=control_type,
             dims=tu.shape_to_dims_str(shape),
-            dtype=emu.dtype_str(dtype),
+            dtype=dtype_str(dtype),
         )
     elif initial_state == "zero":
         config += f"""
@@ -642,11 +643,11 @@ output [
         {{
           input_name: "INPUT_STATE__1"
           output_name: "OUTPUT_STATE__1"
-          data_type: {emu.dtype_str(dtype)}
+          data_type: {dtype_str(dtype)}
           dims: {tu.shape_to_dims_str(shape)}
           initial_state: {{
               name: "state init"
-              data_type: {emu.dtype_str(dtype)}
+              data_type: {dtype_str(dtype)}
               dims: {tu.shape_to_dims_str(shape_without_variable_dims)}
               zero_data: true
           }}
@@ -696,7 +697,7 @@ output [
     """.format(
             type=control_type,
             dims=tu.shape_to_dims_str(shape),
-            dtype=emu.dtype_str(dtype),
+            dtype=dtype_str(dtype),
             shape_without_variable_dims=tu.shape_to_dims_str(
                 shape_without_variable_dims
             ),
@@ -704,16 +705,14 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
 
-def create_onnx_modelconfig(
-    models_dir, model_version, max_batch, dtype, shape, initial_state
-):
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+def create_onnx_modelconfig(models_dir, max_batch, dtype, shape, initial_state):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -737,9 +736,8 @@ instance_group [
 ]
 """
 
-    # [TODO] move create_general_modelconfig() out of emu as it is general
     # enough for all backends to use
-    config = emu.create_general_modelconfig(
+    config = create_general_modelconfig(
         model_name,
         "onnxruntime_onnx",
         max_batch,
@@ -798,7 +796,7 @@ instance_group [
     """.format(
             type=control_type,
             dims=tu.shape_to_dims_str(shape),
-            dtype=emu.dtype_str(dtype),
+            dtype=dtype_str(dtype),
         )
     elif initial_state == "zero":
         config += f"""
@@ -828,11 +826,11 @@ instance_group [
         {{
           input_name: "INPUT_STATE"
           output_name: "OUTPUT_STATE"
-          data_type: {emu.dtype_str(dtype)}
+          data_type: {dtype_str(dtype)}
           dims: {tu.shape_to_dims_str(shape)}
           initial_state: {{
               name: "state init"
-              data_type: {emu.dtype_str(dtype)}
+              data_type: {dtype_str(dtype)}
               dims: {tu.shape_to_dims_str(shape_without_variable_dims)}
               zero_data: true
           }}
@@ -882,7 +880,7 @@ instance_group [
     """.format(
             type=control_type,
             dims=tu.shape_to_dims_str(shape),
-            dtype=emu.dtype_str(dtype),
+            dtype=dtype_str(dtype),
             shape_without_variable_dims=tu.shape_to_dims_str(
                 shape_without_variable_dims
             ),
@@ -890,7 +888,7 @@ instance_group [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -911,7 +909,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
     if max_batch != 0:
         in0 = network.add_input("INPUT", trt_dtype, [-1] + shape)
         start0 = network.add_input("START", trt_dtype, [-1] + unit_shape)
-        ready0 = network.add_input("READY", trt_dtype, [-1] + unit_shape)
+        network.add_input("READY", trt_dtype, [-1] + unit_shape)
         in_state0 = network.add_input("INPUT_STATE", trt_dtype, [-1] + shape)
         # Append the dimension by 1 so that broadcasting works properly
         constant_1_data = trt.Weights(np.ones(unit_shape + [1], dtype=dtype))
@@ -919,7 +917,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
     else:
         in0 = network.add_input("INPUT", trt_dtype, shape)
         start0 = network.add_input("START", trt_dtype, unit_shape)
-        ready0 = network.add_input("READY", trt_dtype, unit_shape)
+        network.add_input("READY", trt_dtype, unit_shape)
         in_state0 = network.add_input("INPUT_STATE", trt_dtype, shape)
         constant_1_data = trt.Weights(np.ones(unit_shape, dtype=dtype))
         constant_1 = network.add_constant(unit_shape, constant_1_data)
@@ -927,7 +925,11 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
     not_start = network.add_elementwise(
         constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB
     )
-    not_start.set_output_type(0, trt_dtype)
+    # set_output_type was removed from all layers in TensorRT 11; the
+    # elementwise output already has trt_dtype (both inputs do), so this
+    # call was a no-op on modern TRT. Guard for older versions.
+    if hasattr(not_start, "set_output_type"):
+        not_start.set_output_type(0, trt_dtype)
     internal_state = network.add_elementwise(
         in_state0, not_start.get_output(0), trt.ElementWiseOperation.PROD
     )
@@ -998,7 +1000,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -1037,7 +1039,11 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     not_start = network.add_elementwise(
         constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB
     )
-    not_start.set_output_type(0, trt_dtype)
+    # set_output_type was removed from all layers in TensorRT 11; the
+    # elementwise output already has trt_dtype (both inputs do), so this
+    # call was a no-op on modern TRT. Guard for older versions.
+    if hasattr(not_start, "set_output_type"):
+        not_start.set_output_type(0, trt_dtype)
     internal_state = network.add_elementwise(
         in_state0, not_start.get_output(0), trt.ElementWiseOperation.PROD
     )
@@ -1053,8 +1059,16 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     out0_state.get_output(0).name = "OUTPUT_STATE"
     network.mark_output(out0_state.get_output(0))
 
-    out0.get_output(0).dtype = trt_dtype
-    out0_state.get_output(0).dtype = trt_dtype
+    # ITensor.dtype setter removed in TRT 11; elementwise output dtype
+    # already matches trt_dtype.
+    try:
+        out0.get_output(0).dtype = trt_dtype
+    except AttributeError:
+        pass  # ITensor.dtype setter removed in TensorRT 11+
+    try:
+        out0_state.get_output(0).dtype = trt_dtype
+    except AttributeError:
+        pass  # ITensor.dtype setter removed in TensorRT 11+
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     start0.allowed_formats = 1 << int(trt_memory_format)
@@ -1062,19 +1076,22 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
     out0.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
     if trt_dtype == trt.int8:
-        in0.dynamic_range = (-128.0, 127.0)
-        in_state0.dynamic_range = (-128.0, 127.0)
-        out0.dynamic_range = (-128.0, 127.0)
-        start0.dynamic_range = (-128.0, 127.0)
-        ready0.dynamic_range = (-128.0, 127.0)
-
+        trt_set_dynamic_range(in0, -128.0, 127.0)
+        trt_set_dynamic_range(in_state0, -128.0, 127.0)
+        trt_set_dynamic_range(out0, -128.0, 127.0)
+        trt_set_dynamic_range(start0, -128.0, 127.0)
+        trt_set_dynamic_range(ready0, -128.0, 127.0)
     flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
-    flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
-    flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
+    # TensorRT 11 removed PREFER_PRECISION_CONSTRAINTS / INT8 / FP16
+    # BuilderFlags (strongly-typed networks). Older TRT still has them.
+    if hasattr(trt.BuilderFlag, "PREFER_PRECISION_CONSTRAINTS"):
+        flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
+        flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
-    if trt_dtype == trt.int8:
+    if trt_dtype == trt.int8 and hasattr(trt.BuilderFlag, "INT8"):
         flags |= 1 << int(trt.BuilderFlag.INT8)
-    elif trt_dtype == trt.float16:
+    elif trt_dtype == trt.float16 and hasattr(trt.BuilderFlag, "FP16"):
         flags |= 1 << int(trt.BuilderFlag.FP16)
 
     min_shape = []
@@ -1133,7 +1150,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
@@ -1141,7 +1158,7 @@ def create_plan_rf_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
 def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
-    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype):
         return
 
     if dtype != np.float32:
@@ -1150,8 +1167,8 @@ def create_plan_models(models_dir, model_version, max_batch, dtype, shape):
         create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape)
 
 
-def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):
-    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
+def create_plan_modelconfig(models_dir, max_batch, dtype, shape):
+    if not tu.validate_for_trt_model(dtype, dtype, dtype):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -1223,25 +1240,367 @@ instance_group [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
 
 
+def create_torch_aoti_modelfile(models_dir, model_version, max_batch, dtype, shape):
+    # AOT Inductor (PT2) sequence model. The forward arguments map positionally
+    # to the model's ordinal inputs/outputs, which the config addresses directly:
+    #   INPUT__0 = INPUT0 (data),  INPUT__1 = INPUT_STATE (implicit state),
+    #   INPUT__2 = START (control), INPUT__3 = READY (control),
+    #   INPUT__4 = CORRID (control)
+    #   OUTPUT__0 = out (data),     OUTPUT__1 = new_state (implicit state)
+    if dtype not in (np.float32, np.int32):
+        return
+
+    torch_dtype = np_to_torch_dtype(dtype)
+    model_name = tu.get_sequence_model_name("torch_aoti", dtype)
+    shape = [abs(ips) for ips in shape]
+
+    class SequenceNet(nn.Module):
+        def __init__(self):
+            super(SequenceNet, self).__init__()
+
+        def forward(self, INPUT0, INPUT_STATE, START, READY, CORRID):
+            # On sequence START, reset the running state to INPUT0; otherwise
+            # accumulate onto the carried state. The emitted output adds the
+            # correlation id so tests can confirm CORRID delivery, and READY
+            # gates it (active batch slots have READY == 1).
+            keep = (1 - START).to(INPUT_STATE.dtype)
+            new_state = INPUT0 + INPUT_STATE * keep
+            out = (new_state + CORRID.to(new_state.dtype)) * READY.to(new_state.dtype)
+            return out, new_state
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = SequenceNet().to(device).eval()
+
+    # Export with a dynamic first (batch) dimension so the AOTI artifact accepts
+    # any batch size in [1, max_batch]. The correlation id is delivered as an
+    # INT32 tensor (see config), independent of the model's data type.
+    export_batch = 2 if max_batch > 0 else 1
+    data_shape = [export_batch] + list(shape)
+    ctrl_shape = [export_batch, 1]
+    sample_inputs = (
+        torch.zeros(data_shape, dtype=torch_dtype, device=device),
+        torch.zeros(data_shape, dtype=torch_dtype, device=device),
+        torch.zeros(ctrl_shape, dtype=torch_dtype, device=device),
+        torch.zeros(ctrl_shape, dtype=torch_dtype, device=device),
+        torch.zeros(ctrl_shape, dtype=torch.int32, device=device),
+    )
+
+    dynamic_shapes = None
+    if max_batch > 0:
+        batch = torch.export.Dim("batch", min=1, max=max_batch)
+        dynamic_shapes = (
+            {0: batch},
+            {0: batch},
+            {0: batch},
+            {0: batch},
+            {0: batch},
+        )
+
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    try:
+        os.makedirs(model_version_dir)
+    except OSError:
+        pass  # ignore existing dir
+
+    exported_model = torch.export.export(
+        model, sample_inputs, dynamic_shapes=dynamic_shapes
+    )
+    torch._inductor.aoti_compile_and_package(
+        exported_model, package_path=model_version_dir + "/model.pt2"
+    )
+
+
+def create_torch_aoti_modelconfig(models_dir, max_batch, dtype, shape):
+    if dtype not in (np.float32, np.int32):
+        return
+
+    model_name = tu.get_sequence_model_name("torch_aoti", dtype)
+    config_dir = models_dir + "/" + model_name
+    control_type = "int32" if dtype == np.int32 else "fp32"
+
+    config = f"""
+name: "{model_name}"
+backend: "pytorch"
+platform: "torch_aoti"
+max_batch_size: {max_batch}
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {{
+      name: "INPUT__2"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_START
+          {control_type}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
+      name: "INPUT__3"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_READY
+          {control_type}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
+      name: "INPUT__4"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_CORRID
+          data_type: TYPE_INT32
+        }}
+      ]
+    }}
+  ]
+  state [
+    {{
+      input_name: "INPUT__1"
+      output_name: "OUTPUT__1"
+      data_type: {np_to_model_dtype(dtype)}
+      dims: [ {tu.shape_to_dims_str(shape)} ]
+    }}
+  ]
+}}
+input [
+  {{
+    name: "INPUT__0"
+    data_type: {np_to_model_dtype(dtype)}
+    dims: [ {tu.shape_to_dims_str(shape)} ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT__0"
+    data_type: {np_to_model_dtype(dtype)}
+    dims: [ {tu.shape_to_dims_str(shape)} ]
+  }}
+]
+instance_group [
+  {{
+    kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"}
+  }}
+]
+"""
+
+    try:
+        os.makedirs(config_dir)
+    except OSError:
+        pass  # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+
+def create_torch_aoti_forward_modelconfig(models_dir, model_version):
+    # Config-only variant of the float32 sequence model that addresses the
+    # control/state tensors via the forward-argument interface (ARGS[...] /
+    # RESULT[...]) instead of the ordinal INPUT__N / OUTPUT__N names. It reuses
+    # the float32 sequence artifact (5 positional inputs -> ARGS[0..4], two
+    # outputs -> RESULT[0], RESULT[1]).
+    import shutil
+
+    src = models_dir + "/" + tu.get_sequence_model_name("torch_aoti", np.float32)
+    src_pt2 = src + "/" + str(model_version) + "/model.pt2"
+    if not os.path.exists(src_pt2):
+        print(f"warning: {src_pt2} not found; skipping forward-interface model")
+        return
+
+    model_name = "torch_aoti_sequence_forward_float32"
+    dst_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    try:
+        os.makedirs(dst_dir)
+    except OSError:
+        pass  # ignore existing dir
+    shutil.copy(src_pt2, dst_dir + "/model.pt2")
+
+    config = f"""
+name: "{model_name}"
+backend: "pytorch"
+platform: "torch_aoti"
+max_batch_size: 8
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {{ name: "ARGS[2]" control [{{ kind: CONTROL_SEQUENCE_START fp32_false_true: [ 0, 1 ] }}] }},
+    {{ name: "ARGS[3]" control [{{ kind: CONTROL_SEQUENCE_READY fp32_false_true: [ 0, 1 ] }}] }},
+    {{ name: "ARGS[4]" control [{{ kind: CONTROL_SEQUENCE_CORRID data_type: TYPE_INT32 }}] }}
+  ]
+  state [
+    {{
+      input_name: "ARGS[1]"
+      output_name: "RESULT[1]"
+      data_type: {np_to_model_dtype(np.float32)}
+      dims: [ 1 ]
+    }}
+  ]
+}}
+input [
+  {{ name: "ARGS[0]" data_type: {np_to_model_dtype(np.float32)} dims: [ 1 ] }}
+]
+output [
+  {{ name: "RESULT[0]" data_type: {np_to_model_dtype(np.float32)} dims: [ 1 ] }}
+]
+instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"} }}]
+"""
+    with open(models_dir + "/" + model_name + "/config.pbtxt", "w") as f:
+        f.write(config)
+    print(f"Created forward-interface sequence model {model_name}")
+
+
+def create_torch_aoti_initstate_model(models_dir, model_version, max_batch=8):
+    # Sequence model that relies on a declared zero initial_state rather than a
+    # START-driven reset: new_state = INPUT0 + INPUT_STATE (accumulate). On the
+    # first step the state input is the zero initial_state, so it behaves as a
+    # running sum that resets when the sequence (and its state) is recycled.
+    model_name = "torch_aoti_sequence_initstate_float32"
+    dst_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    try:
+        os.makedirs(dst_dir)
+    except OSError:
+        pass  # ignore existing dir
+
+    class SequenceNet(nn.Module):
+        def forward(self, INPUT0, INPUT_STATE, START, READY):
+            new_state = INPUT0 + INPUT_STATE
+            out = new_state * READY.to(new_state.dtype)
+            return out, new_state
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = SequenceNet().to(device).eval()
+    batch = torch.export.Dim("batch", min=1, max=max_batch)
+    sample = (
+        torch.zeros(2, 1, dtype=torch.float32, device=device),
+        torch.zeros(2, 1, dtype=torch.float32, device=device),
+        torch.zeros(2, 1, dtype=torch.float32, device=device),
+        torch.zeros(2, 1, dtype=torch.float32, device=device),
+    )
+    ds = ({0: batch}, {0: batch}, {0: batch}, {0: batch})
+    ep = torch.export.export(model, sample, dynamic_shapes=ds)
+    torch._inductor.aoti_compile_and_package(ep, package_path=dst_dir + "/model.pt2")
+
+    config = f"""
+name: "{model_name}"
+backend: "pytorch"
+platform: "torch_aoti"
+max_batch_size: {max_batch}
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {{ name: "INPUT__2" control [{{ kind: CONTROL_SEQUENCE_START fp32_false_true: [ 0, 1 ] }}] }},
+    {{ name: "INPUT__3" control [{{ kind: CONTROL_SEQUENCE_READY fp32_false_true: [ 0, 1 ] }}] }}
+  ]
+  state [
+    {{
+      input_name: "INPUT__1"
+      output_name: "OUTPUT__1"
+      data_type: {np_to_model_dtype(np.float32)}
+      dims: [ 1 ]
+      initial_state: {{
+        name: "zero state"
+        data_type: {np_to_model_dtype(np.float32)}
+        dims: [ 1 ]
+        zero_data: true
+      }}
+    }}
+  ]
+}}
+input [
+  {{ name: "INPUT__0" data_type: {np_to_model_dtype(np.float32)} dims: [ 1 ] }}
+]
+output [
+  {{ name: "OUTPUT__0" data_type: {np_to_model_dtype(np.float32)} dims: [ 1 ] }}
+]
+instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"} }}]
+"""
+    with open(models_dir + "/" + model_name + "/config.pbtxt", "w") as f:
+        f.write(config)
+    print(f"Created initial-state sequence model {model_name}")
+
+
+def create_torch_aoti_negative_configs(models_dir, model_version):
+    # Config-only negative models that reuse the float32 sequence artifact but
+    # declare an unsupported TYPE_STRING correlation id / state. These must fail
+    # to load; the L0 test starts a dedicated server and asserts the failure.
+    import shutil
+
+    src = models_dir + "/" + tu.get_sequence_model_name("torch_aoti", np.float32)
+    src_pt2 = src + "/" + str(model_version) + "/model.pt2"
+    if not os.path.exists(src_pt2):
+        print(f"warning: {src_pt2} not found; skipping negative models")
+        return
+
+    fp32 = np_to_model_dtype(np.float32)
+    gpu = "KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"
+    variants = {
+        "torch_aoti_sequence_bad_corrid": f"""
+name: "torch_aoti_sequence_bad_corrid"
+backend: "pytorch"
+platform: "torch_aoti"
+max_batch_size: 8
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {{ name: "INPUT__2" control [{{ kind: CONTROL_SEQUENCE_START fp32_false_true: [ 0, 1 ] }}] }},
+    {{ name: "INPUT__3" control [{{ kind: CONTROL_SEQUENCE_READY fp32_false_true: [ 0, 1 ] }}] }},
+    {{ name: "INPUT__4" control [{{ kind: CONTROL_SEQUENCE_CORRID data_type: TYPE_STRING }}] }}
+  ]
+  state [
+    {{ input_name: "INPUT__1" output_name: "OUTPUT__1" data_type: {fp32} dims: [ 1 ] }}
+  ]
+}}
+input [ {{ name: "INPUT__0" data_type: {fp32} dims: [ 1 ] }} ]
+output [ {{ name: "OUTPUT__0" data_type: {fp32} dims: [ 1 ] }} ]
+instance_group [{{ kind: {gpu} }}]
+""",
+        "torch_aoti_sequence_bad_state": f"""
+name: "torch_aoti_sequence_bad_state"
+backend: "pytorch"
+platform: "torch_aoti"
+max_batch_size: 8
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {{ name: "INPUT__2" control [{{ kind: CONTROL_SEQUENCE_START fp32_false_true: [ 0, 1 ] }}] }},
+    {{ name: "INPUT__3" control [{{ kind: CONTROL_SEQUENCE_READY fp32_false_true: [ 0, 1 ] }}] }}
+  ]
+  state [
+    {{ input_name: "INPUT__1" output_name: "OUTPUT__1" data_type: TYPE_STRING dims: [ 1 ] }}
+  ]
+}}
+input [ {{ name: "INPUT__0" data_type: {fp32} dims: [ 1 ] }} ]
+output [ {{ name: "OUTPUT__0" data_type: {fp32} dims: [ 1 ] }} ]
+instance_group [{{ kind: {gpu} }}]
+""",
+    }
+    for model_name, config in variants.items():
+        dst_dir = models_dir + "/" + model_name + "/" + str(model_version)
+        try:
+            os.makedirs(dst_dir)
+        except OSError:
+            pass  # ignore existing dir
+        shutil.copy(src_pt2, dst_dir + "/model.pt2")
+        with open(models_dir + "/" + model_name + "/config.pbtxt", "w") as f:
+            f.write(config)
+        print(f"Created negative sequence model {model_name}")
+
+
 def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
     model_version = 1
 
     if FLAGS.onnx:
-        create_onnx_modelconfig(
-            models_dir, model_version, 8, dtype, shape, initial_state
-        )
+        create_onnx_modelconfig(models_dir, 8, dtype, shape, initial_state)
         create_onnx_modelfile(models_dir, model_version, 8, dtype, shape, initial_state)
         if no_batch:
-            create_onnx_modelconfig(
-                models_dir, model_version, 0, dtype, shape, initial_state
-            )
+            create_onnx_modelconfig(models_dir, 0, dtype, shape, initial_state)
             create_onnx_modelfile(
                 models_dir, model_version, 0, dtype, shape, initial_state
             )
@@ -1253,10 +1612,10 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
         if dtype == np.int8:
             suffix = [1, 1]
 
-        create_plan_modelconfig(models_dir, model_version, 8, dtype, shape + suffix)
+        create_plan_modelconfig(models_dir, 8, dtype, shape + suffix)
         create_plan_models(models_dir, model_version, 8, dtype, shape + suffix)
         if no_batch:
-            create_plan_modelconfig(models_dir, model_version, 0, dtype, shape + suffix)
+            create_plan_modelconfig(models_dir, 0, dtype, shape + suffix)
             create_plan_models(models_dir, model_version, 0, dtype, shape + suffix)
 
     if FLAGS.libtorch:
@@ -1264,19 +1623,29 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
         if dtype == np.int8:
             suffix = [1, 1]
 
-        create_libtorch_modelconfig(
-            models_dir, model_version, 8, dtype, shape + suffix, initial_state
-        )
+        create_libtorch_modelconfig(models_dir, 8, dtype, shape + suffix, initial_state)
         create_libtorch_modelfile(
             models_dir, model_version, 8, dtype, shape + suffix, initial_state
         )
         if no_batch:
             create_libtorch_modelconfig(
-                models_dir, model_version, 0, dtype, shape + suffix, initial_state
+                models_dir, 0, dtype, shape + suffix, initial_state
             )
             create_libtorch_modelfile(
                 models_dir, model_version, 0, dtype, shape + suffix, initial_state
             )
+
+    if FLAGS.torch_aoti:
+        # AOTI sequence models are generated with first-dim batching enabled.
+        create_torch_aoti_modelconfig(models_dir, 8, dtype, shape)
+        create_torch_aoti_modelfile(models_dir, model_version, 8, dtype, shape)
+        # Generate the float32-only variants once (they reuse / extend the
+        # float32 sequence artifact): forward-interface naming, declared zero
+        # initial_state, and the negative (unsupported-type) load-failure models.
+        if dtype == np.float32 and no_batch:
+            create_torch_aoti_forward_modelconfig(models_dir, model_version)
+            create_torch_aoti_initstate_model(models_dir, model_version, 8)
+            create_torch_aoti_negative_configs(models_dir, model_version)
 
 
 if __name__ == "__main__":
@@ -1319,6 +1688,12 @@ if __name__ == "__main__":
         help="Generate Pytorch LibTorch models",
     )
     parser.add_argument(
+        "--torch-aoti",
+        required=False,
+        action="store_true",
+        help="Generate PyTorch AOT Inductor (PT2) sequence models",
+    )
+    parser.add_argument(
         "--openvino",
         required=False,
         action="store_true",
@@ -1340,13 +1715,17 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     if FLAGS.onnx:
         import onnx
 
     if FLAGS.tensorrt:
         import tensorrt as trt
 
-    if FLAGS.libtorch:
+    if FLAGS.libtorch or FLAGS.torch_aoti:
         import torch
         from torch import nn
 
@@ -1425,3 +1804,6 @@ if __name__ == "__main__":
             FLAGS.initial_state,
             False,
         )
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

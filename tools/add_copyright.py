@@ -293,9 +293,9 @@ if __name__ == "__main__":
 #
 # Integration Tests
 #
-import tempfile
+import tempfile  # noqa: E402  (test-section import, deliberately mid-file)
 
-import pytest
+import pytest  # noqa: E402  (test-section import, deliberately mid-file)
 
 
 # Processes provided text through the copyright hook by writing it to a temporary file.

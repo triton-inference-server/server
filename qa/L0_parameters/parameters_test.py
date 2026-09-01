@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,66 +30,86 @@ import sys
 
 sys.path.append("../common")
 
-import os
 import queue
 import unittest
 from functools import partial
-from unittest import IsolatedAsyncioTestCase
 
 import numpy as np
+import requests
 import tritonclient.grpc as grpcclient
 import tritonclient.grpc.aio as asyncgrpcclient
 import tritonclient.http as httpclient
 import tritonclient.http.aio as asynchttpclient
 from tritonclient.utils import InferenceServerException
 
-TEST_HEADER = os.environ.get("TEST_HEADER")
+_TRITON_RESERVED_CLIENT_ERROR = "is a reserved parameter and cannot be specified"
+_TRITON_RESERVED_SERVER_ERROR = "reserved for Triton usage"
+
+# docs/protocol/extension_parameters.md — reserved names
+_RESERVED_PARAMETER_KEYS = (
+    "sequence_id",
+    "sequence_start",
+    "sequence_end",
+    "priority",
+    "timeout",
+    "headers",
+    "binary_data_output",
+    "triton_enable_empty_final_response",
+    "triton_final_response",
+    "triton_injected_via_header",
+)
+
+_HTTP_LOCALHOST = "http://localhost:8000"
 
 
-class InferenceParametersTest(IsolatedAsyncioTestCase):
-    async def asyncSetUp(self):
-        self.http = httpclient.InferenceServerClient(url="localhost:8000")
-        self.async_http = asynchttpclient.InferenceServerClient(url="localhost:8000")
-        self.grpc = grpcclient.InferenceServerClient(url="localhost:8001")
-        self.async_grpc = asyncgrpcclient.InferenceServerClient(url="localhost:8001")
+def _infer_url(model_name="parameter"):
+    return f"{_HTTP_LOCALHOST}/v2/models/{model_name}/infer"
 
-        self.parameter_list = []
-        self.parameter_list.append({"key1": "value1", "key2": "value2"})
-        self.parameter_list.append({"key1": 1, "key2": 2})
-        self.parameter_list.append({"key1": 123.123, "key2": 321.321})
-        self.parameter_list.append({"key1": True, "key2": "value2"})
-        self.parameter_list.append({"triton_": True, "key2": "value2"})
 
-        # Only "test_params" tests parameters without headers.
-        if TEST_HEADER != "test_params":
-            self.headers = {
-                "header_1": "value_1",
-                "header_2": "value_2",
-                "my_header_1": "my_value_1",
-                "my_header_2": "my_value_2",
-                "my_header_3": 'This is a "quoted" string with a backslash\ ',
+def _minimal_fp32_infer_body(parameters=None):
+    """KServe HTTP infer JSON matching qa/L0_parameters model `parameter` (INPUT0 FP32 [1])."""
+    body = {
+        "inputs": [
+            {
+                "name": "INPUT0",
+                "shape": [1],
+                "datatype": "FP32",
+                "data": [1.0],
             }
+        ],
+    }
+    if parameters is not None:
+        body["parameters"] = parameters
+    return body
 
-            # only these headers should be forwarded to the model.
-            if TEST_HEADER == "test_grpc_header_forward_pattern_case_sensitive":
-                self.expected_headers = {}
-            else:
-                self.expected_headers = {
-                    "my_header_1": "my_value_1",
-                    "my_header_2": "my_value_2",
-                    "my_header_3": 'This is a "quoted" string with a backslash\ ',
-                }
-        else:
-            self.headers = {}
-            self.expected_headers = {}
 
-        def callback(user_data, result, error):
-            if error:
-                user_data.put(error)
-            else:
-                user_data.put(result)
+_FORWARD_HEADERS = {
+    "header_1": "value_1",
+    "header_2": "value_2",
+    "my_header_1": "my_value_1",
+    "my_header_2": "my_value_2",
+    "my_header_3": 'This is a "quoted" string with a backslash\\ ',
+}
 
-        self.grpc_callback = callback
+
+def _grpc_stream_callback(user_data, result, error):
+    if error:
+        user_data.put(error)
+    else:
+        user_data.put(result)
+
+
+class InferenceParametersTest(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.httpclient = httpclient.InferenceServerClient(url="localhost:8000")
+        self.async_httpclient = asynchttpclient.InferenceServerClient(
+            url="localhost:8000"
+        )
+        self.grpcclient = grpcclient.InferenceServerClient(url="localhost:8001")
+        self.async_grpcclient = asyncgrpcclient.InferenceServerClient(
+            url="localhost:8001"
+        )
+        self.grpcclient_callback = _grpc_stream_callback
 
     def create_inputs(self, client_type):
         inputs = []
@@ -100,128 +120,257 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
         return inputs
 
     async def send_request_and_verify(
-        self, client_type, client, is_async=False, model_name="parameter"
+        self,
+        client_type,
+        client,
+        parameters,
+        headers,
+        expected_headers,
+        is_async_infer=False,
+        model_name="parameter",
     ):
         inputs = self.create_inputs(client_type)
-        for parameters in self.parameter_list:
-            # Setup infer callable to re-use below for brevity
+
+        if is_async_infer:
+            if client_type == httpclient:
+                result = client.async_infer(
+                    model_name=model_name,
+                    inputs=inputs,
+                    parameters=parameters,
+                    headers=headers,
+                ).get_result()
+            elif client_type == grpcclient:
+                user_data = queue.Queue()
+                client.async_infer(
+                    model_name=model_name,
+                    inputs=inputs,
+                    parameters=parameters,
+                    headers=headers,
+                    callback=partial(self.grpcclient_callback, user_data),
+                )
+                result = user_data.get()
+                self.assertIsNot(result, InferenceServerException)
+            else:
+                raise ValueError(f"Unsupported client type: {client_type}")
+        else:
             infer_callable = partial(
                 client.infer,
                 model_name=model_name,
                 inputs=inputs,
                 parameters=parameters,
-                headers=self.headers,
+                headers=headers,
             )
-
-            # The `triton_` prefix is reserved for Triton usage
-            should_error = False
-            if "triton_" in parameters.keys():
-                should_error = True
-
-            if is_async:
-                if should_error:
-                    with self.assertRaises(InferenceServerException):
-                        await infer_callable()
-                    return
-                else:
-                    result = await infer_callable()
+            if client_type == asynchttpclient or client_type == asyncgrpcclient:
+                result = await infer_callable()
             else:
-                if should_error:
-                    with self.assertRaises(InferenceServerException):
-                        infer_callable()
-                    return
-                else:
-                    result = infer_callable()
+                result = infer_callable()
 
-            self.verify_outputs(result, parameters)
+        self.verify_outputs(result, parameters, expected_headers)
 
-    def verify_outputs(self, result, parameters):
+    def verify_outputs(self, result, parameters, expected_headers):
         keys = result.as_numpy("key")
         values = result.as_numpy("value")
         keys = keys.astype(str).tolist()
-        expected_keys = list(parameters.keys()) + list(self.expected_headers.keys())
-        self.assertEqual(set(keys), set(expected_keys))
+        expected_keys = list(parameters.keys()) + list(expected_headers.keys())
+        self.assertEqual(
+            set(keys),
+            set(expected_keys),
+            msg=f"keys: {keys}, expected_keys: {expected_keys}",
+        )
 
         # We have to convert the parameter values to string
         expected_values = []
         for expected_value in list(parameters.values()):
             expected_values.append(str(expected_value))
-        for value in self.expected_headers.values():
+        for value in expected_headers.values():
             expected_values.append(value)
-        self.assertEqual(set(values.astype(str).tolist()), set(expected_values))
-
-    async def test_grpc_parameter(self):
-        await self.send_request_and_verify(grpcclient, self.grpc)
-
-    async def test_http_parameter(self):
-        await self.send_request_and_verify(httpclient, self.http)
-
-    async def test_async_http_parameter(self):
-        await self.send_request_and_verify(
-            asynchttpclient, self.async_http, is_async=True
+        self.assertEqual(
+            set(values.astype(str).tolist()),
+            set(expected_values),
+            msg=f"values: {values.astype(str).tolist()}, expected_values: {expected_values}",
         )
 
-    async def test_async_grpc_parameter(self):
-        await self.send_request_and_verify(
-            asyncgrpcclient, self.async_grpc, is_async=True
-        )
-
-    def test_http_async_parameter(self):
-        inputs = self.create_inputs(httpclient)
-        # Skip the parameter that returns an error
-        parameter_list = self.parameter_list[:-1]
-        for parameters in parameter_list:
-            result = self.http.async_infer(
-                model_name="parameter",
-                inputs=inputs,
-                parameters=parameters,
-                headers=self.headers,
-            ).get_result()
-            self.verify_outputs(result, parameters)
-
-    def test_grpc_async_parameter(self):
+    async def _verify_grpc_stream_infer(self, parameters, headers, expected_headers):
         user_data = queue.Queue()
-        inputs = self.create_inputs(grpcclient)
-        # Skip the parameter that returns an error
-        parameter_list = self.parameter_list[:-1]
-        for parameters in parameter_list:
-            self.grpc.async_infer(
-                model_name="parameter",
-                inputs=inputs,
-                parameters=parameters,
-                headers=self.headers,
-                callback=partial(self.grpc_callback, user_data),
-            )
-            result = user_data.get()
-            self.assertFalse(result is InferenceServerException)
-            self.verify_outputs(result, parameters)
-
-    def test_grpc_stream_parameter(self):
-        user_data = queue.Queue()
-        self.grpc.start_stream(
-            callback=partial(self.grpc_callback, user_data), headers=self.headers
+        self.grpcclient.start_stream(
+            callback=partial(self.grpcclient_callback, user_data), headers=headers
         )
         inputs = self.create_inputs(grpcclient)
-        # Skip the parameter that returns an error
-        parameter_list = self.parameter_list[:-1]
-        for parameters in parameter_list:
-            # async stream infer
-            self.grpc.async_stream_infer(
-                model_name="parameter", inputs=inputs, parameters=parameters
-            )
-            result = user_data.get()
-            self.assertFalse(result is InferenceServerException)
-            self.verify_outputs(result, parameters)
-        self.grpc.stop_stream()
+        self.grpcclient.async_stream_infer(
+            model_name="parameter", inputs=inputs, parameters=parameters
+        )
+        result = user_data.get()
+        self.assertIsNot(result, InferenceServerException)
+        self.verify_outputs(result, parameters, expected_headers)
+        self.grpcclient.stop_stream()
 
-    async def test_ensemble_parameter_forwarding(self):
-        await self.send_request_and_verify(httpclient, self.http, model_name="ensemble")
+    def _raw_http_post_infer(self, body_dict, extra_headers=None):
+        """POST /v2/models/.../infer without tritonclient (no header normalization)."""
+        headers = {"Content-Type": "application/json"}
+        if extra_headers:
+            headers.update(extra_headers)
+        return requests.post(
+            _infer_url("parameter"),
+            json=body_dict,
+            headers=headers,
+            timeout=60,
+        )
+
+    def _assert_raw_http_400(self, response, text_substr):
+        """Assert status 400 and body contains `text_substr`."""
+        snippet = response.text[:2000] if response.text else ""
+        self.assertEqual(response.status_code, 400, msg=snippet)
+        self.assertIn(text_substr, response.text, msg=snippet)
+
+    async def _run_client_infer_suite(self, parameters, headers, expected_headers):
+        """
+        Full client matrix: gRPC/HTTP sync+async, stream, ensemble.
+        """
+        await self.send_request_and_verify(
+            grpcclient, self.grpcclient, parameters, headers.copy(), expected_headers
+        )
+        await self.send_request_and_verify(
+            httpclient, self.httpclient, parameters, headers.copy(), expected_headers
+        )
+        await self.send_request_and_verify(
+            asynchttpclient,
+            self.async_httpclient,
+            parameters,
+            headers.copy(),
+            expected_headers,
+        )
+        await self.send_request_and_verify(
+            asyncgrpcclient,
+            self.async_grpcclient,
+            parameters,
+            headers.copy(),
+            expected_headers,
+        )
+        await self.send_request_and_verify(
+            httpclient,
+            self.httpclient,
+            parameters,
+            headers.copy(),
+            expected_headers,
+            is_async_infer=True,
+        )
+        await self.send_request_and_verify(
+            grpcclient,
+            self.grpcclient,
+            parameters,
+            headers.copy(),
+            expected_headers,
+            is_async_infer=True,
+        )
+        await self._verify_grpc_stream_infer(
+            parameters, headers.copy(), expected_headers
+        )
+        await self.send_request_and_verify(
+            httpclient,
+            self.httpclient,
+            parameters,
+            headers.copy(),
+            expected_headers,
+            model_name="ensemble",
+        )
+
+    async def test_params(self):
+        for parameters in [
+            {"key1": "value1", "key2": "value2"},
+            {"key1": 1, "key2": 2},
+            {"key1": 123.123, "key2": 321.321},
+            {"key1": True, "key2": "value2"},
+        ]:
+            await self._run_client_infer_suite(parameters, {}, {})
+
+    async def test_params_reserved_rejected(self):
+        for reserved_key in _RESERVED_PARAMETER_KEYS:
+            parameters = {reserved_key: "dummy-value"}
+            body = _minimal_fp32_infer_body(parameters)
+
+            # Raw HTTP
+            if reserved_key.startswith("triton_"):
+                r = self._raw_http_post_infer(body)
+                self._assert_raw_http_400(r, _TRITON_RESERVED_SERVER_ERROR)
+
+            # Python clients
+            for client_type, client in (
+                (httpclient, self.httpclient),
+                (asynchttpclient, self.async_httpclient),
+                (grpcclient, self.grpcclient),
+                (asyncgrpcclient, self.async_grpcclient),
+            ):
+                inputs = self.create_inputs(client_type)
+                with self.assertRaises(InferenceServerException) as cm:
+                    if client_type in (asynchttpclient, asyncgrpcclient):
+                        await client.infer(
+                            model_name="parameter",
+                            inputs=inputs,
+                            parameters=parameters,
+                        )
+                    else:
+                        client.infer(
+                            model_name="parameter",
+                            inputs=inputs,
+                            parameters=parameters,
+                        )
+                msg = str(cm.exception)
+                # Reserved parameters are rejected by the client
+                self.assertIn(_TRITON_RESERVED_CLIENT_ERROR, msg, msg=msg)
+
+    async def test_headers(self):
+        expected_headers = {
+            "my_header_1": "my_value_1",
+            "my_header_2": "my_value_2",
+            "my_header_3": 'This is a "quoted" string with a backslash\\ ',
+        }
+        await self._run_client_infer_suite({}, _FORWARD_HEADERS, expected_headers)
+
+    async def test_grpc_header_forward_pattern_case_sensitive(self):
+        expected_headers = {}
+        await self._run_client_infer_suite({}, _FORWARD_HEADERS, expected_headers)
+
+    async def test_headers_reserved_rejected(self):
+        body = _minimal_fp32_infer_body({})
+        for reserved_key in _RESERVED_PARAMETER_KEYS:
+            # Raw HTTP
+            r = self._raw_http_post_infer(
+                body, extra_headers={reserved_key: "dummy-value"}
+            )
+            self._assert_raw_http_400(r, _TRITON_RESERVED_SERVER_ERROR)
+
+            # Python clients
+            for client_type, client in (
+                (httpclient, self.httpclient),
+                (asynchttpclient, self.async_httpclient),
+                (grpcclient, self.grpcclient),
+                (asyncgrpcclient, self.async_grpcclient),
+            ):
+                inputs = self.create_inputs(client_type)
+                with self.assertRaises(InferenceServerException) as cm:
+                    if client_type in (asynchttpclient, asyncgrpcclient):
+                        await client.infer(
+                            model_name="parameter",
+                            inputs=inputs,
+                            parameters={},
+                            headers={reserved_key: "dummy-value"},
+                        )
+                    else:
+                        client.infer(
+                            model_name="parameter",
+                            inputs=inputs,
+                            parameters={},
+                            headers={reserved_key: "dummy-value"},
+                        )
+                msg = str(cm.exception)
+                # Headers are not rejected by the client
+                self.assertIn(_TRITON_RESERVED_SERVER_ERROR, msg, msg=msg)
 
     async def asyncTearDown(self):
-        self.http.close()
-        self.grpc.close()
-        await self.async_grpc.close()
-        await self.async_http.close()
+        self.httpclient.close()
+        self.grpcclient.close()
+        await self.async_grpcclient.close()
+        await self.async_httpclient.close()
 
 
 if __name__ == "__main__":

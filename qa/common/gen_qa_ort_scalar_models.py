@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,12 +26,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-
-sys.path.append("../common")
 import argparse
 import os
 
+import gen_manifest
 import numpy as np
 import onnx
 import test_util as tu
@@ -68,7 +66,7 @@ def create_onnx_modelfile(models_dir, shape, dtype, model_version=1):
 
     try:
         os.makedirs(model_version_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
@@ -103,7 +101,7 @@ output [
 
     try:
         os.makedirs(config_dir)
-    except OSError as ex:
+    except OSError:
         pass  # ignore existing dir
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
@@ -128,7 +126,14 @@ if __name__ == "__main__":
     if not FLAGS.models_dir:
         raise Exception("--models_dir is required")
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     create_onnx_modelfile(FLAGS.models_dir, shape=[1], dtype=np.float32)
     create_onnx_modelconfig(FLAGS.models_dir, shape=[1], dtype=np.float32)
     create_onnx_modelfile(FLAGS.models_dir, shape=[1, 1], dtype=np.float32)
     create_onnx_modelconfig(FLAGS.models_dir, shape=[1, 1], dtype=np.float32)
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

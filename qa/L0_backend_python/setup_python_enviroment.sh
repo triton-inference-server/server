@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -109,7 +109,7 @@ rm -f /usr/bin/python3 && \
 ln -s "/usr/bin/python3.${PYTHON_ENV_VERSION}" /usr/bin/python3
 pip3 install --upgrade requests numpy virtualenv protobuf
 find /opt/tritonserver/qa/pkgs/ -maxdepth 1 -type f -name \
-    "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
+    "tritonclient-*-py3-none-any.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
 
 # Build triton-shm-monitor for the test

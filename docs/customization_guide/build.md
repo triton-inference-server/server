@@ -59,8 +59,6 @@ to build Triton on a platform that is not listed here.
 
 * [Ubuntu 22.04, x86-64](#building-for-ubuntu-2204)
 
-* [Windows 10, x86-64](#building-for-windows-10)
-
 If you are developing or debugging Triton, see [Development and
 Incremental Builds](#development-and-incremental-builds) for information
 on how to perform incremental build.
@@ -182,6 +180,153 @@ you have a branch called "mybranch" in the
 repo that you want to use in the build, you would specify
 --backend=onnxruntime:mybranch.
 
+#### Build Secrets
+
+Some builds need a credential, for example an apt source list naming an
+authenticated package mirror. Pass these with --docker-build-secret, which
+takes a Docker build secret spec and forwards it to `docker build --secret`
+unchanged. Every form Docker accepts works and the flag may be repeated.
+
+```bash
+$ ./build.py ... --docker-build-secret id=<id>,src=<path> --docker-build-secret id=<id>,env=<variable>
+```
+
+A secret is mounted only for the duration of the build step that uses it and
+never becomes part of an image layer.
+
+A spec may also carry target=`<path>`, which selects where the secret is
+mounted. Docker rejects that key on the command line because it belongs to the
+Dockerfile rather than the build command, so build.py removes it before
+invoking docker and applies it when generating the Dockerfile.
+
+The id `apt_sources` has an additional meaning. Its secret is mounted for the
+duration of every apt step in the generated Dockerfile and Dockerfile.buildbase,
+so package installs resolve through the mirror the list names. It lands on
+target when the spec sets one, and on
+/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list otherwise. When the
+secret is omitted the generated Dockerfiles are unchanged and apt uses the
+distribution repositories.
+
+This includes the first step of Dockerfile.buildbase, which is also the step
+that installs ca-certificates. On a base image that already carries them the
+step resolves through the mirror like any other. On one that does not, apt
+reports the failed TLS handshake, still exits 0, and installs from the
+distribution repositories, so the step behaves as it did before the mount was
+added.
+
+#### Authenticating Clones From GitHub
+
+Source from several other repos is fetched during the build, as described
+above. Those clones are unauthenticated by default, which is subject to
+GitHub's rate limits and cannot reach a private repo. Supply a git config that
+rewrites the GitHub URL to an authenticated one, as the `gitconfig` build
+secret.
+
+```bash
+$ cat > /tmp/gitconfig <<EOF
+[url "https://x-access-token:<token>@github.com/"]
+	insteadOf = https://github.com/
+EOF
+$ chmod 600 /tmp/gitconfig
+$ ./build.py ... --docker-build-secret id=gitconfig,src=/tmp/gitconfig
+```
+
+The token has to appear in the file. git does not expand environment variables
+inside `url.<base>.insteadOf`, so a config that refers to one is stored
+literally and silently fails to authenticate.
+
+That covers the steps that clone while an image is being built. build.py mounts
+the config on each of them and points git at it with GIT_CONFIG_GLOBAL rather
+than installing it at the default path, so nothing outside those steps picks it
+up. The config is never part of an image layer, and only its path reaches the
+generated build scripts.
+
+cmake_build clones while the build runs inside the container rather than while
+an image is built, so no build secret reaches it. Neither does a bind mount:
+docker resolves the source path on the daemon, which need not share a filesystem
+with build.py, and silently mounts a directory when it finds nothing there. Put
+the same text in TRITON_GITCONFIG for that case. build.py forwards the variable
+to the container by name and has it write the file there, so the contents stay
+out of the generated build scripts.
+
+```bash
+$ export TRITON_GITCONFIG="$(cat /tmp/gitconfig)"
+$ ./build.py ...
+```
+
+Set both when a build needs authenticated clones throughout: the secret for the
+image builds, the variable for the build itself. Omit either and the steps it
+covers clone unauthenticated.
+
+#### Experimental: Build Presets
+
+> **Experimental.** This feature is gated behind the
+> `TRITON_BUILD_EXPERIMENTAL=1` environment variable; without it the
+> `--build-presets-file` flag is rejected.
+
+Build presets let you (a) inspect exactly which cmake flags each component
+receives, and (b) pin those flags via a single JSON file with
+`--build-presets-file <path>`.
+
+**Snapshot (dump).** When run with `--dryrun`, build.py writes a
+provenance-annotated snapshot of the fully-resolved cmake configuration to
+`build_presets.json` in the build directory. It records, for `core`, each
+`backend`, `repoagent`, and `cache`, every `-D` flag that lands in `cmake_build`,
+each labeled with its `source`: `cli` (explicit command line), `preset` (from a
+loaded presets file), or `default` (build.py default/derived):
+
+```json
+{
+  "backends": {
+    "onnxruntime": {
+      "tag": { "value": "main", "source": "default" },
+      "cmake_args": {
+        "TRITON_ENABLE_GPU": { "value": "ON", "source": "cli" },
+        "TRITON_BUILD_ONNXRUNTIME_VERSION": { "value": "1.27.0", "source": "default" }
+      }
+    }
+  }
+}
+```
+
+**Reload.** That same file can be fed back with `--build-presets-file` to pin its
+flags (the `source` field is informational on load). A hand-written preset may
+use bare scalars instead of `{value, source}` objects:
+
+```json
+{
+  "backends": {
+    "onnxruntime": {
+      "tag": "r25.08_fix",
+      "cmake_args": { "TRITON_ENABLE_ONNXRUNTIME_OPENVINO": "OFF" }
+    },
+    "python": {
+      "extra_cmake_args": { "TRITON_BOOST_URL": "https://.../boost_1_80_0.tar.gz" }
+    }
+  }
+}
+```
+
+Notes:
+- A component named in the file must also be included in the build (via
+  `--backend`/`--repoagent`/`--cache` or `--enable-all`).
+- Command-line flags always take precedence over the file.
+- `cmake_args` are flags build.py emits natively (applied via the override
+  channel); `extra_cmake_args` are user-added flags build.py does not emit
+  (applied via the append channel). Setting `TRITON_REPO_ORGANIZATION` in a
+  backend's `cmake_args` sets that backend's clone organization *per backend*
+  (both the `git clone` URL and the `-D`), which the global
+  `--github-organization` cannot do.
+- `CMAKE_INSTALL_PREFIX` is omitted from snapshots (it is an absolute build-dir
+  path). Repoagent/cache `cmake_args` are shown for visibility but only their
+  `tag` is re-pinned on load. Reloading pins `-D` values but does not re-derive
+  conditionally-emitted flags, so reload alongside the same top-level flags (or
+  `--enable-all`) for exact reproduction.
+
+A ready-to-copy example lives at
+[`tools/build/build_presets.example.json`](../../tools/build/build_presets.example.json);
+the full schema is documented in `tools/build/build_presets.py`.
+
 #### CPU-Only Build
 
 If you want to build without GPU support you must specify individual
@@ -261,90 +406,6 @@ For a given version of Triton you can attempt to build with
 non-supported versions of TensorRT but you may have build or execution
 issues since non-supported versions are not tested.
 
-## Building for Windows 10
-
-For Windows 10, build.py supports both a Docker build and a non-Docker
-build in a similar way as described for [Ubuntu](#building-for-ubuntu-2204). The primary
-difference is that the minimal/base image used as the base of
-Dockerfile.buildbase image can be built from the provided
-[Dockerfile.win10.min](https://github.com/triton-inference-server/server/blob/main/Dockerfile.win10.min)
-file as described in [Windows 10 "Min" Image](#windows-10-min-image). When running build.py
-use the --image flag to specify the tag that you assigned to this
-image. For example, --image=base,win10-py3-min.
-
-### Windows and Docker
-
-Depending on your version of Windows 10 and your version of Docker you
-may need to perform these additional steps before any of the following
-step.
-
-* Set your Docker to work with "Windows containers". Right click on
-  the whale icon in the lower-right status area and select "Switch to
-  Windows containers".
-
-### Windows 10 "Min" Image
-
-The "min" container describes the base dependencies needed to perform
-the Windows build. The Windows min container is
-[Dockerfile.win10.min](https://github.com/triton-inference-server/server/blob/main/Dockerfile.win10.min).
-
-Before building the min container you must download the appropriate
-cuDNN and TensorRT versions and place them in the same directory as
-Dockerfile.win10.min.
-
-* For cuDNN the CUDNN_VERSION and CUDNN_ZIP arguments defined in
-  Dockerfile.win10.min indicate the version of cuDNN that your should
-  download from https://developer.nvidia.com/rdp/cudnn-download.
-
-* For TensorRT the TENSORRT_VERSION and TENSORRT_ZIP arguments defined
-  in Dockerfile.win10.min indicate the version of TensorRT that your
-  should download from
-  https://developer.nvidia.com/nvidia-tensorrt-download.
-
-After downloading the zip files for cuDNN and TensorRT, you build the
-min container using the following command.
-
-```bash
-$ docker build -t win10-py3-min -f Dockerfile.win10.min .
-```
-
-### Build Triton Server
-
-Triton is built using the build.py script. The build system must have
-Docker, Python3 (plus pip installed *docker* module) and git installed
-so that it can execute build.py and perform a docker build. By
-default, build.py does not enable any of Triton's optional features
-and so you must enable them explicitly. The following build.py
-invocation builds all features and backends available on windows.
-
-```bash
-python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --endpoint=http --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=onnxruntime:<container tag> --backend=openvino:<container tag> --backend=python:<container tag>
-```
-
-If you are building on *main* branch then `<container tag>` will
-default to "main". If you are building on a release branch then
-`<container tag>` will default to the branch name. For example, if you
-are building on the r24.12 branch, `<container tag>` will default to
-r24.12. Therefore, you typically do not need to provide `<container
-tag>` at all (nor the preceding colon). You can use a different
-`<container tag>` for a component to instead use the corresponding
-branch/tag in the build. For example, if you have a branch called
-"mybranch" in the
-[onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
-repo that you want to use in the build, you would specify
---backend=onnxruntime:mybranch.
-
-### Extract Build Artifacts
-
-When build.py completes, a Docker image called *tritonserver* will
-contain the built Triton Server executable, libraries and other
-artifacts. Windows containers do not support GPU access so you likely
-want to extract the necessary files from the tritonserver image and
-run them directly on your host system. All the Triton artifacts can be
-found in /opt/tritonserver directory of the tritonserver image.  Your
-host system will need to install the CUDA, cuDNN, TensorRT and other
-dependencies that were used for the build.
-
 ## Building on Unsupported Platforms
 
 Building for an unsupported OS and/or hardware platform is
@@ -409,8 +470,8 @@ and cmake_build or the equivalent commands to perform a build.
 
 If you are [building without Docker](#building-without-docker) use the
 CMake invocation steps in cmake_build to invoke CMake to set-up a
-build environment where you can invoke make/msbuild.exe to incremental
-build the Triton core, a backend, or a repository agent.
+build environment where you can invoke make to incremental build the Triton
+core, a backend, or a repository agent.
 
 ### Development Builds With Docker
 
@@ -423,8 +484,7 @@ agents.
 
 To perform an incremental build within the *tritonserver_buildbase*
 container, map your source into the container and then run the
-appropriate CMake and `make` (or `msbuild.exe`) steps from cmake_build
-within the container.
+appropriate CMake and `make` steps from cmake_build within the container.
 
 #### Development Build of Triton Core
 
@@ -450,10 +510,9 @@ CMakeLists.txt file and source:
 $ cmake <options> /server
 ```
 
-Then you can change directory into the build directory and run `make`
-(or `msbuild.exe`) as shown in cmake_build. As you make changes to the
-source on your host system, you can perform incremental builds by
-re-running `make` (or `msbuild.exe`).
+Then you can change directory into the build directory and run `make` as shown
+in cmake_build. As you make changes to the source on your host system, you can
+perform incremental builds by re-running `make`.
 
 #### Development Build of Backend or Repository Agent
 
@@ -467,10 +526,8 @@ incremental builds to test those changes. Your source code is in
 /home/me/tritonserver_backend. Run the *tritonserver_buildbase*
 container and map your TensorRT backend source directory into the
 container at /tensorrt_backend. Note that some backends will use
-Docker as part of their build, and so the host's Docker registry must
-be made available within the *tritonserver_buildbase* by mounting
-docker.sock (on Windows use
--v\\.\pipe\docker_engine:\\.\pipe\docker_engine).
+Docker as part of their build, and so the host's Docker registry must be made
+available within the *tritonserver_buildbase* by mounting docker.sock.
 
 ```
 $ docker run -it --rm -v/var/run/docker.sock:/var/run/docker.sock -v/home/me/tensorrt_backend:/tensorrt_backend tritonserver_buildbase bash
@@ -487,10 +544,9 @@ CMakeLists.txt file and source:
 $ cmake <options> /tensorrt_backend
 ```
 
-Then you can change directory into the build directory and run `make`
-(or `msbuild.exe`) as shown in cmake_build. As you make changes to the
-source on your host system, you can perform incremental builds by
-re-running `make` (or `msbuild.exe`).
+Then you can change directory into the build directory and run `make` as shown
+in cmake_build. As you make changes to the source on your host system, you can
+perform incremental builds by re-running `make`.
 
 ### Building with Debug Symbols
 

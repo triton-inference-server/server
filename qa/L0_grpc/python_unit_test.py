@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,7 +34,10 @@ from functools import partial
 
 import numpy as np
 import tritonclient.grpc as grpcclient
-from tritonclient.utils import InferenceServerException
+from tritonclient.grpc import service_pb2, service_pb2_grpc
+from tritonclient.utils import InferenceServerException, deserialize_bytes_tensor
+
+import grpc
 
 
 class UserData:
@@ -47,6 +50,90 @@ def callback(user_data, result, error):
         user_data._completed_requests.put(error)
     else:
         user_data._completed_requests.put(result)
+
+
+class GrpcTest(unittest.TestCase):
+    def test_duplicate_output_names_rejected(self):
+        """Test that duplicate output names in a gRPC infer request are rejected."""
+        client = grpcclient.InferenceServerClient(url="localhost:8001")
+        inputs = [
+            grpcclient.InferInput("INPUT0", [1, 16], "INT32"),
+            grpcclient.InferInput("INPUT1", [1, 16], "INT32"),
+        ]
+        inputs[0].set_data_from_numpy(np.ones(shape=(1, 16), dtype=np.int32))
+        inputs[1].set_data_from_numpy(np.ones(shape=(1, 16), dtype=np.int32))
+
+        num_duplicates = 2
+        outputs = [
+            grpcclient.InferRequestedOutput("OUTPUT0") for _ in range(num_duplicates)
+        ]
+
+        with self.assertRaises(InferenceServerException) as ctx:
+            client.infer(model_name="simple", inputs=inputs, outputs=outputs)
+        self.assertIn(
+            "output 'OUTPUT0' already exists in request",
+            str(ctx.exception),
+        )
+
+        self.assertTrue(
+            client.is_server_live(),
+            "Server is not healthy after duplicate output request",
+        )
+
+    def test_bytes_contents_many_elements_serialization(self):
+        """
+        Regression test for InferGRPCToInput bytes_contents pre-allocation.
+        Sends a BYTES tensor with many explicit bytes_contents elements over
+        the raw gRPC stub.
+        """
+        # 10,485,760 elements * (4-byte length + 1-byte payload) = 50 MiB
+        # of serialized BYTES data on both the request and response sides.
+        element_count = 10 * 1024 * 1024
+        payload = b"A"
+        expected_serialized_size = element_count * (4 + len(payload))
+
+        request = service_pb2.ModelInferRequest()
+        request.model_name = "string_identity"
+
+        input_tensor = request.inputs.add()
+        input_tensor.name = "INPUT0"
+        input_tensor.datatype = "BYTES"
+        input_tensor.shape.extend([element_count])
+        input_tensor.contents.bytes_contents.extend([payload] * element_count)
+        request.outputs.add().name = "OUTPUT0"
+
+        # The default Python gRPC client send/receive limit is 4 MiB which
+        # is below the request and response sizes used here.
+        channel_options = [
+            ("grpc.max_send_message_length", 256 * 1024 * 1024),
+            ("grpc.max_receive_message_length", 256 * 1024 * 1024),
+        ]
+        grpc_stub = service_pb2_grpc.GRPCInferenceServiceStub(
+            grpc.insecure_channel("localhost:8001", options=channel_options)
+        )
+        response = grpc_stub.ModelInfer(request, timeout=120)
+
+        self.assertEqual(list(response.outputs[0].shape), [element_count])
+        self.assertEqual(len(response.raw_output_contents[0]), expected_serialized_size)
+
+        # Verify every element round-tripped correctly through the
+        # serialization path.
+        output = deserialize_bytes_tensor(response.raw_output_contents[0])
+        self.assertEqual(output.shape, (element_count,))
+        self.assertTrue(
+            np.all(output == payload),
+            "bytes_contents elements did not round-trip correctly",
+        )
+
+        client = grpcclient.InferenceServerClient(url="localhost:8001")
+        self.assertTrue(
+            client.is_server_live(),
+            "Server must remain healthy after many bytes_contents elements",
+        )
+        self.assertTrue(
+            client.is_model_ready("string_identity"),
+            "Model must remain ready after many bytes_contents elements",
+        )
 
 
 class RestrictedProtocolTest(unittest.TestCase):
