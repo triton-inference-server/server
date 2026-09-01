@@ -30,15 +30,15 @@ import sys
 
 sys.path.append("../common")
 
-import os
-import unittest
+import os  # noqa: E402
+import unittest  # noqa: E402
 
-import infer_util as iu
-import numpy as np
-import test_util as tu
-import tritonclient.grpc as grpcclient
-import tritonclient.http as httpclient
-from tritonclient.utils import *
+import infer_util as iu  # noqa: E402
+import numpy as np  # noqa: E402
+import test_util as tu  # noqa: E402
+import tritonclient.grpc as grpcclient  # noqa: E402
+import tritonclient.http as httpclient  # noqa: E402
+from tritonclient.utils import InferenceServerException  # noqa: E402
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get("TEST_CUDA_SHARED_MEMORY", 0)))
