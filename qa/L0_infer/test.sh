@@ -320,7 +320,7 @@ for TARGET in cpu gpu; do
 
     generate_model_repository
 
-    if [ "$TARGET" == "gpu" ] && [ -d "${DATADIR}/qa_model_repository/torch_aoti_float32_float32" ]; then
+    if [ "$TARGET" == "gpu" ]; then
         cp -r ${DATADIR}/qa_model_repository/torch_aoti_float32_float32 models/.
     fi
 
