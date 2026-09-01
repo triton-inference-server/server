@@ -36,6 +36,8 @@ import unittest
 import infer_util as iu
 import numpy as np
 import test_util as tu
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
 from tritonclient.utils import *
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
@@ -1181,6 +1183,66 @@ class InferTest(tu.TestResultCollector):
                                 use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                                 use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                             )
+
+    def test_torch_aoti_float32(self):
+        # Light AOTI coverage: one existing add model (ARGS[0]/ARGS[1] -> RESULT).
+        # Not libtorch-shaped; infer_exact cannot be reused.
+        model_name = "torch_aoti_float32_float32"
+        input0 = np.ones((1, 16), dtype=np.float32)
+        input1 = np.full((1, 16), 2.0, dtype=np.float32)
+        expected = input0 + input1
+
+        def _is_ready_http():
+            with httpclient.InferenceServerClient("localhost:8000") as client:
+                return client.is_model_ready(model_name)
+
+        def _is_ready_grpc():
+            with grpcclient.InferenceServerClient("localhost:8001") as client:
+                return client.is_model_ready(model_name)
+
+        ready = False
+        if USE_HTTP:
+            ready = _is_ready_http()
+        elif USE_GRPC:
+            ready = _is_ready_grpc()
+        if not ready:
+            self.skipTest(f"{model_name} not loaded in this L0_infer phase")
+
+        if USE_HTTP:
+            with httpclient.InferenceServerClient("localhost:8000") as client:
+                inputs = [
+                    httpclient.InferInput("ARGS[0]", input0.shape, "FP32"),
+                    httpclient.InferInput("ARGS[1]", input1.shape, "FP32"),
+                ]
+                inputs[0].set_data_from_numpy(input0)
+                inputs[1].set_data_from_numpy(input1)
+                result = client.infer(
+                    model_name,
+                    inputs,
+                    outputs=[httpclient.InferRequestedOutput("RESULT")],
+                )
+                self.assertTrue(
+                    np.allclose(result.as_numpy("RESULT"), expected),
+                    "torch_aoti HTTP RESULT mismatch",
+                )
+
+        if USE_GRPC:
+            with grpcclient.InferenceServerClient("localhost:8001") as client:
+                inputs = [
+                    grpcclient.InferInput("ARGS[0]", input0.shape, "FP32"),
+                    grpcclient.InferInput("ARGS[1]", input1.shape, "FP32"),
+                ]
+                inputs[0].set_data_from_numpy(input0)
+                inputs[1].set_data_from_numpy(input1)
+                result = client.infer(
+                    model_name,
+                    inputs,
+                    outputs=[grpcclient.InferRequestedOutput("RESULT")],
+                )
+                self.assertTrue(
+                    np.allclose(result.as_numpy("RESULT"), expected),
+                    "torch_aoti gRPC RESULT mismatch",
+                )
 
 
 if __name__ == "__main__":
