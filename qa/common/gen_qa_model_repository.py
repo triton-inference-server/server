@@ -115,8 +115,8 @@ ARCHIVE_DIR_NAME = "archives"
 # the manifests, the archive names and the upload path. A version here only
 # created a second place for the two spellings to disagree.
 MODEL_TREE_DIRNAME = "models"
-DEFAULT_UPSTREAM_VERSION = "26.07"
-DEFAULT_SEMVER = "2.72.0dev"
+DEFAULT_UPSTREAM_VERSION = "26.08"
+DEFAULT_SEMVER = "2.73.0dev"
 
 # server/build.py, three levels up from qa/common. Its
 # DEFAULT_TRITON_VERSION_MAP is the one place all three versions are declared

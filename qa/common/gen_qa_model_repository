@@ -71,9 +71,9 @@ log_message.status "define: default values"
 # Bump them here when that map moves. TRITON_VERSION is deliberately gone: it
 # named the container train here and the semver in CI, so reading it was wrong
 # half the time.
-TRITON_CONTAINER_VERSION=${TRITON_CONTAINER_VERSION:=26.08dev}
-NVIDIA_UPSTREAM_VERSION=${NVIDIA_UPSTREAM_VERSION:=26.07}
-TRITON_SEMVER=${TRITON_SEMVER:=2.72.0dev}
+TRITON_CONTAINER_VERSION=${TRITON_CONTAINER_VERSION:=26.09dev}
+NVIDIA_UPSTREAM_VERSION=${NVIDIA_UPSTREAM_VERSION:=26.08}
+TRITON_SEMVER=${TRITON_SEMVER:=2.73.0dev}
 ONNX_VERSION=1.22.0 # https://github.com/microsoft/onnxruntime/blob/v1.28.0/tools/ci_build/github/linux/python/requirements.txt#L15
 # Max opset ONNX Runtime accepts: the last *released* opset of the onnx that ORT
 # was built against, i.e. one below that release's current opset. v1.28.0 pins
@@ -85,7 +85,7 @@ ONNX_OPSET=26
 OPENVINO_VERSION=2024.5.0
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 # Upstream NGC containers, so they follow the upstream train, not the container
-# being built -- there is no nvcr.io/nvidia/pytorch:26.08dev-py3.
+# being built -- there is no nvcr.io/nvidia/pytorch:26.09dev-py3.
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$NVIDIA_UPSTREAM_VERSION-py3}
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$NVIDIA_UPSTREAM_VERSION-py3}
 # "all" per the container toolkit's documented values: every GPU, and the
