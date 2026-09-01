@@ -396,7 +396,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
         cp -fr ./models/onnx_float32_float32_float32 ./nobatch_models/.
         cp -fr ./models/custom_zero_1_float32 ./nobatch_models/.
       fi
-      if [ "$TARGET" == "gpu" ] && [ -d "${DATADIR}/qa_model_repository/torch_aoti_float32_float32" ]; then
+      if [ "$TARGET" == "gpu" ]; then
         cp -r ${DATADIR}/qa_model_repository/torch_aoti_float32_float32 models/.
         cp -r ${DATADIR}/qa_model_repository/torch_aoti_float32_float32 nobatch_models/.
       fi
