@@ -320,8 +320,6 @@ for TARGET in cpu gpu; do
 
     generate_model_repository
 
-    # Light torch_aoti coverage for Dynamo/L0_infer: one existing add model.
-    # GPU-only — the packaged .pt2 is CUDA. Skip CPU target so the server still starts.
     if [ "$TARGET" == "gpu" ] && [ -d "${DATADIR}/qa_model_repository/torch_aoti_float32_float32" ]; then
         cp -r ${DATADIR}/qa_model_repository/torch_aoti_float32_float32 models/.
     fi
