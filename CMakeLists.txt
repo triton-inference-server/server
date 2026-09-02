@@ -78,6 +78,7 @@ option(TRITON_PYTHON_BACKEND   "Build the python_backend repository as part of t
 option(TRITON_DALI_BACKEND     "Build the dali_backend repository as part of the server" OFF)
 option(TRITON_FIL_BACKEND      "Build the fil_backend repository as part of the server" OFF)
 option(TRITON_ONNXRUNTIME_BACKEND "Build the onnxruntime_backend repository as part of the server" OFF)
+option(TRITON_OPENVINO_BACKEND "Build the openvino_backend repository as part of the server" OFF)
 
 # Repository names, which are also the sibling checkout directories. This drives
 # declaration and add_subdirectory in TritonRepos.cmake; the rest is derived from
@@ -87,7 +88,7 @@ option(TRITON_ONNXRUNTIME_BACKEND "Build the onnxruntime_backend repository as p
 # overrides are generated. INTERNAL because it must stay in step with the options
 # above -- adding a backend means one line in each.
 set(TRITON_OPTIONAL_BACKENDS identity_backend repeat_backend tensorrt_backend python_backend
-                             dali_backend fil_backend onnxruntime_backend
+                             dali_backend fil_backend onnxruntime_backend openvino_backend
     CACHE INTERNAL "Backend repositories that can be built as part of the server")
 
 # Note these backends link triton-backend-utils from repo-backend, whose
