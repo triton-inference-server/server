@@ -376,7 +376,9 @@ done
 # separately to reduce the loading time.
 if [ "$TEST_VALGRIND" -eq 1 ]; then
   TESTING_BACKENDS="python python_dlpack onnx"
-  EXPECTED_NUM_TESTS=37
+  # VALGRIND_TESTS=1 omits version/ensemble methods, so this phase cannot
+  # share EXPECTED_NUM_TESTS with the first loop (47, or the GitLab pin).
+  EXPECTED_NUM_VALGRIND_BACKEND_TESTS=${EXPECTED_NUM_VALGRIND_BACKEND_TESTS:="37"}
   if [[ "aarch64" != $(uname -m) ]] ; then
       pip3 install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   else
@@ -444,7 +446,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
             cat $CLIENT_LOG
             RET=1
         else
-            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_VALGRIND_BACKEND_TESTS
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
                 cat $TEST_RESULT_FILE

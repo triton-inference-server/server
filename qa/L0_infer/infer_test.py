@@ -79,6 +79,8 @@ np_dtype_string = np.dtype(object)
 
 # 60 sec is the default value
 NETWORK_TIMEOUT = 300.0 if TEST_VALGRIND else 60.0
+# Same override infer_util uses (DoD / non-localhost server).
+TRITONSERVER_IPADDR = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
 class InferTest(tu.TestResultCollector):
@@ -1193,11 +1195,15 @@ class InferTest(tu.TestResultCollector):
         expected = input0 + input1
 
         def _is_ready_http():
-            with httpclient.InferenceServerClient("localhost:8000") as client:
+            with httpclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8000"
+            ) as client:
                 return client.is_model_ready(model_name)
 
         def _is_ready_grpc():
-            with grpcclient.InferenceServerClient("localhost:8001") as client:
+            with grpcclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8001"
+            ) as client:
                 return client.is_model_ready(model_name)
 
         ready = False
@@ -1209,7 +1215,9 @@ class InferTest(tu.TestResultCollector):
             self.skipTest(f"{model_name} not loaded in this L0_infer phase")
 
         if USE_HTTP:
-            with httpclient.InferenceServerClient("localhost:8000") as client:
+            with httpclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8000"
+            ) as client:
                 inputs = [
                     httpclient.InferInput("ARGS[0]", input0.shape, "FP32"),
                     httpclient.InferInput("ARGS[1]", input1.shape, "FP32"),
@@ -1227,7 +1235,9 @@ class InferTest(tu.TestResultCollector):
                 )
 
         if USE_GRPC:
-            with grpcclient.InferenceServerClient("localhost:8001") as client:
+            with grpcclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8001"
+            ) as client:
                 inputs = [
                     grpcclient.InferInput("ARGS[0]", input0.shape, "FP32"),
                     grpcclient.InferInput("ARGS[1]", input1.shape, "FP32"),
