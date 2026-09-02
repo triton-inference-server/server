@@ -30,9 +30,11 @@ import argparse
 import os
 from typing import List, Tuple
 
-import gen_ensemble_model_utils as emu
+import gen_manifest
 import numpy as np
 from gen_common import (
+    create_general_modelconfig,
+    dtype_str,
     np_to_model_dtype,
     np_to_onnx_dtype,
     np_to_torch_dtype,
@@ -553,14 +555,14 @@ max_batch_size: {max_batch}
 input [
   {{
     name: "INPUT__0"
-    data_type: {emu.dtype_str(dtype)}
+    data_type: {dtype_str(dtype)}
     dims: [ {tu.shape_to_dims_str(shape)} ]
   }}
 ]
 output [
   {{
     name: "OUTPUT__0"
-    data_type: {emu.dtype_str(dtype)}
+    data_type: {dtype_str(dtype)}
     dims: [ {tu.shape_to_dims_str(shape)} ]
   }}
 ]
@@ -611,7 +613,7 @@ output [
     """.format(
             type=control_type,
             dims=tu.shape_to_dims_str(shape),
-            dtype=emu.dtype_str(dtype),
+            dtype=dtype_str(dtype),
         )
     elif initial_state == "zero":
         config += f"""
@@ -641,11 +643,11 @@ output [
         {{
           input_name: "INPUT_STATE__1"
           output_name: "OUTPUT_STATE__1"
-          data_type: {emu.dtype_str(dtype)}
+          data_type: {dtype_str(dtype)}
           dims: {tu.shape_to_dims_str(shape)}
           initial_state: {{
               name: "state init"
-              data_type: {emu.dtype_str(dtype)}
+              data_type: {dtype_str(dtype)}
               dims: {tu.shape_to_dims_str(shape_without_variable_dims)}
               zero_data: true
           }}
@@ -695,7 +697,7 @@ output [
     """.format(
             type=control_type,
             dims=tu.shape_to_dims_str(shape),
-            dtype=emu.dtype_str(dtype),
+            dtype=dtype_str(dtype),
             shape_without_variable_dims=tu.shape_to_dims_str(
                 shape_without_variable_dims
             ),
@@ -734,9 +736,8 @@ instance_group [
 ]
 """
 
-    # [TODO] move create_general_modelconfig() out of emu as it is general
     # enough for all backends to use
-    config = emu.create_general_modelconfig(
+    config = create_general_modelconfig(
         model_name,
         "onnxruntime_onnx",
         max_batch,
@@ -795,7 +796,7 @@ instance_group [
     """.format(
             type=control_type,
             dims=tu.shape_to_dims_str(shape),
-            dtype=emu.dtype_str(dtype),
+            dtype=dtype_str(dtype),
         )
     elif initial_state == "zero":
         config += f"""
@@ -825,11 +826,11 @@ instance_group [
         {{
           input_name: "INPUT_STATE"
           output_name: "OUTPUT_STATE"
-          data_type: {emu.dtype_str(dtype)}
+          data_type: {dtype_str(dtype)}
           dims: {tu.shape_to_dims_str(shape)}
           initial_state: {{
               name: "state init"
-              data_type: {emu.dtype_str(dtype)}
+              data_type: {dtype_str(dtype)}
               dims: {tu.shape_to_dims_str(shape_without_variable_dims)}
               zero_data: true
           }}
@@ -879,7 +880,7 @@ instance_group [
     """.format(
             type=control_type,
             dims=tu.shape_to_dims_str(shape),
-            dtype=emu.dtype_str(dtype),
+            dtype=dtype_str(dtype),
             shape_without_variable_dims=tu.shape_to_dims_str(
                 shape_without_variable_dims
             ),
@@ -908,7 +909,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
     if max_batch != 0:
         in0 = network.add_input("INPUT", trt_dtype, [-1] + shape)
         start0 = network.add_input("START", trt_dtype, [-1] + unit_shape)
-        ready0 = network.add_input("READY", trt_dtype, [-1] + unit_shape)
+        network.add_input("READY", trt_dtype, [-1] + unit_shape)
         in_state0 = network.add_input("INPUT_STATE", trt_dtype, [-1] + shape)
         # Append the dimension by 1 so that broadcasting works properly
         constant_1_data = trt.Weights(np.ones(unit_shape + [1], dtype=dtype))
@@ -916,7 +917,7 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
     else:
         in0 = network.add_input("INPUT", trt_dtype, shape)
         start0 = network.add_input("START", trt_dtype, unit_shape)
-        ready0 = network.add_input("READY", trt_dtype, unit_shape)
+        network.add_input("READY", trt_dtype, unit_shape)
         in_state0 = network.add_input("INPUT_STATE", trt_dtype, shape)
         constant_1_data = trt.Weights(np.ones(unit_shape, dtype=dtype))
         constant_1 = network.add_constant(unit_shape, constant_1_data)
@@ -1714,6 +1715,10 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     if FLAGS.onnx:
         import onnx
 
@@ -1799,3 +1804,6 @@ if __name__ == "__main__":
             FLAGS.initial_state,
             False,
         )
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

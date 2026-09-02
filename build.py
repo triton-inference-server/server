@@ -74,12 +74,11 @@ import requests
 DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.73.0dev",
     "triton_container_version": "26.09dev",
-    "upstream_container_version": "26.07",
-    "ort_version": "1.27.0",
-    "ort_openvino_version": "2026.2.0",
-    "standalone_openvino_version": "2026.2.0",
-    "dcgm_version": "4.5.3-1",
-    "rhel_py_version": "3.12.3",
+    "upstream_container_version": "26.08",
+    "ort_version": "1.28.0",
+    "ort_openvino_version": "2026.3.0",
+    "standalone_openvino_version": "2026.3.0",
+    "dcgm_version": "4.6.1-1",
 }
 
 CORE_BACKENDS = ["ensemble"]
@@ -554,8 +553,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = onnxruntime_cmake_args(images, library_paths)
     elif be == "openvino":
         args = openvino_cmake_args()
-    elif be == "python":
-        args = python_cmake_args()
     elif be == "dali":
         args = dali_cmake_args()
     elif be == "pytorch":
@@ -611,18 +608,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
 
     else:
         cargs.append("..")
-    return cargs
-
-
-def python_cmake_args():
-    cargs = []
-    if target_platform() == "rhel":
-        cargs.append(
-            cmake_backend_arg(
-                "python", "PYBIND11_PYTHON_VERSION", "STRING", FLAGS.rhel_py_version
-            )
-        )
-
     return cargs
 
 
@@ -878,6 +863,122 @@ RUN curl -o /tmp/cuda-keyring.deb \\
                 )
 
 
+# Keys that 'docker build --secret' accepts. A spec may also carry keys that
+# only the Dockerfile side understands ('target', 'required', 'mode', ...);
+# passing those to the build command is an error, so they are filtered out.
+DOCKER_BUILD_SECRET_KEYS = ("id", "src", "source", "env", "type")
+
+# Id whose secret is mounted over the apt source list, and where it lands when
+# the spec does not say.
+APT_SOURCES_SECRET_ID = "apt_sources"
+APT_SOURCES_DEFAULT_TARGET = "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list"
+
+# Variable holding a git config, and where the build container writes it out.
+# The container is handed the contents rather than the file because docker
+# resolves a bind mount source on the daemon, which need not share a filesystem
+# with this script, and silently mounts a directory when it finds nothing there.
+GIT_CONFIG_CONTENT_ENV = "TRITON_GITCONFIG"
+GIT_CONFIG_CONTAINER_PATH = "/tmp/gitconfig"
+
+
+def parse_secret_spec(spec):
+    """Split a Docker secret spec into ordered (key, value) pairs.
+
+    Docker does not require any particular field order, so callers look up
+    keys by name rather than by position.
+    """
+    fields = []
+    for field in spec.split(","):
+        key, _, value = field.partition("=")
+        key = key.strip()
+        if key:
+            fields.append((key, value.strip()))
+    return fields
+
+
+def secret_spec_value(spec, name):
+    """Return the value of one field of a secret spec, or "" when unset."""
+    for key, value in parse_secret_spec(spec):
+        if key == name:
+            return value
+    return ""
+
+
+def secret_spec_id(spec):
+    """Return the 'id' of a Docker secret spec, or "" when it has none."""
+    return secret_spec_value(spec, "id")
+
+
+def declared_secret_specs():
+    """Every --docker-build-secret spec, in the order it was given."""
+    return [spec for spec in getattr(FLAGS, "docker_build_secret", None) or [] if spec]
+
+
+def declared_secret_ids():
+    """Ids of every secret supplied with --docker-build-secret."""
+    return {i for i in (secret_spec_id(s) for s in declared_secret_specs()) if i}
+
+
+def secret_build_args():
+    """Return the '--secret' arguments to forward to 'docker build'.
+
+    Only the keys the build command understands are forwarded. Keys that
+    belong to the Dockerfile mount are dropped here and applied where the
+    Dockerfile is generated instead.
+    """
+    args = []
+    for spec in declared_secret_specs():
+        fields = [
+            "{}={}".format(key, value)
+            for key, value in parse_secret_spec(spec)
+            if key in DOCKER_BUILD_SECRET_KEYS
+        ]
+        if fields:
+            args.append("--secret {}".format(",".join(fields)))
+    return args
+
+
+def apt_sources_secret_mount():
+    """Return the RUN mount flag that overlays the apt source list, or an
+    empty string when no such secret was requested.
+
+    The mount point comes from the spec's 'target' when it has one, so
+    '--docker-build-secret id=apt_sources,src=<path>,target=<path>' controls
+    where the list lands. Without a 'target' it defaults to the NVIDIA
+    Artifactory source list. When the secret is absent this returns "" and the
+    generated Dockerfiles are byte-identical to a build without this feature.
+    """
+    for spec in declared_secret_specs():
+        if secret_spec_id(spec) != APT_SOURCES_SECRET_ID:
+            continue
+        target = secret_spec_value(spec, "target") or APT_SOURCES_DEFAULT_TARGET
+        return "--mount=type=secret,id={},target={},required=false ".format(
+            APT_SOURCES_SECRET_ID, target
+        )
+    return ""
+
+
+def mount_apt_sources_secret(df):
+    """Prefix every 'RUN apt-get update' in df with the apt source list mount.
+
+    A secret mount is scoped to a single RUN instruction, so every apt step
+    that should resolve through the mirror needs its own.
+
+    The first step of the build base is included even though it is the step
+    that installs ca-certificates. On a base image that already carries them
+    the step resolves through the mirror like any other. On one that does not,
+    apt reports the failed TLS handshake, still exits 0, and installs from the
+    distribution repositories, so the step behaves as it did before the mount
+    was added.
+    """
+    mount = apt_sources_secret_mount()
+    if not mount:
+        return df
+
+    marker = "RUN apt-get update"
+    return df.replace(marker, "RUN " + mount + "apt-get update")
+
+
 def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap):
     df = """
 ARG TRITON_VERSION={}
@@ -925,9 +1026,6 @@ RUN yum install -y \\
             numactl-devel \\
             openssl-devel \\
             pkg-config \\
-            python3-pip \\
-            python3-scons \\
-            python3-setuptools \\
             rapidjson-devel \\
             re2-devel \\
             readline-devel \\
@@ -961,20 +1059,21 @@ RUN ccache -p
 """.format(
             os.getenv("CCACHE_REMOTE_STORAGE")
         )
-    # Requires openssl-devel to be installed first for pyenv build to be successful
-    df += change_default_python_version_rhel(FLAGS.rhel_py_version)
+    df += set_python_location_to_manylinux_for_rhel()
+    df += restore_embeddable_python_lib_rhel()
     df += """
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
           auditwheel \\
           build \\
-          wheel \\
-          setuptools \\
+          cmake==4.0.3 \\
           docker \\
-          virtualenv \\
           patchelf==0.17.2 \\
-          cmake==4.0.3
+          scons \\
+          setuptools \\
+          virtualenv \\
+          wheel
 """
     df += f"""
 # Install boost version >= 1.78 for boost::span
@@ -1131,6 +1230,8 @@ COPY . .
 ENTRYPOINT []
 """
 
+    df = mount_apt_sources_secret(df)
+
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -1259,6 +1360,8 @@ RUN ldconfig && \\
     ldconfig
 
 """
+    df = mount_apt_sources_secret(df)
+
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -1335,9 +1438,10 @@ RUN yum install -y \\
         libb64-devel \\
         gperftools-devel \\
         wget \\
-        python3.12-pip \\
         numactl-devel
-
+"""
+        df += set_python_location_to_manylinux_for_rhel()
+        df += """
 RUN pip3 install patchelf==0.17.2
 
 """
@@ -1412,8 +1516,7 @@ RUN yum install -y \\
         openssl-devel \\
         readline-devel
 """
-            # Requires openssl-devel to be installed first for pyenv build to be successful
-            df += change_default_python_version_rhel(FLAGS.rhel_py_version)
+            df += set_python_location_to_manylinux_for_rhel()
             df += """
 RUN pip3 install --upgrade pip \\
     && pip3 install --upgrade \\
@@ -1554,28 +1657,28 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
     return df
 
 
-def change_default_python_version_rhel(version):
-    df = f"""
-# The python library version available for install via 'yum install python3.X-devel' does not
-# match the version of python inside the RHEL base container. This means that python packages
-# installed within the container will not be picked up by the python backend stub process pybind
-# bindings. It must instead must be installed via pyenv.
-ENV PYENV_ROOT=/opt/pyenv_build
-RUN curl https://pyenv.run | bash
-ENV PATH="${{PYENV_ROOT}}/bin:$PATH"
-RUN eval "$(pyenv init -)"
-RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {version} \\
-    && cp ${{PYENV_ROOT}}/versions/{version}/lib/libpython3* /usr/lib64/
-
-# RHEL image has several python versions. It's important
-# to set the correct version, otherwise, packages that are
-# pip installed will not be found during testing.
-ENV PYVER={version} PYTHONPATH=/opt/python/v
-RUN ln -sf ${{PYENV_ROOT}}/versions/${{PYVER}}* ${{PYTHONPATH}}
-ENV PYBIN=${{PYTHONPATH}}/bin
-ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
+def set_python_location_to_manylinux_for_rhel():
+    df = """
+ENV PATH="/opt/_internal/pipx/shared/bin:$PATH"
 """
     return df
+
+
+def restore_embeddable_python_lib_rhel():
+    # The manylinux base container configures CPython with --disable-shared,
+    # so no libpython*.so is ever built, and its finalize.sh then compresses
+    # every libpython*.a into static-libs-for-embedding-only.tar.xz and drops
+    # the originals. triton_python_backend_stub links pybind11::embed and so
+    # needs that archive. Restore it in place -- the path it unpacks to is
+    # exactly the LIBDIR the interpreter's sysconfig reports, which is where
+    # pybind11's FindPythonLibsNew looks.
+    #
+    # This deliberately fails the build if the archive is absent: without it
+    # the stub link fails much later with an unresolvable -lpython<ver>.
+    return """
+RUN tar -xvf /opt/_internal/static-libs-for-embedding-only.tar.xz \\
+        -C /opt/_internal
+"""
 
 
 def create_build_dockerfiles(
@@ -1683,6 +1786,8 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
 
         baseargs += ["--cache-from={}".format(k) for k in cachefrommap]
 
+        baseargs += secret_build_args()
+
         baseargs += ["."]
 
         docker_script.cwd(THIS_SCRIPT_DIR)
@@ -1729,6 +1834,19 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         # or explicit --release-version). Dev / pre-release builds leave it
         # unset so build_wheel.py reads the in-tree TRITON_VERSION file and
         # takes the PEP 817 variant path.
+        # Authenticate the GitHub clones cmake_build performs in this container.
+        # It runs the build rather than an image build, so a build secret cannot
+        # reach it, and a bind mount cannot either: docker resolves the source
+        # path on the daemon, which need not share the filesystem this script
+        # runs on, and silently creates a directory when it does not find it.
+        # Hand the container the contents instead and let it write the file.
+        #
+        # Passed by name rather than as NAME=value, so the contents, which carry
+        # a credential, stay out of this script, which CI publishes as a build
+        # artifact.
+        if os.environ.get(GIT_CONFIG_CONTENT_ENV):
+            runargs += ["-e", GIT_CONFIG_CONTENT_ENV]
+
         if "TRITON_RELEASE_VERSION" in os.environ:
             runargs += [
                 "-e",
@@ -1745,7 +1863,23 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
 
         runargs += ["tritonserver_buildbase"]
 
-        runargs += ["./cmake_build"]
+        # Write the git config out inside the container, where the contents
+        # arrived as an environment variable, and point git at it for the build
+        # only. Single quoted so the outer shell leaves the expansion to the
+        # container, whose environment is the one holding the value.
+        if os.environ.get(GIT_CONFIG_CONTENT_ENV):
+            runargs += [
+                "bash",
+                "-c",
+                '\'printf "%s" "${}" > {} && export GIT_CONFIG_GLOBAL={} && '
+                "./cmake_build'".format(
+                    GIT_CONFIG_CONTENT_ENV,
+                    GIT_CONFIG_CONTAINER_PATH,
+                    GIT_CONFIG_CONTAINER_PATH,
+                ),
+            ]
+        else:
+            runargs += ["./cmake_build"]
 
         # Remove existing tritonserver_builder container...
         docker_script._file.write(
@@ -1785,14 +1919,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             "docker",
             "build",
         ]
-        if secrets:
-            finalargs += [
-                f"--secret id=req,src={requirements}",
-                "--secret id=VLLM_INDEX_URL",
-                "--secret id=PYTORCH_TRITON_URL",
-                "--secret id=NVPL_SLIM_URL",
-                f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
-            ]
+        finalargs += secret_build_args()
         finalargs += [
             "-t",
             "tritonserver",
@@ -1986,17 +2113,6 @@ def backend_build(
 
     cmake_script.mkdir(os.path.join(install_dir, "backends"))
     cmake_script.rmdir(os.path.join(install_dir, "backends", be))
-
-    # The python library version available for install via 'yum install python3.X-devel' does not
-    # match the version of python inside the RHEL base container. This means that python packages
-    # installed within the container will not be picked up by the python backend stub process pybind
-    # bindings. It must instead must be installed via pyenv. We package it here for better usability.
-    if target_platform() == "rhel" and be == "python":
-        major_minor_version = ".".join((FLAGS.rhel_py_version).split(".")[:2])
-        version_matched_files = "/usr/lib64/libpython" + major_minor_version + "*"
-        cmake_script.cp(
-            version_matched_files, os.path.join(repo_install_dir, "backends", be)
-        )
 
     cmake_script.cpdir(
         os.path.join(repo_install_dir, "backends", be),
@@ -2617,21 +2733,25 @@ if __name__ == "__main__":
         help="This flag sets the DCGM version for Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
-        "--rhel-py-version",
-        required=False,
-        default=DEFAULT_TRITON_VERSION_MAP["rhel_py_version"],
-        help="This flag sets the Python version for RHEL platform of Triton Inference Server to be built. Default: the latest supported version.",
-    )
-    parser.add_argument(
-        "--build-secret",
+        "--docker-build-secret",
         action="append",
         required=False,
-        nargs=2,
-        metavar=("key", "value"),
-        help="Add build secrets in the form of <key> <value>. These secrets are used during the build process for vllm. The secrets are passed to the Docker build step as `--secret id=<key>`. The following keys are expected and their purposes are described below:\n\n"
-        "  - 'req': A file containing a list of dependencies for pip (e.g., requirements.txt).\n"
-        "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n\n"
-        "Ensure that the required environment variables for these secrets are set before running the build.",
+        metavar="spec",
+        help="Pass a build secret to 'docker build' using Docker's own syntax. The spec is forwarded "
+        "unchanged, so every form 'docker build --secret' accepts is supported:\n\n"
+        "  - 'id=<id>,src=<path>'  read the secret from a file (source= is an accepted alias)\n"
+        "  - 'id=<id>,env=<var>'   read the secret from an environment variable\n"
+        "  - 'id=<id>'             read the environment variable of the same name\n\n"
+        "May be repeated. The secret is available to a Dockerfile step that mounts it with "
+        "'RUN --mount=type=secret,id=<id>', and never becomes part of an image layer.\n\n"
+        "A spec may additionally carry 'target=<path>'. Docker rejects that key on the command line "
+        "because it belongs to the Dockerfile mount, so it is stripped from the build command and "
+        "applied where the Dockerfile is generated.\n\n"
+        "The id 'apt_sources' carries extra meaning: it is also mounted for the duration of each apt step "
+        "in the generated Dockerfile and Dockerfile.buildbase, so package installs resolve through a "
+        "package mirror. It lands on 'target' when the spec sets one, and on "
+        "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list otherwise. When the secret is omitted the "
+        "generated Dockerfiles are unchanged and apt uses the distribution repositories.",
     )
     parser.add_argument(
         "--triton-wheels-dependencies-group",
@@ -2666,8 +2786,8 @@ if __name__ == "__main__":
         FLAGS.override_backend_cmake_arg = []
     if FLAGS.extra_backend_cmake_arg is None:
         FLAGS.extra_backend_cmake_arg = []
-    if FLAGS.build_secret is None:
-        FLAGS.build_secret = []
+    if FLAGS.docker_build_secret is None:
+        FLAGS.docker_build_secret = []
 
     FLAGS.boost_url = os.getenv(
         "TRITON_BOOST_URL",
@@ -2776,12 +2896,6 @@ if __name__ == "__main__":
                 )
             )
             backends["python"] = backends["vllm"]
-
-    secrets = dict(getattr(FLAGS, "build_secret", []))
-    if secrets:
-        requirements = secrets.get("req", "")
-        build_public_vllm = secrets.get("build_public_vllm", "true")
-        log('Build Arg for BUILD_PUBLIC_VLLM: "{}"'.format(build_public_vllm))
 
     # Initialize map of repo agents to build and repo-tag for each.
     repoagents = {}

@@ -180,6 +180,84 @@ you have a branch called "mybranch" in the
 repo that you want to use in the build, you would specify
 --backend=onnxruntime:mybranch.
 
+#### Build Secrets
+
+Some builds need a credential, for example an apt source list naming an
+authenticated package mirror. Pass these with --docker-build-secret, which
+takes a Docker build secret spec and forwards it to `docker build --secret`
+unchanged. Every form Docker accepts works and the flag may be repeated.
+
+```bash
+$ ./build.py ... --docker-build-secret id=<id>,src=<path> --docker-build-secret id=<id>,env=<variable>
+```
+
+A secret is mounted only for the duration of the build step that uses it and
+never becomes part of an image layer.
+
+A spec may also carry target=`<path>`, which selects where the secret is
+mounted. Docker rejects that key on the command line because it belongs to the
+Dockerfile rather than the build command, so build.py removes it before
+invoking docker and applies it when generating the Dockerfile.
+
+The id `apt_sources` has an additional meaning. Its secret is mounted for the
+duration of every apt step in the generated Dockerfile and Dockerfile.buildbase,
+so package installs resolve through the mirror the list names. It lands on
+target when the spec sets one, and on
+/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list otherwise. When the
+secret is omitted the generated Dockerfiles are unchanged and apt uses the
+distribution repositories.
+
+This includes the first step of Dockerfile.buildbase, which is also the step
+that installs ca-certificates. On a base image that already carries them the
+step resolves through the mirror like any other. On one that does not, apt
+reports the failed TLS handshake, still exits 0, and installs from the
+distribution repositories, so the step behaves as it did before the mount was
+added.
+
+#### Authenticating Clones From GitHub
+
+Source from several other repos is fetched during the build, as described
+above. Those clones are unauthenticated by default, which is subject to
+GitHub's rate limits and cannot reach a private repo. Supply a git config that
+rewrites the GitHub URL to an authenticated one, as the `gitconfig` build
+secret.
+
+```bash
+$ cat > /tmp/gitconfig <<EOF
+[url "https://x-access-token:<token>@github.com/"]
+	insteadOf = https://github.com/
+EOF
+$ chmod 600 /tmp/gitconfig
+$ ./build.py ... --docker-build-secret id=gitconfig,src=/tmp/gitconfig
+```
+
+The token has to appear in the file. git does not expand environment variables
+inside `url.<base>.insteadOf`, so a config that refers to one is stored
+literally and silently fails to authenticate.
+
+That covers the steps that clone while an image is being built. build.py mounts
+the config on each of them and points git at it with GIT_CONFIG_GLOBAL rather
+than installing it at the default path, so nothing outside those steps picks it
+up. The config is never part of an image layer, and only its path reaches the
+generated build scripts.
+
+cmake_build clones while the build runs inside the container rather than while
+an image is built, so no build secret reaches it. Neither does a bind mount:
+docker resolves the source path on the daemon, which need not share a filesystem
+with build.py, and silently mounts a directory when it finds nothing there. Put
+the same text in TRITON_GITCONFIG for that case. build.py forwards the variable
+to the container by name and has it write the file there, so the contents stay
+out of the generated build scripts.
+
+```bash
+$ export TRITON_GITCONFIG="$(cat /tmp/gitconfig)"
+$ ./build.py ...
+```
+
+Set both when a build needs authenticated clones throughout: the secret for the
+image builds, the variable for the build itself. Omit either and the steps it
+covers clone unauthenticated.
+
 #### Experimental: Build Presets
 
 > **Experimental.** This feature is gated behind the

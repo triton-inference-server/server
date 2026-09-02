@@ -27,7 +27,7 @@
 
 from __future__ import annotations
 
-from typing import Iterator, List, Protocol
+from typing import AsyncIterator, List, Protocol
 
 from schemas.openai import (
     CreateChatCompletionRequest,
@@ -67,12 +67,12 @@ class LLMEngine(Protocol):
         """
         pass
 
-    def chat(
+    async def chat(
         self, request: CreateChatCompletionRequest
-    ) -> CreateChatCompletionResponse | Iterator[str]:
+    ) -> CreateChatCompletionResponse | AsyncIterator[str]:
         """
-        If request.stream is True, this returns an Iterator (or Generator) that
-        produces server-sent-event (SSE) strings in the following form:
+        If request.stream is True, this returns an AsyncIterator (or AsyncGenerator)
+        that produces server-sent-event (SSE) strings in the following form:
             'data: {CreateChatCompletionStreamResponse}\n\n'
             ...
             'data: [DONE]\n\n'
@@ -81,12 +81,12 @@ class LLMEngine(Protocol):
         """
         pass
 
-    def completion(
+    async def completion(
         self, request: CreateCompletionRequest
-    ) -> CreateCompletionResponse | Iterator[str]:
+    ) -> CreateCompletionResponse | AsyncIterator[str]:
         """
-        If request.stream is True, this returns an Iterator (or Generator) that
-        produces server-sent-event (SSE) strings in the following form:
+        If request.stream is True, this returns an AsyncIterator (or AsyncGenerator)
+        that produces server-sent-event (SSE) strings in the following form:
             'data: {CreateCompletionResponse}\n\n'
             ...
             'data: [DONE]\n\n'
@@ -95,7 +95,9 @@ class LLMEngine(Protocol):
         """
         pass
 
-    def embedding(self, request: CreateEmbeddingRequest) -> CreateEmbeddingResponse:
+    async def embedding(
+        self, request: CreateEmbeddingRequest
+    ) -> CreateEmbeddingResponse:
         """
         Returns a CreateEmbeddingResponse.
         """

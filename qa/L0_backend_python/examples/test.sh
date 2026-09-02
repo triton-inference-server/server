@@ -42,33 +42,18 @@ pip3 uninstall -y numpy
 # NOTE: Using this subtest as a test case that involves using a python model with
 # numpy 2.X without changing the environments used in all the other test cases.
 if [ "$TEST_JETSON" == "0" ] && [[ ${TEST_WINDOWS} == 0 ]]; then
-    if [ ${PYTHON_ENV_VERSION} == "8" ]; then
-        # Python 3.8 does not support numpy 2.x, so installing numpy1.x
-        pip3 install "numpy<2"
-        pip3 install torch==2.0.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0+cu117
-    else
-        # Python 3.9 >= supports numpy 2.x.
-        pip3 install "numpy>=2"
-        pip3 install torch==2.5.0 torchvision==0.20.0 --index-url https://download.pytorch.org/whl/cu124
-    fi
+    pip3 install "numpy>=2"
+    pip3 install torch==2.5.0 torchvision==0.20.0 --index-url https://download.pytorch.org/whl/cu124
 else
-    if [ ${PYTHON_ENV_VERSION} == "8" ]; then
-        # Python 3.8 does not support numpy 2.x, so installing numpy1.x
-        pip3 install "numpy<2"
-        pip3 install torch==2.0.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.15.0
-    else
-        # Python 3.9 >= supports numpy 2.x.
-        pip3 install "numpy>=2"
-        pip3 install torch==2.5.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.20.0
-    fi
+    pip3 install "numpy>=2"
+    pip3 install torch==2.5.0 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.20.0
 fi
 
 # Install `validators` for Model Instance Kind example
 pip3 install validators
 
 # Install JAX
-# Jax has dropped the support for Python 3.8. See https://jax.readthedocs.io/en/latest/changelog.html
-if [ "$TEST_JETSON" == "0" ] && [ ${PYTHON_ENV_VERSION} != "8" ]; then
+if [ "$TEST_JETSON" == "0" ]; then
     pip install -U "jax[cuda12]"
 fi
 
@@ -152,8 +137,7 @@ kill_server
 
 # JAX AddSub
 # JAX is not supported on Jetson
-# Jax has dropped the support for Python 3.8. See https://jax.readthedocs.io/en/latest/changelog.html
-if [ "$TEST_JETSON" == "0" ] && [ ${PYTHON_ENV_VERSION} != "8" ]; then
+if [ "$TEST_JETSON" == "0" ]; then
     CLIENT_LOG="../examples_jax_client.log"
     mkdir -p models/jax/1/
     cp examples/jax/model.py models/jax/1/model.py
