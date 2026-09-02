@@ -112,8 +112,8 @@ each has a flag that overrides it for one invocation:
 | `--ubuntu-image` | `UBUNTU_IMAGE` | `ubuntu:22.04` |
 | `--pytorch-image` | `PYTORCH_IMAGE` | `nvcr.io/nvidia/pytorch:<version>-py3` |
 | `--tensorrt-image` | `TENSORRT_IMAGE` | `nvcr.io/nvidia/tensorrt:<version>-py3` |
-| `--onnx-version` | `ONNX_VERSION` | `1.20.1` |
-| `--onnx-opset` | `ONNX_OPSET` | `0` |
+| `--onnx-version` | `ONNX_VERSION` | `1.22.0` |
+| `--onnx-opset` | `ONNX_OPSET` | `26` |
 | `--openvino-version` | `OPENVINO_VERSION` | `2024.5.0` |
 | `--model-type` | `MODEL_TYPE` | unset |
 | `--runtime`, `--use-docker`, `--use-enroot` | `TRITON_MODELS_USE_DOCKER`, `TRITON_MODELS_USE_ENROOT` | auto |

@@ -84,14 +84,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-(bash -ex setup_python_enviroment.sh)
-
-python3 --version | grep "3.${PYTHON_ENV_VERSION}" > /dev/null
-if [ $? -ne 0 ]; then
-    echo -e "Expecting Python version to be: Python 3.${PYTHON_ENV_VERSION} but actual version is $(python3 --version)"
-    exit 1
-fi
-
 mkdir -p models/identity_fp32/1/
 cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
 cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt

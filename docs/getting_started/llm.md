@@ -55,7 +55,7 @@ as the example model.
 ### 1. Launch the container
 
 ```bash
-export RELEASE=26.07
+export RELEASE=26.08
 docker run --rm -it --net host --shm-size=2g --ulimit memlock=-1 --gpus all \
     -v ~/.cache/huggingface:/root/.cache/huggingface \
     nvcr.io/nvidia/tritonserver:${RELEASE}-trtllm-python-py3 bash

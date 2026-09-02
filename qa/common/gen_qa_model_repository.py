@@ -94,8 +94,8 @@ SH_COLOR_RESET = "\\033[0m"
 SH_COLOR_WARNING = "\\033[33m"
 
 # Defaults, matching the shell driver's `${VAR:=default}` values.
-DEFAULT_ONNX_VERSION = "1.20.1"
-DEFAULT_ONNX_OPSET = "0"
+DEFAULT_ONNX_VERSION = "1.22.0"
+DEFAULT_ONNX_OPSET = "26"
 DEFAULT_OPENVINO_VERSION = "2024.5.0"
 DEFAULT_UBUNTU_IMAGE = "ubuntu:22.04"
 # "all" per the container toolkit's documented values, where it means every GPU
@@ -115,8 +115,8 @@ ARCHIVE_DIR_NAME = "archives"
 # the manifests, the archive names and the upload path. A version here only
 # created a second place for the two spellings to disagree.
 MODEL_TREE_DIRNAME = "models"
-DEFAULT_UPSTREAM_VERSION = "26.07"
-DEFAULT_SEMVER = "2.72.0dev"
+DEFAULT_UPSTREAM_VERSION = "26.08"
+DEFAULT_SEMVER = "2.73.0dev"
 
 # server/build.py, three levels up from qa/common. Its
 # DEFAULT_TRITON_VERSION_MAP is the one place all three versions are declared
