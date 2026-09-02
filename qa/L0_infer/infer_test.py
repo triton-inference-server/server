@@ -37,8 +37,14 @@ import infer_util as iu  # noqa: E402
 import numpy as np  # noqa: E402
 import test_util as tu  # noqa: E402
 import tritonclient.grpc as grpcclient  # noqa: E402
-import tritonclient.http as httpclient  # noqa: E402
 from tritonclient.utils import InferenceServerException  # noqa: E402
+
+# Dynamo images ship gRPC-only tritonclient (no gevent/http extra). Match
+# infer_util: skip the HTTP import so L0_infer can load in dynamo mode.
+if os.environ.get("SERVER_LAUNCH_MODE") == "dynamo":
+    httpclient = None
+else:
+    import tritonclient.http as httpclient  # noqa: E402
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get("TEST_CUDA_SHARED_MEMORY", 0)))
