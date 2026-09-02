@@ -85,7 +85,7 @@ DEFAULT_TRITON_VERSION_MAP = {
 # Minimum CUDA compute capability Triton will load models for. Used as the
 # default for --min-compute-capability when neither that flag nor
 # --cuda-arch-list is given.
-DEFAULT_MIN_COMPUTE_CAPABILITY = "6.0"
+DEFAULT_MIN_COMPUTE_CAPABILITY = "7.5"
 
 CORE_BACKENDS = ["ensemble"]
 
