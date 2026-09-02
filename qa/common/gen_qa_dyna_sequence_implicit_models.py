@@ -29,6 +29,7 @@
 import argparse
 import os
 
+import gen_manifest
 import numpy as np
 from gen_common import (
     np_to_model_dtype,
@@ -859,6 +860,10 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     if FLAGS.onnx:
         import onnx
 
@@ -887,3 +892,6 @@ if __name__ == "__main__":
             ],
             False,
         )
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

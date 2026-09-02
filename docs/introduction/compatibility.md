@@ -71,6 +71,7 @@
 
 | Triton release version	 | NGC Tag	 | Python version	 | vLLM version | CUDA version | CUDA Driver version | Size |
 | --- | --- | --- | --- | --- | --- | --- |
+| 26.08 | nvcr.io/nvidia/tritonserver:26.08-vllm-python-py3 | Python 3.12.3  | 0.27.1+b1082979.nv26.8.62699174 | 13.4.1.012 | 615.61 | 10.65 GB |
 | 26.07 | nvcr.io/nvidia/tritonserver:26.07-vllm-python-py3 | Python 3.12.3  | 0.24.0+092c4842.nv26.7.57386851| 13.3.0.035 | 610.43.02 | 10.28 GB |
 | 26.06 | nvcr.io/nvidia/tritonserver:26.06-vllm-python-py3 | Python 3.12.3  | 0.22.1+7b9cb5b7.nv26.6.55098374 | 13.3.0.035 | 610.43.02 | 10.21 GB |
 | 26.05 | nvcr.io/nvidia/tritonserver:26.05-vllm-python-py3 | Python 3.12.3  | 0.19.0+6bc3197f.nv26.04.48761268 | 13.2.1.009 | 595.58.03 | 9.3G |
@@ -104,6 +105,7 @@
 
 | Triton release version	 | ONNX Runtime	 |
 | --- | --- |
+| 26.08 | 1.28.0 |
 | 26.07 | 1.27.0 |
 | 26.06 | 1.24.4 |
 | 26.05 | 1.24.4 |

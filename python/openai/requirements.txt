@@ -25,7 +25,9 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # FastAPI Application
-fastapi==0.121.2
+# Keep within [0.133.0, 0.137.0): older releases cap starlette below 1.0,
+# and vllm requires fastapi[standard]<0.137.0,>=0.133.0.
+fastapi==0.136.3
 # Fix httpx version to avoid bug in openai library:
 # https://community.openai.com/t/error-with-openai-1-56-0-client-init-got-an-unexpected-keyword-argument-proxies/1040332/3
 httpx==0.27.2
@@ -34,7 +36,5 @@ partial-json-parser # used for parsing partial JSON outputs
 
 # FIXME [TRI-641]: The latest stable version of scipy is 1.17.0 which caused segfault during tests. See TRI-620.
 scipy==1.16.3
-# Minimum starlette version needed to address CVE(s):
-# https://github.com/advisories/GHSA-f96h-pmfr-66vw
-# https://github.com/advisories/GHSA-7f5h-v6xp-fcq8
-starlette>=0.49.1
+# 1.3.1 is the minimum version with all known security fixes applied.
+starlette>=1.3.1,<2

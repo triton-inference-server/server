@@ -29,14 +29,14 @@ import sys
 
 sys.path.append("../common")
 
-import unittest
-from concurrent.futures import ThreadPoolExecutor
+import unittest  # noqa: E402
+from concurrent.futures import ThreadPoolExecutor  # noqa: E402
 
-import numpy as np
-import test_util as tu
-import torch
-import tritonclient.http as http
-from tritonclient.utils import InferenceServerException
+import numpy as np  # noqa: E402
+import test_util as tu  # noqa: E402
+import torch  # noqa: E402
+import tritonclient.http as http  # noqa: E402
+from tritonclient.utils import InferenceServerException  # noqa: E402
 
 
 class TorchAotiTest(tu.TestResultCollector):
@@ -334,6 +334,67 @@ class TorchAotiTest(tu.TestResultCollector):
         executions = self._execution_count(MODEL_NAME) - before
         self.assertGreater(executions, 0)
         self.assertLess(executions, num_requests)
+
+    def test_inference_statistics_sanity(self):
+        # Compute phase durations can never exceed total request time.
+        MODEL_NAME = "torch_aoti_float32_float32"
+        NUM_REQUESTS = 5
+        PHASES = ("compute_input", "compute_infer", "compute_output")
+
+        def stats_snapshot():
+            with http.InferenceServerClient("localhost:8000") as client:
+                model_stats = client.get_inference_statistics(model_name=MODEL_NAME)[
+                    "model_stats"
+                ][0]
+            inference_stats = model_stats["inference_stats"]
+            batch_ns = {phase: 0 for phase in PHASES}
+            for batch_stats in model_stats["batch_stats"]:
+                for phase in PHASES:
+                    batch_ns[phase] += int(batch_stats[phase]["ns"])
+            return {
+                "count": int(inference_stats["success"]["count"]),
+                "request_ns": int(inference_stats["success"]["ns"]),
+                "phase_ns": {
+                    phase: int(inference_stats[phase]["ns"]) for phase in PHASES
+                },
+                "batch_ns": batch_ns,
+            }
+
+        def delta(after, before):
+            # Cumulative uint64 counters wrap; mod 2**64 keeps wraps visible.
+            return (after - before) % 2**64
+
+        before = stats_snapshot()
+        for _ in range(NUM_REQUESTS):
+            self._infer_one_row(MODEL_NAME)
+        after = stats_snapshot()
+
+        self.assertEqual(after["count"] - before["count"], NUM_REQUESTS)
+        request_ns = delta(after["request_ns"], before["request_ns"])
+        self.assertGreater(request_ns, 0)
+
+        phase_ns = {
+            phase: delta(after["phase_ns"][phase], before["phase_ns"][phase])
+            for phase in PHASES
+        }
+        self.assertLessEqual(
+            sum(phase_ns.values()),
+            request_ns,
+            f"compute phase durations {phase_ns} sum past the total request "
+            f"duration {request_ns}ns; timestamps reported out of order",
+        )
+
+        # Same bound for the separately reported batch statistics.
+        batch_phase_ns = {
+            phase: delta(after["batch_ns"][phase], before["batch_ns"][phase])
+            for phase in PHASES
+        }
+        self.assertLessEqual(
+            sum(batch_phase_ns.values()),
+            request_ns,
+            f"batch compute phase durations {batch_phase_ns} sum past the "
+            "total request duration; timestamps reported out of order",
+        )
 
     def test_multi_instance(self):
         # Concurrent requests against a 2-instance model must all be correct.
