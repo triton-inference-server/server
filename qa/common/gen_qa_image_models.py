@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,6 +30,7 @@
 import argparse
 import os
 
+import gen_manifest
 import requests
 import test_util as tu
 import torch
@@ -208,6 +209,10 @@ if __name__ == "__main__":
     parser.add_argument("--vgg19", action="store_true", help="Export VGG19 model")
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     if FLAGS.resnet152:
         models_dir = os.path.join(FLAGS.models_dir, "resnet152_onnx/1")
         os.makedirs(models_dir, exist_ok=True)
@@ -220,3 +225,6 @@ if __name__ == "__main__":
         models_dir = os.path.join(FLAGS.models_dir, "vgg19_onnx/1")
         os.makedirs(models_dir, exist_ok=True)
         export_vgg19(models_dir)
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

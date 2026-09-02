@@ -30,10 +30,13 @@ import argparse
 import os
 import sys
 from builtins import range
+from typing import List, Tuple
 
 import gen_ensemble_model_utils as emu
+import gen_manifest
 import numpy as np
 from gen_common import (
+    create_general_modelconfig,
     np_dtype_bfloat16,
     np_to_model_dtype,
     np_to_onnx_dtype,
@@ -46,7 +49,6 @@ from gen_common import (
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
-from typing import List, Tuple
 
 _color_blue = "\033[94m"
 _color_cyan = "\033[36m"
@@ -217,8 +219,6 @@ def create_plan_dynamic_modelfile(
     max_dim,
 ):
     trt_input_dtype = np_to_trt_dtype(input_dtype)
-    trt_output0_dtype = np_to_trt_dtype(output0_dtype)
-    trt_output1_dtype = np_to_trt_dtype(output1_dtype)
 
     # Create the model
     TRT_LOGGER = (
@@ -513,8 +513,6 @@ def create_plan_fixed_modelfile(
     swap,
 ):
     trt_input_dtype = np_to_trt_dtype(input_dtype)
-    trt_output0_dtype = np_to_trt_dtype(output0_dtype)
-    trt_output1_dtype = np_to_trt_dtype(output1_dtype)
 
     # Create the model
     TRT_LOGGER = (
@@ -856,8 +854,8 @@ output [
         cfile.write(config)
 
     with open(config_dir + "/output0_labels.txt", "w") as lfile:
-        for l in range(output0_label_cnt):
-            lfile.write("label" + str(l) + "\n")
+        for label_idx in range(output0_label_cnt):
+            lfile.write("label" + str(label_idx) + "\n")
 
 
 def create_onnx_modelfile(
@@ -1001,9 +999,8 @@ def create_onnx_modelconfig(
 
     config_dir = models_dir + "/" + model_name
 
-    # [TODO] move create_general_modelconfig() out of emu as it is general
     # enough for all backends to use
-    config = emu.create_general_modelconfig(
+    config = create_general_modelconfig(
         model_name,
         "onnxruntime_onnx",
         max_batch,
@@ -1027,8 +1024,8 @@ def create_onnx_modelconfig(
         file.write(config)
 
     with open(config_dir + "/output0_labels.txt", "w") as file:
-        for l in range(output0_label_cnt):
-            file.write("label" + str(l) + "\n")
+        for label_idx in range(output0_label_cnt):
+            file.write("label" + str(label_idx) + "\n")
 
 
 def create_libtorch_modelfile(
@@ -1772,8 +1769,8 @@ output [
         print(f"Created {config_path}")
 
     with open(f"{config_dir}/{label_filename}", "w") as file:
-        for l in range(output0_label_cnt):
-            file.write("label" + str(l) + "\n")
+        for label_idx in range(output0_label_cnt):
+            file.write("label" + str(label_idx) + "\n")
         print(f"Created {config_dir}/{label_filename}")
 
 
@@ -1856,8 +1853,8 @@ instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU
     label_path = os.path.join(config_dir, label_filename)
 
     with open(label_path, "w") as file:
-        for l in range(output_label_cnt):
-            file.write(f"label{l}\n")
+        for label_idx in range(output_label_cnt):
+            file.write(f"label{label_idx}\n")
         print(f"Created {label_path}")
 
 
@@ -2318,8 +2315,8 @@ output [
         cfile.write(config)
 
     with open(config_dir + "/output0_labels.txt", "w") as lfile:
-        for l in range(output0_label_cnt):
-            lfile.write("label" + str(l) + "\n")
+        for label_idx in range(output0_label_cnt):
+            lfile.write("label" + str(label_idx) + "\n")
 
 
 def create_models(
@@ -2777,6 +2774,10 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     if FLAGS.tensorrt:
         import tensorrt as trt
     if FLAGS.onnx:
@@ -2787,9 +2788,9 @@ if __name__ == "__main__":
         import torch
         from torch import nn
     if FLAGS.torchvision_aoti:
-        import shutil
+        import shutil  # noqa: F811  (this branch is reachable on its own)
 
-        import torch
+        import torch  # noqa: F811  (this branch is reachable on its own)
         import torchvision.models as models
 
         RESNET50_LABEL_FILE = "resnet50_labels.txt"
@@ -3205,3 +3206,6 @@ if __name__ == "__main__":
         # batching of a real, higher-rank ([N,3,224,224]) model.
         if create_torchvision_aoti_model_file(FLAGS.models_dir, 8):
             create_torchvision_aoti_model_config(FLAGS.models_dir, 8)
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)
