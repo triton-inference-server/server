@@ -133,7 +133,7 @@ ParseClassificationParams(
     if (cnt <= 0) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
-          "invalid value for 'classification' parameter, expected >= 0");
+          "invalid value for 'classification' parameter, expected >= 1");
     }
 
     *classification_count = cnt;
