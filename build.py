@@ -668,12 +668,6 @@ def onnxruntime_cmake_args(images, library_paths):
             else FLAGS.ort_version,
         )
     ]
-    if FLAGS.build_parallel_was_explicit:
-        cargs.append(
-            cmake_backend_arg(
-                "onnxruntime", "TRITON_BUILD_PARALLEL", None, FLAGS.build_parallel
-            )
-        )
     # TRITON_ENABLE_GPU is already set for all backends in backend_cmake_args()
     if FLAGS.enable_gpu:
         # TODO: TPRD-712 TensorRT is not currently supported by our RHEL build for SBSA.
@@ -2954,6 +2948,11 @@ if __name__ == "__main__":
         )
         log('CMake core override "-D{}={}"'.format(parts[0], parts[1]))
         OVERRIDE_CORE_CMAKE_FLAGS[parts[0]] = parts[1]
+
+    if FLAGS.build_parallel_was_explicit and "onnxruntime" in backends:
+        FLAGS.extra_backend_cmake_arg.append(
+            f"onnxruntime:TRITON_BUILD_PARALLEL={FLAGS.build_parallel}"
+        )
 
     for cf in FLAGS.extra_backend_cmake_arg:
         parts = cf.split(":", 1)
