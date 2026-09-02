@@ -30,13 +30,15 @@ import sys
 
 sys.path.append("../common")
 
-import os
-import unittest
+import os  # noqa: E402
+import unittest  # noqa: E402
 
-import infer_util as iu
-import numpy as np
-import test_util as tu
-from tritonclient.utils import *
+import infer_util as iu  # noqa: E402
+import numpy as np  # noqa: E402
+import test_util as tu  # noqa: E402
+import tritonclient.grpc as grpcclient  # noqa: E402
+import tritonclient.http as httpclient  # noqa: E402
+from tritonclient.utils import InferenceServerException  # noqa: E402
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get("TEST_CUDA_SHARED_MEMORY", 0)))
@@ -77,6 +79,8 @@ np_dtype_string = np.dtype(object)
 
 # 60 sec is the default value
 NETWORK_TIMEOUT = 300.0 if TEST_VALGRIND else 60.0
+# Same override infer_util uses (DoD / non-localhost server).
+TRITONSERVER_IPADDR = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
 class InferTest(tu.TestResultCollector):
@@ -1181,6 +1185,74 @@ class InferTest(tu.TestResultCollector):
                                 use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                                 use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                             )
+
+    def test_torch_aoti_float32(self):
+        # Light AOTI coverage: one existing add model (ARGS[0]/ARGS[1] -> RESULT).
+        # Not libtorch-shaped; infer_exact cannot be reused.
+        model_name = "torch_aoti_float32_float32"
+        input0 = np.ones((1, 16), dtype=np.float32)
+        input1 = np.full((1, 16), 2.0, dtype=np.float32)
+        expected = input0 + input1
+
+        def _is_ready_http():
+            with httpclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8000"
+            ) as client:
+                return client.is_model_ready(model_name)
+
+        def _is_ready_grpc():
+            with grpcclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8001"
+            ) as client:
+                return client.is_model_ready(model_name)
+
+        ready = False
+        if USE_HTTP:
+            ready = _is_ready_http()
+        elif USE_GRPC:
+            ready = _is_ready_grpc()
+        if not ready:
+            self.skipTest(f"{model_name} not loaded in this L0_infer phase")
+
+        if USE_HTTP:
+            with httpclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8000"
+            ) as client:
+                inputs = [
+                    httpclient.InferInput("ARGS[0]", input0.shape, "FP32"),
+                    httpclient.InferInput("ARGS[1]", input1.shape, "FP32"),
+                ]
+                inputs[0].set_data_from_numpy(input0)
+                inputs[1].set_data_from_numpy(input1)
+                result = client.infer(
+                    model_name,
+                    inputs,
+                    outputs=[httpclient.InferRequestedOutput("RESULT")],
+                )
+                self.assertTrue(
+                    np.allclose(result.as_numpy("RESULT"), expected),
+                    "torch_aoti HTTP RESULT mismatch",
+                )
+
+        if USE_GRPC:
+            with grpcclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8001"
+            ) as client:
+                inputs = [
+                    grpcclient.InferInput("ARGS[0]", input0.shape, "FP32"),
+                    grpcclient.InferInput("ARGS[1]", input1.shape, "FP32"),
+                ]
+                inputs[0].set_data_from_numpy(input0)
+                inputs[1].set_data_from_numpy(input1)
+                result = client.infer(
+                    model_name,
+                    inputs,
+                    outputs=[grpcclient.InferRequestedOutput("RESULT")],
+                )
+                self.assertTrue(
+                    np.allclose(result.as_numpy("RESULT"), expected),
+                    "torch_aoti gRPC RESULT mismatch",
+                )
 
 
 if __name__ == "__main__":
