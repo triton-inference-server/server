@@ -24,7 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import gc
 import os
 import sys
 import threading
@@ -166,7 +165,6 @@ class PBBLSTest(unittest.TestCase):
         self._is_decoupled = True if os.environ["BLS_KIND"] == "decoupled" else False
 
     def add_deferred_exception(self, ex):
-        global _deferred_exceptions
         with _deferred_exceptions_lock:
             _deferred_exceptions.append(ex)
 
@@ -374,8 +372,8 @@ class PBBLSTest(unittest.TestCase):
         self.assertEqual(rc_after_dlpack_output1 - rc_before_dlpack_output1, 1)
 
         # Make sure that reference count decreases after destroying the DLPack
-        output0_dlpack = None
-        output1_dlpack = None
+        del output0_dlpack
+        del output1_dlpack
         rc_after_del_dlpack_output0 = sys.getrefcount(output0)
         rc_after_del_dlpack_output1 = sys.getrefcount(output1)
         self.assertEqual(rc_after_del_dlpack_output0 - rc_after_dlpack_output0, -1)
