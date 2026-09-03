@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,6 +37,8 @@ Alternatively, the user can refer to the web version [API docs](http://bytedeco.
 generated from `tritonserver.java`.
 **Note:** Currently, `tritonserver.java` contains bindings for both the `In-process C-API`
 and the bindings for `C-API Wrapper`. More information about the [developer_tools/server C-API wrapper](https://github.com/triton-inference-server/developer_tools/blob/main/server/README.md) can be found in the [developer_tools repository](https://github.com/triton-inference-server/developer_tools/).
+**The `C-API Wrapper` bindings are deprecated** — `developer_tools/server` is
+no longer built or tested; use the `In-process C-API` bindings instead.
 
 A simple example using the Java API can be found in
 [Samples folder](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver/samples)
@@ -94,7 +96,7 @@ Java program with the Java bindings with the following steps:
       # Run build script
       ## For In-Process C-API Java Bindings
       $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh
-      ## For C-API Wrapper (Triton with C++ bindings) Java Bindings
+      ## For C-API Wrapper (Triton with C++ bindings) Java Bindings [DEPRECATED]
       $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh --enable-developer-tools-server
       ```
       This will install the Java bindings to `/workspace/install/java-api-bindings/tritonserver-java-bindings.jar`
