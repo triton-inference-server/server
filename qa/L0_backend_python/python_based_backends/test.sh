@@ -61,6 +61,7 @@ cp -r ${MODEL_REPOSITORY}/add_sub/1/ ${MODEL_REPOSITORY}/add_sub/2/
 
 # Setup pytorch backend model
 cp ${GEN_PYTORCH_MODEL_PY} ./gen_qa_pytorch_model.py
+cp ../../common/gen_manifest.py ./gen_manifest.py
 GEN_PYTORCH_MODEL_PY=./gen_qa_pytorch_model.py
 
 set +e
@@ -89,7 +90,7 @@ fi
 set -e
 
 kill_server
-rm -rf ${MODEL_REPOSITORY} ${GEN_PYTORCH_MODEL_PY}
+rm -rf ${MODEL_REPOSITORY} ${GEN_PYTORCH_MODEL_PY} ./gen_manifest.py
 
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
