@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -61,6 +61,7 @@ cp -r ${MODEL_REPOSITORY}/add_sub/1/ ${MODEL_REPOSITORY}/add_sub/2/
 
 # Setup pytorch backend model
 cp ${GEN_PYTORCH_MODEL_PY} ./gen_qa_pytorch_model.py
+cp ../../common/gen_manifest.py ./gen_manifest.py
 GEN_PYTORCH_MODEL_PY=./gen_qa_pytorch_model.py
 
 set +e
