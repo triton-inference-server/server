@@ -57,7 +57,7 @@ class TestTrtRequestCancellation(unittest.TestCase):
             grpcclient.InferInput("INPUT0", TRT_SHAPE, "FP32"),
             grpcclient.InferInput("INPUT1", TRT_SHAPE, "FP32"),
         ]
-        for model_input in inputs: 
+        for model_input in inputs:
             model_input.set_data_from_numpy(np.full(TRT_SHAPE, value, dtype=np.float32))
          return inputs
 
