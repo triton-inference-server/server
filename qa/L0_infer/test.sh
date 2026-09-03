@@ -73,9 +73,9 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
 fi
 
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
-    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="33"}
+    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="34"}
 else
-    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="46"}
+    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="47"}
 fi
 
 TEST_JETSON=${TEST_JETSON:=0}
@@ -320,6 +320,10 @@ for TARGET in cpu gpu; do
 
     generate_model_repository
 
+    if [ "$TARGET" == "gpu" ]; then
+        cp -r ${DATADIR}/qa_model_repository/torch_aoti_float32_float32 models/.
+    fi
+
     # Check if running a memory leak check
     if [ "$TEST_VALGRIND" -eq 1 ]; then
         LEAKCHECK_LOG=$LEAKCHECK_LOG_BASE.${TARGET}.log
@@ -372,7 +376,9 @@ done
 # separately to reduce the loading time.
 if [ "$TEST_VALGRIND" -eq 1 ]; then
   TESTING_BACKENDS="python python_dlpack onnx"
-  EXPECTED_NUM_TESTS=36
+  # VALGRIND_TESTS=1 omits version/ensemble methods, so this phase cannot
+  # share EXPECTED_NUM_TESTS with the first loop (47, or the GitLab pin).
+  EXPECTED_NUM_VALGRIND_BACKEND_TESTS=${EXPECTED_NUM_VALGRIND_BACKEND_TESTS:="37"}
   if [[ "aarch64" != $(uname -m) ]] ; then
       pip3 install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   else
@@ -391,6 +397,10 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
         # These two models are required by test_ensemble_mix_batch_nobatch test case.
         cp -fr ./models/onnx_float32_float32_float32 ./nobatch_models/.
         cp -fr ./models/custom_zero_1_float32 ./nobatch_models/.
+      fi
+      if [ "$TARGET" == "gpu" ]; then
+        cp -r ${DATADIR}/qa_model_repository/torch_aoti_float32_float32 models/.
+        cp -r ${DATADIR}/qa_model_repository/torch_aoti_float32_float32 nobatch_models/.
       fi
 
       for BATCHING_MODE in batch nobatch; do
@@ -436,7 +446,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
             cat $CLIENT_LOG
             RET=1
         else
-            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_VALGRIND_BACKEND_TESTS
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
                 cat $TEST_RESULT_FILE
