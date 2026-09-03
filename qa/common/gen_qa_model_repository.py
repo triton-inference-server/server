@@ -76,6 +76,8 @@ import shutil
 import subprocess
 import sys
 
+from check_tensorrt_target import UNSUPPORTED_TARGET_MARKER
+
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 
 COLOR_ERROR = "\033[31m"
@@ -92,8 +94,8 @@ SH_COLOR_RESET = "\\033[0m"
 SH_COLOR_WARNING = "\\033[33m"
 
 # Defaults, matching the shell driver's `${VAR:=default}` values.
-DEFAULT_ONNX_VERSION = "1.20.1"
-DEFAULT_ONNX_OPSET = "0"
+DEFAULT_ONNX_VERSION = "1.22.0"
+DEFAULT_ONNX_OPSET = "26"
 DEFAULT_OPENVINO_VERSION = "2024.5.0"
 DEFAULT_UBUNTU_IMAGE = "ubuntu:22.04"
 # "all" per the container toolkit's documented values, where it means every GPU
@@ -113,8 +115,8 @@ ARCHIVE_DIR_NAME = "archives"
 # the manifests, the archive names and the upload path. A version here only
 # created a second place for the two spellings to disagree.
 MODEL_TREE_DIRNAME = "models"
-DEFAULT_UPSTREAM_VERSION = "26.07"
-DEFAULT_SEMVER = "2.72.0dev"
+DEFAULT_UPSTREAM_VERSION = "26.08"
+DEFAULT_SEMVER = "2.73.0dev"
 
 # server/build.py, three levels up from qa/common. Its
 # DEFAULT_TRITON_VERSION_MAP is the one place all three versions are declared
@@ -231,7 +233,10 @@ class Generate:
 
     def render(self, ctx):
         target = "{}/{}/{}".format(ctx.build_dir, MODEL_TREE_DIRNAME, self.repository)
-        command = ["python3", "{}/{}".format(ctx.source_dir, self.script)]
+        # run_step, not bare python3: see render_step_wrapper. A generator the
+        # GPU's compute capability puts out of reach is skipped with a warning
+        # instead of ending the stage.
+        command = ["run_step", "python3", "{}/{}".format(ctx.source_dir, self.script)]
         command += self.flags
         command.append("--models_dir={}".format(target))
         lines = [" ".join(command)]
@@ -680,7 +685,9 @@ def build_stages(ctx):
                 + SH_COLOR_RESET
                 + " Skipping model generation for data dependent shape"
                 " (NonZero not supported on this GPU)" + SH_COLOR_RESET + "'"
-                " || python3 " + ctx.source_dir + "/gen_qa_trt_data_dependent_shape.py"
+                " || run_step python3 "
+                + ctx.source_dir
+                + "/gen_qa_trt_data_dependent_shape.py"
                 " --models_dir=" + data_dependent_root + "\n"
                 "chmod -R 777 " + data_dependent_root,
                 "data dependent shape models, skipped on sm 10.7 / 11.0",
@@ -701,7 +708,13 @@ def build_stages(ctx):
                 "    rm -rf build && mkdir build && cd build && cmake .. &&"
                 " make -j && \\\n"
                 "    cp libcustomHardmaxPlugin.so " + plugin_root + "/.\n"
-                "  LD_PRELOAD=" + plugin_root + "/libcustomHardmaxPlugin.so \\\n"
+                # `run_step env VAR=...` keeps the assignment attached to
+                # the command run_step exec's, which is what needs it. A
+                # `VAR=... run_step` prefix would set it for the function call
+                # itself and rely on that reaching the exec'd child -- true in
+                # bash, but a level of indirection to reason about for nothing.
+                "  run_step env"
+                " LD_PRELOAD=" + plugin_root + "/libcustomHardmaxPlugin.so \\\n"
                 "    python3 " + ctx.source_dir + "/gen_qa_trt_plugin_models.py \\\n"
                 "    --models_dir=" + plugin_root + "\n"
                 "  chmod -R 777 " + plugin_root + "\n"
@@ -730,6 +743,81 @@ def build_stages(ctx):
 # --------------------------------------------------------------------------
 
 
+# Named inside the build directory, not in /tmp. The enroot runtime bind-mounts
+# the host's /tmp into the container, so a fixed /tmp path is shared by every
+# concurrent job on the node -- two of them would tee into one file and each
+# could read the other's output when classifying a failure. Left to itself
+# build_dir is mount_root plus the job id on either runtime, which is the same
+# reason the enroot image and the container name carry that id. A caller who
+# passes --build-dir supplies the whole path and owns that distinction: point
+# two concurrent jobs at one directory and they share this log again, along
+# with the model tree it sits beside.
+STEP_LOG_NAME = ".gen-step.log"
+
+
+def render_step_wrapper(ctx):
+    """The shell function every generator invocation is run through.
+
+    TensorRT refusing the GPU it is running on is the one generator failure
+    that is not a defect in this repository: the SM the container was built
+    for and the SM in the machine are a release apart, every generator that
+    reaches build_serialized_network gets a null plan back, and the ones that
+    write it unchecked die on a TypeError naming neither cause. Classified
+    per step rather than per stage, so one framework being out of reach costs
+    only its own models -- the rest of the stage still runs, and the trees it
+    did fill still ship.
+
+    The decision is made on the step's own output: TensorRT's wording for the
+    refusal is the only thing that turns a failure into a warning. Anything
+    else exits non-zero as before and `set -e` ends the stage, so a real
+    regression is still loud.
+
+    A shell function rather than a Python wrapper so `set -x` keeps printing
+    the generator's own command line, which is what makes a CI failure
+    reproducible by hand.
+    """
+    return [
+        "",
+        "TRITON_STEP_LOG={}/{}".format(ctx.build_dir, STEP_LOG_NAME),
+        "run_step() {",
+        "  local status",
+        '  "$@" 2>&1 | tee "${TRITON_STEP_LOG}"',
+        # tee is the last command in the pipeline, so the pipeline succeeds and
+        # `set -e` stays out of this; the generator's own status is PIPESTATUS.
+        "  status=${PIPESTATUS[0]}",
+        '  if [ "${status}" -eq 0 ]; then',
+        "    return 0",
+        "  fi",
+        '  if grep -qF "' + UNSUPPORTED_TARGET_MARKER + '" "${TRITON_STEP_LOG}"; then',
+        '    echo -e "'
+        + SH_COLOR_WARNING
+        + "[WARNING]"
+        + SH_COLOR_RESET
+        + " Skipping models from: $*"
+        + SH_COLOR_RESET
+        + '" >&2',
+        '    echo -e "'
+        + SH_COLOR_WARNING
+        + "[WARNING]"
+        + SH_COLOR_RESET
+        + " TensorRT has no kernels for this GPU; the rest of the stage"
+        + " continues."
+        + SH_COLOR_RESET
+        + '" >&2',
+        # The generator got as far as creating the model directory and opening
+        # model.plan before the null plan raised, so a config.pbtxt beside a
+        # zero-byte engine is sitting there. Left alone it would be archived
+        # and published as a real model. The step's own arguments carry the
+        # --models_dir to clean up under.
+        "    python3 " + ctx.source_dir + '/prune_partial_models.py "$@"',
+        "    return 0",
+        "  fi",
+        '  return "${status}"',
+        "}",
+        "",
+    ]
+
+
 def render_stage_script(stage, ctx, final=False):
     """The bash script a stage runs inside its container."""
     lines = [
@@ -746,6 +834,7 @@ def render_stage_script(stage, ctx, final=False):
     ]
     lines += list(stage.prelude)
     lines.append("set -e")
+    lines += render_step_wrapper(ctx)
     lines += list(stage.setup)
     lines.append("")
     for step in stage.steps:
