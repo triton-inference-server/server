@@ -59,7 +59,7 @@ class TestTrtRequestCancellation(unittest.TestCase):
         ]
         for model_input in inputs:
             model_input.set_data_from_numpy(np.full(TRT_SHAPE, value, dtype=np.float32))
-         return inputs
+        return inputs
 
     def _holder_inputs(self):
         inputs = [grpcclient.InferInput("INPUT0", HOLDER_SHAPE, "FP32")]
@@ -104,10 +104,34 @@ class TestTrtRequestCancellation(unittest.TestCase):
         match = re.search(pattern, self._get_metrics())
         return int(match.group(1)) if match else 0
 
+    def _pending_count(self, model):
+        pattern = (
+            rf'nv_inference_pending_request_count\{{model="{model}",'
+            rf'version="1"\}} (\d+)'
+        )
+        match = re.search(pattern, self._get_metrics())
+        return int(match.group(1)) if match else 0
+
+    def _wait_until_queued(self, model, timeout=30, stable_for=1.0):
+        """Wait until 'model' holds one request that has not been dispatched.
+
+        A request stays pending from the moment it is accepted until it is
+        handed to the backend
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if self._pending_count(model) == 1:
+                # Confirm it stays queued rather than being dispatched at once
+                time.sleep(stable_for)
+                if self._pending_count(model) == 1:
+                    return
+            time.sleep(0.1)
+        self.fail(f"'{model}' did not report a queued request within {timeout}s")
+
     def _hold_resource(self, pool):
         """Occupy the shared resource for roughly six seconds."""
         holder = pool.submit(self._triton.infer, HOLDER_MODEL, self._holder_inputs())
-        time.sleep(2)  # ensure the resource has been acquired
+        time.sleep(2)  # give the holder time to acquire the resource
         return holder
 
     # A request cancelled while queued in the rate limiter must never reach the
@@ -123,7 +147,7 @@ class TestTrtRequestCancellation(unittest.TestCase):
             queued = self._triton.async_infer(
                 TRT_MODEL, self._trt_inputs(value=1.0), callback
             )
-            time.sleep(2)  # ensure the request is queued on the rate limiter
+            self._wait_until_queued(TRT_MODEL)
             self.assertFalse(
                 response["responded"],
                 "the request was not held by the rate limiter",
@@ -163,7 +187,7 @@ class TestTrtRequestCancellation(unittest.TestCase):
                 TRT_MODEL, self._trt_inputs(value=2.0), callback
             )
             self.assertIsNotNone(queued)
-            time.sleep(2)  # ensure the request is queued on the rate limiter
+            self._wait_until_queued(TRT_MODEL)
             self.assertFalse(response["responded"])
 
             holder.result()
