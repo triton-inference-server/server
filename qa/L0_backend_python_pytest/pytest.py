@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env python3
 # Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,12 +24,56 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
-# CI-contract shim only: the GitLab job template invokes `bash -ex
-# ${TEST_SCRIPT}` (default ./test.sh) and expects a script file, not an
-# arbitrary command line. All test logic lives in tests/; this just calls
-# pytest natively.
-set -e
-cd "$(dirname "$0")"
-mkdir -p output
-exec python3 -m pytest tests/ --junitxml=output/bls.report.xml -v
+"""Shared entrypoint for every L0_backend_python_pytest scenario.
+
+    ./pytest.py <scenario>   # e.g. ./pytest.py bls
+
+One driver, one image (see Dockerfile): each scenario is a subdirectory
+with its own tests/ and conftest.py; this just points pytest at the right
+one and writes its JUnit report to that scenario's output/.
+
+Named pytest.py, not test.sh: the CI job builds a derived image from this
+directory (see Dockerfile) and runs it with the scenario name as the
+container command, so there is no bash indirection to satisfy here -- this
+*is* the entrypoint, invoked as `python3 pytest.py <scenario>`.
+"""
+
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def main(argv):
+    if len(argv) != 2:
+        print("usage: pytest.py <scenario>", file=sys.stderr)
+        return 2
+
+    scenario = argv[1]
+    scenario_dir = os.path.join(HERE, scenario)
+    if not os.path.isdir(os.path.join(scenario_dir, "tests")):
+        print(
+            "no such scenario (missing %s/tests/): %s" % (scenario, scenario),
+            file=sys.stderr,
+        )
+        return 2
+
+    output_dir = os.path.join(scenario_dir, "output")
+    os.makedirs(output_dir, exist_ok=True)
+
+    return subprocess.call(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/",
+            "-v",
+            "--junitxml=output/%s.report.xml" % scenario,
+        ],
+        cwd=scenario_dir,
+    )
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

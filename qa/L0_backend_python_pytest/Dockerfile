@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -25,11 +24,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# CI-contract shim only: the GitLab job template invokes `bash -ex
-# ${TEST_SCRIPT}` (default ./test.sh) and expects a script file, not an
-# arbitrary command line. All test logic lives in tests/; this just calls
-# pytest natively.
-set -e
-cd "$(dirname "$0")"
-mkdir -p output
-exec python3 -m pytest tests/ --junitxml=output/logging.report.xml -v
+# One shared image for every L0_backend_python_pytest scenario. Built by
+# the CI job on top of the same devel/QA image L0_backend_python--base
+# already runs against (see .gitlab-ci.yml, BASE_IMAGE build-arg), so it
+# inherits the tritonserver binary, backends, and the compiled
+# qa/common/triton_shm_monitor module the shm-leak probe needs -- none of
+# which exist anywhere in source, only baked into that image.
+#
+# This layer adds only the pytest scenario code; which scenario runs is
+# selected at `docker run` time via the CMD argument (see pytest.py).
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+COPY . /opt/tritonserver/qa/L0_backend_python_pytest/
+WORKDIR /opt/tritonserver/qa/L0_backend_python_pytest
+
+ENTRYPOINT ["python3", "pytest.py"]
