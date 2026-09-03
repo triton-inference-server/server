@@ -96,9 +96,11 @@ Java program with the Java bindings with the following steps:
       # Run build script
       ## For In-Process C-API Java Bindings
       $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh
-      ## For C-API Wrapper (Triton with C++ bindings) Java Bindings [DEPRECATED]
-      $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh --enable-developer-tools-server
       ```
+      **The `C-API Wrapper` bindings (`--enable-developer-tools-server`) are deprecated and unsupported** —
+      `developer_tools/server` is no longer built or tested, so this flag is kept only for reference and
+      should not be used. Use the `In-Process C-API Java Bindings` command above instead.
+
       This will install the Java bindings to `/workspace/install/java-api-bindings/tritonserver-java-bindings.jar`
 
    *or*
@@ -126,10 +128,10 @@ You can do this using the following steps:
 
 1. Create the JNI binaries in your local repository (`/root/.m2/repository`)
    with [`javacpp-presets/tritonserver`](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver).
-   For C-API Wrapper Java bindings (Triton with C++ bindings), you need to
-   install some build specific dependencies including cmake and rapidjson.
-   Refer to [java installation script](https://github.com/triton-inference-server/client/blob/main/src/java-api-bindings/scripts/install_dependencies_and_build.sh)
-   for dependencies you need to install and modifications you need to make for your container.
+   **The C-API Wrapper Java bindings (Triton with C++ bindings) are deprecated and unsupported** —
+   `developer_tools/server` is no longer built or tested; skip the cmake/rapidjson build-dependency
+   steps in the [java installation script](https://github.com/triton-inference-server/client/blob/main/src/java-api-bindings/scripts/install_dependencies_and_build.sh)
+   that are specific to it.
 After installing dependencies, you can build the tritonserver project on javacpp-presets:
 ```bash
  $ git clone https://github.com/bytedeco/javacpp-presets.git
