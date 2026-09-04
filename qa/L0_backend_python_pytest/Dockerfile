@@ -25,17 +25,32 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 # One shared image for every L0_backend_python_pytest scenario. Built by
-# the CI job on top of the same devel/QA image L0_backend_python--base
-# already runs against (see .gitlab-ci.yml, BASE_IMAGE build-arg), so it
-# inherits the tritonserver binary, backends, and the compiled
-# qa/common/triton_shm_monitor module the shm-leak probe needs -- none of
-# which exist anywhere in source, only baked into that image.
+# the CI job on top of a pulled BASE_IMAGE (see .gitlab-ci.yml): the
+# lightweight runtime image by default, or the devel/QA image for the ~10
+# scenarios whose conftest.py imports shm_util (see
+# .backend_python_pytest_test_devel in .gitlab-ci.yml) -- those need the
+# compiled qa/common/triton_shm_monitor module the shm-leak probe uses, a
+# build artifact that exists only baked into the devel image, not anywhere
+# in source. Every other scenario needs nothing from BASE_IMAGE beyond the
+# tritonserver binary/backends themselves.
 #
-# This layer adds only the pytest scenario code; which scenario runs is
-# selected at `docker run` time via the CMD argument (see pytest.py).
+# python_models/ and common/ are pulled in as separate build contexts
+# (see .gitlab-ci.yml's `docker build --build-context python_models=...
+# --build-context common=...`) from the *current* checkout, rather than
+# relying on whatever qa/python_models and qa/common the pulled base image
+# happened to have baked in at its own build time -- those can be stale
+# relative to the commit under test (this bit twice during TRI-1744
+# verification: a fixed qa/python_models/bls/model.py and a newly-added
+# qa/common/gen_manifest.py were each missing from an older base image).
+# The directory COPY below merges into /opt/tritonserver/qa/common/ rather
+# than replacing it, so the devel image's compiled triton_shm_monitor
+# module -- which has no equivalent in either build context -- survives
+# untouched when BASE_IMAGE is devel.
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
+COPY --from=python_models . /opt/tritonserver/qa/python_models/
+COPY --from=common . /opt/tritonserver/qa/common/
 COPY . /opt/tritonserver/qa/L0_backend_python_pytest/
 WORKDIR /opt/tritonserver/qa/L0_backend_python_pytest
 
