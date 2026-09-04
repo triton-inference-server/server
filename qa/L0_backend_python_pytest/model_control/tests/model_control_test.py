@@ -36,6 +36,7 @@ sys.path.append("../../common")
 
 import unittest  # noqa: E402
 
+import action_log  # noqa: E402
 import numpy as np  # noqa: E402
 import shm_util  # noqa: E402
 import tritonclient.http as httpclient  # noqa: E402
@@ -102,7 +103,12 @@ class ModelIDValidationTest(unittest.TestCase):
 
         # Check if curl is available
         try:
-            subprocess.run(["curl", "--version"], capture_output=True, check=True)
+            action_log.run(
+                ["curl", "--version"],
+                "Checking curl is available for raw HTTP model-load testing",
+                capture_output=True,
+                check=True,
+            )
         except (subprocess.CalledProcessError, FileNotFoundError):
             self.skipTest("curl command not available - required for raw HTTP testing")
 
@@ -165,8 +171,12 @@ class TritonPythonModel:
                 url,
             ]
 
-            result = subprocess.run(
-                curl_cmd, capture_output=True, text=True, timeout=30
+            result = action_log.run(
+                curl_cmd,
+                "Sending raw HTTP load request for model %r via curl" % model_name,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
 
             # Parse curl output - last line is status code, rest is response body

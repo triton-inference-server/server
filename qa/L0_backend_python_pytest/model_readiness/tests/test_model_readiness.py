@@ -31,12 +31,12 @@ test.sh used.
 """
 
 import os
-import subprocess
 import time
 
 import conftest
 import pytest
 import test_model_readiness_client as client
+from conftest import action_log
 
 OUTPUT_DIR = conftest.OUTPUT_DIR
 MODEL_NAME = "identity_fp32"
@@ -59,14 +59,20 @@ def test_model_readiness_after_stub_signal(signal_num):
     with conftest.serve(model_repository, server_log):
         _run(client.TestModelReadiness, "test_model_ready")
 
-        stub_pid = subprocess.run(
+        stub_pid = action_log.run(
             ["pgrep", "-f", "triton_python_backend_stub"],
+            "Finding the running triton_python_backend_stub PID",
             capture_output=True,
             text=True,
         ).stdout.strip()
         assert stub_pid, "could not find triton_python_backend_stub process"
 
-        subprocess.run(["kill", "-%d" % signal_num, stub_pid], check=True)
+        action_log.run(
+            ["kill", "-%d" % signal_num, stub_pid],
+            "Sending signal %d to stub PID %s to trigger readiness recovery"
+            % (signal_num, stub_pid),
+            check=True,
+        )
         time.sleep(1)
 
         _run(client.TestModelReadiness, "test_model_not_ready")

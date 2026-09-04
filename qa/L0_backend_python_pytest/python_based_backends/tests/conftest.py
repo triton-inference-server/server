@@ -42,6 +42,7 @@ import contextlib
 import os
 import shutil
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -52,6 +53,9 @@ SCENARIO_DIR = os.path.dirname(HERE)
 QA_DIR = os.path.dirname(os.path.dirname(SCENARIO_DIR))
 PYTHON_MODELS_DIR = os.path.join(QA_DIR, "python_models")
 COMMON_DIR = os.path.join(QA_DIR, "common")
+
+sys.path.append(COMMON_DIR)
+import action_log  # noqa: E402
 
 TRITON_DIR = os.environ.get("TRITON_DIR", "/opt/tritonserver")
 SERVER = os.environ.get("SERVER", os.path.join(TRITON_DIR, "bin", "tritonserver"))
@@ -70,7 +74,11 @@ def pinned_torch():
     if os.environ.get("PBB_SKIP_TORCH_INSTALL") == "1":
         yield
         return
-    subprocess.run(["pip3", "install", "torch"], check=True)
+    action_log.run(
+        ["pip3", "install", "torch"],
+        "Installing torch for the generated add_sub_pytorch model",
+        check=True,
+    )
     yield
 
 
@@ -129,8 +137,9 @@ def model_repository(pinned_torch):
         os.path.join(COMMON_DIR, "gen_manifest.py"),
         os.path.join(OUTPUT_DIR, "gen_manifest.py"),
     )
-    subprocess.run(
+    action_log.run(
         ["python3", "gen_qa_pytorch_model.py", "-m", MODELS_DIR],
+        "Generating the add_sub_pytorch model (gen_qa_pytorch_model.py)",
         cwd=OUTPUT_DIR,
         check=True,
     )
@@ -163,7 +172,12 @@ def _running_server(model_repository):
         "--log-verbose=1",
     ]
     with open(server_log, "wb") as log_fh:
-        proc = subprocess.Popen(cmd, stdout=log_fh, stderr=subprocess.STDOUT)
+        proc = action_log.popen(
+            cmd,
+            "Starting tritonserver for python_based_backends (see %s)" % server_log,
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,
+        )
     base = "http://%s:%d" % (TRITONSERVER_IPADDR, HTTP_PORT)
     try:
         if not _ready(base, STARTUP_TIMEOUT_S):

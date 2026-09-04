@@ -43,6 +43,7 @@ import contextlib
 import os
 import shutil
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -51,6 +52,9 @@ import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCENARIO_DIR = os.path.dirname(HERE)
 QA_DIR = os.path.dirname(os.path.dirname(SCENARIO_DIR))
+
+sys.path.append(os.path.join(QA_DIR, "common"))
+import action_log  # noqa: E402
 
 TRITON_DIR = os.environ.get("TRITON_DIR", "/opt/tritonserver")
 SERVER = os.environ.get("SERVER", os.path.join(TRITON_DIR, "bin", "tritonserver"))
@@ -103,7 +107,13 @@ def running_server(server_log_path):
         "--log-verbose=1",
     ]
     with open(server_log_path, "wb") as log_fh:
-        proc = subprocess.Popen(cmd, stdout=log_fh, stderr=subprocess.STDOUT)
+        proc = action_log.popen(
+            cmd,
+            "Starting tritonserver for async_execute's concurrency tests "
+            "(see %s)" % server_log_path,
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,
+        )
     base = "http://%s:%d" % (TRITONSERVER_IPADDR, HTTP_PORT)
     try:
         if not _ready(base, STARTUP_TIMEOUT_S):

@@ -47,6 +47,7 @@ import contextlib
 import os
 import shutil
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -58,6 +59,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCENARIO_DIR = os.path.dirname(HERE)
 QA_DIR = os.path.dirname(os.path.dirname(SCENARIO_DIR))
 PYTHON_MODELS_DIR = os.path.join(QA_DIR, "python_models")
+
+sys.path.append(os.path.join(QA_DIR, "common"))
+import action_log  # noqa: E402
 
 TRITON_DIR = os.environ.get("TRITON_DIR", "/opt/tritonserver")
 SERVER = os.environ.get("SERVER", os.path.join(TRITON_DIR, "bin", "tritonserver"))
@@ -81,11 +85,16 @@ def pinned_torch():
     if os.environ.get("IO_SKIP_TORCH_PIN") == "1":
         yield
         return
-    subprocess.run(
-        ["pip3", "uninstall", "-y", "torch"], check=False, capture_output=True
+    action_log.run(
+        ["pip3", "uninstall", "-y", "torch"],
+        "Uninstalling the image's default torch before pinning io's version",
+        check=False,
+        capture_output=True,
     )
-    subprocess.run(
-        ["pip3", "install", *TORCH_SPEC.split(), "-f", TORCH_INDEX_URL], check=True
+    action_log.run(
+        ["pip3", "install", *TORCH_SPEC.split(), "-f", TORCH_INDEX_URL],
+        "Installing pinned torch for io's dlpack GPU/CPU round trips",
+        check=True,
     )
     yield
 
@@ -188,7 +197,12 @@ def serve(model_repository, server_log):
         "--log-verbose=1",
     ]
     with open(server_log, "wb") as log_fh:
-        proc = subprocess.Popen(cmd, stdout=log_fh, stderr=subprocess.STDOUT)
+        proc = action_log.popen(
+            cmd,
+            "Starting tritonserver for io (model_repository=%s)" % model_repository,
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,
+        )
     base = "http://%s:%d" % (TRITONSERVER_IPADDR, HTTP_PORT)
     try:
         if not _ready(base, STARTUP_TIMEOUT_S):

@@ -33,7 +33,7 @@ assertion is the exit code of `make install`.
 
 import os
 import shutil
-import subprocess
+import sys
 
 from conftest import (
     OUTPUT_DIR,
@@ -44,6 +44,12 @@ from conftest import (
     TRITON_REPO_ORGANIZATION,
 )
 
+_QA_DIR = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
+sys.path.append(os.path.join(_QA_DIR, "common"))
+import action_log  # noqa: E402
+
 
 def _install_build_deps():
     """Mirrors install_build_deps_apt() in qa/L0_backend_python/common.sh.
@@ -53,25 +59,41 @@ def _install_build_deps():
     image happens to ship, it pins a specific version from Kitware's apt
     repo, same as the original bash.
     """
-    subprocess.run(["apt-get", "update"], check=True)
-    subprocess.run(
+    action_log.run(["apt-get", "update"], "Refreshing apt package lists", check=True)
+    action_log.run(
         ["apt-get", "install", "-y", "software-properties-common", "rapidjson-dev"],
+        "Installing software-properties-common and rapidjson-dev "
+        "(python_backend build dependency)",
         check=True,
     )
-    subprocess.run(["apt-get", "update", "-q=2"], check=True)
-    subprocess.run(["apt-get", "install", "-y", "gpg", "wget"], check=True)
-    key = subprocess.run(
+    action_log.run(
+        ["apt-get", "update", "-q=2"],
+        "Refreshing apt package lists before adding the Kitware cmake repo",
+        check=True,
+    )
+    action_log.run(
+        ["apt-get", "install", "-y", "gpg", "wget"],
+        "Installing gpg and wget, needed to add the Kitware apt repo key",
+        check=True,
+    )
+    key = action_log.run(
         ["wget", "-O", "-", "https://apt.kitware.com/keys/kitware-archive-latest.asc"],
+        "Downloading the Kitware apt repo signing key",
         check=True,
         capture_output=True,
     ).stdout
-    keyring = subprocess.run(
-        ["gpg", "--dearmor"], input=key, check=True, capture_output=True
+    keyring = action_log.run(
+        ["gpg", "--dearmor"],
+        "Dearmoring the Kitware apt repo signing key into a keyring",
+        input=key,
+        check=True,
+        capture_output=True,
     ).stdout
     with open("/usr/share/keyrings/kitware-archive-keyring.gpg", "wb") as f:
         f.write(keyring)
-    codename = subprocess.run(
+    codename = action_log.run(
         ["bash", "-c", ". /etc/os-release && echo $UBUNTU_CODENAME"],
+        "Reading the Ubuntu codename to construct the Kitware apt repo entry",
         check=True,
         capture_output=True,
         text=True,
@@ -81,8 +103,12 @@ def _install_build_deps():
             "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] "
             "https://apt.kitware.com/ubuntu/ %s main\n" % codename
         )
-    subprocess.run(["apt-get", "update", "-q=2"], check=True)
-    subprocess.run(
+    action_log.run(
+        ["apt-get", "update", "-q=2"],
+        "Refreshing apt package lists now that the Kitware cmake repo is added",
+        check=True,
+    )
+    action_log.run(
         [
             "apt-get",
             "install",
@@ -91,6 +117,7 @@ def _install_build_deps():
             "cmake=4.0.3*",
             "cmake-data=4.0.3*",
         ],
+        "Installing the pinned cmake 4.0.3 from the Kitware apt repo",
         check=True,
     )
 
@@ -103,7 +130,7 @@ def test_cpu_only_build():
         shutil.rmtree(clone_dir)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    subprocess.run(
+    action_log.run(
         [
             "git",
             "clone",
@@ -112,13 +139,14 @@ def test_cpu_only_build():
             PYTHON_BACKEND_REPO_TAG,
             clone_dir,
         ],
+        "Cloning python_backend for the CPU-only variants build",
         check=True,
     )
 
     build_dir = os.path.join(clone_dir, "builddir")
     os.makedirs(build_dir)
     env = dict(os.environ, CMAKE_POLICY_VERSION_MINIMUM="3.5")
-    subprocess.run(
+    action_log.run(
         [
             "cmake",
             "-DTRITON_ENABLE_GPU=OFF",
@@ -128,8 +156,15 @@ def test_cpu_only_build():
             "-DTRITON_CORE_REPO_TAG=%s" % TRITON_CORE_REPO_TAG,
             "../",
         ],
+        "Configuring python_backend with TRITON_ENABLE_GPU=OFF",
         cwd=build_dir,
         env=env,
         check=True,
     )
-    subprocess.run(["make", "-j18", "install"], cwd=build_dir, env=env, check=True)
+    action_log.run(
+        ["make", "-j18", "install"],
+        "Building and installing the CPU-only python_backend variant",
+        cwd=build_dir,
+        env=env,
+        check=True,
+    )

@@ -41,6 +41,7 @@ import contextlib
 import os
 import shutil
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -48,6 +49,10 @@ import pytest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCENARIO_DIR = os.path.dirname(HERE)
+QA_DIR = os.path.dirname(os.path.dirname(SCENARIO_DIR))
+
+sys.path.append(os.path.join(QA_DIR, "common"))
+import action_log  # noqa: E402
 
 TRITON_DIR = os.environ.get("TRITON_DIR", "/opt/tritonserver")
 SERVER = os.environ.get("SERVER", os.path.join(TRITON_DIR, "bin", "tritonserver"))
@@ -80,10 +85,22 @@ def pinned_deps():
     if os.environ.get("EXAMPLES_SKIP_DEPS") == "1":
         yield
         return
-    subprocess.run(["pip3", "uninstall", "-y", "torch"], check=False)
-    subprocess.run(["pip3", "uninstall", "-y", "numpy"], check=False)
-    subprocess.run(["pip3", "install", "numpy>=2"], check=True)
-    subprocess.run(
+    action_log.run(
+        ["pip3", "uninstall", "-y", "torch"],
+        "Uninstalling any pre-existing torch before pinning the examples version",
+        check=False,
+    )
+    action_log.run(
+        ["pip3", "uninstall", "-y", "numpy"],
+        "Uninstalling any pre-existing numpy before pinning numpy>=2 for the examples scenario",
+        check=False,
+    )
+    action_log.run(
+        ["pip3", "install", "numpy>=2"],
+        "Installing numpy>=2 for the examples scenario",
+        check=True,
+    )
+    action_log.run(
         [
             "pip3",
             "install",
@@ -92,11 +109,20 @@ def pinned_deps():
             "--index-url",
             "https://download.pytorch.org/whl/cu124",
         ],
+        "Installing torch 2.5.0/torchvision 0.20.0 for the examples scenario",
         check=True,
     )
-    subprocess.run(["pip3", "install", "validators"], check=True)
+    action_log.run(
+        ["pip3", "install", "validators"],
+        "Installing validators for the model_instance_kind example",
+        check=True,
+    )
     if not TEST_JETSON:
-        subprocess.run(["pip3", "install", "-U", "jax[cuda12]"], check=True)
+        action_log.run(
+            ["pip3", "install", "-U", "jax[cuda12]"],
+            "Installing jax[cuda12] for the jax example (skipped on Jetson)",
+            check=True,
+        )
     yield
 
 
@@ -112,7 +138,7 @@ def python_backend_clone(pinned_deps):
         if os.path.isdir(clone_dir):
             shutil.rmtree(clone_dir)
         try:
-            subprocess.run(
+            action_log.run(
                 [
                     "git",
                     "clone",
@@ -121,6 +147,8 @@ def python_backend_clone(pinned_deps):
                     PYTHON_BACKEND_REPO_TAG,
                     clone_dir,
                 ],
+                "Cloning python_backend for the examples scenario (attempt %d/%d)"
+                % (attempt, CLONE_MAX_RETRIES),
                 check=True,
             )
             return clone_dir
@@ -193,7 +221,12 @@ def serve(model_repository, server_log, extra_args=()):
         *extra_args,
     ]
     with open(server_log, "wb") as log_fh:
-        proc = subprocess.Popen(cmd, stdout=log_fh, stderr=subprocess.STDOUT)
+        proc = action_log.popen(
+            cmd,
+            "Starting tritonserver for an examples model (see %s)" % server_log,
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,
+        )
     base = "http://%s:%d" % (TRITONSERVER_IPADDR, HTTP_PORT)
     try:
         if not _ready(base, STARTUP_TIMEOUT_S):
@@ -215,8 +248,9 @@ def run_client(clone_dir, client_rel, log_path, extra_args=()):
     original's `cd python_backend && python3 examples/.../client.py`), and
     return its combined stdout+stderr text."""
     with open(log_path, "wb") as log_fh:
-        rv = subprocess.call(
+        rv = action_log.call(
             ["python3", client_rel, *extra_args],
+            "Running example client %s (see %s)" % (client_rel, log_path),
             cwd=clone_dir,
             stdout=log_fh,
             stderr=subprocess.STDOUT,

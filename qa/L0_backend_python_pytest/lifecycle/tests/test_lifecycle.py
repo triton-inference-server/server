@@ -49,8 +49,9 @@ def test_main_phase_5x(main_model_repository):
     """Run the whole lifecycle_client.py suite 5x against one server to
     catch intermittent segfaults, exactly like the original loop; then
     assert no shared-memory pages leaked across the whole run."""
-    import subprocess
     import sys
+
+    import action_log
 
     prev_pages = shm_page_count()
     server_log = os.path.join(OUTPUT_DIR, "lifecycle_server.log")
@@ -58,7 +59,7 @@ def test_main_phase_5x(main_model_repository):
     with serve(main_model_repository, server_log):
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         for i in range(5):
-            rv = subprocess.call(
+            rv = action_log.call(
                 [
                     sys.executable,
                     "-m",
@@ -67,6 +68,8 @@ def test_main_phase_5x(main_model_repository):
                     CLIENT_PY,
                     "--junitxml=lifecycle.iter%d.report.xml" % i,
                 ],
+                "Running lifecycle_client.py iteration %d/5 against the "
+                "already-started server (segfault-flakiness check)" % (i + 1),
                 cwd=OUTPUT_DIR,
             )
             assert rv == 0, "lifecycle_client.py iteration %d FAILED" % i

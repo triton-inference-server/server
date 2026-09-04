@@ -45,6 +45,7 @@ import contextlib
 import os
 import shutil
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -54,6 +55,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCENARIO_DIR = os.path.dirname(HERE)
 QA_DIR = os.path.dirname(os.path.dirname(SCENARIO_DIR))
 PYTHON_MODELS_DIR = os.path.join(QA_DIR, "python_models")
+
+sys.path.append(os.path.join(QA_DIR, "common"))
+import action_log  # noqa: E402
 
 TRITON_DIR = os.environ.get("TRITON_DIR", "/opt/tritonserver")
 SERVER = os.environ.get("SERVER", os.path.join(TRITON_DIR, "bin", "tritonserver"))
@@ -127,11 +131,16 @@ def pinned_torch():
     if os.environ.get("BLS_SKIP_TORCH_PIN") == "1":
         yield
         return
-    subprocess.run(
-        ["pip3", "uninstall", "-y", "torch"], check=False, capture_output=True
+    action_log.run(
+        ["pip3", "uninstall", "-y", "torch"],
+        "Uninstalling whatever torch the QA image shipped, before pinning",
+        check=False,
+        capture_output=True,
     )
-    subprocess.run(
-        ["pip3", "install", *TORCH_SPEC.split(), "-f", TORCH_INDEX_URL], check=True
+    action_log.run(
+        ["pip3", "install", *TORCH_SPEC.split(), "-f", TORCH_INDEX_URL],
+        "Installing pinned torch (%s) for BLS's dlpack CPU/GPU round-trip" % TORCH_SPEC,
+        check=True,
     )
     yield
 
@@ -162,7 +171,7 @@ def model_repository(pinned_torch):
     clone_dir = os.path.join(OUTPUT_DIR, "python_backend")
     if os.path.isdir(clone_dir):
         shutil.rmtree(clone_dir)
-    subprocess.run(
+    action_log.run(
         [
             "git",
             "clone",
@@ -171,6 +180,8 @@ def model_repository(pinned_torch):
             PYTHON_BACKEND_REPO_TAG,
             clone_dir,
         ],
+        "Cloning python_backend (%s) for the square_int32 example model"
+        % PYTHON_BACKEND_REPO_TAG,
         check=True,
     )
     square_dst = os.path.join(MODELS_DIR, "square_int32", "1")
@@ -228,7 +239,14 @@ def serve(model_repository, server_log, bls_kind, extra_args=()):
     ]
     env = dict(os.environ, BLS_KIND=bls_kind)
     with open(server_log, "wb") as log_fh:
-        proc = subprocess.Popen(cmd, stdout=log_fh, stderr=subprocess.STDOUT, env=env)
+        proc = action_log.popen(
+            cmd,
+            "Starting tritonserver for bls (BLS_KIND=%s, see %s)"
+            % (bls_kind, server_log),
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,
+            env=env,
+        )
     base = "http://%s:%d" % (TRITONSERVER_IPADDR, HTTP_PORT)
     try:
         if not _ready(base, STARTUP_TIMEOUT_S):

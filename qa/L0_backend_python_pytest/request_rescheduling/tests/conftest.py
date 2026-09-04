@@ -43,6 +43,7 @@ import contextlib
 import os
 import shutil
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -52,6 +53,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCENARIO_DIR = os.path.dirname(HERE)
 QA_DIR = os.path.dirname(os.path.dirname(SCENARIO_DIR))
 PYTHON_MODELS_DIR = os.path.join(QA_DIR, "python_models")
+
+sys.path.append(os.path.join(QA_DIR, "common"))
+import action_log  # noqa: E402
 
 TRITON_DIR = os.environ.get("TRITON_DIR", "/opt/tritonserver")
 SERVER = os.environ.get("SERVER", os.path.join(TRITON_DIR, "bin", "tritonserver"))
@@ -116,7 +120,12 @@ def _running_server(model_repository):
         "--log-verbose=1",
     ]
     with open(server_log, "wb") as log_fh:
-        proc = subprocess.Popen(cmd, stdout=log_fh, stderr=subprocess.STDOUT)
+        proc = action_log.popen(
+            cmd,
+            "Starting tritonserver for request_rescheduling (see %s)" % server_log,
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,
+        )
     base = "http://%s:%d" % (TRITONSERVER_IPADDR, HTTP_PORT)
     try:
         if not _ready(base, STARTUP_TIMEOUT_S):

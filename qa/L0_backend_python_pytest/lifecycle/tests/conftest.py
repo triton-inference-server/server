@@ -44,6 +44,7 @@ import contextlib
 import os
 import shutil
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -53,6 +54,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCENARIO_DIR = os.path.dirname(HERE)
 QA_DIR = os.path.dirname(os.path.dirname(SCENARIO_DIR))
 PYTHON_MODELS_DIR = os.path.join(QA_DIR, "python_models")
+
+sys.path.append(os.path.join(QA_DIR, "common"))
+import action_log  # noqa: E402
 
 TRITON_DIR = os.environ.get("TRITON_DIR", "/opt/tritonserver")
 SERVER = os.environ.get("SERVER", os.path.join(TRITON_DIR, "bin", "tritonserver"))
@@ -218,8 +222,11 @@ def _cmd(model_repository, extra_args):
 def serve(model_repository, server_log, extra_args=()):
     """Normal server lifecycle: wait for ready, yield, terminate on exit."""
     with open(server_log, "wb") as log_fh:
-        proc = subprocess.Popen(
-            _cmd(model_repository, extra_args), stdout=log_fh, stderr=subprocess.STDOUT
+        proc = action_log.popen(
+            _cmd(model_repository, extra_args),
+            "Starting tritonserver for lifecycle (see %s)" % server_log,
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,
         )
     base = "http://%s:%d" % (TRITONSERVER_IPADDR, HTTP_PORT)
     try:
@@ -243,7 +250,11 @@ def run_and_wait_for_exit(model_repository, server_log, extra_args=()):
     qa/L0_backend_python/lifecycle/test.sh's `run_server_nowait` + `wait
     $SERVER_PID` (no readiness poll, no explicit kill)."""
     with open(server_log, "wb") as log_fh:
-        proc = subprocess.Popen(
-            _cmd(model_repository, extra_args), stdout=log_fh, stderr=subprocess.STDOUT
+        proc = action_log.popen(
+            _cmd(model_repository, extra_args),
+            "Starting tritonserver for lifecycle, expected to exit on its "
+            "own from a model init failure (see %s)" % server_log,
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,
         )
     proc.wait(timeout=EXIT_TIMEOUT_S)

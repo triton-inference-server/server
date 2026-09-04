@@ -36,6 +36,12 @@ Named pytest.py, not test.sh: the CI job builds a derived image from this
 directory (see Dockerfile) and runs it with the scenario name as the
 container command, so there is no bash indirection to satisfy here -- this
 *is* the entrypoint, invoked as `python3 pytest.py <scenario>`.
+
+Runs pytest with -s (capturing off): every scenario's conftest.py prints
+each subprocess it runs via qa/common/action_log before running it, and
+without -s that only shows up in a failing test's "Captured stdout"
+section -- it should be visible for every test, pass or fail, the same
+way `bash -ex` made every command in the old test.sh scripts visible.
 """
 
 import os
@@ -69,6 +75,7 @@ def main(argv):
             "pytest",
             "tests/",
             "-v",
+            "-s",
             "--junitxml=output/%s.report.xml" % scenario,
         ],
         cwd=scenario_dir,

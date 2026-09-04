@@ -44,6 +44,7 @@ import contextlib
 import os
 import shutil
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -53,6 +54,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCENARIO_DIR = os.path.dirname(HERE)
 QA_DIR = os.path.dirname(os.path.dirname(SCENARIO_DIR))
 PYTHON_MODELS_DIR = os.path.join(QA_DIR, "python_models")
+
+sys.path.append(os.path.join(QA_DIR, "common"))
+import action_log  # noqa: E402
 
 # qa/L0_backend_python/decoupled/models/decoupled_* are statically
 # checked-in model repos (not sourced from qa/python_models/) -- the
@@ -90,11 +94,17 @@ def pinned_torch():
     if os.environ.get("DECOUPLED_SKIP_TORCH_PIN") == "1":
         yield
         return
-    subprocess.run(
-        ["pip3", "uninstall", "-y", "torch"], check=False, capture_output=True
+    action_log.run(
+        ["pip3", "uninstall", "-y", "torch"],
+        "Uninstalling whatever torch the QA image shipped, before pinning",
+        check=False,
+        capture_output=True,
     )
-    subprocess.run(
-        ["pip3", "install", *TORCH_SPEC.split(), "-f", TORCH_INDEX_URL], check=True
+    action_log.run(
+        ["pip3", "install", *TORCH_SPEC.split(), "-f", TORCH_INDEX_URL],
+        "Installing pinned torch (%s) for decoupled's dlpack CPU/GPU round-trip"
+        % TORCH_SPEC,
+        check=True,
     )
     yield
 
@@ -128,7 +138,7 @@ def model_repository(pinned_torch):
     clone_dir = os.path.join(OUTPUT_DIR, "python_backend")
     if os.path.isdir(clone_dir):
         shutil.rmtree(clone_dir)
-    subprocess.run(
+    action_log.run(
         [
             "git",
             "clone",
@@ -137,6 +147,8 @@ def model_repository(pinned_torch):
             PYTHON_BACKEND_REPO_TAG,
             clone_dir,
         ],
+        "Cloning python_backend (%s) for the square_int32 example model"
+        % PYTHON_BACKEND_REPO_TAG,
         check=True,
     )
     square_dst = os.path.join(MODELS_DIR, "square_int32", "1")
@@ -193,7 +205,12 @@ def _running_server(model_repository):
         "--log-verbose=1",
     ]
     with open(SERVER_LOG, "wb") as log_fh:
-        proc = subprocess.Popen(cmd, stdout=log_fh, stderr=subprocess.STDOUT)
+        proc = action_log.popen(
+            cmd,
+            "Starting tritonserver for decoupled (see %s)" % SERVER_LOG,
+            stdout=log_fh,
+            stderr=subprocess.STDOUT,
+        )
     base = "http://%s:%d" % (TRITONSERVER_IPADDR, HTTP_PORT)
     try:
         if not _ready(base, STARTUP_TIMEOUT_S):
