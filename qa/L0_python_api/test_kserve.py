@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -62,6 +62,7 @@ class TestGrpcOptions:
             reuse_port=True,
             infer_allocation_pool_size=12,
             http2_max_pings_without_data=10,
+            infer_cq_count=4,
         )
 
     def test_wrong_grpc_parameters(self):
@@ -84,6 +85,10 @@ class TestGrpcOptions:
             KServeGrpc.Options(max_connection_age_ms=-1)
         with pytest.raises(Exception):
             KServeGrpc.Options(max_connection_age_grace_ms=-1)
+        with pytest.raises(Exception):
+            KServeGrpc.Options(infer_cq_count=-1)
+        with pytest.raises(Exception):
+            KServeGrpc.Options(infer_cq_count=129)
 
         # Wrong data type
         with pytest.raises(Exception):

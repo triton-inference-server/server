@@ -1,4 +1,4 @@
-// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -159,7 +159,8 @@ class Server {
 
   std::unique_ptr<::grpc::ServerCompletionQueue> common_cq_;
   std::vector<std::unique_ptr<::grpc::ServerCompletionQueue>> model_infer_cqs_;
-  std::unique_ptr<::grpc::ServerCompletionQueue> model_stream_infer_cq_;
+  std::vector<std::unique_ptr<::grpc::ServerCompletionQueue>>
+      model_stream_infer_cqs_;
 
   std::unique_ptr<HandlerBase> common_handler_;
   std::vector<std::unique_ptr<HandlerBase>> model_infer_handlers_;

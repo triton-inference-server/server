@@ -30,18 +30,18 @@ import sys
 
 sys.path.append("../common")
 
-import os
-import queue
-import threading
-import time
-import unittest
-from contextlib import ExitStack
-from functools import partial
+import os  # noqa: E402
+import queue  # noqa: E402
+import threading  # noqa: E402
+import time  # noqa: E402
+import unittest  # noqa: E402
+from contextlib import ExitStack  # noqa: E402
+from functools import partial  # noqa: E402
 
-import numpy as np
-import test_util as tu
-import tritonclient.grpc as grpcclient
-from tritonclient.utils import InferenceServerException
+import numpy as np  # noqa: E402
+import test_util as tu  # noqa: E402
+import tritonclient.grpc as grpcclient  # noqa: E402
+from tritonclient.utils import InferenceServerException  # noqa: E402
 
 SERVER_URL = "localhost:8001"
 DEFAULT_RESPONSE_TIMEOUT = 60
@@ -77,6 +77,14 @@ def prepare_infer_args(input_value, enable_batching=False):
     infer_input[0].set_data_from_numpy(input_data)
     outputs = [grpcclient.InferRequestedOutput("OUT")]
     return infer_input, outputs
+
+
+def _describe_error(err):
+    """Concise, readable description of a tritonclient error for logs and asserts."""
+    try:
+        return f"{err.status()}: {err.message()}"
+    except Exception:
+        return str(err)
 
 
 def collect_responses(user_data, timeout=DEFAULT_RESPONSE_TIMEOUT):
@@ -138,16 +146,22 @@ class EnsembleBackpressureTest(tu.TestResultCollector):
                     model_name=model_name, inputs=inputs, outputs=outputs
                 )
 
-            # Collect and verify responses for all requests
+            # Collect and verify responses for all requests. Assert on errors
+            # first so a real failure (e.g. CANCELLED) surfaces instead of a
+            # misleading "expected N, got 0".
             for i, ud in enumerate(user_datas):
                 errors, responses = collect_responses(ud)
                 self.assertEqual(
-                    len(responses),
-                    expected_responses_per_request,
-                    f"Request {i}: expected {expected_responses_per_request} responses, got {len(responses)}",
+                    len(errors),
+                    0,
+                    f"Request {i}: Triton returned error(s): "
+                    f"{[_describe_error(e) for e in errors]}",
                 )
                 self.assertEqual(
-                    len(errors), 0, f"Request {i}: unexpected errors: {errors}"
+                    len(responses),
+                    expected_responses_per_request,
+                    f"Request {i}: expected {expected_responses_per_request} "
+                    f"response(s), got {len(responses)}",
                 )
                 # Verify correctness of responses
                 for idx, resp in enumerate(responses):

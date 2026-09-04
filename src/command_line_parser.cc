@@ -545,8 +545,8 @@ TritonParser::SetupOptions()
        "The number of gRPC inference handler threads. Default is 2."});
   grpc_options_.push_back(
       {OPTION_GRPC_INFER_CQ_COUNT, "grpc-infer-cq-count", Option::ArgInt,
-       "The number of gRPC inference completion queues. Default is 0 "
-       "(one CQ per handler thread). Use 1 for legacy single-CQ behavior."});
+       "The number of gRPC inference completion queues. Default is 1 "
+       "(single shared queue). Set to 0 for one CQ per handler thread."});
   grpc_options_.push_back(
       {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
        "grpc-infer-allocation-pool-size", Option::ArgInt,

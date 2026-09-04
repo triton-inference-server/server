@@ -145,6 +145,7 @@ For client-side documentation, see [Client-Side GRPC Status Codes](https://githu
 In general, using 2 threads per completion queue seems to give the best performance, see [gRPC Performance Best Practices](https://grpc.io/docs/guides/performance/#c). However, in cases where the performance bottleneck is at the request handling step (e.g. ensemble models), increasing the number of gRPC inference handler threads may lead to a higher throughput.
 
 * `--grpc-infer-thread-count`: 2 by default.
+* `--grpc-infer-cq-count`: 1 by default (a single shared completion queue). Set to `0` to create one completion queue per handler thread (capped at `--grpc-infer-thread-count`), which reduces contention when many requests or decoupled streams are processed concurrently. Valid range is 0-128.
 
 Note: More threads don't always mean better performance.
 
