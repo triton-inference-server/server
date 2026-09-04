@@ -111,7 +111,7 @@ Java program with the Java bindings with the following steps:
       $ docker cp ${id}:/workspace/install/java-api-bindings/tritonserver-java-bindings.jar <Uber Jar directory>/tritonserver-java-bindings.jar
       $ docker stop ${id}
       ```
-      **Note:** `tritonserver-java-bindings.jar` only includes the `In-Process Java Bindings`. To use the `C-API Wrapper Java Bindings`, please use the build script.
+      **Note:** `tritonserver-java-bindings.jar` only includes the `In-Process Java Bindings`. The `C-API Wrapper Java Bindings` are deprecated and unsupported; use the `In-Process Java Bindings` instead.
 2. Use the built "Uber Jar" that contains the Java bindings
    ```bash
    $ java -cp <Uber Jar directory>/tritonserver-java-bindings.jar <your Java program>
@@ -128,7 +128,7 @@ You can do this using the following steps:
 
 1. Create the JNI binaries in your local repository (`/root/.m2/repository`)
    with [`javacpp-presets/tritonserver`](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver).
-   **The C-API Wrapper Java bindings (Triton with C++ bindings) are deprecated and unsupported** —
+   **The `C-API Wrapper` Java bindings (Triton with C++ bindings) are deprecated and unsupported** —
    `developer_tools/server` is no longer built or tested; skip the cmake/rapidjson build-dependency
    steps in the [java installation script](https://github.com/triton-inference-server/client/blob/main/src/java-api-bindings/scripts/install_dependencies_and_build.sh)
    that are specific to it.
