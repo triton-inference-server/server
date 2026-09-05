@@ -2445,8 +2445,20 @@ Server::Server(
   }
 
   common_cq_ = builder_.AddCompletionQueue();
-  model_infer_cq_ = builder_.AddCompletionQueue();
-  model_stream_infer_cq_ = builder_.AddCompletionQueue();
+
+  int cq_count =
+      (options.infer_cq_count_ > 0)
+          ? std::min(options.infer_cq_count_, options.infer_thread_count_)
+          : options.infer_thread_count_;
+  for (int i = 0; i < cq_count; ++i) {
+    model_infer_cqs_.emplace_back(builder_.AddCompletionQueue());
+  }
+
+  // Shard the streaming CQ like the unary infer CQ so concurrent streams
+  // are not funneled through a single queue.
+  for (int i = 0; i < cq_count; ++i) {
+    model_stream_infer_cqs_.emplace_back(builder_.AddCompletionQueue());
+  }
 
   // For testing purposes only, add artificial delay in grpc responses.
   const char* dstr = getenv("TRITONSERVER_SERVER_DELAY_GRPC_RESPONSE_SEC");
@@ -2467,22 +2479,24 @@ Server::Server(
   for (int i = 0; i < options.infer_thread_count_; ++i) {
     model_infer_handlers_.emplace_back(new ModelInferHandler(
         "ModelInferHandler", tritonserver_, trace_manager_, shm_manager_,
-        &service_, model_infer_cq_.get(),
+        &service_, model_infer_cqs_[i % cq_count].get(),
         options.infer_allocation_pool_size_ /* max_state_bucket_count */,
         options.max_response_pool_size_, options.infer_compression_level_,
         restricted_kv, options.forward_header_pattern_, &conn_mtx_, &conn_cnt_,
         &accepting_new_conn_));
   }
 
-  // Handler for streaming inference requests. Keeps one handler for streaming
-  // to avoid possible concurrent writes which is not allowed
-  model_stream_infer_handlers_.emplace_back(new ModelStreamInferHandler(
-      "ModelStreamInferHandler", tritonserver_, trace_manager_, shm_manager_,
-      &service_, model_stream_infer_cq_.get(),
-      options.infer_allocation_pool_size_ /* max_state_bucket_count */,
-      options.max_response_pool_size_, options.infer_compression_level_,
-      restricted_kv, options.forward_header_pattern_, &conn_mtx_, &conn_cnt_,
-      &accepting_new_conn_));
+  // One handler per streaming CQ (1:1): a stream must be written by a single
+  // thread (gRPC forbids concurrent writes on one stream).
+  for (int i = 0; i < cq_count; ++i) {
+    model_stream_infer_handlers_.emplace_back(new ModelStreamInferHandler(
+        "ModelStreamInferHandler", tritonserver_, trace_manager_, shm_manager_,
+        &service_, model_stream_infer_cqs_[i].get(),
+        options.infer_allocation_pool_size_ /* max_state_bucket_count */,
+        options.max_response_pool_size_, options.infer_compression_level_,
+        restricted_kv, options.forward_header_pattern_, &conn_mtx_, &conn_cnt_,
+        &accepting_new_conn_));
+  }
 }
 
 Server::~Server()
@@ -2547,6 +2561,12 @@ Server::GetOptions(Options& options, UnorderedMapType& options_map)
 
   RETURN_IF_ERR(GetValue(
       options_map, "infer_thread_count", &options.infer_thread_count_));
+  // infer_cq_count is optional: an older tritonfrontend that predates the flag
+  // omits it, so fall back to the default (a single shared completion queue).
+  if (options_map.find("infer_cq_count") != options_map.end()) {
+    RETURN_IF_ERR(
+        GetValue(options_map, "infer_cq_count", &options.infer_cq_count_));
+  }
   RETURN_IF_ERR(GetValue(
       options_map, "infer_allocation_pool_size",
       &options.infer_allocation_pool_size_));
@@ -2681,8 +2701,12 @@ Server::Stop()
 
   // Shutdown completion queues
   common_cq_->Shutdown();
-  model_infer_cq_->Shutdown();
-  model_stream_infer_cq_->Shutdown();
+  for (auto& cq : model_infer_cqs_) {
+    cq->Shutdown();
+  }
+  for (auto& cq : model_stream_infer_cqs_) {
+    cq->Shutdown();
+  }
 
   // Must stop all handlers explicitly to wait for all the handler
   // threads to join since they are referencing completion queue, etc.
