@@ -46,6 +46,12 @@
 # than replacing it, so the devel image's compiled triton_shm_monitor
 # module -- which has no equivalent in either build context -- survives
 # untouched when BASE_IMAGE is devel.
+#
+# tritonclient is installed explicitly rather than assumed: the lightweight
+# runtime image doesn't ship it (only the devel/QA image does), and most
+# scenarios' tests use an HTTP/gRPC client against the server under test --
+# same package the rest of qa/ installs this way, see e.g.
+# qa/L0_backend_fastertransformer/test.sh.
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
@@ -53,5 +59,7 @@ COPY --from=python_models . /opt/tritonserver/qa/python_models/
 COPY --from=common . /opt/tritonserver/qa/common/
 COPY . /opt/tritonserver/qa/L0_backend_python_pytest/
 WORKDIR /opt/tritonserver/qa/L0_backend_python_pytest
+
+RUN pip3 install --no-cache-dir tritonclient[all]
 
 ENTRYPOINT ["python3", "pytest.py"]

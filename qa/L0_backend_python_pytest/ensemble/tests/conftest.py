@@ -67,6 +67,8 @@ MODELS_DIR = os.path.join(OUTPUT_DIR, "models")
 
 
 def _repo_version():
+    """Mirrors DATADIR construction in qa/L0_backend_python/test.sh: plain
+    REPO_VERSION (== NVIDIA_TRITON_SERVER_VERSION), no arch suffix."""
     version = os.environ.get("REPO_VERSION") or os.environ.get(
         "NVIDIA_TRITON_SERVER_VERSION"
     )
@@ -76,8 +78,7 @@ def _repo_version():
             "(selects the QA model repository under DATADIR)",
             pytrace=False,
         )
-    arch = os.environ.get("TEST_REPO_ARCH")
-    return "%s_%s" % (version, arch) if arch else version
+    return version
 
 
 def get_shm_pages():
