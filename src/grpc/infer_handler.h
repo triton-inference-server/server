@@ -887,8 +887,7 @@ class InferHandlerState {
                        << TRITONSERVER_ErrorMessage(err);
               TRITONSERVER_ErrorDelete(err);
             } else {
-              LOG_VERBOSE(1)
-                  << "Cancellation issued for " << state->unique_id_;
+              LOG_VERBOSE(1) << "Cancellation issued for " << state->unique_id_;
             }
             state->step_ = Steps::CANCELLATION_ISSUED;
           } else if (state->step_ == Steps::COMPLETE) {
