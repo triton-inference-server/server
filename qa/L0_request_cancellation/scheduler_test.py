@@ -32,9 +32,9 @@ import unittest
 
 import numpy as np
 import tritonclient.grpc as grpcclient
-from tritonclient.utils import InferenceServerException
 
 from cancellation_test_utils import CancellationTest
+from tritonclient.utils import InferenceServerException
 
 
 class TestScheduler(CancellationTest, unittest.TestCase):

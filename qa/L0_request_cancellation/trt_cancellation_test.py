@@ -31,7 +31,6 @@ import unittest
 
 import numpy as np
 import tritonclient.grpc as grpcclient
-
 from cancellation_test_utils import CancellationTest
 
 # A TensorRT request cancelled while waiting in the rate limiter must not run
