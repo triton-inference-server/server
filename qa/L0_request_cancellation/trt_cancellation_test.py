@@ -202,7 +202,7 @@ class TestTrtRequestCancellation(unittest.TestCase):
 
             (
                 cancelled_callback,
-                cancelled_response
+                cancelled_response,
             ) = self._generate_callback_and_response_pair()
             cancelled_request = self._triton.async_infer(
                 TRT_MODEL, self._trt_inputs(value=1.0), cancelled_callback

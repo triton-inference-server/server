@@ -211,9 +211,7 @@ class TestScheduler(unittest.TestCase):
         )
         return 0 if value is None else value
 
-    def _wait_until_pending(
-        self, model_name, expected, timeout=30, stable_for=0.5
-    ):
+    def _wait_until_pending(self, model_name, expected, timeout=30, stable_for=0.5):
         """Wait until a pending count remains stable for the requested period."""
         deadline = time.monotonic() + timeout
         stable_since = None
