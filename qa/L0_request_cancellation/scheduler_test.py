@@ -67,14 +67,11 @@ class TestScheduler(unittest.TestCase):
 
         return callback, response
 
-    def _wait_for_response(self, response, timeout=30):
+    def _assert_response_is_cancelled(self, response, timeout=30):
         self.assertTrue(
             response["completed"].wait(timeout),
             f"inference callback was not invoked within {timeout}s",
         )
-
-    def _assert_response_is_cancelled(self, response, timeout=30):
-        self._wait_for_response(response, timeout)
         self.assertTrue(response["responded"])
         self.assertEqual(response["result"], None)
         self.assertIsInstance(response["error"], InferenceServerException)
