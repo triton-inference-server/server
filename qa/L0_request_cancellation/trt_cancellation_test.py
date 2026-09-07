@@ -200,9 +200,10 @@ class TestTrtRequestCancellation(unittest.TestCase):
         with concurrent.futures.ThreadPoolExecutor() as pool:
             holders = self._hold_resource(pool)
 
-            cancelled_callback, cancelled_response = (
-                self._generate_callback_and_response_pair()
-            )
+            (
+                cancelled_callback,
+                cancelled_response
+            ) = self._generate_callback_and_response_pair()
             cancelled_request = self._triton.async_infer(
                 TRT_MODEL, self._trt_inputs(value=1.0), cancelled_callback
             )
@@ -226,8 +227,7 @@ class TestTrtRequestCancellation(unittest.TestCase):
             notifications_before = self._cancellation_notification_count()
             cancelled_request.cancel()
             self._wait_until(
-                lambda: self._cancellation_notification_count()
-                > notifications_before,
+                lambda: self._cancellation_notification_count() > notifications_before,
                 "the server to receive the gRPC cancellation notification",
             )
 
@@ -247,8 +247,7 @@ class TestTrtRequestCancellation(unittest.TestCase):
 
         expected_failures = failures_before + 1
         self._wait_until(
-            lambda: self._failure_count(TRT_MODEL, "CANCELED")
-            == expected_failures,
+            lambda: self._failure_count(TRT_MODEL, "CANCELED") == expected_failures,
             f"{TRT_MODEL} CANCELED failure count to reach {expected_failures}",
         )
         expected_executions = executions_before + 1

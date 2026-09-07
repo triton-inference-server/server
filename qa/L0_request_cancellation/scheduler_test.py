@@ -148,9 +148,7 @@ class TestScheduler(unittest.TestCase):
         expected_count = initial_count + expected_count_increase
         labels = {"model": model_name, "reason": reason, "version": "1"}
         self._wait_until(
-            lambda: self._metric_value(
-                "nv_inference_request_failure", labels
-            )
+            lambda: self._metric_value("nv_inference_request_failure", labels)
             == expected_count,
             f"{model_name} {reason} failure count to reach {expected_count}",
         )
