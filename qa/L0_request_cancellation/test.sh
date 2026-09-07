@@ -320,7 +320,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python scheduler_test.py > $TEST_LOG 2>&1
+SERVER_LOG=$SERVER_LOG python scheduler_test.py > $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Scheduler Tests Failed\n***"
     cat $TEST_LOG
@@ -332,23 +332,19 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 #
-# Core cancellation before TensorRT backend dispatch
+# TensorRT cancellation while waiting in the rate limiter
 #
 # 'resource_holder' is slow and holds the global resource both models need, so
 # the TensorRT request stays queued on the rate limiter long enough to cancel.
 #
 TRT_MODEL_SRC=$DATADIR/qa_model_repository/plan_float32_float32_float32
 
-if [ ! -d "$TRT_MODEL_SRC" ]; then
-    echo -e "\n***\n*** TensorRT QA model not found at $TRT_MODEL_SRC\n***"
-    RET=1
-else
-    rm -rf models && mkdir models
-    cp -r $TRT_MODEL_SRC models/plan_no_batching
-    rm -rf models/plan_no_batching/2 models/plan_no_batching/3
+rm -rf models && mkdir models
+cp -r $TRT_MODEL_SRC models/plan_no_batching
+rm -rf models/plan_no_batching/2 models/plan_no_batching/3
 
-    set +e
-    python3 - <<'PYEOF'
+set +e
+python3 - <<'PYEOF'
 from google.protobuf import text_format
 import tritonclient.grpc.model_config_pb2 as model_config_pb2
 
@@ -374,13 +370,13 @@ resource.count = 1
 with open(path, "w") as config_file:
     config_file.write(text_format.MessageToString(config))
 PYEOF
-    TRT_CONFIG_RC=$?
-    set -e
+TRT_CONFIG_RC=$?
+set -e
 
-    if [ $TRT_CONFIG_RC -ne 0 ]; then
-        echo -e "\n***\n*** Failed to prepare the TensorRT model config\n***"
-        RET=1
-    else
+if [ $TRT_CONFIG_RC -ne 0 ]; then
+    echo -e "\n***\n*** Failed to prepare the TensorRT model config\n***"
+    RET=1
+else
 
     mkdir -p models/resource_holder/1 && (cd models/resource_holder && \
         echo 'name: "resource_holder"' >> config.pbtxt && \
@@ -413,7 +409,6 @@ PYEOF
 
     kill $SERVER_PID
     wait $SERVER_PID
-    fi
 fi
 
 #
