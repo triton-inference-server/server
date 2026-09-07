@@ -881,10 +881,14 @@ class InferHandlerState {
             TRITONSERVER_Error* err = nullptr;
             err = TRITONSERVER_InferenceRequestCancel(
                 state->inference_request_.get());
-            // TODO: Add request id to the message
             if (err != nullptr) {
-              LOG_INFO << "Failed to cancel the request: "
+              LOG_INFO << "Failed to issue cancellation for "
+                       << state->unique_id_ << ": "
                        << TRITONSERVER_ErrorMessage(err);
+              TRITONSERVER_ErrorDelete(err);
+            } else {
+              LOG_VERBOSE(1)
+                  << "Cancellation issued for " << state->unique_id_;
             }
             state->step_ = Steps::CANCELLATION_ISSUED;
           } else if (state->step_ == Steps::COMPLETE) {

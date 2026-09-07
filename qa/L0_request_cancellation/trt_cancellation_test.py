@@ -43,7 +43,7 @@ from tritonclient.utils import InferenceServerException
 # "SHARED" resource, so 'resource_holder' keeps the TensorRT requests queued.
 TRT_MODEL = "plan_no_batching"
 HOLDER_MODEL = "resource_holder"
-CANCELLATION_LOG_LINE = "Cancellation notification received for "
+CANCELLATION_ISSUED_LOG_LINE = "Cancellation issued for "
 
 # Plan model from qa_model_repository: OUTPUT0 = INPUT0 + INPUT1.
 TRT_SHAPE = [1, 16]
@@ -112,9 +112,9 @@ class TestTrtRequestCancellation(unittest.TestCase):
         r.raise_for_status()
         return r.text
 
-    def _cancellation_notification_count(self):
+    def _cancellation_issued_count(self):
         with open(self._server_log, encoding="utf-8") as server_log:
-            return server_log.read().count(CANCELLATION_LOG_LINE)
+            return server_log.read().count(CANCELLATION_ISSUED_LOG_LINE)
 
     def _metric_value(self, metric_name, expected_labels):
         for line in self._get_metrics().splitlines():
@@ -224,14 +224,14 @@ class TestTrtRequestCancellation(unittest.TestCase):
             )
             self.assertIsNotNone(live_request)
 
-            notifications_before = self._cancellation_notification_count()
+            cancellations_before = self._cancellation_issued_count()
             cancelled_request.cancel()
             self._wait_until(
-                lambda: self._cancellation_notification_count() > notifications_before,
-                "the server to receive the gRPC cancellation notification",
+                lambda: self._cancellation_issued_count() > cancellations_before,
+                "the server to issue cancellation",
             )
 
-            # The server-side notification is the synchronization point; the
+            # The post-cancellation log is the synchronization point; the
             # holder completion is not used as a cancellation-delivery delay.
             for holder in holders:
                 holder.result(timeout=60)
