@@ -28,6 +28,7 @@
 
 import concurrent.futures
 import re
+import threading
 import time
 import unittest
 
@@ -51,16 +52,29 @@ class TestScheduler(unittest.TestCase):
         return inputs
 
     def _generate_callback_and_response_pair(self):
-        response = {"responded": False, "result": None, "error": None}
+        response = {
+            "completed": threading.Event(),
+            "responded": False,
+            "result": None,
+            "error": None,
+        }
 
         def callback(result, error):
-            response["responded"] = True
             response["result"] = result
             response["error"] = error
+            response["responded"] = True
+            response["completed"].set()
 
         return callback, response
 
-    def _assert_response_is_cancelled(self, response):
+    def _wait_for_response(self, response, timeout=30):
+        self.assertTrue(
+            response["completed"].wait(timeout),
+            f"inference callback was not invoked within {timeout}s",
+        )
+
+    def _assert_response_is_cancelled(self, response, timeout=30):
+        self._wait_for_response(response, timeout)
         self.assertTrue(response["responded"])
         self.assertEqual(response["result"], None)
         self.assertIsInstance(response["error"], InferenceServerException)
@@ -88,26 +102,58 @@ class TestScheduler(unittest.TestCase):
 
     def _get_metrics(self):
         metrics_url = "http://localhost:8002/metrics"
-        r = requests.get(metrics_url)
+        r = requests.get(metrics_url, timeout=5)
         r.raise_for_status()
         return r.text
 
+    def _metric_value(self, metric_name, expected_labels):
+        for line in self._get_metrics().splitlines():
+            if not line.startswith(f"{metric_name}"):
+                continue
+
+            fields = line.split()
+            if len(fields) < 2:
+                continue
+
+            metric_and_labels = fields[0]
+            label_text = metric_and_labels[
+                len(metric_name) + 1 : metric_and_labels.rfind("}")
+            ]
+            labels = dict(re.findall(r'(\w+)="([^"]*)"', label_text))
+            if all(labels.get(key) == value for key, value in expected_labels.items()):
+                return int(float(fields[1]))
+
+        return None
+
+    def _wait_until(self, predicate, description, timeout=30, interval=0.1):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if predicate():
+                return
+            time.sleep(interval)
+        self.fail(f"timed out after {timeout}s waiting for {description}")
+
     def _metrics_before_test(self, model, reason):
-        pattern = rf'nv_inference_request_failure\{{model="{model}",reason="{reason}",version="1"\}} (\d+)'
-        metrics = self._get_metrics()
-        match = re.search(pattern, metrics)
-        if match:
-            return int(match.group(1))
-        else:
+        value = self._metric_value(
+            "nv_inference_request_failure",
+            {"model": model, "reason": reason, "version": "1"},
+        )
+        if value is None:
             raise Exception(f"Failure metrics for model='{model}' not found")
+        return value
 
     def _assert_metrics(
         self, model_name, reason, expected_count_increase, initial_count
     ):
-        metrics = self._get_metrics()
-        # Add initial count + expected count for the the test
-        expected_metric = f'nv_inference_request_failure{{model="{model_name}",reason="{reason}",version="1"}} {expected_count_increase + initial_count}'
-        self.assertIn(expected_metric, metrics)
+        expected_count = initial_count + expected_count_increase
+        labels = {"model": model_name, "reason": reason, "version": "1"}
+        self._wait_until(
+            lambda: self._metric_value(
+                "nv_inference_request_failure", labels
+            )
+            == expected_count,
+            f"{model_name} {reason} failure count to reach {expected_count}",
+        )
 
     # Test queued requests on dynamic batch scheduler can be cancelled
     def test_dynamic_batch_scheduler_request_cancellation(self):
@@ -130,11 +176,10 @@ class TestScheduler(unittest.TestCase):
             self.assertFalse(response["responded"])
             # Cancel the queued request
             queue_future.cancel()
-            time.sleep(2)  # ensure the cancellation is delivered
             self._assert_response_is_cancelled(response)
             # Join saturating thread
-            saturate_thread_1.result()
-            saturate_thread_2.result()
+            saturate_thread_1.result(timeout=60)
+            saturate_thread_2.result(timeout=60)
 
     def _get_inputs_with_value(self, batch_size, value):
         shape = [batch_size, 8]
@@ -142,97 +187,173 @@ class TestScheduler(unittest.TestCase):
         inputs[0].set_data_from_numpy(np.full(shape, value, dtype=np.float32))
         return inputs
 
-    def _cache_counts(self, model_name):
+    def _cache_hit_count(self, model_name):
         stats = self._triton.get_inference_statistics(
             model_name=model_name, as_json=True
         )
         model_stats = stats.get("model_stats", [])
         if not model_stats:
-            return 0, 0
+            return 0
         infer_stats = model_stats[0]["inference_stats"]
-        hits = int(infer_stats.get("cache_hit", {}).get("count", 0))
-        misses = int(infer_stats.get("cache_miss", {}).get("count", 0))
-        return hits, misses
+        return int(infer_stats.get("cache_hit", {}).get("count", 0))
+
+    def _execution_count(self, model_name):
+        stats = self._triton.get_inference_statistics(
+            model_name=model_name, as_json=True
+        )
+        model_stats = stats.get("model_stats", [])
+        if not model_stats:
+            return 0
+        return int(model_stats[0].get("execution_count", 0))
+
+    def _pending_count(self, model_name):
+        value = self._metric_value(
+            "nv_inference_pending_request_count",
+            {"model": model_name, "version": "1"},
+        )
+        return 0 if value is None else value
+
+    def _wait_until_pending(
+        self, model_name, expected, timeout=30, stable_for=0.5
+    ):
+        """Wait until a pending count remains stable for the requested period."""
+        deadline = time.monotonic() + timeout
+        stable_since = None
+        last_count = None
+
+        while time.monotonic() < deadline:
+            now = time.monotonic()
+            last_count = self._pending_count(model_name)
+            if last_count == expected:
+                if stable_since is None:
+                    stable_since = now
+                elif now - stable_since >= stable_for:
+                    return
+            else:
+                stable_since = None
+            time.sleep(0.1)
+
+        self.fail(
+            f"'{model_name}' pending count did not remain at {expected} for "
+            f"{stable_for}s within {timeout}s; last count was {last_count}"
+        )
+
+    def _hold_model_instance(self, pool, model_name, input_factory):
+        """Run one request and keep another queued behind the same instance."""
+        holders = [
+            pool.submit(self._triton.infer, model_name, input_factory(index))
+            for index in range(2)
+        ]
+        self._wait_until_pending(model_name, 1)
+        return holders
+
+    def _wait_for_execution_count(self, model_name, expected):
+        self._wait_until(
+            lambda: self._execution_count(model_name) >= expected,
+            f"{model_name} execution count to reach {expected}",
+        )
+        self.assertEqual(self._execution_count(model_name), expected)
 
     # Test queued requests can be cancelled on a model with no batcher, where
     # the request waits on the rate limiter for a model instance
     def test_no_batcher_queued_request_cancellation(self):
         model_name = "no_batching"
         initial_metrics_value = self._metrics_before_test(model_name, "CANCELED")
+        executions_before = self._execution_count(model_name)
         with concurrent.futures.ThreadPoolExecutor() as pool:
-            # Occupy the single model instance
-            saturate_thread = pool.submit(
-                self._triton.infer, model_name, self._get_inputs(batch_size=1)
+            # A stable pending request proves that one holder is executing and
+            # another is queued behind the single model instance.
+            holders = self._hold_model_instance(
+                pool, model_name, lambda _: self._get_inputs(batch_size=1)
             )
-            time.sleep(2)  # ensure the instance is busy
-            # The next request waits on the rate limiter for an instance
+
             callback, response = self._generate_callback_and_response_pair()
             queue_future = self._triton.async_infer(
                 model_name, self._get_inputs(batch_size=1), callback
             )
-            time.sleep(2)  # ensure the request is waiting
+            self._wait_until_pending(model_name, 2)
             self.assertFalse(response["responded"])
-            # Cancel the waiting request
+
             queue_future.cancel()
-            time.sleep(2)  # ensure the cancellation is delivered
-            # Join the saturating thread so the instance is released
-            saturate_thread.result()
-            time.sleep(2)  # ensure the cancelled request has been responded to
+
+            # The second holder keeps the instance occupied while cancellation
+            # propagates. No execution-delay boundary is used for synchronization.
+            for holder in holders:
+                holder.result(timeout=60)
             self._assert_response_is_cancelled(response)
-        expected_count_increase = 1
+
         self._assert_metrics(
             model_name,
             "CANCELED",
-            expected_count_increase,
+            1,
             initial_metrics_value,
         )
+        self._wait_for_execution_count(model_name, executions_before + 2)
 
     # Test a cancelled response is not written to the response cache, which
     # would serve it as a successful hit to a later matching request
     def test_no_batcher_cancelled_response_is_not_cached(self):
         model_name = "no_batching_cache"
         cancelled_value = 2.0
-        hits_before, misses_before = self._cache_counts(model_name)
+        failures_before = self._metrics_before_test(model_name, "CANCELED")
+        executions_before = self._execution_count(model_name)
         with concurrent.futures.ThreadPoolExecutor() as pool:
-            # Use a different input so the cancelled request cannot hit the
-            # entry cached by this one
-            saturate_thread = pool.submit(
-                self._triton.infer,
+            # Unique holder inputs avoid cache hits while the instance is held.
+            holders = self._hold_model_instance(
+                pool,
                 model_name,
-                self._get_inputs_with_value(batch_size=1, value=1.0),
+                lambda index: self._get_inputs_with_value(
+                    batch_size=1, value=10.0 + index
+                ),
             )
-            time.sleep(2)  # ensure the instance is busy
+
             callback, response = self._generate_callback_and_response_pair()
             queue_future = self._triton.async_infer(
                 model_name,
                 self._get_inputs_with_value(batch_size=1, value=cancelled_value),
                 callback,
             )
-            time.sleep(2)  # ensure the request is waiting
+            self._wait_until_pending(model_name, 2)
             self.assertFalse(response["responded"])
+
             queue_future.cancel()
-            time.sleep(2)  # ensure the cancellation is delivered
-            saturate_thread.result()
-            time.sleep(2)  # ensure the cancelled request has been responded to
+            for holder in holders:
+                holder.result(timeout=60)
             self._assert_response_is_cancelled(response)
-        # The same inputs must be computed by the model, not served from the
-        # cache. Checking the cache counters as well as the output distinguishes
-        # a miss from a hit that happened to return the right data.
-        result = self._triton.infer(
+
+        self._assert_metrics(model_name, "CANCELED", 1, failures_before)
+        self._wait_for_execution_count(model_name, executions_before + 2)
+        hits_after_cancellation = self._cache_hit_count(model_name)
+
+        # The first identical request must execute. If the cancelled response
+        # was cached, this request would incorrectly be served as a cache hit.
+        first_result = self._triton.infer(
             model_name, self._get_inputs_with_value(batch_size=1, value=cancelled_value)
         )
-        output = result.as_numpy("OUTPUT0")
-        self.assertIsNotNone(output, "cancelled response was served from the cache")
+        first_output = first_result.as_numpy("OUTPUT0")
+        self.assertIsNotNone(first_output)
         np.testing.assert_allclose(
-            output, np.full([1, 8], cancelled_value, dtype=np.float32)
+            first_output, np.full([1, 8], cancelled_value, dtype=np.float32)
         )
+        self._wait_for_execution_count(model_name, executions_before + 3)
+        hits_after_first_request = self._cache_hit_count(model_name)
+        self.assertEqual(hits_after_first_request, hits_after_cancellation)
 
-        hits_after, misses_after = self._cache_counts(model_name)
-        self.assertEqual(
-            hits_after, hits_before, "the cancelled response was cached and hit"
+        # The successful response must now be cached. A second identical request
+        # must be a cache hit and must not execute the backend again.
+        second_result = self._triton.infer(
+            model_name, self._get_inputs_with_value(batch_size=1, value=cancelled_value)
         )
-        # The saturating request and this one are both misses
-        self.assertEqual(misses_after, misses_before + 2)
+        second_output = second_result.as_numpy("OUTPUT0")
+        self.assertIsNotNone(second_output)
+        np.testing.assert_allclose(
+            second_output, np.full([1, 8], cancelled_value, dtype=np.float32)
+        )
+        self._wait_until(
+            lambda: self._cache_hit_count(model_name) == hits_after_cancellation + 1,
+            f"{model_name} cache hit count to increase by one",
+        )
+        self.assertEqual(self._execution_count(model_name), executions_before + 3)
 
     # Test backlogged requests on sequence batch scheduler can be cancelled
     def test_sequence_batch_scheduler_backlog_request_cancellation(self):
@@ -267,12 +388,10 @@ class TestScheduler(unittest.TestCase):
             self.assertFalse(backlog_requests[1]["response"]["responded"])
             # Cancelling any backlogged request cancels the entire sequence
             backlog_requests[0]["future"].cancel()
-            time.sleep(2)  # ensure the cancellation is delivered
-            time.sleep(2)  # ensure reaper thread has responded
             self._assert_response_is_cancelled(backlog_requests[0]["response"])
             self._assert_response_is_cancelled(backlog_requests[1]["response"])
             # Join saturating thread
-            saturate_thread.result()
+            saturate_thread.result(timeout=60)
         expected_count_increase = 2
         self._assert_metrics(
             model_name,
@@ -324,12 +443,10 @@ class TestScheduler(unittest.TestCase):
             self.assertFalse(queue_requests[1]["response"]["responded"])
             # Cancelling any queued request cancels the entire sequence
             queue_requests[0]["future"].cancel()
-            time.sleep(2)  # ensure the cancellation is delivered
-            time.sleep(2)  # ensure reaper thread has responded
             self._assert_response_is_cancelled(queue_requests[0]["response"])
             self._assert_response_is_cancelled(queue_requests[1]["response"])
             # Join start thread
-            start_thread.result()
+            start_thread.result(timeout=60)
 
     # Test ensemble scheduler will propagate cancellation request to child
     def test_ensemble_scheduler_request_cancellation(self):
@@ -341,7 +458,6 @@ class TestScheduler(unittest.TestCase):
         time.sleep(2)  # ensure the inference has started
         self.assertFalse(response["responded"])
         infer_future.cancel()
-        time.sleep(2)  # ensure the cancellation is delivered
         self._assert_response_is_cancelled(response)
 
     # Test cancellation on multiple gRPC streaming sequences
