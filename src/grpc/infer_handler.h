@@ -878,16 +878,20 @@ class InferHandlerState {
             // Note that request may or may not be valid at this point.
             // Assuming if RequestComplete callback is run asynchronously
             // before this point.
+            const std::string request_id = state->request_.id().empty()
+                                               ? "<id_unknown>"
+                                               : state->request_.id();
             TRITONSERVER_Error* err = nullptr;
             err = TRITONSERVER_InferenceRequestCancel(
                 state->inference_request_.get());
             if (err != nullptr) {
-              LOG_INFO << "Failed to issue cancellation for "
-                       << state->unique_id_ << ": "
+              LOG_INFO << "[request id: " << request_id
+                       << "] Failed to cancel the request: "
                        << TRITONSERVER_ErrorMessage(err);
               TRITONSERVER_ErrorDelete(err);
             } else {
-              LOG_VERBOSE(1) << "Cancellation issued for " << state->unique_id_;
+              LOG_VERBOSE(1)
+                  << "[request id: " << request_id << "] Cancellation issued";
             }
             state->step_ = Steps::CANCELLATION_ISSUED;
           } else if (state->step_ == Steps::COMPLETE) {

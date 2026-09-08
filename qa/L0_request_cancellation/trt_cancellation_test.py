@@ -66,6 +66,7 @@ class TestTrtRequestCancellation(CancellationTest, unittest.TestCase):
 
     # A cancelled TRT request must not run, while an adjacent live request does.
     def test_trt_rate_limited_cancellation_skips_only_cancelled_request(self):
+        request_id = "trt-rate-limited-cancel"
         executions_before = self._execution_count(TRT_MODEL)
         failures_before = self._failure_count(TRT_MODEL, "CANCELED")
 
@@ -79,7 +80,10 @@ class TestTrtRequestCancellation(CancellationTest, unittest.TestCase):
                 cancelled_response,
             ) = self._generate_callback_and_response_pair()
             cancelled_request = self._triton.async_infer(
-                TRT_MODEL, self._trt_inputs(value=1.0), cancelled_callback
+                TRT_MODEL,
+                self._trt_inputs(value=1.0),
+                cancelled_callback,
+                request_id=request_id,
             )
 
             live_callback, live_response = self._generate_callback_and_response_pair()
@@ -98,7 +102,7 @@ class TestTrtRequestCancellation(CancellationTest, unittest.TestCase):
             )
             self.assertIsNotNone(live_request)
 
-            self._cancel_and_wait(cancelled_request)
+            self._cancel_and_wait(cancelled_request, request_id)
 
             # Let the holders finish so the queued TRT requests can be scheduled.
             for holder in holders:

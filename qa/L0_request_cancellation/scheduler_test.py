@@ -111,6 +111,7 @@ class TestScheduler(CancellationTest, unittest.TestCase):
     # queued in the rate limiter waiting for a model instance.
     def test_no_batcher_queued_request_cancellation(self):
         model_name = "no_batching"
+        request_id = "no-batcher-queued-cancel"
         failures_before = self._failure_count(model_name, "CANCELED")
         executions_before = self._execution_count(model_name)
 
@@ -121,12 +122,15 @@ class TestScheduler(CancellationTest, unittest.TestCase):
 
             callback, response = self._generate_callback_and_response_pair()
             request = self._triton.async_infer(
-                model_name, self._get_inputs(batch_size=1), callback
+                model_name,
+                self._get_inputs(batch_size=1),
+                callback,
+                request_id=request_id,
             )
             self._wait_until_pending(model_name, 2)
             self.assertFalse(response["responded"])
 
-            self._cancel_and_wait(request)
+            self._cancel_and_wait(request, request_id)
             for holder in holders:
                 holder.result(timeout=60)
             self._assert_response_is_cancelled(response)
@@ -138,6 +142,7 @@ class TestScheduler(CancellationTest, unittest.TestCase):
     # backend execution and its error response is not cached.
     def test_no_batcher_cancelled_request_is_not_executed_or_cached(self):
         model_name = "no_batching_cache"
+        request_id = "no-batcher-cache-cancel"
         cancelled_value = 2.0
         failures_before = self._failure_count(model_name, "CANCELED")
         executions_before = self._execution_count(model_name)
@@ -154,11 +159,12 @@ class TestScheduler(CancellationTest, unittest.TestCase):
                 model_name,
                 self._get_inputs(batch_size=1, value=cancelled_value),
                 callback,
+                request_id=request_id,
             )
             self._wait_until_pending(model_name, 2)
             self.assertFalse(response["responded"])
 
-            self._cancel_and_wait(queue_future)
+            self._cancel_and_wait(queue_future, request_id)
             for holder in holders:
                 holder.result(timeout=60)
             self._assert_response_is_cancelled(response)

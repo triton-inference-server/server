@@ -127,11 +127,11 @@ class CancellationTest:
             time.sleep(interval)
         self.fail(f"timed out after {timeout}s waiting for {description}")
 
-    # Cancel a request and wait until cancellation has been issued to core.
-    def _cancel_and_wait(self, request):
+    # Cancel a request and wait for cancellation log message.
+    def _cancel_and_wait(self, request, request_id):
         def cancellation_count():
             with open(os.environ["SERVER_LOG"], encoding="utf-8") as server_log:
-                return server_log.read().count("Cancellation issued for ")
+                return server_log.read().count(f"[request id: {request_id}] Cancellation issued")
 
         cancellations_before = cancellation_count()
         request.cancel()
