@@ -131,7 +131,9 @@ class CancellationTest:
     def _cancel_and_wait(self, request, request_id):
         def cancellation_count():
             with open(os.environ["SERVER_LOG"], encoding="utf-8") as server_log:
-                return server_log.read().count(f"[request id: {request_id}] Cancellation issued")
+                return server_log.read().count(
+                    f"[request id: {request_id}] Cancellation issued"
+                )
 
         cancellations_before = cancellation_count()
         request.cancel()
