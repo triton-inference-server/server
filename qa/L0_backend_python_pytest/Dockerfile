@@ -47,11 +47,13 @@
 # module -- which has no equivalent in either build context -- survives
 # untouched when BASE_IMAGE is devel.
 #
-# tritonclient is installed explicitly rather than assumed: the lightweight
-# runtime image doesn't ship it (only the devel/QA image does), and most
-# scenarios' tests use an HTTP/gRPC client against the server under test --
-# same package the rest of qa/ installs this way, see e.g.
-# qa/L0_backend_fastertransformer/test.sh.
+# tritonclient and requests are installed explicitly rather than assumed:
+# the lightweight runtime image doesn't ship either (only the devel/QA
+# image does). Most scenarios' tests use an HTTP/gRPC client against the
+# server under test (same package the rest of qa/ installs this way, see
+# e.g. qa/L0_backend_fastertransformer/test.sh); examples/'s cloned
+# python_backend example clients (examples/custom_metrics/client.py) use
+# requests directly to scrape the Prometheus metrics endpoint.
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
@@ -60,6 +62,6 @@ COPY --from=common . /opt/tritonserver/qa/common/
 COPY . /opt/tritonserver/qa/L0_backend_python_pytest/
 WORKDIR /opt/tritonserver/qa/L0_backend_python_pytest
 
-RUN pip3 install --no-cache-dir tritonclient[all]
+RUN pip3 install --no-cache-dir tritonclient[all] requests
 
 ENTRYPOINT ["python3", "pytest.py"]
