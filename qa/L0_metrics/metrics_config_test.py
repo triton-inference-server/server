@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,7 +44,14 @@ INF_COUNTER_PATTERNS = [
     "nv_inference_compute_infer_duration",
     "nv_inference_compute_output_duration",
 ]
-INF_HISTOGRAM_PATTERNS = ["nv_inference_first_response_histogram_ms"]
+INF_HISTOGRAM_PATTERNS = [
+    "nv_inference_first_response_histogram_ms",
+    "nv_inference_request_duration_histogram_us",
+    "nv_inference_queue_duration_histogram_us",
+    "nv_inference_compute_input_duration_histogram_us",
+    "nv_inference_compute_infer_duration_histogram_us",
+    "nv_inference_compute_output_duration_histogram_us",
+]
 INF_SUMMARY_PATTERNS = [
     "nv_inference_request_summary",
     "nv_inference_queue_summary",
