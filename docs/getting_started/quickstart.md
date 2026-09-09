@@ -28,7 +28,7 @@
 
 # Quickstart
 
-**New to Triton Inference Server and want do just deploy your model quickly?**
+**New to Triton Inference Server and want to just deploy your model quickly?**
 Make use of
 [these tutorials](https://github.com/triton-inference-server/tutorials#quick-deploy)
  to begin your Triton journey!
