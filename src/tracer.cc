@@ -1,4 +1,4 @@
-// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,9 +34,13 @@
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 #ifndef _WIN32
-#include "opentelemetry/sdk/resource/semantic_conventions.h"
+// Semantic conventions moved out of the SDK and into their own generated
+// opentelemetry/semconv tree; opentelemetry/sdk/resource/semantic_conventions.h
+// no longer exists.
 #include "opentelemetry/sdk/trace/batch_span_processor_factory.h"
+#include "opentelemetry/semconv/service_attributes.h"
 namespace otel_common = opentelemetry::common;
+namespace otel_semconv = opentelemetry::semconv;
 #endif
 
 namespace triton { namespace server {
@@ -502,7 +506,7 @@ TraceManager::ProcessOpenTelemetryParameters(
     otel_resource::ResourceAttributes& attributes,
     otel_trace_sdk::BatchSpanProcessorOptions& processor_options)
 {
-  attributes[otel_resource::SemanticConventions::kServiceName] =
+  attributes[otel_semconv::service::kServiceName] =
       std::string("triton-inference-server");
   auto mode_key = std::to_string(TRACE_MODE_OPENTELEMETRY);
   auto otel_options_it = config_map.find(mode_key);

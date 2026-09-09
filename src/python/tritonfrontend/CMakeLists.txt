@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -66,7 +66,7 @@ set(
 )
 
 set(PY_BINDING_DEPENDENCY_LIBS
-      b64) # Dependency from common.h
+      b64::b64) # Dependency from common.h
 
 # Conditional Linking Based on Flags
 if(${TRITON_ENABLE_HTTP})
