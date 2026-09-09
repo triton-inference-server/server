@@ -91,6 +91,7 @@ from schemas.openai import (
     CreateEmbeddingRequest,
     CreateEmbeddingResponse,
     EmbeddingObject,
+    EmbeddingUsage,
     FinishReason,
     Function1,
     Function2,
@@ -438,18 +439,62 @@ class TritonLLMEngine(LLMEngine):
         metadata = self.model_metadata.get(model_name)
         self._validate_embedding_request(request, metadata)
 
-        # Convert to Triton request format and perform inference
-        responses = metadata.model.async_infer(
-            metadata.embedding_request_converter(
-                metadata.model,
-                request,
+        # An integer list is one tokenized input; a string list is a text batch.
+        inputs = (
+            request.input
+            if isinstance(request.input, list) and isinstance(request.input[0], str)
+            else [request.input]
+        )
+        data = []
+        usage = EmbeddingUsage(prompt_tokens=0, total_tokens=0)
+        for index, value in enumerate(inputs):
+            embedding_list, input_usage = await self._infer_embedding(
+                request.model_copy(update={"input": value}), metadata
             )
+            data.append(
+                EmbeddingObject(
+                    embedding=self._get_embedding(
+                        embedding_list, request.encoding_format
+                    ),
+                    index=index,
+                    object="embedding",
+                )
+            )
+            if usage is not None and input_usage is not None:
+                usage.prompt_tokens += input_usage.prompt_tokens
+                usage.total_tokens += input_usage.total_tokens
+            else:
+                usage = None
+
+        return CreateEmbeddingResponse(
+            object="list", data=data, model=request.model, usage=usage
         )
 
-        # Response validation with decoupled models in mind
-        responses = [response async for response in responses]
-        _validate_triton_responses_non_streaming(responses)
-        response = responses[0]
+    async def _infer_embedding(
+        self, request: CreateEmbeddingRequest, metadata: TritonModelMetadata
+    ) -> Tuple[List[float], Optional[EmbeddingUsage]]:
+        """Infer one input and cancel native work if response collection is interrupted."""
+        inference_request = metadata.embedding_request_converter(
+            metadata.model, request
+        )
+        inference_request.request_id = str(uuid.uuid4())
+        responses = metadata.model.async_infer(inference_request)
+
+        completed = False
+        try:
+            collected = [response async for response in responses]
+            completed = True
+        finally:
+            if not completed:
+                self._cancel_inference(
+                    responses,
+                    inference_request.request_id,
+                    "embedding response interrupted",
+                )
+
+        # Validate each input's envelope separately, including decoupled final markers.
+        _validate_triton_responses_non_streaming(collected)
+        response = collected[0]
 
         # Extract embedding from response (currently stored as JSON string in text_output)
         embedding_json = _get_output(response)
@@ -459,17 +504,7 @@ class TritonLLMEngine(LLMEngine):
             response, metadata.backend, RequestKind.EMBEDDING
         )
 
-        embedding = self._get_embedding(embedding_list, request.encoding_format)
-        embedding_obj = EmbeddingObject(
-            embedding=embedding, index=0, object="embedding"
-        )
-
-        return CreateEmbeddingResponse(
-            object="list",
-            data=[embedding_obj],
-            model=request.model,
-            usage=usage,
-        )
+        return embedding_list, usage
 
     @staticmethod
     def _get_embedding(
