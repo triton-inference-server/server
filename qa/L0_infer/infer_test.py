@@ -37,7 +37,6 @@ import infer_util as iu  # noqa: E402
 import numpy as np  # noqa: E402
 import test_util as tu  # noqa: E402
 import tritonclient.grpc as grpcclient  # noqa: E402
-import tritonclient.http as httpclient  # noqa: E402
 from tritonclient.utils import InferenceServerException  # noqa: E402
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
@@ -1195,6 +1194,8 @@ class InferTest(tu.TestResultCollector):
         expected = input0 + input1
 
         def _is_ready_http():
+            import tritonclient.http as httpclient
+
             with httpclient.InferenceServerClient(
                 f"{TRITONSERVER_IPADDR}:8000"
             ) as client:
@@ -1215,6 +1216,8 @@ class InferTest(tu.TestResultCollector):
             self.skipTest(f"{model_name} not loaded in this L0_infer phase")
 
         if USE_HTTP:
+            import tritonclient.http as httpclient
+
             with httpclient.InferenceServerClient(
                 f"{TRITONSERVER_IPADDR}:8000"
             ) as client:

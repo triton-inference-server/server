@@ -595,7 +595,7 @@ class PBBLSTest(unittest.TestCase):
                 # error
                 self.assertTrue(infer_response.has_error())
                 self.assertIn(
-                    "Failed for execute the inference request. Model 'non_existent_model' is not ready.",
+                    "Error when running inference: Failed for execute the inference request. Model 'non_existent_model' is not ready.",
                     infer_response.error().message(),
                 )
 
@@ -609,7 +609,7 @@ class PBBLSTest(unittest.TestCase):
             # error
             self.assertTrue(infer_response.has_error())
             self.assertIn(
-                "Failed for execute the inference request. Model 'non_existent_model' is not ready.",
+                "Error when running inference: Failed for execute the inference request. Model 'non_existent_model' is not ready.",
                 infer_response.error().message(),
             )
 

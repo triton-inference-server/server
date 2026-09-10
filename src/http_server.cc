@@ -2238,6 +2238,14 @@ HTTPAPIServer::HandleSystemSharedMemory(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
+  // No shared memory manager (e.g. in-process Python frontend).
+  if (shm_manager_ == nullptr) {
+    RETURN_AND_RESPOND_IF_ERR(
+        req, TRITONSERVER_ErrorNew(
+                 TRITONSERVER_ERROR_UNAVAILABLE,
+                 kSharedMemoryManagerUnavailableErrorStr));
+  }
+
   TRITONSERVER_Error* err = nullptr;
   if (action == "status") {
     triton::common::TritonJson::Value shm_status(
@@ -2331,6 +2339,14 @@ HTTPAPIServer::HandleCudaSharedMemory(
   } else if ((action != "status") && (req->method != htp_method_POST)) {
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+  }
+
+  // No shared memory manager (e.g. in-process Python frontend).
+  if (shm_manager_ == nullptr) {
+    RETURN_AND_RESPOND_IF_ERR(
+        req, TRITONSERVER_ErrorNew(
+                 TRITONSERVER_ERROR_UNAVAILABLE,
+                 kSharedMemoryManagerUnavailableErrorStr));
   }
 
   TRITONSERVER_Error* err = nullptr;
@@ -2657,6 +2673,12 @@ HTTPAPIServer::ParseJsonTritonIO(
           request_input, &use_shm, &shm_region, &shm_offset,
           reinterpret_cast<uint64_t*>(&byte_size)));
       if (use_shm) {
+        // No shared memory manager (e.g. in-process Python frontend).
+        if (shm_manager_ == nullptr) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNAVAILABLE,
+              kSharedMemoryManagerUnavailableErrorStr);
+        }
         void* base;
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
@@ -2821,6 +2843,12 @@ HTTPAPIServer::ParseJsonTritonIO(
       // ValidateOutputParameter ensures that both shm and
       // classification cannot be true.
       if (use_shm) {
+        // No shared memory manager (e.g. in-process Python frontend).
+        if (shm_manager_ == nullptr) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNAVAILABLE,
+              kSharedMemoryManagerUnavailableErrorStr);
+        }
         void* base;
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
