@@ -428,9 +428,11 @@ rm -rf ${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR}
 TEST_NAME="EnsembleBackpressureTest"
 SERVER_LOG="./ensemble_backpressure_test_server.log"
 CLIENT_LOG="./ensemble_backpressure_test_client.log"
-# Shard the streaming completion queue so concurrent streams are not starved
-# on a single CQ (one CQ/handler per thread).
-SERVER_ARGS="--model-repository=${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR} --grpc-infer-cq-count=0 --grpc-infer-thread-count=16"
+# SPIKE EXPERIMENT: run the DEFAULT single-CQ config (no sharding flags) with
+# k=16 outstanding stream accepts via the prefetch env knob. If this passes,
+# accept prefetch alone fixes the flake without CQ sharding.
+export TRITON_GRPC_STREAM_ACCEPT_PREFETCH=16
+SERVER_ARGS="--model-repository=${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR}"
 rm -f $SERVER_LOG $CLIENT_LOG
 
 # Step 1 - decoupled_producer (batch size 2)
@@ -556,6 +558,9 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# End of spike experiment: don't leak the prefetch knob into later sections.
+unset TRITON_GRPC_STREAM_ACCEPT_PREFETCH
 
 
 ######## Test '--grpc-infer-cq-count' command-line validation and boundary startup ########
