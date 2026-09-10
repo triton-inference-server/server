@@ -257,4 +257,10 @@ def run_and_wait_for_exit(model_repository, server_log, extra_args=()):
             stdout=log_fh,
             stderr=subprocess.STDOUT,
         )
-    proc.wait(timeout=EXIT_TIMEOUT_S)
+    try:
+        proc.wait(timeout=EXIT_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        with contextlib.suppress(Exception):
+            proc.wait(timeout=30)
+        raise

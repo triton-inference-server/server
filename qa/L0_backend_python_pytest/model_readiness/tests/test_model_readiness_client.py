@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import queue
 import threading
 import time
@@ -35,8 +36,8 @@ import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 from tritonclient.utils import InferenceServerException
 
-URL_HTTP = "localhost:8000"
-URL_GRPC = "localhost:8001"
+URL_HTTP = "localhost:%s" % os.environ.get("TRITONSERVER_HTTP_PORT", "8000")
+URL_GRPC = "localhost:%s" % os.environ.get("TRITONSERVER_GRPC_PORT", "8001")
 DEFAULT_RESPONSE_TIMEOUT = 60
 
 
