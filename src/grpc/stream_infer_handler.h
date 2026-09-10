@@ -122,6 +122,10 @@ class ModelStreamInferHandler
   TRITONSERVER_ResponseAllocator* allocator_;
 
   grpc_compression_level compression_level_;
+
+  // Experiment: whether the extra accept prefetch slots were already posted.
+  // Only touched on the handler thread.
+  bool accept_prefetch_posted_ = false;
 };
 
 }}}  // namespace triton::server::grpc

@@ -26,6 +26,8 @@
 
 #include "stream_infer_handler.h"
 
+#include <chrono>
+#include <cstdlib>
 #include <regex>
 
 namespace triton { namespace server { namespace grpc {
@@ -110,6 +112,28 @@ StreamOutputBufferAttributes(
 void
 ModelStreamInferHandler::StartNewRequest()
 {
+  // Experiment: keep up to k RequestModelStreamInfer calls outstanding
+  // instead of 1, so a burst of new streams is matched immediately even
+  // while this handler thread is busy. k comes from the environment
+  // variable TRITON_GRPC_STREAM_ACCEPT_PREFETCH (default 1 = existing
+  // behavior). The k-1 extra slots are posted once at handler start;
+  // each accepted stream still re-posts exactly one replacement, so the
+  // outstanding count stays at k.
+  if (!accept_prefetch_posted_) {
+    accept_prefetch_posted_ = true;
+    static const int prefetch = [] {
+      const char* v = getenv("TRITON_GRPC_STREAM_ACCEPT_PREFETCH");
+      const int k = (v != nullptr) ? atoi(v) : 1;
+      return (k < 1) ? 1 : ((k > 128) ? 128 : k);
+    }();
+    if (prefetch > 1) {
+      LOG_INFO << Name() << " accept prefetch enabled, k=" << prefetch;
+    }
+    for (int i = 1; i < prefetch; ++i) {
+      StartNewRequest();
+    }
+  }
+
   auto context = std::make_shared<State::Context>(cq_, NEXT_UNIQUE_ID);
   context->SetCompressionLevel(compression_level_);
   State* state = StateNew(tritonserver_.get(), context);
@@ -360,8 +384,21 @@ ModelStreamInferHandler::Process(
 #endif  // TRITON_ENABLE_TRACING
 
       state->step_ = ISSUED;
+      // Experiment: measure how long InferAsync holds this handler thread.
+      // Under ensemble backpressure a multi-second duration here would mean
+      // the scheduler's admission gate blocks the gRPC completion-queue
+      // thread (the M5 hypothesis).
+      const auto infer_async_begin = std::chrono::steady_clock::now();
       err = TRITONSERVER_ServerInferAsync(
           tritonserver_.get(), irequest, triton_trace);
+      const int64_t infer_async_us =
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              std::chrono::steady_clock::now() - infer_async_begin)
+              .count();
+      LOG_VERBOSE(1) << "InferAsync returned in " << infer_async_us
+                     << " us for " << Name() << ", context "
+                     << state->context_->unique_id_ << ", "
+                     << state->unique_id_;
     }
 
     // If there was not an error in issuing the 'state' request then
