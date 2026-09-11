@@ -397,6 +397,7 @@ def main():
 
     shutil.copyfile("LICENSE.txt", os.path.join(FLAGS.whl_dir, "LICENSE.txt"))
     shutil.copyfile("setup.py", os.path.join(FLAGS.whl_dir, "setup.py"))
+    shutil.copyfile("pyproject.toml", os.path.join(FLAGS.whl_dir, "pyproject.toml"))
 
     os.chdir(FLAGS.whl_dir)
     # Clean dist/ to prevent accumulating wheels from prior runs. CMake may
@@ -409,7 +410,12 @@ def main():
     if os.path.isdir(_dist):
         shutil.rmtree(_dist)
     print("=== Building wheel")
-    args = ["python3", "setup.py", "bdist_wheel"]
+    # PEP 517 build (python -m build) so the pinned setuptools/wheel
+    # versions in pyproject.toml's [build-system] are installed into an
+    # isolated env and used deterministically, instead of whatever
+    # setuptools happens to be preinstalled in the build image. See
+    # TRI-1775.
+    args = ["python3", "-m", "build"]
 
     # Release-semantic X.Y.Z -> PyPI-clean (no variant label).
     # Anything else -> PEP 817 variant label. The pipeline id is already
@@ -429,7 +435,7 @@ def main():
     wenv["TRITON_PYBIND"] = PYBIND_LIB
     p = subprocess.Popen(args, env=wenv)
     p.wait()
-    fail_if(p.returncode != 0, "setup.py failed")
+    fail_if(p.returncode != 0, "Building wheel failed")
 
     _repair_wheel_with_auditwheel(FLAGS.whl_dir, FLAGS.dest_dir)
 
