@@ -419,7 +419,11 @@ def main():
     # pyproject.toml's [build-system] is installed into an isolated env and
     # used deterministically, instead of whatever build backend happens to be
     # preinstalled in the build image. See TRI-1775.
-    args = ["python3", "-m", "build"]
+    # --wheel: only the wheel is consumed downstream (auditwheel repair +
+    # dist copy). Without it `build` makes an sdist first and builds the
+    # wheel from it, so generated inputs such as TRITON_VERSION must also
+    # be inside the sdist for dynamic version resolution to work.
+    args = ["python3", "-m", "build", "--wheel"]
 
     # Release-semantic X.Y.Z -> PyPI-clean (no variant label).
     # Anything else -> PEP 817 variant label. The pipeline id is already
