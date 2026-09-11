@@ -151,15 +151,17 @@ def python_backend_clone(pinned_deps):
                 % (attempt, CLONE_MAX_RETRIES),
                 check=True,
             )
-            return clone_dir
+            break
         except subprocess.CalledProcessError as e:
             last_err = e
             time.sleep(10)
-    pytest.fail(
-        "Failed to clone python_backend after %d attempts: %s"
-        % (CLONE_MAX_RETRIES, last_err),
-        pytrace=False,
-    )
+    else:
+        pytest.fail(
+            "Failed to clone python_backend after %d attempts: %s"
+            % (CLONE_MAX_RETRIES, last_err),
+            pytrace=False,
+        )
+    return clone_dir
 
 
 def build_model_repo(clone_dir, model_name, model_py_rel, config_rel, extra_models=()):
