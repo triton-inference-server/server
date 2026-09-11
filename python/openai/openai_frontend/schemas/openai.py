@@ -1,4 +1,4 @@
-# Copyright (c) 2024-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2024-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
 from pydantic import AnyUrl, BaseModel, ConfigDict, Field, RootModel, confloat, conint
 
@@ -969,9 +969,9 @@ class CreateEmbeddingRequest(BaseModel):
     # Explicitly return errors for unknown fields.
     model_config: ConfigDict = ConfigDict(extra="forbid")
 
-    input: Union[str, List[int]] = Field(
+    input: Union[str, List[int], List[Annotated[str, Field(min_length=1)]]] = Field(
         ...,
-        description="Input text to embed, encoded as a string or array of tokens. To embed multiple inputs in a single request, pass an array of strings or array of token arrays.",
+        description="Input text to embed, encoded as a string or array of tokens. To embed multiple texts in a single request, pass an array of non-empty strings. Arrays of token arrays are not supported.",
         min_length=1,
         examples=["The food was delicious and the waiter..."],
     )
