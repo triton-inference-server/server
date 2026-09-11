@@ -24,11 +24,58 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+[project]
+name = "tritonfrontend"
+dynamic = ["version"]
+authors = [{ name = "NVIDIA Inc.", email = "sw-dl-triton@nvidia.com" }]
+description = "Triton Inference Server In-Process Python API"
+readme = { content-type = "text/markdown", text = """See the [Triton Inference Server](https://github.com/triton-inference-server/server) repository for package details. `tritonfrontend` exposes Triton's HTTP and gRPC endpoints to the in-process Python API provided by the `tritonserver` package.""" }
+# PEP 639 SPDX expression, emitted as License-Expression at
+# Metadata-Version 2.4. The matching "License ::" trove classifier must stay
+# removed: declaring both is rejected outright by the build backend.
+license = "BSD-3-Clause"
+license-files = ["LICENSE.txt"]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Information Technology",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Utilities",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Environment :: Console",
+    "Natural Language :: English",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = ["tritonserver", "pydantic==2.10.6"]
+
+[project.urls]
+Homepage = "https://developer.nvidia.com/nvidia-triton-inference-server"
+
+[project.optional-dependencies]
+GPU = ["cupy-cuda13x"]
+test = ["pytest"]
+all = ["tritonfrontend[GPU]", "tritonfrontend[test]"]
+
+[tool.hatch.version]
+# build_wheel.py stages TRITON_VERSION into the wheel build root; the pattern
+# takes the whole line so a plain version string is read as-is.
+path = "TRITON_VERSION"
+pattern = "(?P<version>.+)"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tritonfrontend"]
+
+[tool.hatch.build.targets.wheel.hooks.custom]
+# Tags the wheel platform-specific rather than py3-none-any -- see
+# hatch_build.py.
+path = "hatch_build.py"
+
 [build-system]
-# setuptools>=77.0.0 is required for PEP 639 license-file support at
-# Metadata-Version 2.4; older setuptools writes a License-File field while
-# still declaring Metadata-Version 2.1, which PyPI/Kitmaker's Warehouse
-# validation rejects ("license-file introduced in metadata version 2.4,
-# not 2.1"). Matches the pin in core/pyproject.toml. See TRI-1775.
-requires = ["setuptools==77.0.1", "wheel==0.44.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"

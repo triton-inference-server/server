@@ -396,8 +396,13 @@ def main():
     )
 
     shutil.copyfile("LICENSE.txt", os.path.join(FLAGS.whl_dir, "LICENSE.txt"))
-    shutil.copyfile("setup.py", os.path.join(FLAGS.whl_dir, "setup.py"))
     shutil.copyfile("pyproject.toml", os.path.join(FLAGS.whl_dir, "pyproject.toml"))
+    shutil.copyfile("hatch_build.py", os.path.join(FLAGS.whl_dir, "hatch_build.py"))
+    # pyproject.toml resolves the wheel version from the TRITON_VERSION file
+    # next to it. Write the chosen version into the wheel build root; do NOT
+    # modify the source-tree TRITON_VERSION.
+    with open(os.path.join(FLAGS.whl_dir, "TRITON_VERSION"), "w") as vf:
+        vf.write(FLAGS.triton_version)
 
     os.chdir(FLAGS.whl_dir)
     # Clean dist/ to prevent accumulating wheels from prior runs. CMake may
@@ -410,11 +415,10 @@ def main():
     if os.path.isdir(_dist):
         shutil.rmtree(_dist)
     print("=== Building wheel")
-    # PEP 517 build (python -m build) so the pinned setuptools/wheel
-    # versions in pyproject.toml's [build-system] are installed into an
-    # isolated env and used deterministically, instead of whatever
-    # setuptools happens to be preinstalled in the build image. See
-    # TRI-1775.
+    # PEP 517 build (python -m build) so the pinned hatchling version in
+    # pyproject.toml's [build-system] is installed into an isolated env and
+    # used deterministically, instead of whatever build backend happens to be
+    # preinstalled in the build image. See TRI-1775.
     args = ["python3", "-m", "build"]
 
     # Release-semantic X.Y.Z -> PyPI-clean (no variant label).
@@ -430,10 +434,7 @@ def main():
         file=sys.stderr,
     )
 
-    wenv = os.environ.copy()
-    wenv["VERSION"] = FLAGS.triton_version
-    wenv["TRITON_PYBIND"] = PYBIND_LIB
-    p = subprocess.Popen(args, env=wenv)
+    p = subprocess.Popen(args, env=os.environ.copy())
     p.wait()
     fail_if(p.returncode != 0, "Building wheel failed")
 
