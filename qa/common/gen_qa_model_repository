@@ -72,7 +72,7 @@ log_message.status "define: default values"
 # named the container train here and the semver in CI, so reading it was wrong
 # half the time.
 TRITON_CONTAINER_VERSION=${TRITON_CONTAINER_VERSION:=26.09dev}
-NVIDIA_UPSTREAM_VERSION=${NVIDIA_UPSTREAM_VERSION:=26.08}
+NVIDIA_UPSTREAM_VERSION=${NVIDIA_UPSTREAM_VERSION:=26.09}
 TRITON_SEMVER=${TRITON_SEMVER:=2.73.0dev}
 ONNX_VERSION=1.22.0 # https://github.com/microsoft/onnxruntime/blob/v1.28.0/tools/ci_build/github/linux/python/requirements.txt#L15
 # Max opset ONNX Runtime accepts: the last *released* opset of the onnx that ORT
