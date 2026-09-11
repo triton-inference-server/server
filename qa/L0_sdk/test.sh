@@ -56,7 +56,7 @@ client_lib=$(pwd)/triton_client/lib
 client_inc=$(pwd)/triton_client/include
 
 # Test linking against the shared library
-g++ grpc_test.cc -o grpc_test -I$client_inc -L$client_lib -lgrpcclient
+g++ -std=gnu++20 grpc_test.cc -o grpc_test -I$client_inc -L$client_lib -lgrpcclient
 
 if [ $? -eq 0 ]; then
     if [[ ! -x "./grpc_test" ]]; then
@@ -82,7 +82,7 @@ fi
 
 grpc_static_libs="-Wl,--start-group $client_lib/*.a -Wl,--end-group"
 
-g++ grpc_test.cc $grpc_static_libs -o grpc_test_static -I$client_inc -lz -lssl -lcrypto -lpthread
+g++ -std=gnu++20 grpc_test.cc $grpc_static_libs -o grpc_test_static -I$client_inc -lz -lssl -lcrypto -lpthread
 
 if [ $? -eq 0 ]; then
     if [[ ! -x "./grpc_test_static" ]]; then
@@ -107,7 +107,7 @@ fi
 #
 
 # Test linking against the shared library
-g++ http_test.cc -o http_test -I$client_inc -L$client_lib -lhttpclient
+g++ -std=gnu++20 http_test.cc -o http_test -I$client_inc -L$client_lib -lhttpclient
 
 if [ $? -eq 0 ]; then
     if [[ ! -x "./http_test" ]]; then
@@ -127,7 +127,7 @@ else
     RET=1
 fi
 
-g++ http_test.cc $client_lib/libhttpclient_static.a $client_lib/libcurl.a -o http_test_static \
+g++ -std=gnu++20 http_test.cc $client_lib/libhttpclient_static.a $client_lib/libcurl.a -o http_test_static \
   -I$client_inc -lz -lssl -lcrypto -lpthread
 
 if [ $? -eq 0 ]; then
