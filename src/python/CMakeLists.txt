@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,11 +31,13 @@ add_subdirectory(tritonfrontend)
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/TRITON_VERSION ${TRITON_VERSION})
 configure_file(../../LICENSE LICENSE.txt COPYONLY)
 configure_file(setup.py setup.py @ONLY)
+configure_file(pyproject.toml pyproject.toml COPYONLY)
 
 set(WHEEL_DEPENDS
       ${CMAKE_CURRENT_BINARY_DIR}/TRITON_VERSION
       ${CMAKE_CURRENT_BINARY_DIR}/LICENSE.txt
       ${CMAKE_CURRENT_BINARY_DIR}/setup.py
+      ${CMAKE_CURRENT_BINARY_DIR}/pyproject.toml
       ${CMAKE_CURRENT_BINARY_DIR}/tritonfrontend
       py-bindings
 )
