@@ -40,6 +40,8 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
+DATADIR=/data/inferenceserver/${REPO_VERSION}
+
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 CANCEL_LOG_LINE="Cancellation notification received for "
@@ -277,6 +279,23 @@ mkdir -p models/sequence_oldest/1 && (cd models/sequence_oldest && \
     echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
     echo -e 'sequence_batching { oldest { max_candidate_sequences: 1 } \n max_sequence_idle_microseconds: 6000000 }' >> config.pbtxt && \
     echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
+mkdir -p models/no_batching/1 && (cd models/no_batching && \
+    echo 'name: "no_batching"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
+mkdir -p models/no_batching_cache/1 && (cd models/no_batching_cache && \
+    echo 'name: "no_batching_cache"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'response_cache { enable: true }' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
 mkdir -p models/ensemble_model/1 && (cd models/ensemble_model && \
     echo 'name: "ensemble_model"' >> config.pbtxt && \
     echo 'platform: "ensemble"' >> config.pbtxt && \
@@ -291,7 +310,8 @@ mkdir -p models/ensemble_model/1 && (cd models/ensemble_model && \
 TEST_LOG="scheduler_test.log"
 SERVER_LOG="./scheduler_test.server.log"
 
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
+# Cache required by the 'no_batching_cache' model
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2 --cache-config=local,size=1048576"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -300,7 +320,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python scheduler_test.py > $TEST_LOG 2>&1
+SERVER_LOG=$SERVER_LOG python scheduler_test.py > $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Scheduler Tests Failed\n***"
     cat $TEST_LOG
@@ -310,6 +330,86 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+#
+# TensorRT cancellation while waiting in the rate limiter
+#
+# 'resource_holder' is slow and holds the global resource both models need, so
+# the TensorRT request stays queued on the rate limiter long enough to cancel.
+#
+TRT_MODEL_SRC=$DATADIR/qa_model_repository/plan_float32_float32_float32
+
+rm -rf models && mkdir models
+cp -r $TRT_MODEL_SRC models/plan_no_batching
+rm -rf models/plan_no_batching/2 models/plan_no_batching/3
+
+set +e
+python3 - <<'PYEOF'
+from google.protobuf import text_format
+import tritonclient.grpc.model_config_pb2 as model_config_pb2
+
+path = "models/plan_no_batching/config.pbtxt"
+with open(path) as config_file:
+    config = text_format.Parse(config_file.read(), model_config_pb2.ModelConfig())
+
+config.name = "plan_no_batching"
+config.ClearField("version_policy")
+config.ClearField("instance_group")
+config.ClearField("dynamic_batching")
+config.ClearField("sequence_batching")
+config.ClearField("ensemble_scheduling")
+
+instance_group = config.instance_group.add()
+instance_group.count = 1
+instance_group.kind = model_config_pb2.ModelInstanceGroup.KIND_GPU
+resource = instance_group.rate_limiter.resources.add()
+resource.name = "SHARED"
+setattr(resource, "global", True)
+resource.count = 1
+
+with open(path, "w") as config_file:
+    config_file.write(text_format.MessageToString(config))
+PYEOF
+TRT_CONFIG_RC=$?
+set -e
+
+if [ $TRT_CONFIG_RC -ne 0 ]; then
+    echo -e "\n***\n*** Failed to prepare the TensorRT model config\n***"
+    RET=1
+else
+
+    mkdir -p models/resource_holder/1 && (cd models/resource_holder && \
+        echo 'name: "resource_holder"' >> config.pbtxt && \
+        echo 'backend: "identity"' >> config.pbtxt && \
+        echo 'max_batch_size: 1' >> config.pbtxt && \
+        echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+        echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+        echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU \n rate_limiter { resources [{ name: "SHARED" \n global: true \n count: 1 }] } }]' >> config.pbtxt && \
+        echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
+
+    TEST_LOG="trt_cancellation_test.log"
+    SERVER_LOG="./trt_cancellation_test.server.log"
+
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2 --rate-limit=execution_count"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+    SERVER_LOG=$SERVER_LOG python trt_cancellation_test.py > $TEST_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** TensorRT Cancellation Tests Failed\n***"
+        cat $TEST_LOG
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+fi
 
 #
 # Implicit state tests
