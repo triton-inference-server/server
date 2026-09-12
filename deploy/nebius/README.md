@@ -328,8 +328,10 @@ jq -e '.finished_at != null and ((.status.code // 0) == 0)' \
 
 Retrieve the current URL and repeat readiness/auth/inference checks after a
 successful start. Replacements can require another image pull and model load.
-The entrypoint uses `exec` and Triton's 30-second exit allowance, but platform
-termination grace and in-flight request draining still require validation.
+The entrypoint uses `exec` and Triton's 30-second exit allowance. Finish client
+requests before stopping the Endpoint: a live test returned HTTP 502 to
+confirmed in-flight requests while Triton was still waiting for them to finish.
+The server's exit allowance does not guarantee delivery through the gateway.
 
 When finished, delete by the recorded ID and confirm that a subsequent get
 returns **NotFound**, not a connection/authentication error:
@@ -428,9 +430,31 @@ checks on `gpu-l40s-a` / `1gpu-8vcpu-32gb` in `eu-north1` also verified:
   its graceful shutdown path; this does not establish the platform's maximum
   termination grace or behavior for long-running inferences.
 
-The create request omitted `--public`; managed HTTPS worked without requesting
-a public VM IP. The ~753 KB JSON inference body passed. Maximum ingress size,
-request-duration limits and other GPU/driver combinations remain unmeasured.
+On 2026-09-13, the unchanged image also passed the smoke client, numerical
+CPU-reference comparison and concurrency 1/2/4 on `gpu-h100-sxm` /
+`1gpu-16vcpu-200gb` in `eu-north1`. Both GPU platforms used driver 580.173.02.
+Other driver branches remain untested.
+
+A separate L40S test fixture added a Python backend model to measure request
+sizes and delayed responses, retaining the example's HTTP/authentication and
+30-second exit settings. Observations through managed HTTPS were:
+
+- A request body of exactly 1,048,576 bytes (1 MiB), including JSON metadata,
+  passed. A body of 1,048,577 bytes returned HTTP 413. Early rejection could
+  first appear as an SSL/upload error before reading the HTTP response.
+- A 59-second delayed response passed. Delays of 61, 65 and 125 seconds returned
+  HTTP 504 after approximately 60 seconds without a response. The test backend
+  subsequently completed its work. This does not measure streaming timeouts.
+- Two requests, with 15- and 45-second computations, were confirmed executing
+  before stop. Both clients received HTTP 502 approximately 6.3 seconds after
+  stop was requested. Triton logged its shutdown wait and later completed the
+  15-second computation; its result did not reach the client.
+
+These are observations from this configuration, not provider guarantees or a
+production SLA. The request fixture is not included in the deployment image.
+The create requests omitted `--public`; managed HTTPS worked without requesting
+a public VM IP. The example's ~753 KB JSON inference body stayed below the
+observed size limit. Header, response-size and streaming limits remain untested.
 Use [Serverless lifecycle/status details](https://docs.nebius.com/serverless/lifecycle)
 and logs to distinguish capacity, image-pull, model-load and authentication failures.
 GPU OOM requires an explicit concurrency/preset decision. Keep model-control
