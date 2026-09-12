@@ -396,7 +396,13 @@ def main():
     )
 
     shutil.copyfile("LICENSE.txt", os.path.join(FLAGS.whl_dir, "LICENSE.txt"))
-    shutil.copyfile("setup.py", os.path.join(FLAGS.whl_dir, "setup.py"))
+    shutil.copyfile("pyproject.toml", os.path.join(FLAGS.whl_dir, "pyproject.toml"))
+    shutil.copyfile("hatch_build.py", os.path.join(FLAGS.whl_dir, "hatch_build.py"))
+    # pyproject.toml resolves the wheel version from the TRITON_VERSION file
+    # next to it. Write the chosen version into the wheel build root; do NOT
+    # modify the source-tree TRITON_VERSION.
+    with open(os.path.join(FLAGS.whl_dir, "TRITON_VERSION"), "w") as vf:
+        vf.write(FLAGS.triton_version)
 
     os.chdir(FLAGS.whl_dir)
     # Clean dist/ to prevent accumulating wheels from prior runs. CMake may
@@ -409,7 +415,15 @@ def main():
     if os.path.isdir(_dist):
         shutil.rmtree(_dist)
     print("=== Building wheel")
-    args = ["python3", "setup.py", "bdist_wheel"]
+    # PEP 517 build (python -m build) so the pinned hatchling version in
+    # pyproject.toml's [build-system] is installed into an isolated env and
+    # used deterministically, instead of whatever build backend happens to be
+    # preinstalled in the build image. See TRI-1775.
+    # --wheel: only the wheel is consumed downstream (auditwheel repair +
+    # dist copy). Without it `build` makes an sdist first and builds the
+    # wheel from it, so generated inputs such as TRITON_VERSION must also
+    # be inside the sdist for dynamic version resolution to work.
+    args = ["python3", "-m", "build", "--wheel"]
 
     # Release-semantic X.Y.Z -> PyPI-clean (no variant label).
     # Anything else -> PEP 817 variant label. The pipeline id is already
@@ -424,12 +438,9 @@ def main():
         file=sys.stderr,
     )
 
-    wenv = os.environ.copy()
-    wenv["VERSION"] = FLAGS.triton_version
-    wenv["TRITON_PYBIND"] = PYBIND_LIB
-    p = subprocess.Popen(args, env=wenv)
+    p = subprocess.Popen(args, env=os.environ.copy())
     p.wait()
-    fail_if(p.returncode != 0, "setup.py failed")
+    fail_if(p.returncode != 0, "Building wheel failed")
 
     _repair_wheel_with_auditwheel(FLAGS.whl_dir, FLAGS.dest_dir)
 
