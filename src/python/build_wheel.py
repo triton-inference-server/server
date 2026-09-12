@@ -270,8 +270,20 @@ def _repair_wheel_with_auditwheel(whl_dir, dest_dir):
                 f"auditwheel repair -> PEP 513/599/600 manylinux{_RESET}",
                 file=sys.stderr,
             )
+            # libtritonserver must not be vendored: the tritonserver package
+            # creates the server and passes its raw pointer to tritonfrontend,
+            # so both must use the same instance. Resolved at runtime from
+            # /opt/tritonserver/lib via /etc/ld.so.conf.d/tritonserver.conf.
             r = subprocess.run(
-                ["auditwheel", "repair", wheel_path, "--wheel-dir", dist_dir],
+                [
+                    "auditwheel",
+                    "repair",
+                    wheel_path,
+                    "--wheel-dir",
+                    dist_dir,
+                    "--exclude",
+                    "libtritonserver.so",
+                ],
                 capture_output=True,
                 text=True,
             )
