@@ -86,6 +86,9 @@ as an "Application" or "Service" within the trusted internal network.
 * [https://konghq.com/blog/enterprise/envoy-service-mesh]
 * [https://www.solo.io/topics/envoy-proxy/]
 
+For an example using a managed HTTPS gateway with bearer-token authentication,
+see [Triton on Nebius Serverless](https://github.com/triton-inference-server/server/tree/main/deploy/nebius).
+
 ## Securing Model and Backend Code
 
 > [!WARNING]
