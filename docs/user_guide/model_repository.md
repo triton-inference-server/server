@@ -370,6 +370,20 @@ An TorchScript model is a single file that by default must be named model.pt.
 This default name can be overridden using the *default_model_filename* property in the [model configuration](model_configuration.md).
 It is possible that some models traced with different versions of PyTorch may not be supported by Triton due to changes in the underlying opset.
 
+The PyTorch (LibTorch) backend loads the model from a *TorchScript* file, so the
+`model.pt` file must be produced with `torch.jit.script()` or `torch.jit.trace()`
+and saved with `torch.jit.save()`. Saving an eager-mode module or only its weights
+(for example with `torch.save(model.state_dict())`) produces a plain pickle archive
+that the backend cannot load, and Triton fails with an error such as:
+
+```
+failed to load 'model' version 1: Internal: failed to load model 'model': PytorchStreamReader
+failed reading zip archive: failed finding central directory
+```
+
+If you encounter this error, convert the model to TorchScript and re-save it with
+`torch.jit.save()` before adding it to the model repository.
+
 A minimal model repository for a TorchScript model is:
 
 ```
