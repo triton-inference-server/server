@@ -42,6 +42,10 @@ GPU_CONFIG = (
     "\n# This example serves only version 1 on one GPU.\n"
     "instance_group [{ kind: KIND_GPU count: 1 gpus: [0] }]\n"
     "version_policy: { specific: { versions: [1] } }\n"
+    "# Disable reduced-precision TF32 for the FP32 numerical reference check.\n"
+    "optimization { execution_accelerators { gpu_execution_accelerator [ {\n"
+    '  name: "cuda" parameters { key: "use_tf32" value: "0" }\n'
+    "} ] } }\n"
 )
 CONFIG_PATH = "model_repository/densenet_onnx/config.pbtxt"
 

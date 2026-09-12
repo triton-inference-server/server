@@ -32,11 +32,11 @@ This example packages DenseNet-121 with Triton and serves it through a
 It uses one GPU, one HTTP port and managed HTTPS bearer-token authentication.
 No Kubernetes cluster or changes to Triton are required.
 
-> **Validation status:** model preparation and the local CPU/HTTP-contract tests
-> have been exercised. The GPU container and Nebius deployment have not yet been
-> validated. Complete the [validation checklist](#validation-checklist) before
-> relying on this example. In particular, confirm the selected image's driver
-> compatibility with the GPU platform.
+> **Validation status:** the image and authenticated GPU inference were exercised
+> on Nebius with one L40S, including a successful stop/start and repeat smoke
+> test. The [validation checklist](#validation-checklist) records the scope and
+> remaining limits. The current API requires a short unique image tag instead
+> of a digest reference; see [image preparation](#prepare-the-model-and-image).
 
 An Endpoint runs until stopped or deleted. This recipe does not configure
 autoscaling, scale-to-zero, high availability or preemptible recovery. It uses
@@ -59,15 +59,17 @@ they are not needed for this example.
 configuration/labels, and their source revisions and SHA-256 hashes. This is the
 full ONNX-capable server image, not an SDK, minimal or LLM-specific image.
 
+The pinned image was exercised on a single L40S in `eu-north1` with NVIDIA
+driver **580.173.02**. The image's runtime API reports **CUDA 13.4**; its ONNX
+Runtime library is **1.28.0**, and the serving API reports **Triton 2.72.0**.
+GPU inference passed the numerical reference check with TF32 disabled.
+
 The [26.08 release notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-26-08.html)
-list ONNX Runtime 1.28.0 and GPUs with compute capability 7.5 or later. At the time
-this example was prepared, that page had conflicting CUDA versions and an
-incomplete minimum-driver field. Treat this pin as a candidate until GPU
-initialization and inference pass on your selected platform. An L40S is a
-reasonable single-GPU candidate, but no region's capacity or preset is assumed.
-If another release is required, update the pin and Dockerfile together and
-repeat the tests; do not use `latest` or assume a TensorRT-LLM image's driver
-matrix applies to the full server image.
+had conflicting CUDA details and an incomplete minimum-driver field when this
+example was prepared. The observed combination above is evidence for that
+specific setup, not a general driver-compatibility matrix or a region-capacity
+guarantee. Revalidate other platforms, drivers or image releases; update the pin
+and Dockerfile together if changing the base, and do not use `latest`.
 
 ## Prepare the model and image
 
@@ -80,7 +82,9 @@ python3 prepare_models.py
 
 Preparation downloads approximately 32 MB plus configuration and notices,
 verifies each pinned size/hash, and adds a single GPU instance and a policy
-selecting only model version 1. It publishes `build/` only after success and
+selecting only model version 1. It also disables ONNX Runtime CUDA TF32 so the
+FP32 zero-input result can be compared with the CPU reference at the stated
+tolerance. It publishes `build/` only after success and
 refuses to replace an existing directory. It downloads actual model bytes,
 not the Git LFS pointer. To repeat preparation, move the existing build aside
 or choose `--output` with a new directory. The Dockerfile expects `build/`.
@@ -106,17 +110,32 @@ This example does not publish an image on your behalf.
 Build and push to your registry, then resolve the resulting image digest:
 
 ```bash
-export IMAGE_REPOSITORY='YOUR_REGISTRY/YOUR_NAMESPACE/triton-densenet'
-export IMAGE_TAG="${IMAGE_REPOSITORY}:nebius-example-1"
+export IMAGE_REPOSITORY='YOUR_REGISTRY/YOUR_NAMESPACE/t'
+export IMAGE_TAG="${IMAGE_REPOSITORY}:UNIQUE_SHORT_TAG"
+# The complete ASCII image reference must fit the current 64-character limit.
+(( ${#IMAGE_TAG} <= 64 )) || { echo 'Shorten the image reference' >&2; exit 1; }
 docker buildx build --platform linux/amd64 --tag "$IMAGE_TAG" --push .
 docker buildx imagetools inspect "$IMAGE_TAG"
 ```
 
-Set `IMAGE` to the returned digest reference, for example
-`YOUR_REGISTRY/YOUR_NAMESPACE/triton-densenet@sha256:...`. Use the **derived**
-image digest, not the base image digest from `pins.json`: the base does not
-contain the prepared model. Keep the image available while an Endpoint may
-restart. A private registry also requires the credential secret described below.
+Record the returned **derived** image digest; the base digest in `pins.json`
+does not include the prepared model. Set `IMAGE` to the short, unique tag:
+
+```bash
+export IMAGE="$IMAGE_TAG"
+```
+
+**Observed API limitation (2026-09-12):** a digest reference was rejected because
+the service copied the 135-character image reference into a compute label with
+a 64-character limit. A 57-character tag referencing the same manifest passed
+validation. Until this is fixed, digest-addressed deployment is unavailable in
+this workflow. Never move or reuse the unique tag, and verify its manifest digest
+against the recorded digest before creating or restarting an Endpoint. This is
+an operational convention, not an atomic digest pin enforced by the Endpoint.
+The base image and model artifacts remain checksum-pinned.
+
+Keep the tag and image available while an Endpoint may restart. A private registry
+also requires the credential secret described below.
 
 ## Create an authenticated Endpoint
 
@@ -139,7 +158,7 @@ export SUBNET_ID='YOUR_SUBNET_ID'
 export GPU_PLATFORM='YOUR_SINGLE_GPU_PLATFORM'
 export GPU_PRESET='YOUR_COMPATIBLE_SINGLE_GPU_PRESET'
 export AUTH_TOKEN_SECRET='YOUR_SECRET_ID@YOUR_VERSION_ID'
-export IMAGE='YOUR_REGISTRY/YOUR_NAMESPACE/triton-densenet@sha256:YOUR_DIGEST'
+export IMAGE='YOUR_REGISTRY/YOUR_NAMESPACE/t:UNIQUE_SHORT_TAG'
 
 umask 077
 RUN_DIR="receipts/$(date -u +%Y%m%dT%H%M%SZ)-$(openssl rand -hex 4)"
@@ -156,7 +175,7 @@ nebius --profile "$NEBIUS_PROFILE" ai endpoint create \
   --container-port 8000/http \
   --auth token --token-secret "$AUTH_TOKEN_SECRET" \
   --disk-size 250Gi --shm-size 1Gi \
-  --async --retries 1 --format json > "$RUN_DIR/create-operation.json"
+  --async --retries 1 > "$RUN_DIR/create-output.txt"
 ```
 
 Stop here if creation returns an error or the response is missing. A lost
@@ -165,21 +184,37 @@ name, image and creation time in the console or `ai endpoint list`; names are
 not necessarily unique. Do not automatically run create again. Keep the receipt
 directory private: raw service responses may contain sensitive information.
 
-On a successful asynchronous response, save the operation and resource IDs:
+CLI 0.12.265 returns `Endpoint ID: aiendpoint-...` from asynchronous creation,
+even when `--format json` is requested. Save and validate that ID, then discover
+the creation operation for that exact resource. Do not parse the create output
+as operation JSON:
 
 ```bash
-OPERATION_ID=$(jq -er '.id | select(type == "string" and length > 0)' \
-  "$RUN_DIR/create-operation.json")
-ENDPOINT_ID=$(jq -er '.resource_id | select(type == "string" and length > 0)' \
-  "$RUN_DIR/create-operation.json")
-printf '%s\n' "${ENDPOINT_ID:?Missing Endpoint ID}" > "$RUN_DIR/endpoint-id"
+ENDPOINT_ID=$(sed -nE 's/^Endpoint ID: (aiendpoint-[a-z0-9]+)$/\1/p' \
+  "$RUN_DIR/create-output.txt")
+[[ "$ENDPOINT_ID" =~ ^aiendpoint-[a-z0-9]+$ ]] || \
+  { echo 'Reconcile the saved create response before continuing' >&2; exit 1; }
+printf '%s\n' "$ENDPOINT_ID" > "$RUN_DIR/endpoint-id"
+nebius --profile "$NEBIUS_PROFILE" ai endpoint operation list \
+  --resource-id "$ENDPOINT_ID" --all --format json > "$RUN_DIR/create-operations.json"
+OPERATION_ID=$(jq -er --arg id "$ENDPOINT_ID" \
+  '[.operations[] | select(.resource_id == $id and .description == "Create endpoint")] |
+   if length == 1 then .[0].id else error("Reconcile creation operations") end' \
+  "$RUN_DIR/create-operations.json")
 nebius --profile "$NEBIUS_PROFILE" ai endpoint operation wait \
   "${OPERATION_ID:?Missing operation ID}" --timeout 35m --format json \
-  > "$RUN_DIR/create-result.json"
+  > "$RUN_DIR/create-result.txt"
+nebius --profile "$NEBIUS_PROFILE" ai endpoint operation get "$OPERATION_ID" \
+  --format json > "$RUN_DIR/create-operation-final.json"
+jq -e '.finished_at != null and ((.status.code // 0) == 0)' \
+  "$RUN_DIR/create-operation-final.json" || exit 1
 ```
 
-Confirm successful operation completion. If waiting times out, inspect the
-**same operation** with `ai endpoint operation get "$OPERATION_ID"` and the
+Confirm successful operation completion explicitly: CLI 0.12.265's
+`operation wait` returned an Endpoint resource and exited zero even for a failed
+startup whose operation had status code 9. `operation get` returns the authoritative
+`finished_at` and `status.code` (omitted/zero for success), not a `done` boolean. If
+waiting times out, inspect the **same operation** with `ai endpoint operation get "$OPERATION_ID"` and the
 Endpoint's state/details; do not create another resource. Choose your own
 bounded waiting/spending limit. The service documents a 30-minute capacity
 provisioning timeout; image pull and model readiness are separate stages.
@@ -224,7 +259,10 @@ unset ENDPOINT_AUTH_TOKEN
 
 The smoke test waits for **both** `/v2/health/ready` and
 `/v2/models/densenet_onnx/versions/1/ready`, then verifies that missing and wrong
-tokens return 401/403 at health and inference routes. It sends a zero-filled
+tokens return 401/403 at health and inference routes. The unauthorized inference
+probe uses a small `{"inputs": []}` body: the gateway can reject authorization
+and close the connection before a full tensor finishes uploading. Authenticated
+inference still sends the complete zero-filled
 FP32 tensor to `/v2/models/densenet_onnx/versions/1/infer` with
 `Authorization: Bearer ...` and checks model/version, output metadata and 1,000
 finite values. Credentials and response bodies are not printed; redirects are
@@ -236,7 +274,8 @@ execution and the HTTP contract, not image-classification accuracy. These
 outputs are logits, not probabilities. The script limits response size to 1 MiB
 and does not retry inference. It is an example client, not a load generator.
 
-`RUNNING` or `/v2/health/live` alone does not prove model readiness. No custom
+`operation wait` success, `RUNNING`, or `/v2/health/live` alone does not prove
+model readiness. No custom
 platform readiness-probe field is configured; do not assume Docker health
 checks gate Nebius ingress. Strict Triton readiness and client polling provide
 the checks here, while early callers may still receive startup errors.
@@ -252,24 +291,39 @@ An external repository needs its own credentials, immutable revisions,
 checksums and live validation; this recipe does not poll a mutable bucket.
 
 Stop/start preserves the Endpoint definition, not warm GPU memory or a specific
-VM. Stop synchronously and wait for the operation to finish before starting:
+VM. Stop and verify the operation has finished successfully before starting:
 
 ```bash
-nebius --profile "$NEBIUS_PROFILE" ai endpoint stop "${ENDPOINT_ID:?}" --timeout 10m
+nebius --profile "$NEBIUS_PROFILE" ai endpoint stop "${ENDPOINT_ID:?}" \
+  --async --retries 1 > "$RUN_DIR/stop-operation-id"
+OPERATION_ID=$(cat "$RUN_DIR/stop-operation-id")
+[[ "$OPERATION_ID" =~ ^opvmapp-[a-z0-9]+$ ]] || exit 1
+nebius --profile "$NEBIUS_PROFILE" ai endpoint operation wait "$OPERATION_ID" --timeout 10m
+nebius --profile "$NEBIUS_PROFILE" ai endpoint operation get "$OPERATION_ID" \
+  --format json > "$RUN_DIR/stop-operation-final.json"
+jq -e '.finished_at != null and ((.status.code // 0) == 0)' \
+  "$RUN_DIR/stop-operation-final.json" || exit 1
 nebius --profile "$NEBIUS_PROFILE" ai endpoint get "$ENDPOINT_ID" \
   --format jsonpath='{.status.state}'
 ```
 
 Confirm `STOPPED`. If stop times out, inspect `ai endpoint operation list
 --resource-id "$ENDPOINT_ID" --all` and wait for the relevant operation before
-starting again; state alone is not confirmation of operation completion.
+starting again; state alone is not confirmation of operation completion. Verify that the unique
+image tag still resolves to the recorded derived digest before starting.
 
 ```bash
 nebius --profile "$NEBIUS_PROFILE" ai endpoint start "$ENDPOINT_ID" \
-  --async --retries 1 --format json > "$RUN_DIR/start-operation.json"
-OPERATION_ID=$(jq -er '.id' "$RUN_DIR/start-operation.json")
+  --async --retries 1 > "$RUN_DIR/start-operation-id"
+OPERATION_ID=$(cat "$RUN_DIR/start-operation-id")
+[[ "$OPERATION_ID" =~ ^opvmapp-[a-z0-9]+$ ]] || \
+  { echo 'Reconcile the saved start response' >&2; exit 1; }
 nebius --profile "$NEBIUS_PROFILE" ai endpoint operation wait \
   "${OPERATION_ID:?}" --timeout 35m
+nebius --profile "$NEBIUS_PROFILE" ai endpoint operation get "$OPERATION_ID" \
+  --format json > "$RUN_DIR/start-operation-final.json"
+jq -e '.finished_at != null and ((.status.code // 0) == 0)' \
+  "$RUN_DIR/start-operation-final.json" || exit 1
 ```
 
 Retrieve the current URL and repeat readiness/auth/inference checks after a
@@ -282,12 +336,29 @@ returns **NotFound**, not a connection/authentication error:
 
 ```bash
 nebius --profile "$NEBIUS_PROFILE" ai endpoint delete "${ENDPOINT_ID:?}" \
-  --async --retries 1 --format json > "$RUN_DIR/delete-operation.json"
-OPERATION_ID=$(jq -er '.id' "$RUN_DIR/delete-operation.json")
-nebius --profile "$NEBIUS_PROFILE" ai endpoint operation wait \
-  "${OPERATION_ID:?}" --timeout 10m
+  --async --retries 1 > "$RUN_DIR/delete-operation-id"
+OPERATION_ID=$(cat "$RUN_DIR/delete-operation-id")
+[[ "$OPERATION_ID" =~ ^opvmapp-[a-z0-9]+$ ]] || \
+  { echo 'Reconcile the saved delete response' >&2; exit 1; }
+DELETE_DEADLINE=$((SECONDS + 600))
+while (( SECONDS < DELETE_DEADLINE )); do
+  nebius --profile "$NEBIUS_PROFILE" ai endpoint operation get "$OPERATION_ID" \
+    --format json > "$RUN_DIR/delete-operation.json" || exit 1
+  if jq -e '.finished_at != null' "$RUN_DIR/delete-operation.json" >/dev/null; then
+    break
+  fi
+  sleep 5
+done
+jq -e '.finished_at != null and ((.status.code // 0) == 0)' \
+  "$RUN_DIR/delete-operation.json" || \
+  { echo 'Deletion incomplete or failed; reconcile before cleanup' >&2; exit 1; }
 nebius --profile "$NEBIUS_PROFILE" ai endpoint get "$ENDPOINT_ID"
 ```
+
+CLI 0.12.265's `operation wait` can return `NotFound` after a successful delete
+because it tries to retrieve the removed Endpoint. The loop above verifies the
+operation directly; the final Endpoint get must separately return `NotFound`.
+Do not treat an arbitrary wait failure as proof of successful deletion.
 
 If deletion is incomplete, retain the receipt and reconcile it through
 Serverless. Do not directly modify the managed VM. Closing a terminal or
@@ -336,8 +407,30 @@ Before marking this example cloud-validated, record:
 - No public VM IP; working registry pull and secret delivery; observed ingress
   size/time limits, not assumptions about raw Triton ports.
 
-The local HTTP fixtures exercise the example's client, not Nebius's gateway.
-Neither those tests nor CPU ONNX inference establish GPU compatibility.
+The local HTTP fixtures exercise the example's client. On 2026-09-12, live
+checks on `gpu-l40s-a` / `1gpu-8vcpu-32gb` in `eu-north1` also verified:
+
+- Private-registry pull and separate SecretStash credentials, managed HTTPS,
+  correct-token inference and HTTP 401 for missing/wrong-token probes.
+- Two starts of the corrected image, numerical CPU-reference agreement
+  (`max_abs_error = 6.4e-6`), and finite concurrency 1/2/4.
+- Version/model rejection (404), disabled model load (503), and continued
+  readiness after rejected requests. An empty `{}` request returned 500; this
+  is an observed server-error response, not a claim that malformed input is
+  correctly classified as a client error.
+- A corrupted model failed the startup checksum gate: the Endpoint reached
+  `ERROR / StartFailed` and readiness returned 404. Its creation wait command
+  still exited zero despite operation status code 9, so both operation status
+  and application readiness require explicit checks.
+- All three test Endpoint definitions were deleted: each deletion operation
+  completed successfully and each Endpoint ID subsequently returned `NotFound`.
+- Four bounded requests issued alongside stop all returned 200. Triton logged
+  its graceful shutdown path; this does not establish the platform's maximum
+  termination grace or behavior for long-running inferences.
+
+The create request omitted `--public`; managed HTTPS worked without requesting
+a public VM IP. The ~753 KB JSON inference body passed. Maximum ingress size,
+request-duration limits and other GPU/driver combinations remain unmeasured.
 Use [Serverless lifecycle/status details](https://docs.nebius.com/serverless/lifecycle)
 and logs to distinguish capacity, image-pull, model-load and authentication failures.
 GPU OOM requires an explicit concurrency/preset decision. Keep model-control

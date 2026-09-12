@@ -162,7 +162,9 @@ class Client:
         wrong_token = secrets.token_hex(32)
         while wrong_token == self.token:
             wrong_token = secrets.token_hex(32)
-        for path, payload in (("/v2/health/ready", None), (INFER, inference_payload())):
+        # Gateways can reject authorization before reading the request body.
+        # Keep this probe small so an early 401 does not interrupt a large upload.
+        for path, payload in (("/v2/health/ready", None), (INFER, {"inputs": []})):
             for token in (None, wrong_token):
                 status, _ = self.request(path, request_timeout, payload, token)
                 if status not in {401, 403}:
