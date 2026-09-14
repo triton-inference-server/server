@@ -1184,6 +1184,7 @@ CommonHandler::RegisterTrace()
     TRITONSERVER_Error* err = nullptr;
     TRITONSERVER_InferenceTraceLevel level = TRITONSERVER_TRACE_LEVEL_DISABLED;
     uint32_t rate;
+    bool honor_parent_sampling;
     int32_t count;
     uint32_t log_frequency;
     std::string filepath;
@@ -1389,8 +1390,8 @@ CommonHandler::RegisterTrace()
     // Get current trace setting, this is needed even if the setting
     // has been updated above as some values may not be provided in the request.
     trace_manager_->GetTraceSetting(
-        request.model_name(), &level, &rate, &count, &log_frequency, &filepath,
-        &trace_mode, &config_map);
+        request.model_name(), &level, &rate, &honor_parent_sampling, &count,
+        &log_frequency, &filepath, &trace_mode, &config_map);
     // level
     {
       inference::TraceSettingResponse::SettingValue level_setting;
