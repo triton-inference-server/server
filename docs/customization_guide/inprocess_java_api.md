@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,6 +37,8 @@ Alternatively, the user can refer to the web version [API docs](http://bytedeco.
 generated from `tritonserver.java`.
 **Note:** Currently, `tritonserver.java` contains bindings for both the `In-process C-API`
 and the bindings for `C-API Wrapper`. More information about the [developer_tools/server C-API wrapper](https://github.com/triton-inference-server/developer_tools/blob/main/server/README.md) can be found in the [developer_tools repository](https://github.com/triton-inference-server/developer_tools/).
+**The `C-API Wrapper` bindings are deprecated** — `developer_tools/server` is
+no longer built or tested; use the `In-process C-API` bindings instead.
 
 A simple example using the Java API can be found in
 [Samples folder](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver/samples)
@@ -94,9 +96,11 @@ Java program with the Java bindings with the following steps:
       # Run build script
       ## For In-Process C-API Java Bindings
       $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh
-      ## For C-API Wrapper (Triton with C++ bindings) Java Bindings
-      $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh --enable-developer-tools-server
       ```
+      **The `C-API Wrapper` bindings (`--enable-developer-tools-server`) are deprecated and unsupported** —
+      `developer_tools/server` is no longer built or tested, so this flag is kept only for reference and
+      should not be used. Use the `In-Process C-API Java Bindings` command above instead.
+
       This will install the Java bindings to `/workspace/install/java-api-bindings/tritonserver-java-bindings.jar`
 
    *or*
@@ -107,7 +111,7 @@ Java program with the Java bindings with the following steps:
       $ docker cp ${id}:/workspace/install/java-api-bindings/tritonserver-java-bindings.jar <Uber Jar directory>/tritonserver-java-bindings.jar
       $ docker stop ${id}
       ```
-      **Note:** `tritonserver-java-bindings.jar` only includes the `In-Process Java Bindings`. To use the `C-API Wrapper Java Bindings`, please use the build script.
+      **Note:** `tritonserver-java-bindings.jar` only includes the `In-Process Java Bindings`. The `C-API Wrapper Java Bindings` are deprecated and unsupported; use the `In-Process Java Bindings` instead.
 2. Use the built "Uber Jar" that contains the Java bindings
    ```bash
    $ java -cp <Uber Jar directory>/tritonserver-java-bindings.jar <your Java program>
@@ -124,10 +128,10 @@ You can do this using the following steps:
 
 1. Create the JNI binaries in your local repository (`/root/.m2/repository`)
    with [`javacpp-presets/tritonserver`](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver).
-   For C-API Wrapper Java bindings (Triton with C++ bindings), you need to
-   install some build specific dependencies including cmake and rapidjson.
-   Refer to [java installation script](https://github.com/triton-inference-server/client/blob/main/src/java-api-bindings/scripts/install_dependencies_and_build.sh)
-   for dependencies you need to install and modifications you need to make for your container.
+   **The `C-API Wrapper` Java bindings (Triton with C++ bindings) are deprecated and unsupported** —
+   `developer_tools/server` is no longer built or tested; skip the cmake/rapidjson build-dependency
+   steps in the [java installation script](https://github.com/triton-inference-server/client/blob/main/src/java-api-bindings/scripts/install_dependencies_and_build.sh)
+   that are specific to it.
 After installing dependencies, you can build the tritonserver project on javacpp-presets:
 ```bash
  $ git clone https://github.com/bytedeco/javacpp-presets.git
