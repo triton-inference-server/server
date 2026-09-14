@@ -277,7 +277,7 @@ mkdir -p models/sequence_oldest/1 && (cd models/sequence_oldest && \
     echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
-    echo -e 'sequence_batching { oldest { max_candidate_sequences: 1 } \n max_sequence_idle_microseconds: 6000000 }' >> config.pbtxt && \
+    echo -e 'sequence_batching { oldest { max_candidate_sequences: 3 } \n max_sequence_idle_microseconds: 6000000 }' >> config.pbtxt && \
     echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
 mkdir -p models/no_batching/1 && (cd models/no_batching && \
     echo 'name: "no_batching"' >> config.pbtxt && \

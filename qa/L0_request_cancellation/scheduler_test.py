@@ -266,6 +266,57 @@ class TestScheduler(CancellationTest, unittest.TestCase):
         model_name = "sequence_oldest"
         self._test_sequence_batch_scheduler_queued_request_cancellation(model_name)
 
+    # Test an oldest-first request cancelled while waiting for an instance.
+    def test_oldest_sequence_rate_limiter_request_cancellation(self):
+        model_name = "sequence_oldest"
+        request_id = "oldest-rate-limiter-cancel"
+        failures_before = self._failure_count(model_name, "CANCELED")
+        executions_before = self._execution_count(model_name)
+
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            holders = [
+                pool.submit(
+                    self._triton.infer,
+                    model_name,
+                    self._get_inputs(batch_size=1),
+                    sequence_id=100 + index,
+                    sequence_start=True,
+                    sequence_end=True,
+                )
+                for index in range(2)
+            ]
+            self._wait_until_pending(model_name, 1)
+
+            callback, response = self._generate_callback_and_response_pair()
+            request = self._triton.async_infer(
+                model_name,
+                self._get_inputs(batch_size=1),
+                callback,
+                request_id=request_id,
+                sequence_id=102,
+                sequence_start=True,
+                sequence_end=True,
+            )
+            self._wait_until_pending(model_name, 2)
+            self.assertFalse(response["responded"])
+
+            self._cancel_and_wait(request, request_id)
+            live_request = pool.submit(
+                self._triton.infer,
+                model_name,
+                self._get_inputs(batch_size=1),
+                sequence_id=103,
+                sequence_start=True,
+                sequence_end=True,
+            )
+            for holder in holders:
+                holder.result(timeout=60)
+            live_request.result(timeout=60)
+            self._assert_response_is_cancelled(response)
+
+        self._assert_metrics(model_name, "CANCELED", 1, failures_before)
+        self._wait_for_execution_count(model_name, executions_before + 3)
+
     # Helper function
     def _test_sequence_batch_scheduler_queued_request_cancellation(self, model_name):
         with concurrent.futures.ThreadPoolExecutor() as pool:
