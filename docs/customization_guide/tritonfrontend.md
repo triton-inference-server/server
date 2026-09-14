@@ -35,6 +35,21 @@ with Triton's Python In-Process API
 and [`tritonclient`](https://github.com/triton-inference-server/client/tree/main/src/python/library)
 extend the ability to use Triton's full feature set with a few lines of Python.
 
+## Runtime Dependency on `libtritonserver.so`
+
+The `tritonfrontend` wheel does not bundle `libtritonserver.so`. These bindings
+operate on a server object created by the
+[`tritonserver`](https://github.com/triton-inference-server/core/tree/main/python/tritonserver)
+package, so both must resolve to the same loaded copy of the library at runtime.
+`libtritonserver.so` is therefore excluded from the wheel during
+`auditwheel repair` and resolved from the Triton installation instead
+(`/opt/tritonserver/lib` in the Triton container).
+
+`tritonfrontend` consequently requires an existing Triton installation that
+provides `libtritonserver.so` on the dynamic linker search path, and is not
+usable as a standalone `pip install` without one. The `tritonserver` wheel
+excludes the library for the same reason.
+
 Let us walk through a simple example:
 1. First we need to load the desired models and start the server with `tritonserver`.
 ```python
