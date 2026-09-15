@@ -2395,6 +2395,22 @@ Server::Server(
           keepalive_options.max_connection_age_grace_ms_);
     }
 
+    // Experiment: raise gRPC's unmatched-pending-call cancellation deadline
+    // (default 30s in gRPC >=1.60). Set the seconds value via the environment
+    // variable TRITON_GRPC_SERVER_MAX_UNREQUESTED_TIME_SEC; if unset or <=0 the
+    // gRPC default is left in place.
+    {
+      const char* utstr = getenv("TRITON_GRPC_SERVER_MAX_UNREQUESTED_TIME_SEC");
+      const int unrequested_time_sec = (utstr != nullptr) ? atoi(utstr) : 0;
+      if (unrequested_time_sec > 0) {
+        LOG_INFO << "gRPC server_max_unrequested_time_in_server set to "
+                 << unrequested_time_sec << "s";
+        builder_.AddChannelArgument(
+            "grpc.server_max_unrequested_time_in_server",
+            unrequested_time_sec);
+      }
+    }
+
     std::vector<std::string> headers{"GRPC KeepAlive Option", "Value"};
     triton::common::TablePrinter table_printer(headers);
     std::vector<std::string> row{
