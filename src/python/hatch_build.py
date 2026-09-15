@@ -1,4 +1,4 @@
-# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,47 +24,23 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required(VERSION 3.31.8)
-
-add_subdirectory(tritonfrontend)
-
-file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/TRITON_VERSION ${TRITON_VERSION})
-configure_file(../../LICENSE LICENSE.txt COPYONLY)
-configure_file(pyproject.toml pyproject.toml COPYONLY)
-configure_file(hatch_build.py hatch_build.py COPYONLY)
-
-set(WHEEL_DEPENDS
-      ${CMAKE_CURRENT_BINARY_DIR}/TRITON_VERSION
-      ${CMAKE_CURRENT_BINARY_DIR}/LICENSE.txt
-      ${CMAKE_CURRENT_BINARY_DIR}/pyproject.toml
-      ${CMAKE_CURRENT_BINARY_DIR}/hatch_build.py
-      ${CMAKE_CURRENT_BINARY_DIR}/tritonfrontend
-      py-bindings
-)
-
-set(wheel_stamp_file "stamp.whl")
-
-add_custom_command(
-  OUTPUT "${wheel_stamp_file}"
-  COMMAND python3
-  ARGS
-    "${CMAKE_CURRENT_SOURCE_DIR}/build_wheel.py"
-    --dest-dir "${CMAKE_CURRENT_BINARY_DIR}/generic"
-    --binding-path $<TARGET_FILE:py-bindings>
-  DEPENDS ${WHEEL_DEPENDS}
-)
-
-add_custom_target(
-  frontend-server-wheel ALL
-  DEPENDS
-    "${wheel_stamp_file}"
-)
+from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 
-# Wheel
-set(WHEEL_OUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/generic/wheel/dist/")
-install(
-  DIRECTORY
-  ${WHEEL_OUT_DIR}
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/python"
-)
+class CustomBuildHook(BuildHookInterface):
+    """Tag the tritonfrontend wheel as platform-specific.
+
+    The wheel ships an arch-specific pybind11 extension
+    (tritonfrontend/_c/triton_bindings.*.so) that is staged into the package
+    by build_wheel.py rather than compiled by the build backend. Hatchling
+    therefore sees only data files and would emit a pure-Python
+    "py3-none-any" wheel, which auditwheel rejects.
+
+    Setting pure_python=False plus infer_tag=True makes hatchling derive the
+    cp<XY>-cp<XY>-linux_<arch> tag from the running interpreter, matching what
+    the previous setuptools BinaryDistribution shim produced. See TRI-983.
+    """
+
+    def initialize(self, version, build_data):
+        build_data["pure_python"] = False
+        build_data["infer_tag"] = True
