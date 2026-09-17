@@ -26,6 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# flake8: noqa: E402,F403,F405
 import sys
 
 sys.path.append("../common")
@@ -54,9 +55,6 @@ DYNAMO = os.environ.get("SERVER_LAUNCH_MODE") == "dynamo"
 # Reasons the corresponding tests are skipped under Dynamo.
 DYNAMO_SKIP_FP16 = (
     "FP16/BF16 tensors: Dynamo tensor DataType has no half-precision variant"
-)
-DYNAMO_SKIP_CLASS = (
-    "classification output: Dynamo frontend drops the KServe classification parameter"
 )
 DYNAMO_SKIP_VERSION = "model version selection: Dynamo routes by model name only, serving the default version"
 
@@ -537,7 +535,6 @@ class InferTest(tu.TestResultCollector):
     # shared memory does not support class output
     if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
 
-        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_class_bbb(self):
             self._full_exact(
                 np.int8,
@@ -548,7 +545,6 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
-        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_class_sss(self):
             self._full_exact(
                 np.int16,
@@ -559,7 +555,6 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
-        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_class_iii(self):
             self._full_exact(
                 np.int32,
@@ -570,7 +565,6 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
-        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_class_lll(self):
             self._full_exact(
                 np.int64,
@@ -581,7 +575,6 @@ class InferTest(tu.TestResultCollector):
                 swap=False,
             )
 
-        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_class_fff(self):
             self._full_exact(
                 np.float32,
@@ -592,7 +585,6 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
-        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_class_iff(self):
             self._full_exact(
                 np.int32,
@@ -603,7 +595,6 @@ class InferTest(tu.TestResultCollector):
                 swap=False,
             )
 
-        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_mix_bbb(self):
             self._full_exact(
                 np.int8,
@@ -614,7 +605,6 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
-        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_mix_sss(self):
             self._full_exact(
                 np.int16,
@@ -625,7 +615,6 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
-        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_mix_iii(self):
             self._full_exact(
                 np.int32,
@@ -636,7 +625,6 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
-        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_mix_lll(self):
             self._full_exact(
                 np.int64,
@@ -647,7 +635,6 @@ class InferTest(tu.TestResultCollector):
                 swap=False,
             )
 
-        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_mix_fff(self):
             self._full_exact(
                 np.float32,
@@ -658,7 +645,6 @@ class InferTest(tu.TestResultCollector):
                 swap=True,
             )
 
-        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
         def test_mix_iff(self):
             self._full_exact(
                 np.int32,
@@ -1104,7 +1090,6 @@ class InferTest(tu.TestResultCollector):
 
             if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
 
-                @unittest.skipIf(DYNAMO, DYNAMO_SKIP_CLASS)
                 def test_ensemble_label_lookup(self):
                     if all(x in BACKENDS for x in ["onnx", "libtorch"]):
                         # Ensemble needs to look up label from the actual model

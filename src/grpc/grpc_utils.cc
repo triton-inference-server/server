@@ -1,4 +1,4 @@
-// Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -133,7 +133,7 @@ ParseClassificationParams(
     if (cnt <= 0) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
-          "invalid value for 'classification' parameter, expected >= 0");
+          "invalid value for 'classification' parameter, expected >= 1");
     }
 
     *classification_count = cnt;
