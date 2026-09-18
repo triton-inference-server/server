@@ -29,7 +29,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="mlflow-triton",
-    version="0.2.0",
+    version="0.2.1",
     description="Triton Mlflow Deployment",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
