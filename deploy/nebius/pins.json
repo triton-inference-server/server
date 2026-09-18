@@ -1,0 +1,49 @@
+{
+  "runtime": {
+    "tag": "nvcr.io/nvidia/tritonserver:26.08-py3",
+    "platform": "linux/amd64",
+    "digest": "sha256:71a23d2f27001af58c242380fe05c9d46d5dbc79913d62c60de72543964267df"
+  },
+  "sources": {
+    "triton_server": "34fafaaf274dcb7dce3a98ec938c6ec4d3e511ef",
+    "onnx_models": "4f43949841cb55a0b98dc8fcd045431ccafd9f96"
+  },
+  "artifacts": [
+    {
+      "path": "model_repository/densenet_onnx/1/model.onnx",
+      "url": "https://media.githubusercontent.com/media/onnx/models/4f43949841cb55a0b98dc8fcd045431ccafd9f96/validated/vision/classification/densenet-121/model/densenet-7.onnx",
+      "size_bytes": 32719461,
+      "sha256": "79c3bc0974696a2ea9efd2f7bca19fdd630834bd0086f1b4a1c3db3dce3b2a51"
+    },
+    {
+      "path": "model_repository/densenet_onnx/config.pbtxt",
+      "url": "https://raw.githubusercontent.com/triton-inference-server/server/34fafaaf274dcb7dce3a98ec938c6ec4d3e511ef/docs/examples/model_repository/densenet_onnx/config.pbtxt",
+      "size_bytes": 387,
+      "sha256": "fd425185cc2ff71f8eee474a4f8ab30b93eb9ae2703e9438c7f5743ba116559f"
+    },
+    {
+      "path": "model_repository/densenet_onnx/densenet_labels.txt",
+      "url": "https://raw.githubusercontent.com/triton-inference-server/server/34fafaaf274dcb7dce3a98ec938c6ec4d3e511ef/docs/examples/model_repository/densenet_onnx/densenet_labels.txt",
+      "size_bytes": 10311,
+      "sha256": "9c89e59490666e2976a0dded535a755b9878a71e14400804df8d356131d2fc04"
+    },
+    {
+      "path": "notices/onnx-models-LICENSE",
+      "url": "https://raw.githubusercontent.com/onnx/models/4f43949841cb55a0b98dc8fcd045431ccafd9f96/LICENSE",
+      "size_bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "notices/densenet-README.md",
+      "url": "https://raw.githubusercontent.com/onnx/models/4f43949841cb55a0b98dc8fcd045431ccafd9f96/validated/vision/classification/densenet-121/README.md",
+      "size_bytes": 3143,
+      "sha256": "75839fbaa1760841d486c7e6a365b0cbbfa9265e4f6b7c60514c2a74df28a537"
+    },
+    {
+      "path": "notices/triton-LICENSE",
+      "url": "https://raw.githubusercontent.com/triton-inference-server/server/34fafaaf274dcb7dce3a98ec938c6ec4d3e511ef/LICENSE",
+      "size_bytes": 1490,
+      "sha256": "179f37347fde9030609578b02539af12bc66b39c291de1c30d8525c6cd390036"
+    }
+  ]
+}
