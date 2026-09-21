@@ -428,7 +428,8 @@ class HTTPAPIServer : public HTTPServer {
         std::map<std::string, triton::common::TritonJson::Value>&
             input_metadata,
         const MappingSchema* schema,
-        triton::common::TritonJson::Value& generate_request);
+        triton::common::TritonJson::Value& generate_request,
+        size_t& consumed_input_size);
 
     const MappingSchema* RequestSchema() { return request_schema_; }
     const MappingSchema* ResponseSchema() { return response_schema_; }
