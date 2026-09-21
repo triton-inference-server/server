@@ -789,6 +789,54 @@ class InferSizeLimitTest(TestResultCollector):
             f"(limit {max_rss_growth_bytes / MIB:.0f} MIB).",
         )
 
+    def test_nested_parameters_bypass_input_size_limit(self):
+        """Regression: inputs split across the top-level object and the nested
+        'parameters' object of a /generate request must count toward a single
+        cumulative input-size total. The running total used to reset when the
+        parser recursed into 'parameters', so two inputs each under
+        --http-max-input-size could smuggle a combined payload over the limit.
+        """
+        model = "onnx_int32_int32_int32"  # two INT32 inputs: INPUT0, INPUT1
+        url = f"http://localhost:8000/v2/models/{model}/generate"
+        headers = {"Content-Type": "application/json"}
+        bytes_per_int32 = 4
+
+        # Each input is ~half the 64MB limit (+offset): individually under the
+        # cap, but the two together exceed it.
+        elements_per_input = DEFAULT_LIMIT_ELEMENTS // 2 + OFFSET_ELEMENTS
+        self.assertLess(elements_per_input * bytes_per_int32, DEFAULT_LIMIT_BYTES)
+        self.assertGreater(
+            2 * elements_per_input * bytes_per_int32, DEFAULT_LIMIT_BYTES
+        )
+        big = [1] * elements_per_input
+
+        # INPUT0 at the top level, INPUT1 inside the nested 'parameters' object.
+        bypass_payload = {"INPUT0": big, "parameters": {"INPUT1": big}}
+        response = requests.post(url, headers=headers, json=bypass_payload)
+
+        self.assertEqual(
+            400,
+            response.status_code,
+            "Inputs split across top-level and nested 'parameters' bypassed the "
+            "cumulative size limit (got {}): {!r}".format(
+                response.status_code, response.content[:200]
+            ),
+        )
+        error_msg = response.content.decode()
+        self.assertIn(" bytes exceeds the maximum allowed input size of ", error_msg)
+        self.assertIn("Use --http-max-input-size to increase the limit.", error_msg)
+
+        # Control: the same split shape with small inputs must NOT be rejected
+        # for size, so the fix does not over-block legitimate nested parameters.
+        small = [1] * 16
+        ok_payload = {"INPUT0": small, "parameters": {"INPUT1": small}}
+        response = requests.post(url, headers=headers, json=ok_payload)
+        self.assertNotIn(
+            "exceeds the maximum allowed input size of",
+            response.content.decode(),
+            "A small nested-parameters request was wrongly rejected for size",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

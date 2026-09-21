@@ -803,6 +803,8 @@ mkdir -p $MODELDIR
 rm -rf ${MODELDIR}/*
 cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float32 ${MODELDIR}/.
 cp -r ./models/simple_identity ${MODELDIR}/.
+# Two-input model for the nested-parameters cumulative-size-limit test.
+cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 ${MODELDIR}/.
 
 # First run with default size limit - large inputs should fail
 SERVER_ARGS="--model-repository=${MODELDIR}"
@@ -850,6 +852,13 @@ python http_input_size_limit_test.py InferSizeLimitTest.test_json_dtype_size_exp
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Default Input Size Limit Test Failed for type size explosion\n***"
+    RET=1
+fi
+
+python http_input_size_limit_test.py InferSizeLimitTest.test_nested_parameters_bypass_input_size_limit >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Default Input Size Limit Test Failed for nested parameters bypass\n***"
     RET=1
 fi
 
