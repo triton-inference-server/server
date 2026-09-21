@@ -338,13 +338,13 @@ SagemakerAPIServer::ParseSageMakerRequest(
     }
   }
 
-  // Reject an empty URL before calling std::filesystem::absolute(), because
-  // it can throw exception and crash the server.
+  // An empty path can make std::filesystem::absolute() throw an exception and
+  // crash the server.
   if (url_string.empty()) {
     HTTP_RESPOND_IF_ERR(
         req, TRITONSERVER_ErrorNew(
                  TRITONSERVER_ERROR_INVALID_ARG,
-                 "'url' property must not be empty"));
+                 "'url' property is required and must not be empty"));
   }
 
   std::filesystem::path url_path(url_string);

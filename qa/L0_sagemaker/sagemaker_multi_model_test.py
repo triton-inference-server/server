@@ -137,8 +137,8 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
                 )
                 self.assertEqual(response.status_code, 400)
                 self.assertIn(
-                    "'url' property must not be empty",
-                    response.json().get("error", "")
+                    "'url' property is required and must not be empty",
+                    response.json().get("error", ""),
                 )
 
                 health = requests.get(self.url_ping_, timeout=10)
