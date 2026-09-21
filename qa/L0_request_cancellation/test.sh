@@ -412,6 +412,42 @@ else
 fi
 
 #
+# HTTP client disconnect tests
+#
+rm -rf models && mkdir models
+mkdir -p models/execute_cancel/1 && \
+    cp ../python_models/execute_cancel/model.py models/execute_cancel/1/ && \
+    cp ../python_models/execute_cancel/config.pbtxt models/execute_cancel/
+
+for TEST_CASE in "test_http_infer_client_disconnect" \
+                    "test_http_generate_client_disconnect" \
+                    "test_http_infer_client_connected"; do
+    TEST_LOG="./http_cancellation_test.$TEST_CASE.log"
+    SERVER_LOG="./http_cancellation_test.$TEST_CASE.server.log"
+
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+    SERVER_LOG=$SERVER_LOG python http_cancellation_test.py HttpCancellationTest.$TEST_CASE > $TEST_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** HTTP Cancellation Tests Failed on $TEST_CASE\n***"
+        cat $TEST_LOG
+        cat $SERVER_LOG
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
+
+#
 # Implicit state tests
 #
 rm -rf models && mkdir models
