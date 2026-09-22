@@ -32,9 +32,15 @@
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
+#include <event2/event.h>
+#include <event2/util.h>
 #include <re2/re2.h>
+#ifndef _WIN32
+#include <sys/socket.h>
+#endif
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdlib>
 #include <list>
 #include <regex>
@@ -4006,6 +4012,7 @@ HTTPAPIServer::InferRequestClass::RequestFiniHook(
     LOG_ERROR << "[INTERNAL] mismatched request in fini hook";
     return EVHTP_RES_ERROR;
   } else {
+    infer_request->StopDisconnectWatch();
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestCancel(
             infer_request->triton_request_.get()),
@@ -4013,6 +4020,69 @@ HTTPAPIServer::InferRequestClass::RequestFiniHook(
     infer_request->req_ = nullptr;
   }
   return EVHTP_RES_OK;
+}
+
+void
+HTTPAPIServer::InferRequestClass::StartDisconnectWatch(evhtp_connection_t* conn)
+{
+  if ((disconnect_ev_ != nullptr) || (conn == nullptr) ||
+      (conn->evbase == nullptr)) {
+    return;
+  }
+  disconnect_ev_ = event_new(
+      conn->evbase, conn->sock, EV_READ | EV_PERSIST, DisconnectWatchCallback,
+      reinterpret_cast<void*>(this));
+  if ((disconnect_ev_ != nullptr) &&
+      (event_add(disconnect_ev_, nullptr) != 0)) {
+    event_free(disconnect_ev_);
+    disconnect_ev_ = nullptr;
+  }
+}
+
+void
+HTTPAPIServer::InferRequestClass::StopDisconnectWatch()
+{
+  if (disconnect_ev_ != nullptr) {
+    event_free(disconnect_ev_);
+    disconnect_ev_ = nullptr;
+  }
+}
+
+void
+HTTPAPIServer::InferRequestClass::DisconnectWatchCallback(
+    evutil_socket_t fd, short events, void* arg)
+{
+  HTTPAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
+
+  // Peek so that any data stays in the socket for evhtp to read once the
+  // request is resumed.
+  char byte;
+  const auto nread = recv(fd, &byte, 1, MSG_PEEK);
+  if (nread > 0) {
+    // The client sent more data (e.g. a pipelined request) so the socket
+    // stays readable. A disconnect can't be detected without consuming that
+    // data, stop watching.
+    infer_request->StopDisconnectWatch();
+    return;
+  }
+  if (nread < 0) {
+    const int err = EVUTIL_SOCKET_ERROR();
+#ifdef _WIN32
+    if ((err == WSAEWOULDBLOCK) || (err == WSAEINTR)) {
+#else
+    if ((err == EAGAIN) || (err == EWOULDBLOCK) || (err == EINTR)) {
+#endif
+      return;
+    }
+  }
+
+  // The client closed the connection (nread == 0) or the socket is in error.
+  LOG_VERBOSE(1) << "HTTP client disconnected, cancelling inference request";
+  infer_request->StopDisconnectWatch();
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceRequestCancel(infer_request->triton_request_.get()),
+      "cancelling request");
 }
 
 HTTPAPIServer::InferRequestClass::InferRequestClass(
@@ -4030,6 +4100,7 @@ HTTPAPIServer::InferRequestClass::InferRequestClass(
   evhtp_request_set_hook(
       req_, evhtp_hook_on_request_fini, (evhtp_hook)(void*)RequestFiniHook,
       reinterpret_cast<void*>(this));
+  StartDisconnectWatch(htpconn);
 }
 
 void
