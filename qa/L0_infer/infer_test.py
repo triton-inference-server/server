@@ -61,8 +61,12 @@ DYNAMO_SKIP_VERSION = "model version selection: Dynamo routes by model name only
 USE_GRPC = os.environ.get("USE_GRPC", 1) != "0"
 USE_HTTP = os.environ.get("USE_HTTP", 1) != "0"
 # The Dynamo frontend exposes only the KServe gRPC endpoint, not HTTP/REST.
+# Dynamo images ship gRPC-only tritonclient (no gevent). Match infer_util.
 if DYNAMO:
     USE_HTTP = False
+    httpclient = None
+else:
+    import tritonclient.http as httpclient  # noqa: E402
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
 BACKENDS = os.environ.get(
@@ -530,6 +534,110 @@ class InferTest(tu.TestResultCollector):
             output0_raw=True,
             output1_raw=True,
             swap=False,
+        )
+
+    def _infer_torch_aoti(self, model_name, input0, input1, expected, dtype_str):
+        # AOTI add models: ARGS[0]/ARGS[1] -> RESULT. Not libtorch-shaped.
+        def _is_ready_http():
+            with httpclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8000"
+            ) as client:
+                return client.is_model_ready(model_name)
+
+        def _is_ready_grpc():
+            with grpcclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8001"
+            ) as client:
+                return client.is_model_ready(model_name)
+
+        ready = False
+        if USE_HTTP:
+            ready = _is_ready_http()
+        elif USE_GRPC:
+            ready = _is_ready_grpc()
+        if not ready:
+            self.skipTest(f"{model_name} not loaded in this L0_infer phase")
+
+        if USE_HTTP:
+            with httpclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8000"
+            ) as client:
+                inputs = [
+                    httpclient.InferInput("ARGS[0]", input0.shape, dtype_str),
+                    httpclient.InferInput("ARGS[1]", input1.shape, dtype_str),
+                ]
+                inputs[0].set_data_from_numpy(input0)
+                inputs[1].set_data_from_numpy(input1)
+                result = client.infer(
+                    model_name,
+                    inputs,
+                    outputs=[httpclient.InferRequestedOutput("RESULT")],
+                )
+                got = result.as_numpy("RESULT")
+                if np.issubdtype(expected.dtype, np.floating):
+                    self.assertTrue(
+                        np.allclose(got, expected),
+                        f"{model_name} HTTP RESULT mismatch",
+                    )
+                else:
+                    self.assertTrue(
+                        np.array_equal(got, expected),
+                        f"{model_name} HTTP RESULT mismatch",
+                    )
+
+        if USE_GRPC:
+            with grpcclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8001"
+            ) as client:
+                inputs = [
+                    grpcclient.InferInput("ARGS[0]", input0.shape, dtype_str),
+                    grpcclient.InferInput("ARGS[1]", input1.shape, dtype_str),
+                ]
+                inputs[0].set_data_from_numpy(input0)
+                inputs[1].set_data_from_numpy(input1)
+                result = client.infer(
+                    model_name,
+                    inputs,
+                    outputs=[grpcclient.InferRequestedOutput("RESULT")],
+                )
+                got = result.as_numpy("RESULT")
+                if np.issubdtype(expected.dtype, np.floating):
+                    self.assertTrue(
+                        np.allclose(got, expected),
+                        f"{model_name} gRPC RESULT mismatch",
+                    )
+                else:
+                    self.assertTrue(
+                        np.array_equal(got, expected),
+                        f"{model_name} gRPC RESULT mismatch",
+                    )
+
+    def test_torch_aoti_int8(self):
+        input0 = np.ones((1, 16), dtype=np.int8)
+        input1 = np.full((1, 16), 2, dtype=np.int8)
+        self._infer_torch_aoti(
+            "torch_aoti_int8_int8", input0, input1, input0 + input1, "INT8"
+        )
+
+    def test_torch_aoti_int32(self):
+        input0 = np.ones((1, 16), dtype=np.int32)
+        input1 = np.full((1, 16), 2, dtype=np.int32)
+        self._infer_torch_aoti(
+            "torch_aoti_int32_int32", input0, input1, input0 + input1, "INT32"
+        )
+
+    def test_torch_aoti_float16(self):
+        input0 = np.ones((1, 16), dtype=np.float16)
+        input1 = np.full((1, 16), 2.0, dtype=np.float16)
+        self._infer_torch_aoti(
+            "torch_aoti_float16_float16", input0, input1, input0 + input1, "FP16"
+        )
+
+    def test_torch_aoti_float32(self):
+        input0 = np.ones((1, 16), dtype=np.float32)
+        input1 = np.full((1, 16), 2.0, dtype=np.float32)
+        self._infer_torch_aoti(
+            "torch_aoti_float32_float32", input0, input1, input0 + input1, "FP32"
         )
 
     # shared memory does not support class output
@@ -1169,78 +1277,6 @@ class InferTest(tu.TestResultCollector):
                                 use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                                 use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                             )
-
-    def test_torch_aoti_float32(self):
-        # Light AOTI coverage: one existing add model (ARGS[0]/ARGS[1] -> RESULT).
-        # Not libtorch-shaped; infer_exact cannot be reused.
-        model_name = "torch_aoti_float32_float32"
-        input0 = np.ones((1, 16), dtype=np.float32)
-        input1 = np.full((1, 16), 2.0, dtype=np.float32)
-        expected = input0 + input1
-
-        def _is_ready_http():
-            import tritonclient.http as httpclient
-
-            with httpclient.InferenceServerClient(
-                f"{TRITONSERVER_IPADDR}:8000"
-            ) as client:
-                return client.is_model_ready(model_name)
-
-        def _is_ready_grpc():
-            with grpcclient.InferenceServerClient(
-                f"{TRITONSERVER_IPADDR}:8001"
-            ) as client:
-                return client.is_model_ready(model_name)
-
-        ready = False
-        if USE_HTTP:
-            ready = _is_ready_http()
-        elif USE_GRPC:
-            ready = _is_ready_grpc()
-        if not ready:
-            self.skipTest(f"{model_name} not loaded in this L0_infer phase")
-
-        if USE_HTTP:
-            import tritonclient.http as httpclient
-
-            with httpclient.InferenceServerClient(
-                f"{TRITONSERVER_IPADDR}:8000"
-            ) as client:
-                inputs = [
-                    httpclient.InferInput("ARGS[0]", input0.shape, "FP32"),
-                    httpclient.InferInput("ARGS[1]", input1.shape, "FP32"),
-                ]
-                inputs[0].set_data_from_numpy(input0)
-                inputs[1].set_data_from_numpy(input1)
-                result = client.infer(
-                    model_name,
-                    inputs,
-                    outputs=[httpclient.InferRequestedOutput("RESULT")],
-                )
-                self.assertTrue(
-                    np.allclose(result.as_numpy("RESULT"), expected),
-                    "torch_aoti HTTP RESULT mismatch",
-                )
-
-        if USE_GRPC:
-            with grpcclient.InferenceServerClient(
-                f"{TRITONSERVER_IPADDR}:8001"
-            ) as client:
-                inputs = [
-                    grpcclient.InferInput("ARGS[0]", input0.shape, "FP32"),
-                    grpcclient.InferInput("ARGS[1]", input1.shape, "FP32"),
-                ]
-                inputs[0].set_data_from_numpy(input0)
-                inputs[1].set_data_from_numpy(input1)
-                result = client.infer(
-                    model_name,
-                    inputs,
-                    outputs=[grpcclient.InferRequestedOutput("RESULT")],
-                )
-                self.assertTrue(
-                    np.allclose(result.as_numpy("RESULT"), expected),
-                    "torch_aoti gRPC RESULT mismatch",
-                )
 
 
 if __name__ == "__main__":

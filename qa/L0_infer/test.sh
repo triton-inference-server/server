@@ -73,9 +73,9 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
 fi
 
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
-    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="34"}
+    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="37"}
 else
-    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="47"}
+    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="50"}
 fi
 
 TEST_JETSON=${TEST_JETSON:=0}
@@ -307,6 +307,19 @@ function generate_model_repository() {
 
 }
 
+copy_torch_aoti_models() {
+    local dest_dir=$1
+    for m in torch_aoti_int8_int8 torch_aoti_int32_int32 \
+             torch_aoti_float16_float16 torch_aoti_float32_float32; do
+        src="${DATADIR}/qa_model_repository/${m}"
+        if [ ! -d "${src}" ]; then
+            echo -e "\n***\n*** Missing AOTI model: ${src}\n***"
+            exit 1
+        fi
+        cp -r "${src}" "${dest_dir}/."
+    done
+}
+
 for TARGET in cpu gpu; do
     if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
         if [ "$TARGET" == "gpu" ]; then
@@ -321,7 +334,7 @@ for TARGET in cpu gpu; do
     generate_model_repository
 
     if [ "$TARGET" == "gpu" ]; then
-        cp -r ${DATADIR}/qa_model_repository/torch_aoti_float32_float32 models/.
+        copy_torch_aoti_models models
     fi
 
     # Check if running a memory leak check
@@ -377,8 +390,8 @@ done
 if [ "$TEST_VALGRIND" -eq 1 ]; then
   TESTING_BACKENDS="python python_dlpack onnx"
   # VALGRIND_TESTS=1 omits version/ensemble methods, so this phase cannot
-  # share EXPECTED_NUM_TESTS with the first loop (47, or the GitLab pin).
-  EXPECTED_NUM_VALGRIND_BACKEND_TESTS=${EXPECTED_NUM_VALGRIND_BACKEND_TESTS:="37"}
+  # share EXPECTED_NUM_TESTS with the first loop (50, or the GitLab pin).
+  EXPECTED_NUM_VALGRIND_BACKEND_TESTS=${EXPECTED_NUM_VALGRIND_BACKEND_TESTS:="40"}
   if [[ "aarch64" != $(uname -m) ]] ; then
       pip3 install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   else
@@ -399,8 +412,8 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
         cp -fr ./models/custom_zero_1_float32 ./nobatch_models/.
       fi
       if [ "$TARGET" == "gpu" ]; then
-        cp -r ${DATADIR}/qa_model_repository/torch_aoti_float32_float32 models/.
-        cp -r ${DATADIR}/qa_model_repository/torch_aoti_float32_float32 nobatch_models/.
+        copy_torch_aoti_models models
+        copy_torch_aoti_models nobatch_models
       fi
 
       for BATCHING_MODE in batch nobatch; do
