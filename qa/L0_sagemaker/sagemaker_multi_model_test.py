@@ -44,6 +44,7 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
     def setUp(self):
         SAGEMAKER_BIND_TO_PORT = os.getenv("SAGEMAKER_BIND_TO_PORT", "8080")
         self.url_mme_ = "http://localhost:{}/models".format(SAGEMAKER_BIND_TO_PORT)
+        self.url_ping_ = "http://localhost:{}/ping".format(SAGEMAKER_BIND_TO_PORT)
 
         # model_1 setup
         self.model1_name = "sm_mme_model_1"
@@ -123,6 +124,25 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
             "true",
             "Variable SAGEMAKER_MULTI_MODEL must be set to true",
         )
+
+    def test_sm_0a_invalid_model_url(self):
+        headers = {"Content-Type": "application/json"}
+        for request_body in (
+            {"model_name": "invalid_url_test", "url": ""},
+            {"model_name": "invalid_url_test"},
+        ):
+            with self.subTest(request_body=request_body):
+                response = requests.post(
+                    self.url_mme_, json=request_body, headers=headers, timeout=10
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(
+                    "'url' property is required and must not be empty",
+                    response.json().get("error", ""),
+                )
+
+                health = requests.get(self.url_ping_, timeout=10)
+                self.assertEqual(health.status_code, 200)
 
     def test_sm_1_model_load(self):
         # Load model_1

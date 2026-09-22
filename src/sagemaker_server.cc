@@ -338,6 +338,15 @@ SagemakerAPIServer::ParseSageMakerRequest(
     }
   }
 
+  // An empty path can make std::filesystem::absolute() throw an exception and
+  // crash the server.
+  if (url_string.empty()) {
+    HTTP_RESPOND_IF_ERR(
+        req, TRITONSERVER_ErrorNew(
+                 TRITONSERVER_ERROR_INVALID_ARG,
+                 "'url' property is required and must not be empty"));
+  }
+
   std::filesystem::path url_path(url_string);
   url_path = std::filesystem::absolute(
       url_path.lexically_normal());  // Normalize the path to remove any
