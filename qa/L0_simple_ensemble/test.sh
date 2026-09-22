@@ -428,7 +428,9 @@ rm -rf ${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR}
 TEST_NAME="EnsembleBackpressureTest"
 SERVER_LOG="./ensemble_backpressure_test_server.log"
 CLIENT_LOG="./ensemble_backpressure_test_client.log"
-SERVER_ARGS="--model-repository=${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR}"
+# Shard the streaming completion queue so concurrent streams are not starved
+# on a single CQ (one CQ/handler per thread).
+SERVER_ARGS="--model-repository=${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR} --grpc-infer-cq-count=0 --grpc-infer-thread-count=16"
 rm -f $SERVER_LOG $CLIENT_LOG
 
 # Step 1 - decoupled_producer (batch size 2)
@@ -554,6 +556,53 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+
+######## Test '--grpc-infer-cq-count' command-line validation and boundary startup ########
+# The flag selects how many gRPC inference completion queues are created
+# (0 = one CQ per handler thread). Reject out-of-range/non-integer values and
+# start cleanly at the accepted boundaries.
+SERVER_LOG="./grpc_infer_cq_count_server.log"
+set +e
+
+# Invalid values must be rejected before the server starts serving.
+for cfg in "-1:Must be in the range 0 to 128" \
+           "129:Must be in the range 0 to 128" \
+           "abc:Invalid option value"; do
+    val="${cfg%%:*}"
+    msg="${cfg#*:}"
+    SERVER_ARGS="--model-repository=${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR} --grpc-infer-cq-count=${val}"
+    rm -f $SERVER_LOG
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        echo -e "\n***\n*** FAILED: server started with invalid --grpc-infer-cq-count=${val}\n***"
+        kill $SERVER_PID
+        wait $SERVER_PID
+        RET=1
+    elif ! grep -q "$msg" $SERVER_LOG; then
+        echo -e "\n***\n*** FAILED: missing expected error for --grpc-infer-cq-count=${val}\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+done
+
+# Accepted boundary values (1 = legacy single CQ, 128 = max) must start cleanly.
+# Thread count must be >= 2; clamp it so the max case still builds 128 CQs/handlers.
+for val in 1 128; do
+    thread_count=$(( val < 2 ? 2 : val ))
+    SERVER_ARGS="--model-repository=${ENSEMBLE_BACKPRESSURE_TEST_MODEL_DIR} --grpc-infer-cq-count=${val} --grpc-infer-thread-count=${thread_count}"
+    rm -f $SERVER_LOG
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** FAILED: server did not start with --grpc-infer-cq-count=${val}\n***"
+        cat $SERVER_LOG
+        RET=1
+    else
+        kill $SERVER_PID
+        wait $SERVER_PID
+    fi
+done
+set -e
 
 
 ######## Test invalid values for 'max_inflight_requests' config option ########
