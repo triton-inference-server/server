@@ -1174,6 +1174,7 @@ RUN apt-get update \\
             wget \\
             zlib1g-dev \\
             libarchive-dev \\
+            libevent-dev \\
             libxml2-dev \\
             libnuma-dev \\
             wget \\
