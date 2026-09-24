@@ -1,4 +1,4 @@
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,6 +49,7 @@ class TritonPythonModel:
         for request in requests:
             params = json.loads(request.parameters())
             rep_count = params["REPETITION"] if "REPETITION" in params else 1
+            header_text = params.get("x-generate-header")
 
             input_np = pb_utils.get_input_tensor_by_name(request, "PROMPT").as_numpy()
             stream_np = pb_utils.get_input_tensor_by_name(request, "STREAM").as_numpy()
@@ -62,9 +63,12 @@ class TritonPythonModel:
                     )
                 )
             else:
-                out_tensor = pb_utils.Tensor(
-                    "TEXT", np.repeat(input_np, rep_count, axis=1)
+                out_np = (
+                    np.asarray([[header_text]], dtype=object)
+                    if header_text is not None
+                    else np.repeat(input_np, rep_count, axis=1)
                 )
+                out_tensor = pb_utils.Tensor("TEXT", out_np)
                 responses.append(pb_utils.InferenceResponse([out_tensor]))
         return responses
 
@@ -75,11 +79,15 @@ class TritonPythonModel:
             fail_last = params["FAIL_LAST"] if "FAIL_LAST" in params else False
             delay = params["DELAY"] if "DELAY" in params else None
             output_0_dim = params["OUTPUT_0_DIM"] if "OUTPUT_0_DIM" in params else False
+            header_text = params.get("x-generate-header")
 
             sender = request.get_response_sender()
             input_np = pb_utils.get_input_tensor_by_name(request, "PROMPT").as_numpy()
             stream_np = pb_utils.get_input_tensor_by_name(request, "STREAM").as_numpy()
-            out_value = np.array([]) if output_0_dim else input_np
+            if header_text is not None:
+                out_value = np.asarray([[header_text]], dtype=object)
+            else:
+                out_value = np.array([]) if output_0_dim else input_np
             out_tensor = pb_utils.Tensor("TEXT", out_value)
             response = pb_utils.InferenceResponse([out_tensor])
             # If stream enabled, just send multiple copies of response
