@@ -1,4 +1,4 @@
-// Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -103,35 +103,6 @@ std::string
 ShapeToString(const std::vector<int64_t>& shape)
 {
   return ShapeToString(shape.data(), shape.size());
-}
-
-int64_t
-GetElementCount(const std::vector<int64_t>& dims)
-{
-  bool first = true;
-  int64_t cnt = 0;
-  for (auto dim : dims) {
-    if (dim == WILDCARD_DIM) {
-      return -1;
-    } else if (dim < 0) {  // invalid dim
-      return -2;
-    } else if (dim == 0) {
-      return 0;
-    }
-
-    if (first) {
-      cnt = dim;
-      first = false;
-    } else {
-      // Check for overflow before multiplication
-      if (cnt > (INT64_MAX / dim)) {
-        return -3;
-      }
-      cnt *= dim;
-    }
-  }
-
-  return cnt;
 }
 
 bool
