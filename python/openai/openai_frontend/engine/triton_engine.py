@@ -100,6 +100,8 @@ from schemas.openai import (
 )
 from utils.utils import ClientError, ServerError
 
+MAX_EMBEDDING_BATCH_SIZE = 2048
+
 logger = logging.getLogger(__name__)
 
 
@@ -1249,6 +1251,17 @@ class TritonLLMEngine(LLMEngine):
         if not metadata.embedding_request_converter:
             raise ServerError(
                 f"Unknown embedding request format for model: {request.model}"
+            )
+
+        # Bound child inference count without limiting a single tokenized input.
+        if (
+            isinstance(request.input, list)
+            and len(request.input) > MAX_EMBEDDING_BATCH_SIZE
+            and isinstance(request.input[0], str)
+        ):
+            raise ClientError(
+                f"Text batches support at most {MAX_EMBEDDING_BATCH_SIZE} inputs; "
+                f"received {len(request.input)}."
             )
 
     def _should_stream_with_auto_tool_parsing(

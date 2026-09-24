@@ -124,6 +124,13 @@ def engine_and_model(monkeypatch):
         ([101.0], [[101]]),
         (["hello"], ["hello"]),
         (["101", "102"], ["101", "102"]),
+        pytest.param("x" * 2049, ["x" * 2049], id="long-scalar-text"),
+        pytest.param([101] * 2049, [[101] * 2049], id="long-token-sequence"),
+        pytest.param(
+            [101] + ["102"] * 2048,
+            [[101] + [102] * 2048],
+            id="long-coerced-token-sequence",
+        ),
     ],
 )
 async def test_embedding_input_forms(engine_and_model, value, expected_inputs):
@@ -156,6 +163,32 @@ def test_invalid_batch_submits_nothing(engine_and_model, value):
     assert response.status_code == 422
     model.create_request.assert_not_called()
     model.async_infer.assert_not_called()
+
+
+@pytest.mark.parametrize("text", ["hello", "101"])
+@pytest.mark.parametrize("size, status_code", [(2048, 200), (2049, 400)])
+def test_text_batch_size_limit(engine_and_model, text, size, status_code):
+    engine, model = engine_and_model
+    app = FastAPI()
+    app.include_router(embeddings.router)
+    app.engine = engine
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/embeddings", json={"model": "test-model", "input": [text] * size}
+        )
+
+    assert response.status_code == status_code
+    if status_code == 400:
+        assert "2048" in response.json()["detail"]
+        model.create_request.assert_not_called()
+        model.async_infer.assert_not_called()
+    else:
+        submitted = [
+            json.loads(call.args[0].inputs["embedding_request"][0])["input"]
+            for call in model.async_infer.call_args_list
+        ]
+        assert submitted == [text] * size
+        assert [item["index"] for item in response.json()["data"]] == list(range(size))
 
 
 @pytest.mark.asyncio
