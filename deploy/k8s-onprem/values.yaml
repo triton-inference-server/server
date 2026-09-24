@@ -81,4 +81,4 @@ prometheus-adapter:
         name:
           matches: "nv_inference_queue_duration_us"
           as: "avg_time_queue_us"
-        metricsQuery: 'avg(delta(nv_inference_queue_duration_us{<<.LabelMatchers>>}[30s])/(1+delta(nv_inference_request_success{<<.LabelMatchers>>}[30s]))) by (<<.GroupBy>>)'
+        metricsQuery: 'sum(increase(nv_inference_queue_duration_us{<<.LabelMatchers>>}[30s])) by (<<.GroupBy>>) / clamp_min(sum(increase(nv_inference_request_success{<<.LabelMatchers>>}[30s])) by (<<.GroupBy>>), 1)'
