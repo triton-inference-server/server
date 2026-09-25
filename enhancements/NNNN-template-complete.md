@@ -81,7 +81,7 @@ Goals may be aspirational / difficult to measure but guide the proposal.
 List out any items which are out of scope / specifically not required in bullet points.
 Indicates the scope of the proposal and issue being resolved.
 
-### Requirements
+## Requirements
 
 **\[Optional \- if not applicable omit\]**
 
@@ -89,7 +89,7 @@ List out any additional requirements in numbered subheadings.
 
 **\<numbered subheadings\>**
 
-#### REQ \<\#\> \<Title\>
+### REQ \<\#\> \<Title\>
 
 Describe the requirement in as much detail as necessary for others to understand it and how it applies to the TEP.
 Keep in mind that requirements should be measurable and will be used to determine if a TEP has been successfully implemented or not.
