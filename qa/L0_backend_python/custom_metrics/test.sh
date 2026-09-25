@@ -30,7 +30,7 @@ CLIENT_LOG="./custom_metrics_client.log"
 TEST_RESULT_FILE='test_results.txt'
 source ../../common/util.sh
 
-SERVER_ARGS="--model-repository=${MODELDIR}/custom_metrics/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS="--model-repository=${MODELDIR}/custom_metrics/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --load-model=* --log-verbose=1"
 SERVER_LOG="./custom_metrics_server.log"
 
 RET=0
@@ -39,6 +39,10 @@ rm -fr *.log ./models *.txt
 mkdir -p models/custom_metrics/1/
 cp ../../python_models/custom_metrics/model.py models/custom_metrics/1/
 cp ../../python_models/custom_metrics/config.pbtxt models/custom_metrics
+
+mkdir -p models/custom_metrics_reload/1/
+cp ../../python_models/custom_metrics_reload/model.py models/custom_metrics_reload/1/
+cp ../../python_models/custom_metrics_reload/config.pbtxt models/custom_metrics_reload
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -53,6 +57,13 @@ export MODEL_NAME='custom_metrics'
 python3 -m pytest --junitxml="${MODEL_NAME}.report.xml" $CLIENT_PY >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** 'Custom Metrics' test FAILED. \n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+
+python3 -m pytest --junitxml="custom_metrics_reload.report.xml" custom_metrics_reload_test.py >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** 'Custom Metrics Reload' test FAILED. \n***"
     cat $CLIENT_LOG
     RET=1
 fi
