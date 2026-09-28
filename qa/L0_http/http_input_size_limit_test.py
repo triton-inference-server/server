@@ -826,15 +826,17 @@ class InferSizeLimitTest(TestResultCollector):
         self.assertIn(" bytes exceeds the maximum allowed input size of ", error_msg)
         self.assertIn("Use --http-max-input-size to increase the limit.", error_msg)
 
-        # Control: the same split shape with small inputs must NOT be rejected
-        # for size, so the fix does not over-block legitimate nested parameters.
+        # Control: the same split shape with small inputs must be accepted, so
+        # the fix does not over-block legitimate nested parameters. A plain 200
+        # (not just the absence of the size error) proves the request succeeds.
         small = [1] * 16
         ok_payload = {"INPUT0": small, "parameters": {"INPUT1": small}}
         response = requests.post(url, headers=headers, json=ok_payload)
-        self.assertNotIn(
-            "exceeds the maximum allowed input size of",
-            response.content.decode(),
-            "A small nested-parameters request was wrongly rejected for size",
+        self.assertEqual(
+            200,
+            response.status_code,
+            "A small nested-parameters request should be accepted "
+            "(got {}): {!r}".format(response.status_code, response.content[:200]),
         )
 
 
