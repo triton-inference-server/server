@@ -25,6 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Local test modules are imported after adjusting sys.path for ../common.
+# flake8: noqa: E402
 import sys
 
 sys.path.append("../common")
@@ -37,7 +39,7 @@ import unittest
 
 import numpy as np
 import requests
-from test_util import GIB, MIB, TestResultCollector, get_server_process_from_env
+from test_util import MIB, TestResultCollector, get_server_process_from_env
 
 # Constants for size calculations
 # Each FP32 value is 4 bytes, so we need to divide target byte sizes by 4 to get element counts
