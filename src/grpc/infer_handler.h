@@ -1709,6 +1709,12 @@ class ModelInferHandler
 };
 
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+inline opentelemetry::nostd::string_view
+GrpcMetadataValueView(const ::grpc::string_ref& value) noexcept
+{
+  return {value.data(), value.size()};
+}
+
 class GrpcServerCarrier : public otel_cntxt::propagation::TextMapCarrier {
  public:
   GrpcServerCarrier(::grpc::ServerContext* context) : context_(context) {}
@@ -1718,7 +1724,7 @@ class GrpcServerCarrier : public otel_cntxt::propagation::TextMapCarrier {
   {
     auto it = context_->client_metadata().find({key.data(), key.size()});
     if (it != context_->client_metadata().end()) {
-      return {it->second.data(), it->second.size()};
+      return GrpcMetadataValueView(it->second);
     }
     return "";
   }
