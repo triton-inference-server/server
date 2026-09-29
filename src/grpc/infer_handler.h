@@ -1718,7 +1718,7 @@ class GrpcServerCarrier : public otel_cntxt::propagation::TextMapCarrier {
   {
     auto it = context_->client_metadata().find({key.data(), key.size()});
     if (it != context_->client_metadata().end()) {
-      return it->second.data();
+      return {it->second.data(), it->second.size()};
     }
     return "";
   }
