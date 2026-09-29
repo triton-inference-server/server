@@ -45,7 +45,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 class MockS3AddressingService:
-    def __init__(self, address="localhost", port=8080, bucket="dummy-bucket"):
+    def __init__(self, address="0.0.0.0", port=8080, bucket="dummy-bucket"):
         self.__address = address
         self.__port = port
         self.__bucket = bucket

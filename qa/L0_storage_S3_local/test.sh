@@ -387,6 +387,24 @@ fi
 # is purely on the observed addressing style.
 ADDR_BUCKET="dummy-bucket"
 ADDR_PORT=8080
+# Virtual-hosted-style addressing makes the S3 client connect to
+# "<bucket>.localhost". Whether "*.localhost" resolves to loopback is
+# platform/resolver dependent (not all runners special-case it beyond the bare
+# "localhost"), so map the bucket-prefixed hostname to loopback explicitly to
+# guarantee the request reaches the mock. Without this the virtual-hosted cases
+# could time out on name resolution and fail regardless of the addressing style
+# the client actually chose.
+ADDR_VHOST="${ADDR_BUCKET}.localhost"
+ADDR_HOSTS_LINE="127.0.0.1 ${ADDR_VHOST}"
+ADDR_HOSTS_ADDED=0
+if ! grep -qE "[[:space:]]${ADDR_VHOST}(\$|[[:space:]])" /etc/hosts; then
+    if echo "${ADDR_HOSTS_LINE}" >> /etc/hosts 2>/dev/null; then
+        ADDR_HOSTS_ADDED=1
+    else
+        echo "*** Warning: could not add ${ADDR_VHOST} to /etc/hosts;"
+        echo "*** virtual-hosted-style cases rely on it resolving to loopback."
+    fi
+fi
 
 run_addressing_case() {
     # $1: expected style ("path" or "virtual"); remaining args: extra server env
@@ -469,6 +487,13 @@ run_addressing_case "virtual"
 unset S3_USE_VIRTUAL_ADDRESSING
 unset TRITON_CLOUD_CREDENTIAL_PATH
 rm -f ${CRED_FILE_NOFLAG}
+
+# Remove the /etc/hosts mapping if we added it.
+if [ "${ADDR_HOSTS_ADDED}" = "1" ]; then
+    grep -vE "^127\.0\.0\.1[[:space:]]+${ADDR_VHOST}\$" /etc/hosts > /etc/hosts.addr_tmp 2>/dev/null \
+        && cat /etc/hosts.addr_tmp > /etc/hosts
+    rm -f /etc/hosts.addr_tmp
+fi
 
 # Print and return test result
 if [ $RET -eq 0 ]; then
