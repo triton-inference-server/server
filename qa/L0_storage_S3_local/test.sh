@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -376,6 +376,76 @@ else
         RET=1
     fi
 fi
+
+# Test S3 addressing style (path-style vs virtual-hosted-style).
+#
+# Verifies the S3_USE_VIRTUAL_ADDRESSING env var and the use_virtual_addressing
+# credential-file field control how the S3 client addresses the bucket. The mock
+# service records whether requests arrive path-style (Host: <endpoint>) or
+# virtual-hosted-style (Host: <bucket>.<endpoint>). The server is expected to
+# fail to start (the mock does not serve a real model repository); the assertion
+# is purely on the observed addressing style.
+ADDR_BUCKET="dummy-bucket"
+ADDR_PORT=8080
+
+run_addressing_case() {
+    # $1: expected style ("path" or "virtual"); remaining args: extra server env
+    local expect=$1; shift
+    local test_log="./addressing_${expect}_$$.log"
+    local server_log="./addressing_${expect}_$$.server.log"
+    python3 mock_s3_addressing_service.py --port ${ADDR_PORT} --bucket ${ADDR_BUCKET} \
+        --expect ${expect} --timeout 15 > ${test_log} 2>&1 &
+    local mock_pid=$!
+    sleep 2  # make sure the mock service has started
+
+    SERVER_LOG="${server_log}"
+    SERVER_ARGS="--model-repository=s3://localhost:${ADDR_PORT}/${ADDR_BUCKET} --exit-timeout-secs=120"
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        echo -e "\n***\n*** Unexpected server start $SERVER (addressing ${expect})\n***"
+        cat $SERVER_LOG
+        kill $SERVER_PID
+        wait $SERVER_PID
+        RET=1
+    fi
+
+    wait ${mock_pid}
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** S3 addressing test failed: expected ${expect}-style requests\n***"
+        cat ${test_log}
+        RET=1
+    fi
+}
+
+echo "=== Running S3 addressing style tests ==="
+
+# 1. Default: no setting -> path-style (preserves existing behavior).
+unset S3_USE_VIRTUAL_ADDRESSING
+unset TRITON_CLOUD_CREDENTIAL_PATH
+run_addressing_case "path"
+
+# 2. Env var S3_USE_VIRTUAL_ADDRESSING=true -> virtual-hosted-style.
+export S3_USE_VIRTUAL_ADDRESSING=true
+run_addressing_case "virtual"
+unset S3_USE_VIRTUAL_ADDRESSING
+
+# 3. Credential-file field use_virtual_addressing=true -> virtual-hosted-style.
+CRED_FILE="./addressing_cred_$$.json"
+cat > ${CRED_FILE} <<EOF
+{
+  "s3": {
+    "": {
+      "key_id": "${AWS_ACCESS_KEY_ID}",
+      "secret_key": "${AWS_SECRET_ACCESS_KEY}",
+      "use_virtual_addressing": true
+    }
+  }
+}
+EOF
+export TRITON_CLOUD_CREDENTIAL_PATH=${CRED_FILE}
+run_addressing_case "virtual"
+unset TRITON_CLOUD_CREDENTIAL_PATH
+rm -f ${CRED_FILE}
 
 # Print and return test result
 if [ $RET -eq 0 ]; then
