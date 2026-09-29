@@ -407,10 +407,12 @@ if ! grep -qE "[[:space:]]${ADDR_VHOST}(\$|[[:space:]])" /etc/hosts; then
 fi
 
 run_addressing_case() {
-    # $1: expected style ("path" or "virtual"); remaining args: extra server env
-    local expect=$1; shift
-    local test_log="./addressing_${expect}_$$.log"
-    local server_log="./addressing_${expect}_$$.server.log"
+    # $1: distinct label for log filenames
+    # $2: expected style ("path" or "virtual")
+    local label=$1
+    local expect=$2
+    local test_log="./addressing_${label}_$$.log"
+    local server_log="./addressing_${label}_$$.server.log"
     python3 mock_s3_addressing_service.py --port ${ADDR_PORT} --bucket ${ADDR_BUCKET} \
         --expect ${expect} --timeout 15 > ${test_log} 2>&1 &
     local mock_pid=$!
@@ -420,16 +422,21 @@ run_addressing_case() {
     SERVER_ARGS="--model-repository=s3://localhost:${ADDR_PORT}/${ADDR_BUCKET} --exit-timeout-secs=120"
     run_server
     if [ "$SERVER_PID" != "0" ]; then
-        echo -e "\n***\n*** Unexpected server start $SERVER (addressing ${expect})\n***"
+        echo -e "\n***\n*** Unexpected server start $SERVER (addressing ${label})\n***"
         cat $SERVER_LOG
         kill $SERVER_PID
         wait $SERVER_PID
         RET=1
     fi
 
+    # Capture the mock's exit status without letting `set -e` abort the script
+    # on a failing case, so the failure is reported and later cleanup still runs.
+    set +e
     wait ${mock_pid}
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** S3 addressing test failed: expected ${expect}-style requests\n***"
+    local mock_status=$?
+    set -e
+    if [ ${mock_status} -ne 0 ]; then
+        echo -e "\n***\n*** S3 addressing test failed: expected ${expect}-style requests (${label})\n***"
         cat ${test_log}
         RET=1
     fi
@@ -437,18 +444,35 @@ run_addressing_case() {
 
 echo "=== Running S3 addressing style tests ==="
 
+# Ensure the /etc/hosts mapping and any generated credential files are removed
+# even if a case fails and `set -e` aborts the script mid-way.
+ADDR_CRED_FILES=""
+cleanup_addressing() {
+    if [ "${ADDR_HOSTS_ADDED}" = "1" ]; then
+        grep -vE "^127\.0\.0\.1[[:space:]]+${ADDR_VHOST}\$" /etc/hosts > /etc/hosts.addr_tmp 2>/dev/null \
+            && cat /etc/hosts.addr_tmp > /etc/hosts
+        rm -f /etc/hosts.addr_tmp
+        ADDR_HOSTS_ADDED=0
+    fi
+    if [ -n "${ADDR_CRED_FILES}" ]; then
+        rm -f ${ADDR_CRED_FILES}
+    fi
+}
+trap cleanup_addressing EXIT
+
 # 1. Default: no setting -> path-style (preserves existing behavior).
 unset S3_USE_VIRTUAL_ADDRESSING
 unset TRITON_CLOUD_CREDENTIAL_PATH
-run_addressing_case "path"
+run_addressing_case "default_path" "path"
 
 # 2. Env var S3_USE_VIRTUAL_ADDRESSING=true -> virtual-hosted-style.
 export S3_USE_VIRTUAL_ADDRESSING=true
-run_addressing_case "virtual"
+run_addressing_case "envvar_virtual" "virtual"
 unset S3_USE_VIRTUAL_ADDRESSING
 
 # 3. Credential-file field use_virtual_addressing=true -> virtual-hosted-style.
 CRED_FILE="./addressing_cred_$$.json"
+ADDR_CRED_FILES="${ADDR_CRED_FILES} ${CRED_FILE}"
 cat > ${CRED_FILE} <<EOF
 {
   "s3": {
@@ -461,7 +485,7 @@ cat > ${CRED_FILE} <<EOF
 }
 EOF
 export TRITON_CLOUD_CREDENTIAL_PATH=${CRED_FILE}
-run_addressing_case "virtual"
+run_addressing_case "credfile_virtual" "virtual"
 unset TRITON_CLOUD_CREDENTIAL_PATH
 rm -f ${CRED_FILE}
 
@@ -471,6 +495,7 @@ rm -f ${CRED_FILE}
 #    (the env-var constructor is not invoked when TRITON_CLOUD_CREDENTIAL_PATH
 #    is set, so the JSON path must fall back to the env var).
 CRED_FILE_NOFLAG="./addressing_cred_noflag_$$.json"
+ADDR_CRED_FILES="${ADDR_CRED_FILES} ${CRED_FILE_NOFLAG}"
 cat > ${CRED_FILE_NOFLAG} <<EOF
 {
   "s3": {
@@ -483,17 +508,14 @@ cat > ${CRED_FILE_NOFLAG} <<EOF
 EOF
 export TRITON_CLOUD_CREDENTIAL_PATH=${CRED_FILE_NOFLAG}
 export S3_USE_VIRTUAL_ADDRESSING=true
-run_addressing_case "virtual"
+run_addressing_case "credfile_envvar_virtual" "virtual"
 unset S3_USE_VIRTUAL_ADDRESSING
 unset TRITON_CLOUD_CREDENTIAL_PATH
 rm -f ${CRED_FILE_NOFLAG}
 
-# Remove the /etc/hosts mapping if we added it.
-if [ "${ADDR_HOSTS_ADDED}" = "1" ]; then
-    grep -vE "^127\.0\.0\.1[[:space:]]+${ADDR_VHOST}\$" /etc/hosts > /etc/hosts.addr_tmp 2>/dev/null \
-        && cat /etc/hosts.addr_tmp > /etc/hosts
-    rm -f /etc/hosts.addr_tmp
-fi
+# Best-effort cleanup here as well; the EXIT trap guarantees it on failure.
+cleanup_addressing
+trap - EXIT
 
 # Print and return test result
 if [ $RET -eq 0 ]; then
