@@ -302,7 +302,7 @@ export TRITON_CLOUD_CREDENTIAL_PATH="cloud_credential.json"
 
 To match a credential, the longest matching credential name against the start of a given path is used. For example: `gs://gcs-bucket-002/model_repository` will match the "gs://gcs-bucket-002" GCS credential, and `gs://any-other-gcs-bucket` will match the "" GCS credential.
 
-The optional `"use_virtual_addressing"` boolean field in an S3 credential block controls the S3 addressing style for matching paths (default `false` = path-style). Set it to `true` for S3-compatible stores that require virtual-hosted-style addressing. This is equivalent to the `S3_USE_VIRTUAL_ADDRESSING` environment variable.
+The optional `"use_virtual_addressing"` boolean field in an S3 credential block controls the S3 addressing style for matching paths (default `false` = path-style). Set it to `true` for S3-compatible stores that require virtual-hosted-style addressing. This is equivalent to the `S3_USE_VIRTUAL_ADDRESSING` environment variable. When the field is present in the credential block it takes precedence; when it is omitted, Triton falls back to the `S3_USE_VIRTUAL_ADDRESSING` environment variable, so the environment variable remains effective even when `TRITON_CLOUD_CREDENTIAL_PATH` is set.
 
 This feature is intended for use-cases which multiple credentials are needed for each cloud storage provider. Be sure to replace any credential paths/keys with the actual paths/keys from the example above.
 

@@ -447,6 +447,29 @@ run_addressing_case "virtual"
 unset TRITON_CLOUD_CREDENTIAL_PATH
 rm -f ${CRED_FILE}
 
+# 4. Credential file present but WITHOUT the use_virtual_addressing field, with
+#    the S3_USE_VIRTUAL_ADDRESSING env var set -> virtual-hosted-style. This
+#    guards against the credential-file path ignoring the environment variable
+#    (the env-var constructor is not invoked when TRITON_CLOUD_CREDENTIAL_PATH
+#    is set, so the JSON path must fall back to the env var).
+CRED_FILE_NOFLAG="./addressing_cred_noflag_$$.json"
+cat > ${CRED_FILE_NOFLAG} <<EOF
+{
+  "s3": {
+    "": {
+      "key_id": "${AWS_ACCESS_KEY_ID}",
+      "secret_key": "${AWS_SECRET_ACCESS_KEY}"
+    }
+  }
+}
+EOF
+export TRITON_CLOUD_CREDENTIAL_PATH=${CRED_FILE_NOFLAG}
+export S3_USE_VIRTUAL_ADDRESSING=true
+run_addressing_case "virtual"
+unset S3_USE_VIRTUAL_ADDRESSING
+unset TRITON_CLOUD_CREDENTIAL_PATH
+rm -f ${CRED_FILE_NOFLAG}
+
 # Print and return test result
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
