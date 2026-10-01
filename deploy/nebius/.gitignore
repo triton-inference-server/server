@@ -1,0 +1,5 @@
+/build/
+/receipts/
+/reference.json
+/.env*
+__pycache__/
