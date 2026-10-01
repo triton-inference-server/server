@@ -286,6 +286,7 @@ class HTTPAPIServer : public HTTPServer {
 
     virtual ~InferRequestClass()
     {
+      StopDisconnectWatch();
       if (req_ != nullptr) {
         evhtp_request_unset_hook(req_, evhtp_hook_on_request_fini);
       }
@@ -365,6 +366,17 @@ class HTTPAPIServer : public HTTPServer {
 
     // Event hook for called before request deletion
     static evhtp_res RequestFiniHook(evhtp_request* req, void* arg);
+
+    // evhtp stops reading from the connection while the request is paused,
+    // so a client disconnect is otherwise not noticed until a response is
+    // written. Watch the socket for the lifetime of the request and cancel
+    // the inference request if the client goes away. Must be called on the
+    // evhtp thread that owns the connection.
+    void StartDisconnectWatch(evhtp_connection_t* conn);
+    void StopDisconnectWatch();
+    static void DisconnectWatchCallback(
+        evutil_socket_t fd, short events, void* arg);
+    struct event* disconnect_ev_{nullptr};
 
     // Pointer to associated Triton request, this class does not own the
     // request and must not reference it after a successful
