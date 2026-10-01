@@ -47,8 +47,10 @@ class GenerateEndpointTest(tu.TestResultCollector):
     def _get_infer_url(self, model_name, route):
         return f"http://localhost:8000/v2/models/{model_name}/{route}"
 
-    def generate_stream(self, model_name, inputs, stream=False):
-        headers = {"Accept": "text/event-stream"}
+    def generate_stream(self, model_name, inputs, stream=False, headers=None):
+        request_headers = {"Accept": "text/event-stream"}
+        if headers is not None:
+            request_headers.update(headers)
         url = self._get_infer_url(model_name, "generate_stream")
         # stream=True used to indicate response can be iterated over, which
         # should be the common setting for generate_stream.
@@ -57,14 +59,16 @@ class GenerateEndpointTest(tu.TestResultCollector):
         return requests.post(
             url,
             data=inputs if isinstance(inputs, str) else json.dumps(inputs),
-            headers=headers,
+            headers=request_headers,
             stream=stream,
         )
 
-    def generate(self, model_name, inputs):
+    def generate(self, model_name, inputs, headers=None):
         url = self._get_infer_url(model_name, "generate")
         return requests.post(
-            url, data=inputs if isinstance(inputs, str) else json.dumps(inputs)
+            url,
+            data=inputs if isinstance(inputs, str) else json.dumps(inputs),
+            headers=headers,
         )
 
     def generate_expect_failure(self, model_name, inputs, msg):
@@ -200,6 +204,22 @@ class GenerateEndpointTest(tu.TestResultCollector):
         self.assertNotIn("id", data)
         self.assertIn("TEXT", data)
         self.assertEqual(text, data["TEXT"])
+
+    def test_generate_forwards_http_headers_to_parameters(self):
+        text = "hello world"
+        header_value = "forwarded header value"
+        headers = {"x-generate-header": header_value}
+        inputs = {"PROMPT": text, "STREAM": False}
+
+        r = self.generate("mock_llm_ensemble", inputs, headers=headers)
+        r.raise_for_status()
+
+        self.assertIn("Content-Type", r.headers)
+        self.assertEqual(r.headers["Content-Type"], "application/json")
+
+        data = r.json()
+        self.assertIn("TEXT", data)
+        self.assertEqual(header_value, data["TEXT"])
 
     def test_generate_stream(self):
         # Setup text-based input

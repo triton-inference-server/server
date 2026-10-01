@@ -697,7 +697,7 @@ wait $SERVER_PID
 # https://github.com/mpetazzoni/sseclient
 pip install sseclient-py psutil
 
-SERVER_ARGS="--model-repository=`pwd`/../python_models/generate_models --log-verbose=1"
+SERVER_ARGS="--model-repository=`pwd`/../python_models/generate_models --log-verbose=1 --http-header-forward-pattern x-generate-header"
 SERVER_LOG="./inference_server_generate_endpoint_test.log"
 CLIENT_LOG="./generate_endpoint_test.log"
 run_server
@@ -710,7 +710,7 @@ fi
 ## Python Unit Tests
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=generate_endpoint_test.py
-EXPECTED_NUM_TESTS=18
+EXPECTED_NUM_TESTS=19
 set +e
 python $PYTHON_TEST > $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
