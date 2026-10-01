@@ -58,25 +58,30 @@ def get_server_process_from_env(env_var="SERVER_PID"):
         raise AssertionError(f"Invalid or stale {env_var}={pid_str!r}: {e}")
 
 
-def wait_for_stable_rss(server, rss_tolerance_bytes=0.1 * MIB, stable_threshold=10):
-    """
-    Wait until the RSS of the server is stable.
-    """
+def wait_for_stable_rss(
+    server, rss_tolerance_bytes=0.1 * MIB, stable_threshold=10, timeout_seconds=30
+):
+    """Wait for a quiet RSS sample window, failing if it never settles."""
     import time
+    from collections import deque
 
-    last_rss = None
-    stable_count = 0
+    samples = deque(maxlen=stable_threshold + 1)
+    deadline = time.monotonic() + timeout_seconds
     while True:
         rss = server.memory_info().rss
-        if last_rss is not None and abs(rss - last_rss) < rss_tolerance_bytes:
-            stable_count += 1
-        else:
-            stable_count = 0
-        last_rss = rss
-        if stable_count >= stable_threshold:
-            break
+        samples.append(rss)
+        # Comparing the whole window also detects gradual cumulative growth.
+        if (
+            len(samples) == samples.maxlen
+            and max(samples) - min(samples) < rss_tolerance_bytes
+        ):
+            return
+        if time.monotonic() >= deadline:
+            raise AssertionError(
+                f"Server RSS did not stabilize within {timeout_seconds}s; "
+                f"last samples: {list(samples)}"
+            )
         time.sleep(0.1)
-    return
 
 
 def shape_element_count(shape):
