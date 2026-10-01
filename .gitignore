@@ -19,6 +19,11 @@ qa/common/gen.*.cmds
 
 # Test exclusions
 qa/L0_openai/openai
+
+# L0_backend_python_pytest: generated model repos, server logs, cloned
+# backends, and JUnit XML all land under each scenario's output/ so a run
+# can be cleaned up with one `rm -rf` without touching source.
+qa/L0_backend_python_pytest/*/output/
 tensorrtllm_models
 tensorrtllm_mistral_models/
 custom_tokenizer
