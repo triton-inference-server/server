@@ -55,6 +55,7 @@ all_tests=("test_params"
            "test_params_reserved_rejected"
            "test_headers"
            "test_grpc_header_forward_pattern_case_sensitive"
+           "test_http_header_forward_pattern_generate"
            "test_headers_reserved_rejected")
 
 RET=0
@@ -70,6 +71,9 @@ for test in "${all_tests[@]}"; do
   # https://github.com/geventhttpclient/geventhttpclient/blob/d1e14356c3b02099c879cf9b3bdb684a0cbd8bf5/src/geventhttpclient/header.py#L62-L63
   elif [ "$test" == "test_grpc_header_forward_pattern_case_sensitive" ]; then
     SERVER_ARGS+=" --grpc-header-forward-pattern (?-i)MY_HEADER.*"
+  elif [ "$test" == "test_http_header_forward_pattern_generate" ]; then
+    # Regression test for issue #8790: /generate must honor the pattern too.
+    SERVER_ARGS+=" --http-header-forward-pattern MY_HEADER.*"
   elif [ "$test" == "test_headers_reserved_rejected" ]; then
     SERVER_ARGS+=" --grpc-header-forward-pattern .*"
     SERVER_ARGS+=" --http-header-forward-pattern .*"
