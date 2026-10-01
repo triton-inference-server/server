@@ -3547,9 +3547,11 @@ HTTPAPIServer::HandleGenerate(
   RETURN_AND_CALLBACK_IF_ERR(
       ParseJsonTritonRequestID(request, irequest), error_callback);
 
+  size_t consumed_input_size{0};
   RETURN_AND_CALLBACK_IF_ERR(
       generate_request->ConvertGenerateRequest(
-          input_metadata, generate_request->RequestSchema(), request),
+          input_metadata, generate_request->RequestSchema(), request,
+          consumed_input_size),
       error_callback);
 
   auto request_release_payload =
@@ -3630,13 +3632,12 @@ TRITONSERVER_Error*
 HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
     std::map<std::string, triton::common::TritonJson::Value>& input_metadata,
     const MappingSchema* schema,
-    triton::common::TritonJson::Value& generate_request)
+    triton::common::TritonJson::Value& generate_request,
+    size_t& consumed_input_size)
 {
   // First find all top-level keys in JSON
   std::vector<std::string> members;
   RETURN_IF_ERR(generate_request.Members(&members));
-
-  size_t consumed_input_size{0};
 
   for (const auto& m : members) {
     auto it = schema->children_.find(m);
@@ -3665,7 +3666,8 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
               "Expected JSON object for keyword: '" + m + "'");
           RETURN_MSG_IF_ERR(
               ConvertGenerateRequest(
-                  input_metadata, it->second.get(), nested_generate_request),
+                  input_metadata, it->second.get(), nested_generate_request,
+                  consumed_input_size),
               "Converting keyword: '" + m + "'");
           break;
         }
