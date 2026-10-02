@@ -1700,6 +1700,12 @@ def create_build_dockerfiles(
 
     if "inference" in images:
         inference_image = images["inference"]
+    elif "base" in images:
+        # An explicit --image=base override has always supplied the runtime
+        # image as well. Leave it doing so, rather than silently swapping the
+        # final image for the default and discarding whatever runtime
+        # dependencies the override was chosen for.
+        inference_image = None
     elif FLAGS.enable_gpu and target_platform() != "rhel" and "vllm" not in backends:
         inference_image = (
             "nvcr.io/nvidia/cuda-dl-base:{}-inference-runtime-ubuntu24.04".format(
