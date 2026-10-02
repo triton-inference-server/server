@@ -467,12 +467,14 @@ if __name__ == "__main__":
     else:
         get_container_version_if_not_specified()
         if FLAGS.enable_gpu:
+            import build
+
             images = {
                 "full": "nvcr.io/nvidia/tritonserver:{}-py3".format(
                     FLAGS.container_version
                 ),
-                "min": "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
-                    FLAGS.container_version
+                "min": "nvcr.io/nvidia/cuda-dl-base:{}-inference-runtime-ubuntu24.04".format(
+                    build.DEFAULT_TRITON_VERSION_MAP["cuda_dl_base_version"]
                 ),
             }
         else:
