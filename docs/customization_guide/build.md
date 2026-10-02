@@ -103,7 +103,7 @@ building with Docker.
     *tritonserver_buildbase* image is based on a minimal/base
     image. When building with GPU support (--enable-gpu), the *min*
     image is the
-    [cuda-dl-base \<xx.yy\>-cuda\<x.y\>-devel](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/cuda-dl-base)
+    [cuda-dl-base \<YY.MM\>-cuda\<X.Y\>-devel](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/cuda-dl-base)
     image pulled from [NGC](https://ngc.nvidia.com) that contains the
     CUDA, cuDNN, TensorRT and other dependencies that are required to
     build Triton. When building without GPU support, the *min* image
@@ -339,7 +339,7 @@ available for a non-GPU / CPU-only build: `identity`, `repeat`, `ensemble`,
 CPU-only builds of the PyTorch backends require some CUDA stubs
 and runtime dependencies that are not present in the CPU-only base container.
 These are retrieved from a GPU base container, which can be changed with the
-`--image=gpu-base,nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min` flag.
+`--image=gpu-base,nvcr.io/nvidia/tritonserver:<YY.MM>-py3-min` flag.
 
 ### Building Without Docker
 
@@ -362,7 +362,7 @@ $ ./build.py -v --enable-all
 From Dockerfile.buildbase you can see what dependencies you need to
 install on your host system. Note that when building with --enable-gpu
 (or --enable-all), Dockerfile.buildbase depends on the
-[cuda-dl-base \<xx.yy\>-cuda\<x.y\>-devel](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/cuda-dl-base)
+[cuda-dl-base \<YY.MM\>-cuda\<X.Y\>-devel](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/cuda-dl-base)
 image pulled from [NGC](https://ngc.nvidia.com). Rather than reproducing
 that image, you must manually install [CUDA and
 cuDNN](#cuda-cublas-cudnn) and [TensorRT](#tensorrt) dependencies as
