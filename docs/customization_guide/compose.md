@@ -72,14 +72,15 @@ This may result in different GPU statistic reporting behavior.
 
 `compose.py` requires two containers: a `min` container which is the
 base the compose container is built from and a `full` container from which the
-script will extract components. The version of the `min` and `full` container
-is determined by the branch of Triton `compose.py` is on.
+script will extract components. The version of the `full` container is
+determined by the branch of Triton `compose.py` is on, while the `min`
+container is the CUDA DL base image that branch builds against.
 For example, running
 ```
 python3 compose.py --backend pytorch --repoagent checksum
 ```
 on branch [r26.09](https://github.com/triton-inference-server/server/tree/r26.09) pulls:
-- `min` container `nvcr.io/nvidia/tritonserver:26.09-py3-min`
+- `min` container `nvcr.io/nvidia/cuda-dl-base:26.09-cuda13.4-inference-runtime-ubuntu24.04`
 - `full` container `nvcr.io/nvidia/tritonserver:26.09-py3`
 
 Alternatively, users can specify the version of Triton container to pull from
@@ -91,7 +92,7 @@ python3 compose.py --backend pytorch --repoagent checksum --container-version 26
 2. Specifying `--image min,<min container image name> --image full,<full container image name>`.
    The user is responsible for specifying compatible `min` and `full` containers.
 ```
-python3 compose.py --backend pytorch --repoagent checksum --image min,nvcr.io/nvidia/tritonserver:26.09-py3-min --image full,nvcr.io/nvidia/tritonserver:26.09-py3
+python3 compose.py --backend pytorch --repoagent checksum --image min,nvcr.io/nvidia/cuda-dl-base:26.09-cuda13.4-inference-runtime-ubuntu24.04 --image full,nvcr.io/nvidia/tritonserver:26.09-py3
 ```
 Method 1 and 2 will result in the same composed container. Furthermore,
 `--image` flag overrides the `--container-version` flag when both are specified.

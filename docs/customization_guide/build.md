@@ -103,11 +103,11 @@ building with Docker.
     *tritonserver_buildbase* image is based on a minimal/base
     image. When building with GPU support (--enable-gpu), the *min*
     image is the
-    [\<xx.yy\>-py3-min](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
+    [cuda-dl-base \<YY.MM\>-cuda\<X.Y\>-devel](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/cuda-dl-base)
     image pulled from [NGC](https://ngc.nvidia.com) that contains the
     CUDA, cuDNN, TensorRT and other dependencies that are required to
     build Triton. When building without GPU support, the *min* image
-    is the standard ubuntu:22.04 image.
+    is the standard ubuntu:24.04 image.
 
   * Run the cmake_build script within the *tritonserver_buildbase*
     image to actually build Triton. The cmake_build script performs
@@ -339,7 +339,7 @@ available for a non-GPU / CPU-only build: `identity`, `repeat`, `ensemble`,
 CPU-only builds of the PyTorch backends require some CUDA stubs
 and runtime dependencies that are not present in the CPU-only base container.
 These are retrieved from a GPU base container, which can be changed with the
-`--image=gpu-base,nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min` flag.
+`--image=gpu-base,nvcr.io/nvidia/tritonserver:<YY.MM>-py3-min` flag.
 
 ### Building Without Docker
 
@@ -362,11 +362,9 @@ $ ./build.py -v --enable-all
 From Dockerfile.buildbase you can see what dependencies you need to
 install on your host system. Note that when building with --enable-gpu
 (or --enable-all), Dockerfile.buildbase depends on the
-[\<xx.yy\>-py3-min](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
-image pulled from [NGC](https://ngc.nvidia.com). Unfortunately, a
-Dockerfile is not currently available for the
-[\<xx.yy\>-py3-min](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
-image. Instead, you must manually install [CUDA and
+[cuda-dl-base \<YY.MM\>-cuda\<X.Y\>-devel](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/cuda-dl-base)
+image pulled from [NGC](https://ngc.nvidia.com). Rather than reproducing
+that image, you must manually install [CUDA and
 cuDNN](#cuda-cublas-cudnn) and [TensorRT](#tensorrt) dependencies as
 described below.
 
