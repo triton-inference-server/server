@@ -281,6 +281,10 @@ HTTPServer::StopCallback(evutil_socket_t sock, short events, void* arg)
 void
 HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
 {
+  // A parser hook may have replied before the buffered request body finishes.
+  if ((req->flags & EVHTP_REQ_FLAG_FINISHED) != 0) {
+    return;
+  }
   (static_cast<HTTPServer*>(arg))->Handle(req);
 }
 
@@ -317,6 +321,13 @@ HTTPServer::ChunkCountIncrement(
     return EVHTP_RES_OK;
   }
   if (++req->chunk_count > kMaxChunkedChunks) {
+    // Release the accumulated body before allocating the error response. The
+    // parser can still consume bytes from its current read buffer after reads
+    // are disabled, so discard those body fragments instead of retaining them.
+    evbuffer_drain(req->buffer_in, evbuffer_get_length(req->buffer_in));
+    evhtp_request_set_hook(
+        req, evhtp_hook_on_read,
+        (evhtp_hook)(void*)HTTPServer::DiscardRequestBody, nullptr);
     AddContentTypeHeader(req, "application/json");
     const std::string msg =
         std::string("Chunked request body exceeds maximum of ") +
@@ -333,6 +344,16 @@ HTTPServer::ChunkCountIncrement(
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return EVHTP_RES_OK;
   }
+  return EVHTP_RES_OK;
+}
+
+evhtp_res
+HTTPServer::DiscardRequestBody(
+    evhtp_request_t* req, evbuffer* buffer, void* arg)
+{
+  (void)req;
+  (void)arg;
+  evbuffer_drain(buffer, evbuffer_get_length(buffer));
   return EVHTP_RES_OK;
 }
 

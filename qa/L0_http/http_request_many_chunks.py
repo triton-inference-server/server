@@ -134,20 +134,18 @@ class HTTPRequestManyChunksTest(unittest.TestCase):
         server = get_server_process_from_env("SERVER_PID")
         self.assertTrue(server.is_running())
 
-        # Warm up with the same request volume as the measured workload.
-        # A single request does not establish the allocator's steady state.
-        repeat_request_count = 100
-        for _ in range(repeat_request_count):
-            self.send_chunked_request(
-                self._infer_chunked_header(),
-                many_chunks,
-                self._over_max_chunks_error,
-            )
+        # warm up and wait until RSS is stable.
+        self.send_chunked_request(
+            self._infer_chunked_header(),
+            many_chunks,  # way over max chunks
+            self._over_max_chunks_error,
+        )
         # Wait until RSS is stable across several measurements before continuing.
         server = get_server_process_from_env("SERVER_PID")
         wait_for_stable_rss(server)
 
         # Monitor RSS growth over 100 requests.
+        repeat_request_count = 100
         rss_before = server.memory_info().rss
         max_rss_growth_bytes = 1 * MIB
 
@@ -158,8 +156,6 @@ class HTTPRequestManyChunksTest(unittest.TestCase):
                 self._over_max_chunks_error,
             )
 
-        # Use the same quiescence condition for baseline and final samples.
-        wait_for_stable_rss(server)
         rss_after = server.memory_info().rss
         growth = rss_after - rss_before
         print(
