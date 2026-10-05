@@ -59,6 +59,8 @@ import requests
 #   triton version ->
 #     (triton container version,
 #      upstream container version,
+#      cuda-dl-base version (container train and its CUDA version, which
+#        cuda-dl-base publishes as a matched pair and must be bumped together),
 #      ORT version,
 #      ORT OpenVINO version (use None to disable OpenVINO in ORT),
 #      Standalone OpenVINO version,
@@ -75,6 +77,7 @@ DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.74.0dev",
     "triton_container_version": "26.10dev",
     "upstream_container_version": "26.09",
+    "cuda_dl_base_version": "26.09-cuda13.4",
     "ort_version": "1.30.0",
     "ort_openvino_version": "2026.3.1",
     "standalone_openvino_version": "2026.3.1",
@@ -186,6 +189,18 @@ def target_machine():
     if FLAGS and FLAGS.target_machine is not None:
         return FLAGS.target_machine
     return platform.machine().lower()
+
+
+def default_build_container_image():
+    """Image the compile toolchain runs in.
+
+    Always CUDA-capable: the ONNX Runtime and OpenVINO backends build in this
+    container and need the CUDA toolchain even when Triton itself is being
+    built CPU-only.
+    """
+    return "nvcr.io/nvidia/cuda-dl-base:{}-devel-ubuntu24.04".format(
+        FLAGS.cuda_dl_base_version
+    )
 
 
 def container_versions(version, container_version, upstream_container_version):
@@ -661,21 +676,14 @@ def onnxruntime_cmake_args(images, library_paths):
                 )
             )
 
-    if "base" in images:
-        cargs.append(
-            cmake_backend_arg(
-                "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
-            )
+    cargs.append(
+        cmake_backend_arg(
+            "onnxruntime",
+            "TRITON_BUILD_CONTAINER",
+            None,
+            images.get("base", default_build_container_image()),
         )
-    else:
-        cargs.append(
-            cmake_backend_arg(
-                "onnxruntime",
-                "TRITON_BUILD_CONTAINER_VERSION",
-                None,
-                FLAGS.upstream_container_version,
-            )
-        )
+    )
 
     # TODO: TPRD-333 OpenVino extension is not currently supported by our manylinux build
     if (
@@ -719,21 +727,14 @@ def openvino_cmake_args():
             FLAGS.standalone_openvino_version,
         )
     ]
-    if "base" in images:
-        cargs.append(
-            cmake_backend_arg(
-                "openvino", "TRITON_BUILD_CONTAINER", None, images["base"]
-            )
+    cargs.append(
+        cmake_backend_arg(
+            "openvino",
+            "TRITON_BUILD_CONTAINER",
+            None,
+            images.get("base", default_build_container_image()),
         )
-    else:
-        cargs.append(
-            cmake_backend_arg(
-                "openvino",
-                "TRITON_BUILD_CONTAINER_VERSION",
-                None,
-                FLAGS.upstream_container_version,
-            )
-        )
+    )
     return cargs
 
 
@@ -1693,14 +1694,24 @@ def create_build_dockerfiles(
     elif target_platform() == "rhel":
         raise KeyError("A base image must be specified when targeting RHEL")
     elif FLAGS.enable_gpu:
-        base_image = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
-            FLAGS.upstream_container_version
-        )
+        base_image = default_build_container_image()
     else:
         base_image = "ubuntu:24.04"
 
     if "inference" in images:
         inference_image = images["inference"]
+    elif "base" in images:
+        # An explicit --image=base override has always supplied the runtime
+        # image as well. Leave it doing so, rather than silently swapping the
+        # final image for the default and discarding whatever runtime
+        # dependencies the override was chosen for.
+        inference_image = None
+    elif FLAGS.enable_gpu and target_platform() != "rhel" and "vllm" not in backends:
+        inference_image = (
+            "nvcr.io/nvidia/cuda-dl-base:{}-inference-runtime-ubuntu24.04".format(
+                FLAGS.cuda_dl_base_version
+            )
+        )
     else:
         inference_image = None
 
@@ -2541,7 +2552,7 @@ if __name__ == "__main__":
         "--image",
         action="append",
         required=False,
-        help='Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", or "pytorch".',
+        help='Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", "pytorch", or "inference".',
     )
 
     parser.add_argument(
@@ -2707,6 +2718,12 @@ if __name__ == "__main__":
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["upstream_container_version"],
         help="This flag sets the upstream container version for Triton Inference Server to be built. Default: the latest released version.",
+    )
+    parser.add_argument(
+        "--cuda-dl-base-version",
+        required=False,
+        default=DEFAULT_TRITON_VERSION_MAP["cuda_dl_base_version"],
+        help="This flag sets the cuda-dl-base container train and its CUDA version, as a matched pair (e.g. 26.09-cuda13.4), used for the default build and runtime base images. Default: the latest supported version.",
     )
     parser.add_argument(
         "--ort-version",
