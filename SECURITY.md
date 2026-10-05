@@ -43,12 +43,4 @@ If reporting a potential vulnerability via email, please encrypt it using NVIDIA
 
 See https://www.nvidia.com/en-us/security/ for past NVIDIA Security Bulletins and Notices.
 
-## Additional Reporting Guidance
-
-**Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.**
-
-Where the feature is enabled for this repository, you can also report a vulnerability privately through GitHub by using the "Report a vulnerability" button on the repository's Security tab.
-
-## Security Model
-
-The security of a Triton Inference Server deployment depends largely on how it is configured and where it is run. See [Secure Deployment Considerations](docs/customization_guide/deploy.md) for the deployment practices NVIDIA recommends.
+**Please do not report security vulnerabilities through public issues or other public channels.**
