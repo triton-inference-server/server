@@ -43,47 +43,37 @@ If reporting a potential vulnerability via email, please encrypt it using NVIDIA
 
 See https://www.nvidia.com/en-us/security/ for past NVIDIA Security Bulletins and Notices.
 
-## Reporting Channels
+## Additional Reporting Channels
 
-**Please do not open a public GitHub issue, discussion or pull request to report a security vulnerability.** Use one of the following private channels:
+1. **NVIDIA Vulnerability Disclosure Program** (preferred): https://www.nvidia.com/en-us/security/
+2. **GitHub Private Vulnerability Reporting (where enabled):** use the "Report a vulnerability" button on the Security tab of this repository.
 
-1. **NVIDIA Vulnerability Disclosure Program** (preferred): submit through the [Security Vulnerability Submission Form](https://www.nvidia.com/object/submit-security-vulnerability.html). Program information: https://www.nvidia.com/en-us/security/
-2. **Email**: [psirt@nvidia.com](mailto:psirt@nvidia.com), encrypted with NVIDIA's [public PGP key](https://www.nvidia.com/en-us/security/pgp-key/)
-3. **GitHub Private Vulnerability Reporting**: use the "Report a vulnerability" button on the Security tab of this repository, where it is enabled
-
-NVIDIA PSIRT acknowledges reports, assesses severity and coordinates remediation and disclosure with the reporter.
+**Do not open a public issue or pull request to report a vulnerability.**
 
 ## Security Architecture and Context
 
-Triton Inference Server (`server`) is a **Service**: a long-running inference server that loads models from a model repository and serves inference requests over network endpoints. Its primary security responsibility is to parse untrusted network input safely, enforce the configured access restrictions, and keep requests for different models and clients isolated within one process.
+**Project:** The Triton Inference Server provides an optimized cloud and edge inferencing solution.
 
-Key interfaces and trust boundaries:
+**Software type:** Software component (library, backend, client or tool) used as part of a Triton Inference Server deployment.
 
-- **HTTP/REST endpoint** (`src/http_server.cc`): KServe v2 and extension APIs for inference, model metadata, model repository control, shared memory, statistics, tracing and logging. Also optional SageMaker and Vertex AI adapters.
-- **gRPC endpoint** (`src/grpc/`): the same APIs over gRPC, including streaming inference. Optional TLS and mutual TLS are configured through the `--grpc-use-ssl*` options.
-- **Metrics endpoint**: optional Prometheus metrics, enabled with `--allow-metrics`.
-- **Command line and configuration** (`src/command_line_parser.cc`, `src/main.cc`): options set by the deployer control listeners, enabled APIs, model control mode, tracing output and TLS material.
-- **Model repository and backends**: model files, model configuration and backend libraries are loaded from local or cloud storage into the server process.
-- **Shared memory** (`src/shared_memory_manager.cc`): clients on the same host can register system or CUDA shared memory regions for tensor exchange.
+**Security boundaries:** The main security boundary is between this component and the data, models and configuration it is given, and between it and the server or application that hosts it.
 
-The HTTP and gRPC listeners default to binding all interfaces (`0.0.0.0`). Built-in access control is limited to optional per-API-category restrictions (`--http-restricted-api`, `--grpc-restricted-protocol`), which require a configured request header key and value. The categories are health, metadata, inference, shared-memory, model-config, model-repository, statistics, trace and logging.
+**Repository Exposure Classification:** Public.
+
+**Service Exposure Classification:** Deployment-dependent. Exposure depends on how the software is deployed and configured by the operator.
 
 ## Threat Model
 
-1. **Unauthenticated access to management APIs.** If the endpoints are reachable by untrusted clients and the restrictions above are not configured, any client can call the model repository, shared memory, trace, logging and statistics APIs. In particular, the model repository load and unload APIs, available when `--model-control-mode=explicit`, can change which models and backends run in the server.
-2. **Malicious or tampered models and backends.** Model files, configuration and backend libraries are loaded from the model repository. A model from an untrusted source, or a repository that an attacker can write to, can execute arbitrary code in the server process, since backends are loaded as shared libraries and the Python backend runs model code.
-3. **Malformed or oversized requests.** The HTTP parser (`src/http_server.cc`) and the gRPC handlers (`src/grpc/infer_handler.cc`, `src/grpc/stream_infer_handler.cc`) process attacker-controlled headers, JSON, binary tensor data and compressed bodies. Malformed input can lead to memory exhaustion, crashes or denial of service. `--http-max-input-size` is enforced while the HTTP handler processes the request body (JSON size and tensor byte sizes); the server sets no separate limit on how much of an incoming request it buffers, so an oversized request can consume memory before it is rejected. The gRPC message size is fixed at `INT32_MAX` (`MAX_GRPC_MESSAGE_SIZE` in `src/common.h`) and has no command-line option, so deployments that need a smaller request bound must enforce one outside the server, for example in a gateway.
-4. **Shared memory abuse.** A client that can register shared memory regions (`src/shared_memory_manager.cc`) supplies a region key, offset and size that the server maps and reads or writes. Incorrect bounds, access to regions belonging to other processes, or exposure of CUDA IPC handles can leak or corrupt data across trust boundaries.
-5. **Information disclosure through observability.** Metrics, statistics, model metadata and verbose logs can reveal model names, configuration, request rates and error details. Trace output (`src/tracer.cc`, `--trace-config`) can include input and output tensors at the `TENSORS` level and is written to a path chosen by the deployer, so the file's location and permissions determine who can read it.
-6. **Weak transport security.** The HTTP and metrics endpoints have no native TLS option (only gRPC has `--grpc-use-ssl*`), so endpoints that are not protected by a TLS-terminating gateway expose request and response data, including tensors and any restricted-API header values, to anyone on the network path. gRPC TLS and mutual TLS are optional and are off by default.
-7. **Build and supply chain.** `build.py`, the Dockerfiles and the dependencies fetched during the build determine what ends up in the released server and container images. Unpinned or unverified dependencies can introduce compromised code.
+1. **Untrusted input:** Requests, models, configuration or data supplied to this component may be malformed or malicious, and could cause crashes, memory errors or unintended behavior if not validated.
+2. **Supply chain:** Source and build dependencies fetched at build or install time may be compromised, outdated or unpinned.
+3. **Network exposure:** When deployed behind a network-facing server, endpoints may be reachable by untrusted clients. This component does not by itself provide authentication, authorization or encryption.
+4. **Resource exhaustion:** Oversized or numerous requests may consume memory, compute or other resources and degrade availability.
+5. **Information disclosure:** Logs, metrics and error messages may reveal sensitive data such as paths, identifiers or request content.
 
 ## Critical Security Assumptions
 
-- Triton is deployed on a **trusted network** or behind a gateway that provides authentication, authorization, rate limiting and TLS termination. The server itself does not provide user identity or per-user authorization.
-- Operators who expose Triton beyond a trusted network configure `--http-address`, `--grpc-address` and the restricted-API options so that management APIs are not reachable by untrusted clients.
-- The **model repository is trusted and access-controlled.** Anyone who can write models or backends to the repository, or call the model repository API, is able to run code in the server. Models from untrusted sources must be reviewed or run in an isolated deployment.
-- Shared memory is used only between **mutually trusted processes on the same host**, and the host operating system and GPU driver enforce memory isolation correctly.
-- TLS certificates and keys provided through the `--grpc-use-ssl*` options, and any restricted-API header values, are stored and rotated securely by the operator.
-- Trace and log output locations are writable only by the server and readable only by authorized users.
-- Backends and third-party libraries (including the framework runtimes each backend embeds) are kept up to date and are not affected by known vulnerabilities in the deployed version.
+* The component is deployed in a trusted environment or behind a gateway that provides authentication, authorization, TLS and rate limiting.
+* Models, configuration and other inputs come from trusted sources.
+* Dependencies and the build environment are kept up to date and obtained from trusted sources.
+* Operators protect secrets, certificates and credentials, and restrict access to logs and metrics.
+* Host operating system, driver and hardware security are the operator's responsibility.
