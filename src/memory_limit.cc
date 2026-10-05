@@ -26,6 +26,7 @@
 
 #include "memory_limit.h"
 
+#include <cstdio>
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -242,6 +243,35 @@ ParseLimit(const std::string& contents, uint64_t physical_ram, uint64_t* bytes)
   return true;
 }
 
+// Formats a byte count for log messages, for example "512 MiB".
+std::string
+FormatBytes(uint64_t bytes)
+{
+  constexpr uint64_t kMiB = 1ULL << 20;
+  constexpr uint64_t kGiB = 1ULL << 30;
+  char buffer[64];
+  if ((bytes >= kGiB) && (bytes % kGiB == 0)) {
+    std::snprintf(
+        buffer, sizeof(buffer), "%llu GiB",
+        static_cast<unsigned long long>(bytes / kGiB));
+  } else if (bytes >= kGiB) {
+    std::snprintf(
+        buffer, sizeof(buffer), "%.2f GiB", static_cast<double>(bytes) / kGiB);
+  } else if ((bytes >= kMiB) && (bytes % kMiB == 0)) {
+    std::snprintf(
+        buffer, sizeof(buffer), "%llu MiB",
+        static_cast<unsigned long long>(bytes / kMiB));
+  } else if (bytes >= kMiB) {
+    std::snprintf(
+        buffer, sizeof(buffer), "%.2f MiB", static_cast<double>(bytes) / kMiB);
+  } else {
+    std::snprintf(
+        buffer, sizeof(buffer), "%llu bytes",
+        static_cast<unsigned long long>(bytes));
+  }
+  return buffer;
+}
+
 }  // namespace
 
 uint64_t
@@ -295,6 +325,7 @@ DetectMemoryLimit(const std::string& root, uint64_t physical_ram_bytes)
     cgroup_path = self.v2_path;
   } else {
     fallback.detail = "no cgroup memory mount found for this process";
+    fallback.detection_failed = true;
     return fallback;
   }
 
@@ -313,6 +344,7 @@ DetectMemoryLimit(const std::string& root, uint64_t physical_ram_bytes)
   if (!FileExists(mount_dir + relative + "/cgroup.procs")) {
     fallback.detail =
         "cgroup directory not found: " + mount.mount_point + relative;
+    fallback.detection_failed = true;
     return fallback;
   }
 
@@ -355,6 +387,67 @@ MemoryLimit
 DetectMemoryLimit()
 {
   return DetectMemoryLimit("", PhysicalRamBytes());
+}
+
+ParseMemoryBudget
+ResolveParseMemoryBudget(int64_t flag_bytes, const MemoryLimit& limit)
+{
+  ParseMemoryBudget budget;
+  if (flag_bytes == 0) {
+    budget.enabled = false;
+    budget.warn = true;
+    budget.description = "turned off by --http-parse-memory-budget=0";
+    return budget;
+  }
+
+  if (flag_bytes > 0) {
+    budget.bytes = static_cast<uint64_t>(flag_bytes);
+    budget.description =
+        FormatBytes(budget.bytes) + " (set by --http-parse-memory-budget)";
+    if ((limit.source != MemoryLimitSource::PHYSICAL_RAM) &&
+        (budget.bytes > limit.bytes)) {
+      budget.warn = true;
+      budget.description +=
+          ", which is above the memory limit of the server (" +
+          FormatBytes(limit.bytes) + ")";
+    }
+    return budget;
+  }
+
+  // Not set: a percent of the memory limit, or of physical RAM. Split the
+  // multiplication so it cannot overflow.
+  const uint64_t percent = HTTP_PARSE_MEMORY_BUDGET_PERCENT;
+  budget.bytes =
+      (limit.bytes / 100) * percent + (limit.bytes % 100) * percent / 100;
+  if (budget.bytes == 0) {
+    budget.enabled = false;
+    budget.warn = true;
+    budget.description =
+        "turned off: the memory limit and physical RAM size are unknown. Set "
+        "--http-parse-memory-budget to turn it on";
+    return budget;
+  }
+
+  const std::string share =
+      FormatBytes(budget.bytes) + " (" + std::to_string(percent) + "% of ";
+  if (limit.source == MemoryLimitSource::PHYSICAL_RAM) {
+    budget.description = share + "physical RAM " + FormatBytes(limit.bytes) +
+                         ", " + limit.detail +
+                         "). Set --http-parse-memory-budget if the server has "
+                         "a lower memory limit";
+    budget.warn = limit.detection_failed;
+  } else {
+    budget.description = share + "the memory limit " +
+                         FormatBytes(limit.bytes) + " from " + limit.detail +
+                         ")";
+  }
+  return budget;
+}
+
+ParseMemoryBudget
+ResolveParseMemoryBudget(int64_t flag_bytes)
+{
+  return ResolveParseMemoryBudget(flag_bytes, DetectMemoryLimit());
 }
 
 }}  // namespace triton::server

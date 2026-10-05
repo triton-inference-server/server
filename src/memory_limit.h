@@ -28,6 +28,8 @@
 #include <cstdint>
 #include <string>
 
+#include "common.h"
+
 namespace triton { namespace server {
 
 // Where a detected memory limit came from. Used in the startup log line.
@@ -41,6 +43,9 @@ struct MemoryLimit {
   // The cgroup file the limit was read from, or why the physical RAM
   // fallback was used.
   std::string detail;
+  // True when cgroup files were found but the cgroup of this process could
+  // not be resolved, so the physical RAM fallback may be too high.
+  bool detection_failed{false};
 };
 
 // Returns the memory limit that applies to this process: the smallest cgroup
@@ -60,5 +65,26 @@ MemoryLimit DetectMemoryLimit(
 
 // Total physical RAM in bytes, or 0 if it cannot be determined.
 uint64_t PhysicalRamBytes();
+
+// The HTTP parse memory budget shared by all HTTP endpoints.
+struct ParseMemoryBudget {
+  // False when the budget is turned off.
+  bool enabled{true};
+  uint64_t bytes{0};
+  // How the budget was picked, for the startup log line.
+  std::string description;
+  // True when the startup log line should be a warning.
+  bool warn{false};
+};
+
+// Works out the parse memory budget from the value of
+// --http-parse-memory-budget: a byte count, 0 to turn the budget off, or
+// HTTP_PARSE_MEMORY_BUDGET_AUTO to use HTTP_PARSE_MEMORY_BUDGET_PERCENT of
+// 'limit'.
+ParseMemoryBudget ResolveParseMemoryBudget(
+    int64_t flag_bytes, const MemoryLimit& limit);
+
+// Same as above, with the limit from DetectMemoryLimit().
+ParseMemoryBudget ResolveParseMemoryBudget(int64_t flag_bytes);
 
 }}  // namespace triton::server

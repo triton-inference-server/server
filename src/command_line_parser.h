@@ -200,6 +200,7 @@ struct TritonServerParameters {
   RestrictedFeatures http_restricted_apis_{};
   // Default value 64MB
   size_t http_max_input_size_{HTTP_DEFAULT_MAX_INPUT_SIZE};
+  int64_t http_parse_memory_budget_{HTTP_PARSE_MEMORY_BUDGET_AUTO};
 #endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_GRPC

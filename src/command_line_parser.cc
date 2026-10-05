@@ -299,6 +299,7 @@ enum TritonOptionId {
   OPTION_HTTP_THREAD_COUNT,
   OPTION_HTTP_RESTRICTED_API,
   OPTION_HTTP_MAX_INPUT_SIZE,
+  OPTION_HTTP_PARSE_MEMORY_BUDGET,
 #endif  // TRITON_ENABLE_HTTP
 #if defined(TRITON_ENABLE_GRPC)
   OPTION_ALLOW_GRPC,
@@ -504,6 +505,16 @@ TritonParser::SetupOptions()
        ("Maximum allowed HTTP request input size in bytes. For compressed "
         "requests, this also limits the decompressed size. Default is " +
         std::to_string(HTTP_DEFAULT_MAX_INPUT_SIZE) + " bytes (64MB).")});
+  http_options_.push_back(
+      {OPTION_HTTP_PARSE_MEMORY_BUDGET, "http-parse-memory-budget",
+       Option::ArgInt,
+       ("Maximum total memory in bytes that HTTP requests being parsed at the "
+        "same time may use for their JSON. A request that would go over the "
+        "budget gets a retryable 503 response. 0 turns the budget off. If "
+        "not set, the budget is " +
+        std::to_string(HTTP_PARSE_MEMORY_BUDGET_PERCENT) +
+        "% of the memory limit of the server (cgroup), or of physical RAM "
+        "when no limit is set.")});
   http_options_.push_back(
       {OPTION_HTTP_RESTRICTED_API, "http-restricted-api",
        "<string>:<string>=<string>",
@@ -1415,6 +1426,15 @@ TritonParser::Parse(int argc, char** argv)
                 "Error: --http-max-input-size must be greater than 0.");
           }
           lparams.http_max_input_size_ = temp_input_size;
+          break;
+        }
+        case OPTION_HTTP_PARSE_MEMORY_BUDGET: {
+          int64_t budget = ParseOption<int64_t>(optarg);
+          if (budget < 0) {
+            throw ParseException(
+                "Error: --http-parse-memory-budget must be 0 or greater.");
+          }
+          lparams.http_parse_memory_budget_ = budget;
           break;
         }
         case OPTION_HTTP_RESTRICTED_API:

@@ -41,6 +41,7 @@
 #include <thread>
 
 #include "classification.h"
+#include "memory_limit.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \
@@ -96,6 +97,11 @@ constexpr uint64_t kMaxChunkedChunks =
 
 
 namespace {
+
+// Parse memory budget shared by all HTTP endpoints. Set once by
+// HTTPAPIServer::ConfigureParseMemoryBudget().
+std::once_flag parse_memory_budget_once;
+ParseMemoryBudget parse_memory_budget;
 
 int
 HttpCodeFromError(TRITONSERVER_Error* error)
@@ -5026,10 +5032,29 @@ HTTPAPIServer::Create(
       GetValue(options, "header_forward_pattern", &header_forward_pattern));
   RETURN_IF_ERR(GetValue(options, "thread_count", &thread_count));
 
+  // The in-process Python frontend has no --http-parse-memory-budget, so it
+  // uses the automatic budget.
+  ConfigureParseMemoryBudget(HTTP_PARSE_MEMORY_BUDGET_AUTO);
+
   return Create(
       server, trace_manager, shm_manager, port, reuse_port, address,
       header_forward_pattern, thread_count, HTTP_DEFAULT_MAX_INPUT_SIZE,
       restricted_features, service);
+}
+
+void
+HTTPAPIServer::ConfigureParseMemoryBudget(int64_t flag_bytes)
+{
+  std::call_once(parse_memory_budget_once, [flag_bytes]() {
+    parse_memory_budget = ResolveParseMemoryBudget(flag_bytes);
+    if (parse_memory_budget.warn) {
+      LOG_WARNING << "HTTP parse memory budget: "
+                  << parse_memory_budget.description;
+    } else {
+      LOG_INFO << "HTTP parse memory budget: "
+               << parse_memory_budget.description;
+    }
+  });
 }
 
 

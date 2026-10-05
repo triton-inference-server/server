@@ -213,6 +213,11 @@ class HTTPAPIServer : public HTTPServer {
       const RestrictedFeatures& restricted_features,
       std::unique_ptr<HTTPServer>* service);
 
+  // Sets the parse memory budget shared by all HTTP endpoints (HTTP,
+  // SageMaker, Vertex AI) from the value of --http-parse-memory-budget, and
+  // logs it. Only the first call has an effect.
+  static void ConfigureParseMemoryBudget(int64_t flag_bytes);
+
   virtual ~HTTPAPIServer();
 
   //
