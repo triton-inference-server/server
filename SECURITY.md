@@ -43,37 +43,12 @@ If reporting a potential vulnerability via email, please encrypt it using NVIDIA
 
 See https://www.nvidia.com/en-us/security/ for past NVIDIA Security Bulletins and Notices.
 
-## Additional Reporting Channels
+## Additional Reporting Guidance
 
-1. **NVIDIA Vulnerability Disclosure Program** (preferred): https://www.nvidia.com/en-us/security/
-2. **GitHub Private Vulnerability Reporting (where enabled):** use the "Report a vulnerability" button on the Security tab of this repository.
+**Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.**
 
-**Do not open a public issue or pull request to report a vulnerability.**
+Where the feature is enabled for this repository, you can also report a vulnerability privately through GitHub by using the "Report a vulnerability" button on the repository's Security tab.
 
-## Security Architecture and Context
+## Security Model
 
-**Project:** The Triton Inference Server provides an optimized cloud and edge inferencing solution.
-
-**Software type:** Software component (library, backend, client or tool) used as part of a Triton Inference Server deployment.
-
-**Security boundaries:** The main security boundary is between this component and the data, models and configuration it is given, and between it and the server or application that hosts it.
-
-**Repository Exposure Classification:** Public.
-
-**Service Exposure Classification:** Deployment-dependent. Exposure depends on how the software is deployed and configured by the operator.
-
-## Threat Model
-
-1. **Untrusted input:** Requests, models, configuration or data supplied to this component may be malformed or malicious, and could cause crashes, memory errors or unintended behavior if not validated.
-2. **Supply chain:** Source and build dependencies fetched at build or install time may be compromised, outdated or unpinned.
-3. **Network exposure:** When deployed behind a network-facing server, endpoints may be reachable by untrusted clients. This component does not by itself provide authentication, authorization or encryption.
-4. **Resource exhaustion:** Oversized or numerous requests may consume memory, compute or other resources and degrade availability.
-5. **Information disclosure:** Logs, metrics and error messages may reveal sensitive data such as paths, identifiers or request content.
-
-## Critical Security Assumptions
-
-* The component is deployed in a trusted environment or behind a gateway that provides authentication, authorization, TLS and rate limiting.
-* Models, configuration and other inputs come from trusted sources.
-* Dependencies and the build environment are kept up to date and obtained from trusted sources.
-* Operators protect secrets, certificates and credentials, and restrict access to logs and metrics.
-* Host operating system, driver and hardware security are the operator's responsibility.
+The security of a Triton Inference Server deployment depends largely on how it is configured and where it is run. See [Secure Deployment Considerations](docs/customization_guide/deploy.md) for the deployment practices NVIDIA recommends.
