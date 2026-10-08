@@ -30,7 +30,11 @@ import sys
 import unittest
 
 sys.path.append("../common")
-from test_util import MIB, get_server_process_from_env, wait_for_stable_rss
+from test_util import (  # noqa: E402
+    MIB,
+    get_server_process_from_env,
+    wait_for_stable_rss,
+)
 
 
 class HTTPRequestManyChunksTest(unittest.TestCase):
@@ -142,7 +146,7 @@ class HTTPRequestManyChunksTest(unittest.TestCase):
         )
         # Wait until RSS is stable across several measurements before continuing.
         server = get_server_process_from_env("SERVER_PID")
-        wait_for_stable_rss(server)
+        wait_for_stable_rss(server, stable_threshold=100)
 
         # Monitor RSS growth over 100 requests.
         repeat_request_count = 100
