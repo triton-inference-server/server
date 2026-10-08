@@ -142,7 +142,7 @@ class HTTPRequestManyChunksTest(unittest.TestCase):
         )
         # Wait until RSS is stable across several measurements before continuing.
         server = get_server_process_from_env("SERVER_PID")
-        wait_for_stable_rss(server)
+        wait_for_stable_rss(server, stable_threshold=100)
 
         # Monitor RSS growth over 100 requests.
         repeat_request_count = 100
