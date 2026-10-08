@@ -30,7 +30,11 @@ import sys
 import unittest
 
 sys.path.append("../common")
-from test_util import MIB, get_server_process_from_env, wait_for_stable_rss
+from test_util import (  # noqa: E402
+    MIB,
+    get_server_process_from_env,
+    wait_for_stable_rss,
+)
 
 
 class HTTPRequestManyChunksTest(unittest.TestCase):
