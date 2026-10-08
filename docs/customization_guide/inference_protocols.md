@@ -150,6 +150,18 @@ In general, using 2 threads per completion queue seems to give the best performa
 
 Note: More threads don't always mean better performance.
 
+#### GRPC Streaming Accept Prefetch
+
+A new stream reaches Triton only after gRPC matches it to an accept request posted by the streaming inference handler.
+gRPC cancels a stream that stays unmatched for more than 30 seconds (the gRPC default for `grpc.server_max_unrequested_time_in_server`, which Triton does not currently expose).
+Keeping several accept requests outstanding lets new streams be matched right away even while the handler is busy, for example when an ensemble's `max_inflight_requests` limit is holding back requests.
+
+* `--grpc-stream-accept-prefetch`: 16 by default.
+  The number of accept requests each streaming inference handler keeps outstanding, so up to this many new streams can be matched immediately.
+  Increase it if larger bursts of new streams arrive while requests are being held back.
+  A value of `1` keeps a single outstanding accept request, which was the behavior before this option was added.
+  Valid range is `1-128`.
+
 ### Limit Endpoint Access (BETA)
 
 Triton users may want to restrict access to protocols or APIs that are
