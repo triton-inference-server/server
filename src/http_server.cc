@@ -4442,6 +4442,7 @@ HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
   if (response != nullptr) {
     err = infer_request->FinalizeResponse(response);
   }
+  const auto response_code = HttpCodeFromError(err);
   if (err != nullptr) {
     infer_request->AddErrorJson(err);
   }
@@ -4450,7 +4451,7 @@ HTTPAPIServer::GenerateRequestClass::InferResponseComplete(
   // First response starts the chunked response, the response code is set here
   // so user should check response body in case of error at later time.
   if (infer_request->IncrementResponseCount() == 0) {
-    infer_request->response_code_ = HttpCodeFromError(err);
+    infer_request->response_code_ = response_code;
     evthr_defer(infer_request->thread_, StartResponse, infer_request);
   }
 
