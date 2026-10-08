@@ -81,7 +81,7 @@ DEFAULT_TRITON_VERSION_MAP = {
     "ort_version": "1.30.0",
     "ort_openvino_version": "2026.4.1",
     "standalone_openvino_version": "2026.4.1",
-    "dcgm_version": "4.7.0-1",
+    "dcgm_version": "4.7.0-2",
 }
 
 CORE_BACKENDS = ["ensemble"]
