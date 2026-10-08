@@ -380,6 +380,16 @@ if __name__ == "__main__":
         "repository branch.",
     )
     parser.add_argument(
+        "--cuda-dl-base-version",
+        type=str,
+        required=False,
+        help="The cuda-dl-base container train and its CUDA version, as a matched "
+        "pair (e.g. 26.09-cuda13.4), used for the 'min' container. If not "
+        "specified the value from build.py's version map is used, which "
+        "corresponds to the branch compose.py is on rather than to "
+        "--container-version.",
+    )
+    parser.add_argument(
         "--image",
         action="append",
         required=False,
@@ -465,14 +475,32 @@ if __name__ == "__main__":
             log('image "{}": "{}"'.format(parts[0], parts[1]))
             images[parts[0]] = parts[1]
     else:
+        container_version_specified = FLAGS.container_version is not None
         get_container_version_if_not_specified()
         if FLAGS.enable_gpu:
+            import build
+
+            # cuda-dl-base couples its train to a CUDA version, so it cannot be
+            # derived from --container-version. Warn rather than silently pairing
+            # a requested `full` with a `min` from a different release.
+            if FLAGS.cuda_dl_base_version is None:
+                FLAGS.cuda_dl_base_version = build.DEFAULT_TRITON_VERSION_MAP[
+                    "cuda_dl_base_version"
+                ]
+                if container_version_specified:
+                    log(
+                        "warning: --container-version was specified but "
+                        "--cuda-dl-base-version was not, so the 'min' container "
+                        "will use {} and may not match the 'full' container".format(
+                            FLAGS.cuda_dl_base_version
+                        )
+                    )
             images = {
                 "full": "nvcr.io/nvidia/tritonserver:{}-py3".format(
                     FLAGS.container_version
                 ),
-                "min": "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
-                    FLAGS.container_version
+                "min": "nvcr.io/nvidia/cuda-dl-base:{}-inference-runtime-ubuntu24.04".format(
+                    FLAGS.cuda_dl_base_version
                 ),
             }
         else:

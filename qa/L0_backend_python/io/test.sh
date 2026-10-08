@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,32 +43,29 @@ pip3 install torch==2.3.1+cu118 -f https://download.pytorch.org/whl/torch_stable
 # IOTest.test_ensemble_io
 TRIALS="default decoupled"
 
-for trial in $TRIALS; do
-    export TRIAL=$trial
+# Set up the ensemble_io models for the given trial (default|decoupled).
+setup_ensemble_io_models() {
     rm -rf ./models
-
-    if [ $trial = "default" ]; then
-        for i in {1..3}; do
-            model_name=dlpack_io_identity_$i
-            mkdir -p models/$model_name/1/
-            cp ../../python_models/dlpack_io_identity/model.py ./models/$model_name/1/
-            cp ../../python_models/dlpack_io_identity/config.pbtxt ./models/$model_name/
-            (cd models/$model_name && \
-                      sed -i "s/^name:.*/name: \"$model_name\"/" config.pbtxt)
-        done
+    if [ $1 = "default" ]; then
+        src_model=dlpack_io_identity
     else
-        for i in {1..3}; do
-            model_name=dlpack_io_identity_$i
-            mkdir -p models/$model_name/1/
-            cp ../../python_models/dlpack_io_identity_decoupled/model.py ./models/$model_name/1/
-            cp ../../python_models/dlpack_io_identity_decoupled/config.pbtxt ./models/$model_name/
-            (cd models/$model_name && \
-                      sed -i "s/^name:.*/name: \"$model_name\"/" config.pbtxt)
-        done
+        src_model=dlpack_io_identity_decoupled
     fi
-
+    for i in {1..3}; do
+        model_name=dlpack_io_identity_$i
+        mkdir -p models/$model_name/1/
+        cp ../../python_models/$src_model/model.py ./models/$model_name/1/
+        cp ../../python_models/$src_model/config.pbtxt ./models/$model_name/
+        (cd models/$model_name && \
+                  sed -i "s/^name:.*/name: \"$model_name\"/" config.pbtxt)
+    done
     mkdir -p models/ensemble_io/1/
     cp ../../python_models/ensemble_io/config.pbtxt ./models/ensemble_io
+}
+
+for trial in $TRIALS; do
+    export TRIAL=$trial
+    setup_ensemble_io_models $trial
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -90,6 +87,44 @@ for trial in $TRIALS; do
     kill $SERVER_PID
     wait $SERVER_PID
 done
+
+# IOTest.test_ensemble_io with GPU outputs falling back to pinned memory
+CUDA_MEMORY_POOL_SIZE_BYTES=1024
+SAVED_SERVER_ARGS="${SERVER_ARGS}"
+SERVER_ARGS="${SERVER_ARGS} --cuda-memory-pool-byte-size=0:${CUDA_MEMORY_POOL_SIZE_BYTES}"
+SUBTEST="test_ensemble_io"
+for trial in $TRIALS; do
+    export TRIAL=$trial
+    setup_ensemble_io_models $trial
+    SERVER_LOG="./io_server.cuda_pool_fallback.${TRIAL}.log"
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        RET=1
+        continue
+    fi
+
+    set +e
+    python3 -m pytest --junitxml=${SUBTEST}.cuda_pool_fallback.${TRIAL}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}.cuda_pool_fallback.${TRIAL}
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** IOTest.${SUBTEST} (CUDA pool fallback, ${TRIAL}) FAILED. \n***"
+        cat ${CLIENT_LOG}.${SUBTEST}.cuda_pool_fallback.${TRIAL}
+        RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+    set -e
+
+    if ! grep -q "falling back to pinned system memory" $SERVER_LOG; then
+        echo -e "\n***\n*** Expected the CUDA memory pool to be exhausted and fall back to pinned memory (${TRIAL}). \n***"
+        RET=1
+    fi
+done
+SERVER_ARGS="${SAVED_SERVER_ARGS}"
+SERVER_LOG="./io_server.log"
 
 # IOTest.test_empty_gpu_output
 rm -rf models && mkdir models
