@@ -42,6 +42,7 @@ class GenerateErrorStatusTest(tu.TestResultCollector):
             f"http://localhost:8000/v2/models/mock_llm/{route}",
             data=json.dumps(inputs),
             headers={"Accept": "text/event-stream"},
+            timeout=30,
         )
 
     def test_model_error_status(self):
