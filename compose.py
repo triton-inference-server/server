@@ -283,7 +283,7 @@ def create_argmap(images, skip_pull):
     dcgm_ver = re.search("DCGM_VERSION=([\\S]{4,}) ", vars)
     dcgm_version = ""
     if dcgm_ver is None:
-        dcgm_version = "4.7.0-1"
+        dcgm_version = "4.7.0-2"
         log(
             "WARNING: DCGM version not found from image, installing the earlierst version {}".format(
                 dcgm_version
