@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -387,22 +387,41 @@ for p in http grpc; do
         CLIENT_PY=../clients/simple_grpc_infer_client.py
     fi
 
-    pids=()
-    for i in {0..10}; do
-        python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 &
-        pids+=" $!"
+    # The kernel assigns each new connection to one of the SO_REUSEPORT
+    # listeners by hashing the client address/port, so a single batch of
+    # clients can miss a server by chance. Keep sending batches until every
+    # server has served a request, up to MAX_CLIENT_ROUNDS.
+    MAX_CLIENT_ROUNDS=10
+    for round in $(seq 1 $MAX_CLIENT_ROUNDS); do
+        pids=()
+        for i in {0..10}; do
+            python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 &
+            pids+=($!)
+        done
+        for pid in "${pids[@]}"; do
+            wait $pid || { echo -e "\n***\n*** Python ${p} Async Infer Test Failed\n***"; cat $CLIENT_LOG; RET=1; }
+        done
+
+        server0_request_count=`curl -s localhost:8002/metrics | awk '/nv_inference_request_success{/ {print $2}'`
+        server1_request_count=`curl -s localhost:8003/metrics | awk '/nv_inference_request_success{/ {print $2}'`
+        server2_request_count=`curl -s 127.0.0.2:8004/metrics | awk '/nv_inference_request_success{/ {print $2}'`
+        server0_request_count=${server0_request_count:-0}
+        server1_request_count=${server1_request_count:-0}
+        server2_request_count=${server2_request_count:-0}
+        echo "${p} round ${round}: server0=${server0_request_count} server1=${server1_request_count} server2=${server2_request_count}"
+        if [ ${server0_request_count%.*} -gt 0 ] && \
+           [ ${server1_request_count%.*} -gt 0 ] && \
+           [ ${server2_request_count%.*} -gt 0 ]; then
+            break
+        fi
     done
-    wait $pids || { echo -e "\n***\n*** Python ${p} Async Infer Test Failed\n***"; cat $CLIENT_LOG; RET=1; }
 
     set -e
 
-    server0_request_count=`curl -s localhost:8002/metrics | awk '/nv_inference_request_success{/ {print $2}'`
-    server1_request_count=`curl -s localhost:8003/metrics | awk '/nv_inference_request_success{/ {print $2}'`
-    server2_request_count=`curl -s 127.0.0.2:8004/metrics | awk '/nv_inference_request_success{/ {print $2}'`
     if [ ${server0_request_count%.*} -eq 0 ] || \
        [ ${server1_request_count%.*} -eq 0 ] || \
        [ ${server2_request_count%.*} -eq 0 ]; then
-        echo -e "\n***\n*** Failed: ${p} requests are not distributed among all servers.\n***"
+        echo -e "\n***\n*** Failed: ${p} requests are not distributed among all servers after ${MAX_CLIENT_ROUNDS} rounds.\n***"
         RET=1
     fi
     kill_servers
