@@ -376,4 +376,12 @@ function kill_server () {
     fi
 
     stop_dynamo_discovery
+
+    # Fail the suite when the Python backend logged a stub crash signal.
+    if [[ -n "${SERVER_LOG:-}" && -f "$SERVER_LOG" ]] &&
+       grep -q "exited on signal " "$SERVER_LOG"; then
+        echo -e "\n***\n*** FAILED: Python backend stub exited on signal.\n***"
+        cat $SERVER_LOG
+        return 1
+    fi
 }
