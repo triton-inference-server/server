@@ -1,3 +1,5 @@
 README.md
 examples/README.md
 user_guide/perf_analyzer.md
+model_navigator/CHANGELOG.md
+model_navigator/docs/support_matrix.md
