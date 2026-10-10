@@ -1,4 +1,4 @@
-// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -88,6 +88,10 @@ struct Options {
   // The number of gRPC inference handler threads. Useful for
   // throughput tuning of models that are request handling bounded.
   int infer_thread_count_{2};
+  // The number of accept requests each streaming inference handler keeps
+  // outstanding, so up to this many new streams are matched without waiting
+  // for the handler thread to post the next one.
+  int stream_accept_prefetch_{16};
   // The maximum number of inference request/response objects that
   // remain allocated for reuse. As long as the number of in-flight
   // requests doesn't exceed this value there will be no

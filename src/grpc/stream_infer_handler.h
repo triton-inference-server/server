@@ -1,4 +1,4 @@
-// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -74,13 +74,14 @@ class ModelStreamInferHandler
       size_t max_response_queue_size, grpc_compression_level compression_level,
       std::pair<std::string, std::string> restricted_kv,
       const std::string& header_forward_pattern, std::shared_mutex* conn_mtx,
-      std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn)
+      std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn,
+      int accept_prefetch)
       : InferHandler(
             name, tritonserver, service, cq, max_state_bucket_count,
             max_response_queue_size, restricted_kv, header_forward_pattern,
             conn_mtx, conn_cnt, accepting_new_conn),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
-        compression_level_(compression_level)
+        compression_level_(compression_level), accept_prefetch_(accept_prefetch)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
@@ -116,12 +117,21 @@ class ModelStreamInferHandler
       void* userp);
   static void StateWriteResponse(InferHandler::State* state);
   bool Finish(State* state);
+  // Posts one RequestModelStreamInfer accept request.
+  void PostAcceptRequest();
 
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
   TRITONSERVER_ResponseAllocator* allocator_;
 
   grpc_compression_level compression_level_;
+
+  // Number of RequestModelStreamInfer calls this handler keeps outstanding,
+  // so up to that many new streams can be matched while the thread is busy.
+  const int accept_prefetch_;
+  // Whether the extra accept requests have been posted. Only accessed on the
+  // handler thread.
+  bool accept_prefetch_posted_{false};
 };
 
 }}}  // namespace triton::server::grpc

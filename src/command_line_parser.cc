@@ -307,6 +307,7 @@ enum TritonOptionId {
   OPTION_GRPC_ADDRESS,
   OPTION_GRPC_HEADER_FORWARD_PATTERN,
   OPTION_GRPC_INFER_THREAD_COUNT,
+  OPTION_GRPC_STREAM_ACCEPT_PREFETCH,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
   OPTION_GRPC_MAX_RESPONSE_POOL_SIZE,
   OPTION_GRPC_USE_SSL,
@@ -542,6 +543,13 @@ TritonParser::SetupOptions()
       {OPTION_GRPC_INFER_THREAD_COUNT, "grpc-infer-thread-count",
        Option::ArgInt,
        "The number of gRPC inference handler threads. Default is 2."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_STREAM_ACCEPT_PREFETCH, "grpc-stream-accept-prefetch",
+       Option::ArgInt,
+       "The number of accept requests each gRPC streaming inference handler "
+       "keeps outstanding, so up to this many new streams can be matched "
+       "immediately even while the handler is busy. Must be in the range 1 "
+       "to 128. Default is 16."});
   grpc_options_.push_back(
       {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
        "grpc-infer-allocation-pool-size", Option::ArgInt,
@@ -1477,6 +1485,15 @@ TritonParser::Parse(int argc, char** argv)
             throw ParseException(
                 "invalid argument for --grpc_infer_thread_count. Must be in "
                 "the range 2 to 128.");
+          }
+          break;
+        case OPTION_GRPC_STREAM_ACCEPT_PREFETCH:
+          lgrpc_options.stream_accept_prefetch_ = ParseOption<int>(optarg);
+          if (lgrpc_options.stream_accept_prefetch_ < 1 ||
+              lgrpc_options.stream_accept_prefetch_ > 128) {
+            throw ParseException(
+                "invalid argument for --grpc-stream-accept-prefetch. Must be "
+                "in the range 1 to 128.");
           }
           break;
         case OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE:
