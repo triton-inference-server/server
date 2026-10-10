@@ -371,7 +371,8 @@ function kill_server () {
        grep -q "exited on signal " "$SERVER_LOG"; then
         echo -e "\n***\n*** FAILED: Python backend stub exited on signal.\n***"
         cat $SERVER_LOG
-        return 1
+        # exit, not return: callers often run under `set +e` and ignore $?.
+        exit 1
     fi
 }
 
