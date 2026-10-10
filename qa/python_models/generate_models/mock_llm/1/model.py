@@ -1,4 +1,4 @@
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -73,6 +73,7 @@ class TritonPythonModel:
             params = json.loads(request.parameters())
             rep_count = params["REPETITION"] if "REPETITION" in params else 1
             fail_last = params["FAIL_LAST"] if "FAIL_LAST" in params else False
+            error_code = params.get("ERROR_CODE")
             delay = params["DELAY"] if "DELAY" in params else None
             output_0_dim = params["OUTPUT_0_DIM"] if "OUTPUT_0_DIM" in params else False
 
@@ -97,7 +98,14 @@ class TritonPythonModel:
                     None
                     if not fail_last
                     else pb_utils.InferenceResponse(
-                        error=pb_utils.TritonError("An Error Occurred")
+                        error=pb_utils.TritonError(
+                            "An Error Occurred",
+                            **(
+                                {"code": getattr(pb_utils.TritonError, error_code)}
+                                if error_code is not None
+                                else {}
+                            ),
+                        )
                     ),
                     flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL,
                 )
