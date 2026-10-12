@@ -1351,8 +1351,9 @@ COPY docker/sagemaker/serve /usr/bin/.
     # This is required since libcublasLt.so is not present during the build
     # stage of the PyTorch backend
     if not FLAGS.enable_gpu and ("pytorch" in backends):
-        df += """
-RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.13 backends/pytorch/libtorch_cuda.so
+        cuda_arch = "sbsa" if target_machine == "aarch64" else "x86_64"
+        df += f"""
+RUN patchelf --add-needed /usr/local/cuda/targets/{cuda_arch}-linux/lib/libcublasLt.so.13 backends/pytorch/libtorch_cuda.so
 """
     if "tensorrtllm" in backends:
         df += """
@@ -1621,8 +1622,8 @@ COPY --from=min_container /usr/local/cuda/lib64/libcufile.so.0 /usr/local/cuda/t
 COPY --from=min_container /usr/local/cuda/lib64/libnvrtc.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libcusparseLt.so.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libnvshmem_host.so.3 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda/lib64/libcublasLt.so /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda/lib64/libcublas.so /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libcublasLt.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libcublas.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
 COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1
