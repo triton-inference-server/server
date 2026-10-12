@@ -508,10 +508,11 @@ TritonParser::SetupOptions()
   http_options_.push_back(
       {OPTION_HTTP_PARSE_MEMORY_BUDGET, "http-parse-memory-budget",
        Option::ArgInt,
-       ("Maximum total memory in bytes that HTTP requests being parsed at the "
-        "same time may use for their JSON. A request that would go over the "
-        "budget gets a retryable 503 response. 0 turns the budget off. If "
-        "not set, the budget is " +
+       ("Maximum total memory in bytes that the parsed JSON of HTTP requests "
+        "may use at the same time. A request that would go over the budget "
+        "gets a retryable 503 response, or a 400 response if it needs more "
+        "than the whole budget. 0 turns the budget off. If not set, the "
+        "budget is " +
         std::to_string(HTTP_PARSE_MEMORY_BUDGET_PERCENT) +
         "% of the memory limit of the server (cgroup), or of physical RAM "
         "when no limit is set.")});
