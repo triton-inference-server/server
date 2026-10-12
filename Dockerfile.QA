@@ -290,17 +290,6 @@ RUN mkdir -p qa/L0_passive_instance/models/distributed_int32_int32_int32/1 && \
     cp tritonbuild/tritonserver/backends/distributed_addsub/libtriton_distributed_addsub.so \
         qa/L0_passive_instance/models/distributed_int32_int32_int32/1/.
 
-# QA tests run /usr/src/tensorrt/bin/trtexec. In the CUDA devel image that path
-# is a symlink to /usr/bin/trtexec (libnvinfer-bin), so stage the real binary
-# for the final image, which may be built on a runtime image without it. Also
-# stage the builder resource libraries trtexec dlopens to build engines.
-RUN mkdir -p /opt/trtexec && \
-    if [ -e /usr/src/tensorrt/bin/trtexec ]; then \
-        cp -L /usr/src/tensorrt/bin/trtexec /opt/trtexec/trtexec && \
-        find /usr/lib /usr/local -name 'libnvinfer_builder_resource*.so*' \
-            -exec cp -a --parents {} /opt/trtexec/ \; ; \
-    fi
-
 ############################################################################
 ## Copy artifacts from sdk container
 ############################################################################
@@ -392,19 +381,15 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 # The CUDA inference-runtime base ships the TensorRT runtime libraries but not
-# trtexec or the builder resource libraries.
-COPY --from=cibase /opt/trtexec/ /opt/trtexec/
-RUN if [ -e /opt/trtexec/trtexec ]; then \
-        if [ ! -e /usr/src/tensorrt/bin/trtexec ]; then \
-            mkdir -p /usr/src/tensorrt/bin && \
-            mv /opt/trtexec/trtexec /usr/src/tensorrt/bin/trtexec; \
-        fi && \
-        rm -f /opt/trtexec/trtexec && \
-        cp -an /opt/trtexec/. / && \
-        ldconfig && \
-        ! ldd /usr/src/tensorrt/bin/trtexec | grep 'not found'; \
-    fi && \
-    rm -rf /opt/trtexec
+# trtexec or the builder resource libraries it dlopens to build engines. QA
+# tests call trtexec through the devel image's /usr/src/tensorrt/bin symlink.
+COPY --from=cibase /usr/bin/trtexec /usr/bin/trtexec
+COPY --from=cibase /usr/lib/*-linux-gnu/libnvinfer_builder_resource*.so.*.*.* /usr/local/tensorrt/builder_resource/
+RUN mkdir -p /usr/src/tensorrt/bin && \
+    ln -sf /usr/bin/trtexec /usr/src/tensorrt/bin/trtexec && \
+    echo /usr/local/tensorrt/builder_resource > /etc/ld.so.conf.d/tensorrt-builder-resource.conf && \
+    ldconfig && \
+    ! ldd /usr/bin/trtexec | grep 'not found'
 
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
