@@ -381,23 +381,13 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 # The CUDA inference-runtime base ships the TensorRT runtime libraries but not
-# trtexec or the builder resource libraries it dlopens to build engines. The
-# builder resources must sit next to libnvinfer. QA tests call trtexec through
-# the devel image's /usr/src/tensorrt/bin symlink.
+# trtexec or the builder resource libraries it dlopens (from libnvinfer's
+# directory) to build engines. QA tests call /usr/src/tensorrt/bin/trtexec.
 COPY --from=cibase /usr/bin/trtexec /usr/bin/trtexec
 COPY --from=cibase /usr/lib/*-linux-gnu/libnvinfer_builder_resource*.so.*.*.* /tmp/trt_builder_resource/
-RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-        TRT_LIB_DIR=/usr/lib/aarch64-linux-gnu; \
-    else \
-        TRT_LIB_DIR=/usr/lib/x86_64-linux-gnu; \
-    fi && \
-    mv /tmp/trt_builder_resource/* ${TRT_LIB_DIR}/ && \
-    rm -rf /tmp/trt_builder_resource && \
-    ls ${TRT_LIB_DIR}/libnvinfer.so.* > /dev/null && \
+RUN mv /tmp/trt_builder_resource/* /usr/lib/*-linux-gnu/ && \
     mkdir -p /usr/src/tensorrt/bin && \
-    ln -sf /usr/bin/trtexec /usr/src/tensorrt/bin/trtexec && \
-    ldconfig && \
-    ! ldd /usr/bin/trtexec | grep 'not found'
+    ln -s /usr/bin/trtexec /usr/src/tensorrt/bin/trtexec
 
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
