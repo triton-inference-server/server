@@ -1351,7 +1351,7 @@ COPY docker/sagemaker/serve /usr/bin/.
     # This is required since libcublasLt.so is not present during the build
     # stage of the PyTorch backend
     if not FLAGS.enable_gpu and ("pytorch" in backends):
-        cuda_arch = "sbsa" if target_machine == "aarch64" else "x86_64"
+        cuda_arch = "sbsa" if target_machine() == "aarch64" else "x86_64"
         df += f"""
 RUN patchelf --add-needed /usr/local/cuda/targets/{cuda_arch}-linux/lib/libcublasLt.so.13 backends/pytorch/libtorch_cuda.so
 """
