@@ -25,78 +25,24 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Benchmarks the TensorRT-LLM LLM API (Python) model, the same way the C++
+# backend was benchmarked, so results stay comparable run to run. Execution now
+# goes through an out-of-process Python stub (shared-memory IPC, the GIL), so
+# numbers from the C++ backend are not comparable and the reporting baseline
+# has to be re-established.
+
 RET=0
 BASE_DIR=$(pwd)
-NUM_GPUS=${NUM_GPUS:=1}
-TENSORRTLLM_BACKEND_REPO_TAG=${TENSORRTLLM_BACKEND_REPO_TAG:="main"}
-TRITON_REPO_ORG=${TRITON_REPO_ORG:="https://github.com/triton-inference-server"}
-TRT_ROOT="/usr/local/tensorrt"
 
-MODEL_NAME="gpt2_tensorrt_llm"
+MODEL_NAME="tensorrt_llm"
 NAME="tensorrt_llm_benchmarking_test"
 MODEL_REPOSITORY="$(pwd)/triton_model_repo"
-TENSORRTLLM_BACKEND_DIR="/workspace/tensorrtllm_backend"
-GPT_DIR="$TENSORRTLLM_BACKEND_DIR/tensorrt_llm/examples/models/core/gpt"
-TOKENIZER_DIR="$GPT_DIR/gpt2"
-ENGINES_DIR="${BASE_DIR}/engines/inflight_batcher_llm/${NUM_GPUS}-gpu"
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_LOG="${NAME}_server.log"
-SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
+# A benchmark wants the KV cache the model would normally get, not the small
+# share the functional tests use to leave room for other servers.
+LLMAPI_KV_CACHE_FRACTION=${LLMAPI_KV_CACHE_FRACTION:="0.5"}
 source ../common/trtllm_util.sh
-
-# Update Open MPI to a version compatible with SLURM.
-function upgrade_openmpi {
-    local CURRENT_VERSION=$(mpirun --version 2>&1 | awk '/Open MPI/ {gsub(/rc[0-9]+/, "", $NF); print $NF}')
-
-    if [ -n "$CURRENT_VERSION" ] && dpkg --compare-versions "$CURRENT_VERSION" lt "5.0.1"; then
-        # Uninstall the current version of Open MPI
-        rm -r /opt/hpcx/ompi/ /usr/local/mpi && rm -rf /usr/lib/$(gcc -print-multiarch)/openmpi || {
-            echo "Failed to uninstall the existing Open MPI version $CURRENT_VERSION."
-            exit 1
-        }
-    else
-        echo "The installed Open MPI version ($CURRENT_VERSION) is 5.0.1 or higher. Skipping the upgrade."
-        return
-    fi
-
-    # Install SLURM supported Open MPI version
-    cd /tmp/
-    wget "https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-5.0.1.tar.gz" || {
-        echo "Failed to download Open MPI 5.0.1"
-        exit 1
-    }
-    rm -rf openmpi-5.0.1 && tar -xzf openmpi-5.0.1.tar.gz && cd openmpi-5.0.1 || {
-        echo "Failed to extract Open MPI 5.0.1"
-        exit 1
-    }
-    ./configure --prefix=/opt/hpcx/ompi/ && make && make install || {
-        echo "Failed to install Open MPI 5.0.1"
-        exit 1
-    }
-
-    # Update environment variables
-    export PATH=/opt/hpcx/ompi/bin:$PATH
-    export LD_LIBRARY_PATH=/opt/hpcx/ompi/lib:$LD_LIBRARY_PATH
-
-    if ! grep -q '/opt/hpcx/ompi/bin' ~/.bashrc; then
-        echo 'export PATH=/opt/hpcx/ompi/bin:$PATH' >>~/.bashrc
-    fi
-
-    if ! grep -q '/opt/hpcx/ompi/lib' ~/.bashrc; then
-        echo 'export LD_LIBRARY_PATH=/opt/hpcx/ompi/lib:$LD_LIBRARY_PATH' >>~/.bashrc
-    fi
-    ldconfig
-    cd "$BASE_DIR"
-    mpirun --version
-}
-
-upgrade_openmpi
-clone_tensorrt_llm_backend_repo
-build_gpt2_base_model
-build_gpt2_tensorrt_engine
-prepare_model_repository
 
 # Install perf_analyzer
 pip3 install perf_analyzer
@@ -113,14 +59,16 @@ PERF_CLIENT_PROTOCOL="grpc"
 EXPORT_FILE=profile-export-tensorrt-llm-model.json
 rm -rf *.tjson *.json *.csv *log
 
+# Streaming needs a decoupled model: model.yaml alone is not enough, the
+# launcher disables auto-complete-config, so the policy goes in config.pbtxt.
+prepare_llmapi_model_repository ${MODEL_REPOSITORY} 1 1 1
+
 echo '{
   "data": [
     {
       "text_input": ["Hello, my name is"],
-      "stream": [true],
-      "max_tokens": [16],
-      "bad_words": [""],
-      "stop_words": [""]
+      "streaming": [true],
+      "sampling_param_max_tokens": [16]
     }
   ]
 }' >$INPUT_DATA
@@ -129,16 +77,22 @@ echo '{
 # LLM generates a sequence of tokens that is unlikely to be within a reasonable bound to determine valid measurement in terms of latency.
 # Using "count_windows" measurement mode, which automatically extends the window for collecting responses.
 PERF_CLIENT_ARGS="-v -m $MODEL_NAME -i $PERF_CLIENT_PROTOCOL --async --streaming --input-data=$INPUT_DATA --profile-export-file=$EXPORT_FILE \
-                  --shape=text_input:1 --shape=max_tokens:1 --shape=bad_words:1 --shape=stop_words:1 --measurement-mode=count_windows \
+                  --shape=text_input:1 --measurement-mode=count_windows \
                   --concurrency-range=$CONCURRENCY --measurement-request-count=10 --stability-percentage=999"
 
 set +e
-run_server
+run_llmapi_server ${MODEL_REPOSITORY}
+
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start the server\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
 
 $PERF_CLIENT $PERF_CLIENT_ARGS -f ${NAME}.csv 2>&1 | tee ${NAME}_perf_analyzer.log
 set +o pipefail
 
-kill_server
+kill_llmapi_server
 set -e
 
 echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >>${NAME}.tjson
