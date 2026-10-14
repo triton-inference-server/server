@@ -82,6 +82,7 @@ DEFAULT_TRITON_VERSION_MAP = {
     "ort_openvino_version": "2026.4.1",
     "standalone_openvino_version": "2026.4.1",
     "dcgm_version": "4.7.0-2",
+    "tensorrtllm_version": "1.4.0rc0",
 }
 
 CORE_BACKENDS = ["ensemble"]
@@ -343,6 +344,34 @@ class BuildScript:
             )
             self.cmd("fi")
 
+    def gitfetch(self, repo, ref, subdir, org, sparse_dir):
+        """Shallow, sparse, non-recursive checkout of 'sparse_dir' at 'ref'.
+
+        'ref' may be a tag, a branch or a full commit SHA. Unlike gitclone
+        this does not clone submodules, so a very large repository can be
+        pinned to an exact revision while only fetching the files needed.
+        """
+        if not FLAGS.no_force_clone:
+            self.rmdir(subdir)
+
+        self.cmd(f"if [[ ! -e {subdir} ]]; then")
+        self.cmd(f"  git init -q {subdir}", check_exitcode=True)
+        self.cmd(
+            f"  git -C {subdir} remote add origin {org}/{repo}.git",
+            check_exitcode=True,
+        )
+        self.cmd(
+            f"  git -C {subdir} sparse-checkout set --cone {sparse_dir}",
+            check_exitcode=True,
+        )
+        self.cmd(
+            f"  git -C {subdir} fetch -q --depth=1 --filter=blob:none origin {ref}",
+            check_exitcode=True,
+        )
+        self.cmd(f"  git -C {subdir} checkout -q FETCH_HEAD", check_exitcode=True)
+        self.cmd(f"  git --git-dir {subdir}/.git log --oneline -1")
+        self.cmd("fi")
+
 
 def cmake_core_arg(name, type, value):
     # Return cmake -D setting to set name=value for core build. Use
@@ -582,8 +611,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = fastertransformer_cmake_args()
     elif be == "tensorrt":
         args = tensorrt_cmake_args()
-    elif be == "tensorrtllm":
-        args = tensorrtllm_cmake_args(images)
     else:
         args = []
 
@@ -618,11 +645,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         cargs.append(cmake_backend_enable(be, "TRITON_ENABLE_MEMORY_TRACKER", True))
 
     cargs += cmake_backend_extra_args(be)
-    if be == "tensorrtllm":
-        cargs.append("-S ../triton_backend/inflight_batcher_llm -B .")
-
-    else:
-        cargs.append("..")
+    cargs.append("..")
     return cargs
 
 
@@ -785,12 +808,6 @@ def fastertransformer_cmake_args():
         ),
         cmake_backend_arg("fastertransformer", "ENABLE_FP8", None, "OFF"),
     ]
-    return cargs
-
-
-def tensorrtllm_cmake_args(images):
-    cargs = []
-    cargs.append(cmake_backend_enable("tensorrtllm", "USE_CXX11_ABI", True))
     return cargs
 
 
@@ -1355,13 +1372,6 @@ COPY docker/sagemaker/serve /usr/bin/.
         df += f"""
 RUN patchelf --add-needed /usr/local/cuda/targets/{cuda_arch}-linux/lib/libcublasLt.so.13 backends/pytorch/libtorch_cuda.so
 """
-    if "tensorrtllm" in backends:
-        df += """
-RUN ldconfig && \\
-    find /opt/tritonserver -name lib*so -exec dirname {} \\; > /etc/ld.so.conf.d/tritonserver.conf && \\
-    ldconfig
-
-"""
     df = mount_apt_sources_secret(df)
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -1707,6 +1717,11 @@ def create_build_dockerfiles(
         # final image for the default and discarding whatever runtime
         # dependencies the override was chosen for.
         inference_image = None
+    elif "tensorrtllm" in backends:
+        # The TensorRT-LLM runtime comes from its release container.
+        inference_image = "nvcr.io/nvidia/tensorrt-llm/release:{}".format(
+            FLAGS.tensorrtllm_version
+        )
     elif FLAGS.enable_gpu and target_platform() != "rhel" and "vllm" not in backends:
         inference_image = (
             "nvcr.io/nvidia/cuda-dl-base:{}-inference-runtime-ubuntu24.04".format(
@@ -2058,31 +2073,6 @@ def core_build(
     cmake_script.blankln()
 
 
-def tensorrtllm_prebuild(cmake_script):
-    # Export the TRT_ROOT environment variable
-    cmake_script.cmd("export TRT_ROOT=/usr/local/tensorrt")
-    cmake_script.cmd("export ARCH=$(uname -m)")
-    cmake_script.cmd(
-        'export LD_LIBRARY_PATH="/usr/local/cuda/compat/lib.real:${LD_LIBRARY_PATH}"'
-    )
-
-
-def tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir):
-    # TODO: Update the CMakeLists.txt of TRT-LLM backend to install the artifacts to the correct location
-    cmake_destination_dir = os.path.join(repo_install_dir, "backends/tensorrtllm")
-    cmake_script.mkdir(cmake_destination_dir)
-
-    # Copy over the TRT-LLM backend libraries
-    cmake_script.cp(
-        os.path.join(tensorrtllm_be_dir, "build", "libtriton_tensorrtllm*.so"),
-        cmake_destination_dir,
-    )
-    cmake_script.cp(
-        os.path.join(tensorrtllm_be_dir, "build", "trtllmExecutorWorker"),
-        cmake_destination_dir,
-    )
-
-
 def backend_build(
     be,
     cmake_script,
@@ -2103,14 +2093,7 @@ def backend_build(
     cmake_script.comment()
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
-    if be == "tensorrtllm":
-        repository_name = "TensorRT-LLM"
-        cmake_script.gitclone(repository_name, tag, be, github_organization)
-    else:
-        cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
-
-    if be == "tensorrtllm":
-        tensorrtllm_prebuild(cmake_script)
+    cmake_script.gitclone(backend_repo(be), tag, be, github_organization)
 
     cmake_script.mkdir(repo_build_dir)
     cmake_script.cwd(repo_build_dir)
@@ -2118,10 +2101,6 @@ def backend_build(
         backend_cmake_args(images, components, be, repo_install_dir, library_paths)
     )
     cmake_script.makeinstall()
-
-    if be == "tensorrtllm":
-        tensorrtllm_be_dir = os.path.join(build_dir, be)
-        tensorrtllm_postbuild(cmake_script, repo_install_dir, tensorrtllm_be_dir)
 
     cmake_script.mkdir(os.path.join(install_dir, "backends"))
     cmake_script.rmdir(os.path.join(install_dir, "backends", be))
@@ -2170,6 +2149,53 @@ def backend_clone(
 
     clone_script.comment()
     clone_script.comment(f"end '{be}' backend")
+    clone_script.commentln(8)
+    clone_script.blankln()
+
+
+def tensorrtllm_clone(
+    be,
+    clone_script,
+    tag,
+    build_dir,
+    install_dir,
+    github_organization,
+):
+    # TensorRT-LLM is served through its LLM API model, which is a model
+    # repository artifact executed by the stock Python backend, not a Triton
+    # backend. Nothing is compiled: fetch the files needed to serve it and
+    # keep the upstream triton_backend/ layout, so that launch_triton_server.py
+    # still finds ../all_models/llmapi.
+    clone_script.commentln(8)
+    clone_script.comment(f"'{be}' LLM API model repository (no compile)")
+    clone_script.comment("Delete this section to remove backend from build")
+    clone_script.comment()
+    clone_script.mkdir(build_dir)
+    clone_script.cwd(build_dir)
+    clone_script.gitfetch(
+        "TensorRT-LLM", tag, be, github_organization, "triton_backend"
+    )
+
+    source_dir = os.path.join(build_dir, be, "triton_backend")
+    target_dir = os.path.join(install_dir, be)
+    clone_script.rmdir(target_dir)
+    for subdir in ("all_models", "scripts", "tools"):
+        clone_script.mkdir(os.path.join(target_dir, subdir))
+    clone_script.cpdir(
+        os.path.join(source_dir, "all_models", "llmapi"),
+        os.path.join(target_dir, "all_models"),
+    )
+    clone_script.cp(
+        os.path.join(source_dir, "scripts", "launch_triton_server.py"),
+        os.path.join(target_dir, "scripts"),
+    )
+    clone_script.cp(
+        os.path.join(source_dir, "tools", "llmapi_client.py"),
+        os.path.join(target_dir, "tools"),
+    )
+
+    clone_script.comment()
+    clone_script.comment(f"end '{be}' LLM API model repository")
     clone_script.commentln(8)
     clone_script.blankln()
 
@@ -2751,6 +2777,12 @@ if __name__ == "__main__":
         help="This flag sets the DCGM version for Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
+        "--tensorrtllm-version",
+        required=False,
+        default=DEFAULT_TRITON_VERSION_MAP["tensorrtllm_version"],
+        help="This flag sets the TensorRT-LLM release used by the tensorrtllm backend: it selects the default runtime image (nvcr.io/nvidia/tensorrt-llm/release:<version>) and the default TensorRT-LLM tag (v<version>) the LLM API model files are taken from. Default: the latest supported version.",
+    )
+    parser.add_argument(
         "--docker-build-secret",
         action="append",
         required=False,
@@ -2902,7 +2934,13 @@ if __name__ == "__main__":
     for be in FLAGS.backend:
         parts = be.split(":")
         if len(parts) == 1:
-            parts.append(default_repo_tag)
+            # The tensorrtllm backend serves model files taken from
+            # TensorRT-LLM, whose tags follow the TensorRT-LLM release.
+            parts.append(
+                f"v{FLAGS.tensorrtllm_version}"
+                if parts[0] == "tensorrtllm"
+                else default_repo_tag
+            )
         log('backend "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
         backends[parts[0]] = parts[1]
 
@@ -2914,6 +2952,15 @@ if __name__ == "__main__":
                 )
             )
             backends["python"] = backends["vllm"]
+
+    if "tensorrtllm" in backends:
+        if "python" not in backends:
+            log(
+                "TensorRT-LLM backend requires Python backend, adding Python backend with tag {}".format(
+                    default_repo_tag
+                )
+            )
+            backends["python"] = default_repo_tag
 
     # Initialize map of repo agents to build and repo-tag for each.
     repoagents = {}
@@ -2946,6 +2993,16 @@ if __name__ == "__main__":
         )
         log('image "{}": "{}"'.format(parts[0], parts[1]))
         images[parts[0]] = parts[1]
+
+    fail_if(
+        "tensorrtllm" in backends and not FLAGS.enable_gpu,
+        "the tensorrtllm backend requires --enable-gpu",
+    )
+    fail_if(
+        "vllm" in backends and "tensorrtllm" in backends and "inference" not in images,
+        "the vllm and tensorrtllm backends default to different runtime images, "
+        "select one with --image=inference,<full-image-name>",
+    )
 
     # Initialize map of library paths for each backend.
     library_paths = {}
@@ -3179,6 +3236,11 @@ if __name__ == "__main__":
             # If armnn_tflite backend, source from external repo for git clone
             if be == "armnn_tflite":
                 github_organization = "https://gitlab.com/arm-research/smarter/"
+            elif be == "tensorrtllm":
+                # The model files come from the TensorRT-LLM release itself.
+                github_organization = backend_org_overrides.get(
+                    be, "https://github.com/NVIDIA"
+                )
             else:
                 github_organization = backend_org_overrides.get(
                     be, FLAGS.github_organization
@@ -3186,6 +3248,15 @@ if __name__ == "__main__":
 
             if be == "vllm":
                 backend_clone(
+                    be,
+                    cmake_script,
+                    backends[be],
+                    script_build_dir,
+                    script_install_dir,
+                    github_organization,
+                )
+            elif be == "tensorrtllm":
+                tensorrtllm_clone(
                     be,
                     cmake_script,
                     backends[be],
