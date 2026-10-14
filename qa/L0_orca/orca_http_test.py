@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,13 +31,22 @@ import sys
 
 import requests
 
-
 # To run the test, have tritonserver running and run this script with the endpoint as a flag.
 #
 # Example:
 # ```
-# python3 orca_header_test.py http://localhost:8000/v2/models/ensemble/generate
+# python3 orca_http_test.py http://localhost:8000/v2/models/orca_kv_metrics/generate
 # ```
+#
+# The model is expected to publish nv_trt_llm_kv_cache_block_metrics with
+# tokens_per=32, used=25 and max=100 (qa/python_models/orca_kv_metrics), which
+# the server turns into the load metrics below.
+EXPECTED_METRICS = {
+    "kv_cache_utilization": 25 / 100,
+    "max_token_capacity": 100 * 32,
+}
+
+
 def get_endpoint_header(url, data, request_header=None):
     """
     Sends a POST request to the given URL with the provided data and returns the value of the "endpoint-load-metrics" header,
@@ -96,14 +105,22 @@ def check_for_keys(data, desired_keys, orca_format):
     """
     Checks if all desired keys are present in the given data dictionary.
     """
-    if all(key in data for key in desired_keys):
-        print(
-            f"ORCA header present in {orca_format} format with kv_cache_utilization: {[f'{k}: {data[k]}' for k in desired_keys]}"
-        )
-        return True
-    else:
+    if not all(key in data for key in desired_keys):
         print(f"Missing keys in header: {', '.join(set(desired_keys) - set(data))}")
         return False
+
+    print(
+        f"ORCA header present in {orca_format} format with kv_cache_utilization: {[f'{k}: {data[k]}' for k in desired_keys]}"
+    )
+    wrong = {
+        key: (data[key], EXPECTED_METRICS[key])
+        for key in desired_keys
+        if abs(float(data[key]) - EXPECTED_METRICS[key]) > 1e-6
+    }
+    if wrong:
+        print(f"Unexpected metric values in header (got, expected): {wrong}")
+        return False
+    return True
 
 
 def request_header(orca_format):
@@ -130,7 +147,7 @@ def test_header_type(url, data, orca_format):
             return False
         else:
             # No request header set <=> no response header. Intended behavior.
-            print(f"response header empty, endpoint-load-metrics-format is not set")
+            print("response header empty, endpoint-load-metrics-format is not set")
             return True
 
     data = parse_header_data(response_header, orca_format)
@@ -148,7 +165,7 @@ if __name__ == "__main__":
     parser.add_argument("url", help="The model URL to send the request to.")
     args = parser.parse_args()
     TEST_DATA = json.loads(
-        '{"text_input": "hello world", "max_tokens": 20, "bad_words": "", "stop_words": ""}'
+        '{"text_input": "hello world", "sampling_param_max_tokens": 20}'
     )
     passed = True
 
