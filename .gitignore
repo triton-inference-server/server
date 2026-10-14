@@ -19,6 +19,7 @@ qa/common/gen.*.cmds
 
 # Test exclusions
 qa/L0_openai/openai
+qa/L0_trtllm_llmapi/model_repos
 tensorrtllm_models
 tensorrtllm_mistral_models/
 custom_tokenizer
