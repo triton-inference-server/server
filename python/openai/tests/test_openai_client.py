@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@ from typing import List
 import numpy as np
 import openai
 import pytest
+from tests.utils import LLMAPI_STOP_WORDS
 
 
 @pytest.mark.openai
@@ -40,11 +41,7 @@ class TestOpenAIClient:
     def test_openai_client_models(self, client: openai.OpenAI, backend: str):
         models = list(client.models.list())
         print(f"Models: {models}")
-        if backend == "tensorrtllm":
-            # tensorrt_llm_bls +
-            # preprocess -> tensorrt_llm -> postprocess
-            assert len(models) == 4
-        elif backend == "vllm":
+        if backend in ("llmapi", "vllm"):
             assert len(models) == 1
         else:
             raise Exception(f"Unexpected backend {backend=}")
@@ -120,11 +117,7 @@ class TestAsyncOpenAIClient:
         async_models = await client.models.list()
         models = [model async for model in async_models]
         print(f"Models: {models}")
-        if backend == "tensorrtllm":
-            # tensorrt_llm_bls +
-            # preprocess -> tensorrt_llm -> postprocess
-            assert len(models) == 4
-        elif backend == "vllm":
+        if backend in ("llmapi", "vllm"):
             assert len(models) == 1
         else:
             raise Exception(f"Unexpected backend {backend=}")
@@ -230,7 +223,10 @@ class TestAsyncOpenAIClient:
         model: str,
         messages: List[dict],
         sampling_parameter_dict: dict,
+        backend: str,
     ):
+        if backend == "llmapi" and sampling_parameter_dict.get("stop"):
+            pytest.skip(reason=LLMAPI_STOP_WORDS)
         # Fixed seed and temperature for comparing reproducible responses
         seed = 0
         temperature = 0.0

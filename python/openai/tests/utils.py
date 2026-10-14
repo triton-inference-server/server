@@ -37,8 +37,18 @@ import requests
 import tritonserver
 
 sys.path.append(os.path.join(Path(__file__).resolve().parent, "..", "openai_frontend"))
-from engine.triton_engine import TritonLLMEngine
-from frontend.fastapi_frontend import FastApiFrontend
+from engine.triton_engine import TritonLLMEngine  # noqa: E402
+from frontend.fastapi_frontend import FastApiFrontend  # noqa: E402
+
+# Why some tests are skipped for the TensorRT-LLM LLM API backend.
+LLMAPI_STOP_WORDS = (
+    "sampling_param_stop fails in TensorRT-LLM's llmapi model: the stop strings "
+    "reach the tokenizer as bytes"
+)
+LLMAPI_GUIDED_DECODING = (
+    "tool_choice that constrains the output to a schema needs guided decoding, "
+    "which the LLM API backend does not provide"
+)
 
 
 # TODO: Cleanup, refactor, mock, etc.

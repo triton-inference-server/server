@@ -541,9 +541,9 @@ class TestModelManagementInference(_ModelManagementBase):
 
     @pytest.fixture(scope="class")
     def load_model(self, model: str) -> list[str]:
-        # For tensorrt_llm_bls, we need to load all the dependent models
-        if model == "tensorrt_llm_bls":
-            return ["postprocessing", "preprocessing", "tensorrt_llm"]
+        # The vLLM and LLM API repositories serve a single model with no
+        # dependent models to load first.
+        return None
 
     @staticmethod
     def _assert_load(base_url, model_name: str):

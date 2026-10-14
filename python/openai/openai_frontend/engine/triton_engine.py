@@ -56,8 +56,11 @@ from engine.utils.tokenizer import get_tokenizer
 from engine.utils.tool_call_parsers import ToolCallParser, ToolParserManager
 from engine.utils.tool_call_parsers.utils import DEFAULT_MAX_TOOL_CALL_PARSE_BYTES
 from engine.utils.triton import (
+    LLMAPI_BACKEND,
+    LLMAPI_MARKER_INPUT,
     RequestKind,
     TritonLoraConfig,
+    _create_llmapi_generate_request,
     _create_trtllm_embedding_request,
     _create_trtllm_generate_request,
     _create_vllm_embedding_request,
@@ -66,6 +69,7 @@ from engine.utils.triton import (
     _get_openai_completion_format_logprobs_from_vllm_response,
     _get_output,
     _get_usage_from_response,
+    _LlmapiTextStream,
     _parse_lora_configs,
     _StreamingUsageAccumulator,
     _validate_triton_responses_non_streaming,
@@ -249,6 +253,11 @@ class TritonLLMEngine(LLMEngine):
         request_id = f"cmpl-{uuid.uuid1()}"
         created = int(time.time())
         default_role = "assistant"
+        text_stream = (
+            _LlmapiTextStream(metadata.tokenizer, prompt)
+            if metadata.backend == LLMAPI_BACKEND
+            else None
+        )
         role = self._get_first_response_role(
             conversation, add_generation_prompt, default_role
         )
@@ -266,6 +275,7 @@ class TritonLLMEngine(LLMEngine):
                 role,
                 tool_call_parser,
                 responses,
+                text_stream,
             )
             return self._stream_with_inference_cancellation(
                 stream, responses, request_id
@@ -289,6 +299,8 @@ class TritonLLMEngine(LLMEngine):
         usage = _get_usage_from_response(
             response, metadata.backend, RequestKind.GENERATION
         )
+        if usage is None and text_stream is not None:
+            usage = text_stream.usage(text)
 
         # Parse logprobs if requested
         logprobs_data = None
@@ -389,9 +401,14 @@ class TritonLLMEngine(LLMEngine):
         # Prepare and send responses back to client in OpenAI format
         request_id = f"cmpl-{uuid.uuid1()}"
         created = int(time.time())
+        text_stream = (
+            _LlmapiTextStream(metadata.tokenizer, request.prompt)
+            if metadata.backend == LLMAPI_BACKEND
+            else None
+        )
         if request.stream:
             stream = self._streaming_completion_iterator(
-                request_id, created, request, responses, metadata.backend
+                request_id, created, request, responses, metadata.backend, text_stream
             )
             return self._stream_with_inference_cancellation(
                 stream, responses, request_id
@@ -406,6 +423,8 @@ class TritonLLMEngine(LLMEngine):
         usage = _get_usage_from_response(
             response, metadata.backend, RequestKind.GENERATION
         )
+        if usage is None and text_stream is not None:
+            usage = text_stream.usage(text)
 
         # Parse logprobs if requested
         logprobs_data = None
@@ -503,6 +522,12 @@ class TritonLLMEngine(LLMEngine):
             else:
                 return _create_vllm_embedding_request
 
+        if backend == LLMAPI_BACKEND:
+            if request_type == RequestKind.GENERATION:
+                return _create_llmapi_generate_request
+            else:
+                return _create_trtllm_embedding_request
+
         # Use TRT-LLM format as default for everything else. This could be
         # an ensemble, a python or BLS model, a TRT-LLM backend model, etc.
         if request_type == RequestKind.GENERATION:
@@ -532,6 +557,13 @@ class TritonLLMEngine(LLMEngine):
         backend = model.config()["backend"]
         if not backend and model.config()["platform"] == "ensemble":
             backend = "ensemble"
+        # The LLM API model is a Python-backend model; its inputs identify it.
+        if self.backend == LLMAPI_BACKEND or (
+            backend == "python"
+            and LLMAPI_MARKER_INPUT
+            in [input["name"] for input in model.config()["input"]]
+        ):
+            backend = LLMAPI_BACKEND
         print(f"Found model: {name=}, {backend=}")
 
         lora_configs = _parse_lora_configs(
@@ -716,6 +748,7 @@ class TritonLLMEngine(LLMEngine):
         role: str,
         tool_call_parser: ToolCallParser,
         responses: TritonAsyncResponseIterator,
+        text_stream: Optional[_LlmapiTextStream] = None,
     ) -> AsyncGenerator[str, None]:
         model = request.model
 
@@ -740,6 +773,8 @@ class TritonLLMEngine(LLMEngine):
 
         async for response in responses:
             delta_text = _get_output(response)
+            if text_stream is not None:
+                delta_text = text_stream.delta(delta_text)
             if include_usage:
                 usage_accumulator.update(response)
 
@@ -828,6 +863,8 @@ class TritonLLMEngine(LLMEngine):
         # Send the final usage chunk if requested via stream_options.
         if include_usage:
             usage_payload = usage_accumulator.get_final_usage()
+            if usage_payload is None and text_stream is not None:
+                usage_payload = text_stream.usage()
             if usage_payload:
                 final_usage_chunk = CreateChatCompletionStreamResponse(
                     id=request_id,
@@ -1053,6 +1090,7 @@ class TritonLLMEngine(LLMEngine):
         request: CreateCompletionRequest,
         responses: TritonAsyncResponseIterator,
         backend: str,
+        text_stream: Optional[_LlmapiTextStream] = None,
     ) -> AsyncGenerator[str, None]:
         model = request.model
         include_usage = request.stream_options and request.stream_options.include_usage
@@ -1064,6 +1102,8 @@ class TritonLLMEngine(LLMEngine):
                 usage_accumulator.update(response)
 
             text = _get_output(response)
+            if text_stream is not None:
+                text = text_stream.delta(text)
 
             # Parse logprobs for this chunk if requested
             chunk_logprobs = None
@@ -1100,6 +1140,8 @@ class TritonLLMEngine(LLMEngine):
         # Send the final usage chunk if requested via stream_options.
         if include_usage:
             usage_payload = usage_accumulator.get_final_usage()
+            if usage_payload is None and text_stream is not None:
+                usage_payload = text_stream.usage()
             if usage_payload:
                 final_usage_chunk = CreateCompletionResponse(
                     id=request_id,

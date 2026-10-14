@@ -44,7 +44,7 @@ from .utils import OpenAIServer
 
 def is_vllm_installed():
     try:
-        import vllm as _
+        import vllm as _  # noqa: F401
 
         return True
     except ImportError:
@@ -86,6 +86,24 @@ def test_parse_lora_configs(model_repository: str, model_name: str, expect_error
             )
 
 
+_LORA_MODEL = "tensorrt_llm_bls"
+_LORA_WEIGHT_DIRS = (
+    "luotuo-lora-7b-0.1-weights",
+    "Japanese-Alpaca-LoRA-7b-v0-weights",
+)
+
+
+@pytest.fixture
+def lora_repo(tmp_path):
+    """A model repository holding LoRA weights in the layout the frontend checks."""
+    for weight_dir in _LORA_WEIGHT_DIRS:
+        path = tmp_path / _LORA_MODEL / "1" / weight_dir
+        path.mkdir(parents=True)
+        (path / "model.lora_weights.npy").touch()
+        (path / "model.lora_config.npy").touch()
+    return str(tmp_path)
+
+
 @pytest.mark.skipif(
     is_vllm_installed(),
     reason="VLLM backend does not validate LoRA paths",
@@ -96,15 +114,11 @@ def test_parse_lora_configs(model_repository: str, model_name: str, expect_error
         # Valid relative path inside repo (requires .npy files to exist at runtime).
         ("tensorrt_llm_bls/1/luotuo-lora-7b-0.1-weights", False, None),
         ("tensorrt_llm_bls/1/Japanese-Alpaca-LoRA-7b-v0-weights", False, None),
-        # Absolute path not allowed.
+        # Absolute path not allowed; "{repo}" is the repository under test.
         (
-            os.path.join(
-                os.path.abspath(os.curdir),
-                "tests/tensorrtllm_models",
-                "tensorrt_llm_bls/1/luotuo-lora-7b-0.1-weights",
-            ),
+            "{repo}/tensorrt_llm_bls/1/luotuo-lora-7b-0.1-weights",
             True,
-            f"must be a relative path inside its model repository",
+            "must be a relative path inside its model repository",
         ),
         ("/etc/passwd", True, "must be a relative path inside its model repository"),
         # Path outside repo (traversal).
@@ -123,12 +137,14 @@ def test_parse_lora_configs(model_repository: str, model_name: str, expect_error
     ],
 )
 def test_validate_lora_path_trtllm(
+    lora_repo: str,
     lora_path: str,
     expect_error: bool,
     error_message: str,
 ):
     lora_name = ""
-    repo_path = "tests/tensorrtllm_models"
+    repo_path = lora_repo
+    lora_path = lora_path.format(repo=lora_repo)
     try:
         validate_lora_path_trtllm(repo_path, lora_path, lora_name)
     except Exception as e:
@@ -145,8 +161,8 @@ def test_validate_lora_path_trtllm(
 
 
 class LoRATest(unittest.TestCase):
-    _backend = "vllm" if is_vllm_installed() else "tensorrtllm"
-    _model_name = "gemma-2b" if _backend == "vllm" else "tensorrt_llm_bls"
+    _backend = "vllm" if is_vllm_installed() else "llmapi"
+    _model_name = "gemma-2b" if _backend == "vllm" else "tensorrt_llm"
     # TODO: Find a LoRA model that has its own tokenizer.
     _tokenizer = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     _lora_separator = "_lora_"
@@ -191,19 +207,6 @@ class LoRATest(unittest.TestCase):
             local_dir=f"models/{self._model_name}/1/GemmaSheep",
         )
 
-    def _create_trtllm_model_repository_with_lora(self):
-        shutil.rmtree("models", ignore_errors=True)
-        shutil.copytree("tests/tensorrtllm_models", "models")
-        with open(f"models/{self._model_name}/1/multi_lora.json", "w") as f:
-            f.write(
-                json.dumps(
-                    {
-                        "doll": f"models/{self._model_name}/1/luotuo-lora-7b-0.1-weights",
-                        "sheep": f"models/{self._model_name}/1/Japanese-Alpaca-LoRA-7b-v0-weights",
-                    }
-                )
-            )
-
     def _create_vllm_model_repository_without_lora(self):
         shutil.rmtree("models", ignore_errors=True)
         os.makedirs(f"models/{self._model_name}/1", exist_ok=True)
@@ -211,10 +214,6 @@ class LoRATest(unittest.TestCase):
             f.write('backend: "vllm"')
         with open(f"models/{self._model_name}/1/model.json", "w") as f:
             f.write(json.dumps({"model": "unsloth/gemma-2b"}))
-
-    def _create_trtllm_model_repository_without_lora(self):
-        shutil.rmtree("models", ignore_errors=True)
-        shutil.copytree("tests/tensorrtllm_models", "models")
 
     def _create_model_repository_mock_llm(self):
         shutil.rmtree("models", ignore_errors=True)
@@ -290,10 +289,6 @@ class LoRATest(unittest.TestCase):
             expected_model_names.append(self._get_model_name(lora_name))
         models = client.models.list()
         for model in models:
-            if self._backend == "tensorrtllm" and not model.id.startswith(
-                "tensorrt_llm_bls"
-            ):
-                continue
             self.assertIn(model.id, expected_model_names)
             expected_model_names.remove(model.id)
         self.assertEqual(
@@ -333,8 +328,11 @@ class LoRATest(unittest.TestCase):
     def test_lora_separator_not_set(self):
         if self._backend == "vllm":
             self._create_vllm_model_repository_with_lora()
-        elif self._backend == "tensorrtllm":
-            self._create_trtllm_model_repository_with_lora()
+        elif self._backend == "llmapi":
+            self.skipTest(
+                "LoRA through the OpenAI frontend is not supported for the "
+                "TensorRT-LLM LLM API backend"
+            )
         else:
             raise Exception(f"Unexpected backend {self._backend=}")
 
@@ -374,8 +372,11 @@ class LoRATest(unittest.TestCase):
     def test_lora_separator_set(self):
         if self._backend == "vllm":
             self._create_vllm_model_repository_with_lora()
-        elif self._backend == "tensorrtllm":
-            self._create_trtllm_model_repository_with_lora()
+        elif self._backend == "llmapi":
+            self.skipTest(
+                "LoRA through the OpenAI frontend is not supported for the "
+                "TensorRT-LLM LLM API backend"
+            )
         else:
             raise Exception(f"Unexpected backend {self._backend=}")
 
@@ -423,8 +424,11 @@ class LoRATest(unittest.TestCase):
     def test_lora_separator_set_for_lora_off_model(self):
         if self._backend == "vllm":
             self._create_vllm_model_repository_without_lora()
-        elif self._backend == "tensorrtllm":
-            self._create_trtllm_model_repository_without_lora()
+        elif self._backend == "llmapi":
+            self.skipTest(
+                "LoRA through the OpenAI frontend is not supported for the "
+                "TensorRT-LLM LLM API backend"
+            )
         else:
             raise Exception(f"Unexpected backend {self._backend=}")
 
