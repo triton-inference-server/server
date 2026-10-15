@@ -146,9 +146,13 @@ class GrpcStream:
         )
 
     def send(self, prompt, request_id="", **params):
+        self.send_inputs(MODEL_NAME, build_inputs(prompt, **params), request_id)
+
+    def send_inputs(self, model, inputs, request_id=""):
+        """Send prepared `inputs` to `model`, e.g. an ensemble over the LLM."""
         self._client.async_stream_infer(
-            MODEL_NAME,
-            build_inputs(prompt, **params),
+            model,
+            inputs,
             request_id=request_id,
             enable_empty_final_response=True,
         )
