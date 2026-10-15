@@ -44,7 +44,10 @@ import pytest
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCENARIO_DIR = os.path.dirname(HERE)
 SUITE_DIR = os.path.dirname(SCENARIO_DIR)
-OUTPUT_DIR = os.path.join(SCENARIO_DIR, "output")
+# Set by pytest.py (--output-dir); same default when pytest is run directly.
+OUTPUT_DIR = os.environ.get("LLMAPI_OUTPUT_DIR") or os.path.join(
+    SUITE_DIR, "output", os.path.basename(SCENARIO_DIR)
+)
 
 # llmapi_test_util (the tests' client helpers) and qa/common/action_log.
 sys.path.append(SUITE_DIR)

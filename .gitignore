@@ -20,8 +20,8 @@ qa/common/gen.*.cmds
 # Test exclusions
 qa/L0_openai/openai
 # L0_trtllm_llmapi: generated model repositories, server logs and JUnit XML
-# land under each scenario's output/.
-qa/L0_trtllm_llmapi/*/output/
+# land under output/<scenario>/ by default.
+qa/L0_trtllm_llmapi/output/
 llmapi_models
 llmapi_mistral_models/
 custom_tokenizer
