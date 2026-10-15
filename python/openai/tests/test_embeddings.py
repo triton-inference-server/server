@@ -533,6 +533,68 @@ class TestEmbeddings:
 
         self._check_embedding_response(response, model, encoding_format=encoding_format)
 
+    @pytest.mark.parametrize("encoding_format", ["float", "base64"])
+    @pytest.mark.parametrize(
+        "inputs",
+        [
+            ["The food was delicious and the waiter..."],
+            [
+                "The food was delicious and the waiter...",
+                "The deployment controller started a replacement replica and waited "
+                "for the model to become ready before routing inference requests.",
+                "101",
+                "102",
+                "The food was delicious and the waiter...",
+            ],
+        ],
+    )
+    def test_embeddings_text_batch(self, client, model, inputs, encoding_format):
+        expected = []
+        for text in inputs:
+            response = client.post(
+                "/v1/embeddings",
+                json={
+                    "model": model,
+                    "input": text,
+                    "encoding_format": encoding_format,
+                },
+            )
+            assert response.status_code == 200, response.json()
+            expected.append(response.json())
+
+        response = client.post(
+            "/v1/embeddings",
+            json={
+                "model": model,
+                "input": inputs,
+                "encoding_format": encoding_format,
+            },
+        )
+        assert response.status_code == 200, response.json()
+        batch = response.json()
+        assert batch["object"] == "list"
+        assert batch["model"] == model
+        assert len(batch["data"]) == len(inputs)
+        for index, (item, single) in enumerate(zip(batch["data"], expected)):
+            assert item["index"] == index
+            assert item["object"] == "embedding"
+            actual_vector = item["embedding"]
+            expected_vector = single["data"][0]["embedding"]
+            if encoding_format == "base64":
+                actual_vector = np.frombuffer(
+                    base64.b64decode(actual_vector), dtype=np.float32
+                )
+                expected_vector = np.frombuffer(
+                    base64.b64decode(expected_vector), dtype=np.float32
+                )
+            np.testing.assert_allclose(
+                actual_vector, expected_vector, rtol=0, atol=1e-3
+            )
+        for field in ("prompt_tokens", "total_tokens"):
+            assert batch["usage"][field] == sum(
+                single["usage"][field] for single in expected
+            )
+
     def test_embeddings_empty_request(self, client):
         response = client.post("/v1/embeddings", json={})
         assert response.status_code == 422
