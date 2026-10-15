@@ -379,6 +379,14 @@ ENV GOPATH /root/go
 ENV PATH $PATH:/usr/local/go/bin:$GOPATH/bin
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+# The CUDA inference-runtime base ships the TensorRT runtime libraries and the
+# /usr/src/tensorrt/bin/trtexec symlink, but not trtexec or the builder resource
+# libraries it dlopens from libnvinfer's directory to build engines.
+COPY --from=cibase /usr/bin/trtexec /usr/bin/trtexec
+COPY --from=cibase /usr/lib/*-linux-gnu/libnvinfer_builder_resource*.so.*.*.* /tmp/trt_builder_resource/
+RUN mv /tmp/trt_builder_resource/* /usr/lib/*-linux-gnu/
+
 # CI expects tests in /opt/tritonserver/qa. The triton-server (1000)
 # user should own all artifacts in case CI is run using triton-server
 # user.
