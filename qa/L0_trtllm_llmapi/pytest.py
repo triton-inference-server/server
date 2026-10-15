@@ -27,7 +27,9 @@
 
 """Shared entrypoint for every L0_trtllm_llmapi scenario.
 
-    ./pytest.py <scenario>   # e.g. ./pytest.py ensemble
+    ./pytest.py <scenario> [pytest args...]
+    # e.g. ./pytest.py ensemble
+    #      ./pytest.py unary -vv -k perf_metrics
 
 Each scenario is a subdirectory with its own tests/ and conftest.py, which
 serves the model the way that scenario needs; this points pytest at it and
@@ -35,7 +37,9 @@ writes its JUnit report to the scenario's output/. Scenarios run one at a
 time: each starts its own server on the default ports and GPU.
 
 Runs pytest with -s so that every server start, logged through
-qa/common/action_log, is visible for passing tests too.
+qa/common/action_log, is visible for passing tests too. Arguments after the
+scenario are passed to pytest after the defaults, so they add to or override
+them.
 """
 
 import os
@@ -46,8 +50,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def main(argv):
-    if len(argv) != 2:
-        print("usage: pytest.py <scenario>", file=sys.stderr)
+    if len(argv) < 2:
+        print("usage: pytest.py <scenario> [pytest args...]", file=sys.stderr)
         return 2
 
     scenario = argv[1]
@@ -72,7 +76,8 @@ def main(argv):
             "-s",
             "-rs",
             "--junitxml=output/%s.report.xml" % scenario,
-        ],
+        ]
+        + argv[2:],
         cwd=scenario_dir,
     )
 
