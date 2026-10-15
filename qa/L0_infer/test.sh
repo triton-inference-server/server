@@ -310,7 +310,8 @@ function generate_model_repository() {
 copy_torch_aoti_models() {
     local dest_dir=$1
     for m in torch_aoti_int8_int8 torch_aoti_int32_int32 \
-             torch_aoti_float16_float16 torch_aoti_float32_float32; do
+             torch_aoti_float16_float16 torch_aoti_bf16_bf16 \
+             torch_aoti_float32_float32; do
         src="${DATADIR}/qa_model_repository/${m}"
         if [ ! -d "${src}" ]; then
             echo -e "\n***\n*** Missing AOTI model: ${src}\n***"
