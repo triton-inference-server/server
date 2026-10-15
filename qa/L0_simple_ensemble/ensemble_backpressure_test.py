@@ -26,22 +26,22 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
+import queue
 import sys
+import threading
+import time
+import unittest
+from contextlib import ExitStack
+from functools import partial
+
+import numpy as np
+import tritonclient.grpc as grpcclient
+from tritonclient.utils import InferenceServerException
 
 sys.path.append("../common")
 
-import os  # noqa: E402
-import queue  # noqa: E402
-import threading  # noqa: E402
-import time  # noqa: E402
-import unittest  # noqa: E402
-from contextlib import ExitStack  # noqa: E402
-from functools import partial  # noqa: E402
-
-import numpy as np  # noqa: E402
 import test_util as tu  # noqa: E402
-import tritonclient.grpc as grpcclient  # noqa: E402
-from tritonclient.utils import InferenceServerException  # noqa: E402
 
 SERVER_URL = "localhost:8001"
 DEFAULT_RESPONSE_TIMEOUT = 60

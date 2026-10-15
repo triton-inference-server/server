@@ -26,7 +26,6 @@
 
 #include "stream_infer_handler.h"
 
-#include <algorithm>
 #include <regex>
 
 namespace triton { namespace server { namespace grpc {
@@ -111,16 +110,13 @@ StreamOutputBufferAttributes(
 void
 ModelStreamInferHandler::StartNewRequest()
 {
-  // Keep 'accept_prefetch_' accept requests outstanding rather than one, so up
-  // to that many new streams are matched at once even while this thread is
-  // busy. gRPC cancels a call that stays unmatched longer than its
-  // unrequested-time limit (30s by default). All of them are posted on the
-  // first call; after that every accepted stream posts exactly one
-  // replacement, so the number outstanding stays the same.
+  // Post all kAcceptPrefetch accept requests on the first call. After that,
+  // each accepted stream posts exactly one replacement, so at most
+  // kAcceptPrefetch are outstanding.
   int count = 1;
   if (!accept_prefetch_posted_) {
     accept_prefetch_posted_ = true;
-    count = std::max(accept_prefetch_, 1);
+    count = kAcceptPrefetch;
     LOG_VERBOSE(1) << Name() << " outstanding accept requests: " << count;
   }
   for (int i = 0; i < count; ++i) {

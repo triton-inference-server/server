@@ -74,14 +74,13 @@ class ModelStreamInferHandler
       size_t max_response_queue_size, grpc_compression_level compression_level,
       std::pair<std::string, std::string> restricted_kv,
       const std::string& header_forward_pattern, std::shared_mutex* conn_mtx,
-      std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn,
-      int accept_prefetch)
+      std::atomic<uint32_t>* conn_cnt, bool* accepting_new_conn)
       : InferHandler(
             name, tritonserver, service, cq, max_state_bucket_count,
             max_response_queue_size, restricted_kv, header_forward_pattern,
             conn_mtx, conn_cnt, accepting_new_conn),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
-        compression_level_(compression_level), accept_prefetch_(accept_prefetch)
+        compression_level_(compression_level)
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
@@ -126,11 +125,15 @@ class ModelStreamInferHandler
 
   grpc_compression_level compression_level_;
 
-  // Number of RequestModelStreamInfer calls this handler keeps outstanding,
-  // so up to that many new streams can be matched while the thread is busy.
-  const int accept_prefetch_;
-  // Whether the extra accept requests have been posted. Only accessed on the
-  // handler thread.
+  // An accept request is a RequestModelStreamInfer call posted to gRPC. gRPC
+  // hands each new stream to one of them; a stream left unmatched longer than
+  // gRPC's unrequested-call limit (30 s by default) is cancelled before Triton
+  // sees it. Keeping several outstanding lets a burst of new streams be
+  // matched even while this handler's thread is busy. 16 matched bursts of up
+  // to 40 new streams in the L0_simple_ensemble backpressure ensemble.
+  static constexpr int kAcceptPrefetch = 16;
+  // Whether the accept requests have been posted. Only accessed on the handler
+  // thread.
   bool accept_prefetch_posted_{false};
 };
 

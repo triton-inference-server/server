@@ -556,65 +556,34 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 
-######## Test '--grpc-stream-accept-prefetch' command-line option ########
-# The option sets how many accept requests the gRPC streaming handler keeps
-# outstanding. Invalid values must be rejected at startup. For the default and
-# the boundary values the handler must post exactly that many accept requests
-# at startup (one "New request handler" line each; no streams are opened here).
+######## Test that the gRPC streaming handler keeps 16 accept requests outstanding ########
+# The handler posts them all at startup (one "New request handler" line each;
+# no streams are opened here), so a burst of new streams is matched without
+# waiting for the handler thread.
 EMPTY_MODEL_DIR="`pwd`/empty_models"
 rm -rf ${EMPTY_MODEL_DIR} && mkdir -p ${EMPTY_MODEL_DIR}
+SERVER_LOG="./stream_accept_requests_server.log"
+SERVER_ARGS="--model-repository=${EMPTY_MODEL_DIR} --log-verbose=1"
+EXPECTED_ACCEPT_REQUESTS=16
+rm -f $SERVER_LOG
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
 set +e
-
-for val in 0 129 abc; do
-    expected_err="invalid argument for --grpc-stream-accept-prefetch. Must be in the range 1 to 128."
-    if [ "$val" == "abc" ]; then
-        expected_err="Invalid option value. Got abc"
-    fi
-    SERVER_LOG="./grpc_stream_accept_prefetch_${val}_server.log"
-    SERVER_ARGS="--model-repository=${EMPTY_MODEL_DIR} --grpc-stream-accept-prefetch=${val}"
-    rm -f $SERVER_LOG
-    run_server
-    if [ "$SERVER_PID" != "0" ]; then
-        echo -e "\n***\n*** FAILED: server started with invalid --grpc-stream-accept-prefetch=${val}\n***"
-        cat $SERVER_LOG
-        kill $SERVER_PID
-        wait $SERVER_PID
-        RET=1
-    elif ! grep -qF "$expected_err" $SERVER_LOG; then
-        echo -e "\n***\n*** FAILED: missing expected error for --grpc-stream-accept-prefetch=${val}\n***"
-        cat $SERVER_LOG
-        RET=1
-    fi
-done
-
-# "default" runs without the option and expects 16.
-for val in default 1 128; do
-    SERVER_LOG="./grpc_stream_accept_prefetch_${val}_server.log"
-    SERVER_ARGS="--model-repository=${EMPTY_MODEL_DIR} --log-verbose=1"
-    expected=16
-    if [ "$val" != "default" ]; then
-        SERVER_ARGS="${SERVER_ARGS} --grpc-stream-accept-prefetch=${val}"
-        expected=$val
-    fi
-    rm -f $SERVER_LOG
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** FAILED: server did not start with --grpc-stream-accept-prefetch=${val}\n***"
-        cat $SERVER_LOG
-        RET=1
-        continue
-    fi
-    posted=`grep -c "New request handler for ModelStreamInferHandler" $SERVER_LOG`
-    if ! grep -E -q "ModelStreamInferHandler outstanding accept requests: ${expected}([^0-9]|$)" $SERVER_LOG || \
-       [ "$posted" != "$expected" ]; then
-        echo -e "\n***\n*** FAILED: expected ${expected} outstanding stream accept requests for ${val}, found ${posted} posted\n***"
-        cat $SERVER_LOG
-        RET=1
-    fi
-    kill $SERVER_PID
-    wait $SERVER_PID
-done
+posted=`grep -c "New request handler for ModelStreamInferHandler" $SERVER_LOG`
+if [ "$posted" != "$EXPECTED_ACCEPT_REQUESTS" ]; then
+    echo -e "\n***\n*** FAILED: expected ${EXPECTED_ACCEPT_REQUESTS} stream accept requests at startup, found ${posted}\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
 set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 rm -rf ${EMPTY_MODEL_DIR}
 
 
