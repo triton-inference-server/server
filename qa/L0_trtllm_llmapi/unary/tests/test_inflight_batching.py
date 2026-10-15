@@ -44,8 +44,11 @@ MAX_TOKENS = 64
 
 def _timestamps(index):
     # Distinct prompts, so that no request is served from another's KV cache.
+    # They must not start with the UUID: TensorRT-LLM reuses partially
+    # matching KV-cache blocks by default, and test_perf_metrics_outputs, which
+    # runs in the same server, needs its UUID-led prompt to reuse nothing.
     result = util.grpc_infer(
-        f"{uuid.uuid4()} Request {index}: tell a long story about a lighthouse.",
+        f"Request {index} ({uuid.uuid4()}): tell a long story about a lighthouse.",
         sampling_param_max_tokens=MAX_TOKENS,
         sampling_param_temperature=0.0,
         sampling_param_return_perf_metrics=True,
