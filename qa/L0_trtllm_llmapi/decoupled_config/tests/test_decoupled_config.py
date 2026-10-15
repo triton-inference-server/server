@@ -40,21 +40,16 @@ the launcher or the model, this suite is expected to fail: update it and drop
 the config.pbtxt workaround from common/trtllm_util.sh.
 """
 
-import sys
 import unittest
 
+import llmapi_test_util as util
 import requests
-
-sys.path.append("../common")
-
-import llmapi_test_util as util  # noqa: E402
-from test_util import TestResultCollector  # noqa: E402
 
 PROMPT = "The capital of France is Paris. The capital of Germany is"
 SINGLE_RESPONSE_ERROR = "Non-decoupled model cannot send more than one response"
 
 
-class LlmapiDecoupledConfigTest(TestResultCollector):
+class LlmapiDecoupledConfigTest(unittest.TestCase):
     def test_model_yaml_decoupled_flag_is_not_applied(self):
         config = requests.get(
             f"{util.HTTP_URL}/v2/models/{util.MODEL_NAME}/config", timeout=10

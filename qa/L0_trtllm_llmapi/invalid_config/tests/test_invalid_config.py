@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -25,47 +24,30 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Two model instances on one GPU (instance_group count 2, gpu_device_ids "0;0")."""
 
-import concurrent.futures
-import sys
-import unittest
+"""Two instances need one gpu_device_ids entry each: the model must fail to
+load, and say why, when the parameter is missing or too short."""
 
-import requests
+import os
 
-sys.path.append("../common")
+import pytest
+from conftest import OUTPUT_DIR, ServerStartError, prepare_repository, serve
 
-import llmapi_test_util as util  # noqa: E402
-from test_util import TestResultCollector  # noqa: E402
-
-PROMPT = "The capital of France is Paris. The capital of Germany is"
-
-
-class LlmapiMultiInstanceTest(TestResultCollector):
-    def test_both_instances_are_loaded(self):
-        config = requests.get(
-            f"{util.HTTP_URL}/v2/models/{util.MODEL_NAME}/config", timeout=10
-        ).json()
-        self.assertEqual(config["instance_group"][0]["count"], 2)
-        log = util.server_log_text()
-        for index in (0, 1):
-            self.assertIn(
-                f"TRITONBACKEND_ModelInstanceInitialize: {util.MODEL_NAME}_0_{index}",
-                log,
-            )
-
-    def test_concurrent_requests_succeed(self):
-        def generate(_):
-            result = util.grpc_infer(
-                PROMPT, sampling_param_max_tokens=16, sampling_param_temperature=0.0
-            )
-            return util.output_text(result)
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-            outputs = list(pool.map(generate, range(16)))
-        self.assertEqual(len(outputs), 16)
-        self.assertTrue(all("Berlin" in text for text in outputs), outputs)
+CASES = {
+    "no_gpu_ids": (None, "gpu_device_ids parameter required"),
+    "short_gpu_ids": ("0", "gpu_device_ids mismatch"),
+}
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.mark.parametrize("case", sorted(CASES))
+def test_model_is_rejected(case):
+    gpu_device_ids, expected_error = CASES[case]
+    repo = prepare_repository(
+        os.path.join(OUTPUT_DIR, "models_%s" % case), gpu_device_ids=gpu_device_ids
+    )
+    server_log = os.path.join(OUTPUT_DIR, "%s_server.log" % case)
+    with pytest.raises(ServerStartError):
+        with serve(repo, server_log):
+            pass
+    with open(server_log, errors="replace") as f:
+        assert expected_error in f.read()

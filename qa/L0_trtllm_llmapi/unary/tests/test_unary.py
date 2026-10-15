@@ -27,20 +27,16 @@
 
 """Non-decoupled LLM API model: unary HTTP and gRPC requests."""
 
-import sys
 import unittest
 import uuid
 
-sys.path.append("../common")
-
-import llmapi_test_util as util  # noqa: E402
-from test_util import TestResultCollector  # noqa: E402
-from tritonclient.utils import InferenceServerException  # noqa: E402
+import llmapi_test_util as util
+from tritonclient.utils import InferenceServerException
 
 PROMPT = "The capital of France is Paris. The capital of Germany is"
 
 
-class LlmapiUnaryTest(TestResultCollector):
+class LlmapiUnaryTest(unittest.TestCase):
     def _expect_error(self, expected, prompt=PROMPT, **params):
         """The request must fail with `expected` in the error message."""
         with self.assertRaises(InferenceServerException) as ctx:

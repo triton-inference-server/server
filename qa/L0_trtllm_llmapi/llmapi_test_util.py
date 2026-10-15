@@ -40,6 +40,7 @@ import subprocess
 import time
 
 import numpy as np
+import pytest
 import requests
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import np_to_triton_dtype
@@ -51,7 +52,6 @@ GRPC_PORT = int(os.environ.get("TRITON_GRPC_PORT", "8001"))
 METRICS_PORT = int(os.environ.get("TRITON_METRICS_PORT", "8002"))
 HTTP_URL = f"http://{HOST}:{HTTP_PORT}"
 GRPC_URL = f"{HOST}:{GRPC_PORT}"
-SERVER_LOG = os.environ.get("SERVER_LOG")
 
 # Optional inputs of the model and their numpy types (config.pbtxt).
 INPUT_DTYPES = {
@@ -226,19 +226,26 @@ def metric_value(name, model=MODEL_NAME):
     return total
 
 
+def server_log_path():
+    """Log of the running server; each conftest sets SERVER_LOG when it starts one."""
+    return os.environ.get("SERVER_LOG")
+
+
 def server_log_text():
-    if not SERVER_LOG or not os.path.exists(SERVER_LOG):
+    path = server_log_path()
+    if not path or not os.path.exists(path):
         return ""
-    with open(SERVER_LOG, errors="replace") as f:
+    with open(path, errors="replace") as f:
         return f.read()
 
 
 def server_log_count(needle):
     """Number of server log lines containing `needle` (log must be verbose)."""
-    if not SERVER_LOG or not os.path.exists(SERVER_LOG):
+    path = server_log_path()
+    if not path or not os.path.exists(path):
         return 0
     result = subprocess.run(
-        ["grep", "-c", "-F", needle, SERVER_LOG], capture_output=True, text=True
+        ["grep", "-c", "-F", needle, path], capture_output=True, text=True
     )
     return int(result.stdout.strip() or 0)
 
@@ -272,7 +279,7 @@ def gpu_memory_used_mib():
     return sum(int(v) for v in out.split())
 
 
-def require_gpus(testcase, needed):
+def require_gpus(needed):
     """Skip loudly, or fail when REQUIRE_GPUS is set, if too few GPUs exist.
 
     A silent skip would let a TP1-only run report green for a matrix that also
@@ -283,5 +290,5 @@ def require_gpus(testcase, needed):
         return
     message = f"needs {needed} GPU(s), {available} available"
     if os.environ.get("REQUIRE_GPUS") == "1":
-        testcase.fail(f"REQUIRE_GPUS=1 but test {message}")
-    testcase.skipTest(message)
+        pytest.fail(f"REQUIRE_GPUS=1 but test {message}", pytrace=False)
+    pytest.skip(message)

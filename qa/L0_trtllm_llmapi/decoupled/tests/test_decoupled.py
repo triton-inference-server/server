@@ -31,14 +31,10 @@ The model is served with ``model_transaction_policy { decoupled: true }`` in
 config.pbtxt (see common/trtllm_util.sh for why model.yaml alone is not enough).
 """
 
-import sys
 import time
 import unittest
 
-sys.path.append("../common")
-
-import llmapi_test_util as util  # noqa: E402
-from test_util import TestResultCollector  # noqa: E402
+import llmapi_test_util as util
 
 PROMPT = "The capital of France is Paris. The capital of Germany is"
 LONG_PROMPT = "Write a very long story about a dragon and a knight."
@@ -46,7 +42,7 @@ LONG_PROMPT = "Write a very long story about a dragon and a knight."
 LONG_OUTPUT = dict(sampling_param_max_tokens=30000, sampling_param_temperature=0.8)
 
 
-class LlmapiDecoupledTest(TestResultCollector):
+class LlmapiDecoupledTest(unittest.TestCase):
     # The server logs one line per streamed response (the launcher enables
     # verbose logging), so the count only grows while a request is generating.
     # Decoupled Python-backend requests are never "pending" in Triton's

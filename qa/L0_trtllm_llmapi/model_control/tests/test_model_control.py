@@ -28,14 +28,10 @@
 """Explicit model control: unloading must release the engine, reloading must work."""
 
 import subprocess
-import sys
 import unittest
 
-sys.path.append("../common")
-
-import llmapi_test_util as util  # noqa: E402
-import tritonclient.grpc as grpcclient  # noqa: E402
-from test_util import TestResultCollector  # noqa: E402
+import llmapi_test_util as util
+import tritonclient.grpc as grpcclient
 
 PROMPT = "The capital of France is Paris. The capital of Germany is"
 
@@ -46,7 +42,7 @@ def processes(pattern):
     return out.stdout.split()
 
 
-class LlmapiModelControlTest(TestResultCollector):
+class LlmapiModelControlTest(unittest.TestCase):
     def setUp(self):
         self.client = grpcclient.InferenceServerClient(util.GRPC_URL)
 
