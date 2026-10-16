@@ -73,9 +73,9 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
 fi
 
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
-    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="37"}
+    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="38"}
 else
-    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="50"}
+    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="51"}
 fi
 
 TEST_JETSON=${TEST_JETSON:=0}
@@ -391,8 +391,8 @@ done
 if [ "$TEST_VALGRIND" -eq 1 ]; then
   TESTING_BACKENDS="python python_dlpack onnx"
   # VALGRIND_TESTS=1 omits version/ensemble methods, so this phase cannot
-  # share EXPECTED_NUM_TESTS with the first loop (50, or the GitLab pin).
-  EXPECTED_NUM_VALGRIND_BACKEND_TESTS=${EXPECTED_NUM_VALGRIND_BACKEND_TESTS:="40"}
+  # share EXPECTED_NUM_TESTS with the first loop (51, or the GitLab pin).
+  EXPECTED_NUM_VALGRIND_BACKEND_TESTS=${EXPECTED_NUM_VALGRIND_BACKEND_TESTS:="41"}
   if [[ "aarch64" != $(uname -m) ]] ; then
       pip3 install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   else
