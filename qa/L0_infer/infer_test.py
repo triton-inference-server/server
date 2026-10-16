@@ -575,19 +575,22 @@ class InferTest(tu.TestResultCollector):
                     outputs=[httpclient.InferRequestedOutput("RESULT")],
                 )
                 got = result.as_numpy("RESULT")
+                want = expected
                 if expected.dtype == ml_dtypes.bfloat16:
-                    # numpy has no native BF16; compare in float32.
+                    # numpy has no native BF16; check the dtype, then compare
+                    # in float32 without rebinding 'expected' so the other
+                    # protocol's check below still sees BF16.
                     self.assertEqual(got.dtype, ml_dtypes.bfloat16)
                     got = got.astype(np.float32)
-                    expected = expected.astype(np.float32)
-                if np.issubdtype(expected.dtype, np.floating):
+                    want = expected.astype(np.float32)
+                if np.issubdtype(want.dtype, np.floating):
                     self.assertTrue(
-                        np.allclose(got, expected),
+                        np.allclose(got, want),
                         f"{model_name} HTTP RESULT mismatch",
                     )
                 else:
                     self.assertTrue(
-                        np.array_equal(got, expected),
+                        np.array_equal(got, want),
                         f"{model_name} HTTP RESULT mismatch",
                     )
 
@@ -607,19 +610,22 @@ class InferTest(tu.TestResultCollector):
                     outputs=[grpcclient.InferRequestedOutput("RESULT")],
                 )
                 got = result.as_numpy("RESULT")
+                want = expected
                 if expected.dtype == ml_dtypes.bfloat16:
-                    # numpy has no native BF16; compare in float32.
+                    # numpy has no native BF16; check the dtype, then compare
+                    # in float32 without rebinding 'expected' so the other
+                    # protocol's check below still sees BF16.
                     self.assertEqual(got.dtype, ml_dtypes.bfloat16)
                     got = got.astype(np.float32)
-                    expected = expected.astype(np.float32)
-                if np.issubdtype(expected.dtype, np.floating):
+                    want = expected.astype(np.float32)
+                if np.issubdtype(want.dtype, np.floating):
                     self.assertTrue(
-                        np.allclose(got, expected),
+                        np.allclose(got, want),
                         f"{model_name} gRPC RESULT mismatch",
                     )
                 else:
                     self.assertTrue(
-                        np.array_equal(got, expected),
+                        np.array_equal(got, want),
                         f"{model_name} gRPC RESULT mismatch",
                     )
 
