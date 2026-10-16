@@ -35,6 +35,7 @@ import os  # noqa: E402
 import unittest  # noqa: E402
 
 import infer_util as iu  # noqa: E402
+import ml_dtypes  # noqa: E402
 import numpy as np  # noqa: E402
 import test_util as tu  # noqa: E402
 import tritonclient.grpc as grpcclient  # noqa: E402
@@ -574,14 +575,22 @@ class InferTest(tu.TestResultCollector):
                     outputs=[httpclient.InferRequestedOutput("RESULT")],
                 )
                 got = result.as_numpy("RESULT")
-                if np.issubdtype(expected.dtype, np.floating):
+                want = expected
+                if expected.dtype == ml_dtypes.bfloat16:
+                    # numpy has no native BF16; check the dtype, then compare
+                    # in float32 without rebinding 'expected' so the other
+                    # protocol's check below still sees BF16.
+                    self.assertEqual(got.dtype, ml_dtypes.bfloat16)
+                    got = got.astype(np.float32)
+                    want = expected.astype(np.float32)
+                if np.issubdtype(want.dtype, np.floating):
                     self.assertTrue(
-                        np.allclose(got, expected),
+                        np.allclose(got, want),
                         f"{model_name} HTTP RESULT mismatch",
                     )
                 else:
                     self.assertTrue(
-                        np.array_equal(got, expected),
+                        np.array_equal(got, want),
                         f"{model_name} HTTP RESULT mismatch",
                     )
 
@@ -601,14 +610,22 @@ class InferTest(tu.TestResultCollector):
                     outputs=[grpcclient.InferRequestedOutput("RESULT")],
                 )
                 got = result.as_numpy("RESULT")
-                if np.issubdtype(expected.dtype, np.floating):
+                want = expected
+                if expected.dtype == ml_dtypes.bfloat16:
+                    # numpy has no native BF16; check the dtype, then compare
+                    # in float32 without rebinding 'expected' so the other
+                    # protocol's check below still sees BF16.
+                    self.assertEqual(got.dtype, ml_dtypes.bfloat16)
+                    got = got.astype(np.float32)
+                    want = expected.astype(np.float32)
+                if np.issubdtype(want.dtype, np.floating):
                     self.assertTrue(
-                        np.allclose(got, expected),
+                        np.allclose(got, want),
                         f"{model_name} gRPC RESULT mismatch",
                     )
                 else:
                     self.assertTrue(
-                        np.array_equal(got, expected),
+                        np.array_equal(got, want),
                         f"{model_name} gRPC RESULT mismatch",
                     )
 
@@ -631,6 +648,13 @@ class InferTest(tu.TestResultCollector):
         input1 = np.full((1, 16), 2.0, dtype=np.float16)
         self._infer_torch_aoti(
             "torch_aoti_float16_float16", input0, input1, input0 + input1, "FP16"
+        )
+
+    def test_torch_aoti_bfloat16(self):
+        input0 = np.ones((1, 16), dtype=ml_dtypes.bfloat16)
+        input1 = np.full((1, 16), 2.0, dtype=ml_dtypes.bfloat16)
+        self._infer_torch_aoti(
+            "torch_aoti_bf16_bf16", input0, input1, input0 + input1, "BF16"
         )
 
     def test_torch_aoti_float32(self):
