@@ -39,7 +39,8 @@ and GPU.
 Everything a run produces goes to one output directory: the JUnit report
 (<scenario>.report.xml), pytest's own log (<scenario>.pytest.log), the server
 logs (*_server.log for Triton, *_server_launcher.log for the server's stdout,
-where TensorRT-LLM logs) and the generated model repositories. It is
+where TensorRT-LLM logs), the same logs split per test under logs/<test>/
+(see conftest.py) and the generated model repositories. It is
 --output-dir, else $LLMAPI_OUTPUT_DIR, else output/<scenario>/ next to this
 file; the conftests read it from LLMAPI_OUTPUT_DIR. It is emptied before the
 run, so it only ever holds the latest run.
