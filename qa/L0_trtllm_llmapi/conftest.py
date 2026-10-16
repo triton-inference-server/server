@@ -24,10 +24,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-"""Per-test logs for every L0_trtllm_llmapi scenario.
+"""Machine description and per-test logs for every L0_trtllm_llmapi scenario.
 
 The scenarios' own conftest.py files serve the model; this one, at the suite
-root, only splits the run's logs by test. A server usually outlives many
+root, describes the machine and splits the run's logs by test.
+
+The CPU and GPUs the run sees (system_info.py) head pytest's report and are
+recorded as properties of the JUnit report, so a result says which machine
+and allocation it came from.
+
+A server usually outlives many
 tests, so its log is one file per server start; after each test, the part of
 every server log written while that test ran (setup, call and teardown) is
 copied next to what the test itself printed:
@@ -58,8 +64,35 @@ import time
 import pytest
 
 SUITE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(SUITE_DIR)
+import system_info  # noqa: E402
+
 LOGS_DIRNAME = "logs"
 CHUNK = 1 << 20
+
+# system_info.describe() of this run: (header lines, JUnit properties).
+_system = None
+
+
+def _describe_system():
+    global _system
+    if _system is None:
+        _system = system_info.describe()
+    return _system
+
+
+def pytest_report_header(config):
+    return _describe_system()[0]
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _record_system(record_testsuite_property):
+    lines, properties = _describe_system()
+    for line in lines:
+        logging.getLogger("system_info").info(line)
+    for name, value in properties:
+        record_testsuite_property(name, value)
+
 
 # Log path -> offset up to which it has been copied into per-test logs.
 _sliced_to = {}
