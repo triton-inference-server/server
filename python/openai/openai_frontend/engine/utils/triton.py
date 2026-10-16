@@ -52,10 +52,12 @@ from schemas.openai import (
 from utils.utils import ClientError, ServerError
 
 # The TensorRT-LLM LLM API model (all_models/llmapi in TensorRT-LLM). It runs
-# on the Python backend, so Triton reports its backend as "python"; the
-# frontend recognises it by its inputs, or by --backend llmapi.
+# on the Python backend, so Triton reports its backend as "tensorrtllm" (the
+# Python-based backend build.py installs) or "python" (model.py in the model
+# repository); the frontend recognises it by its inputs, or by --backend llmapi.
 LLMAPI_BACKEND = "llmapi"
 LLMAPI_MARKER_INPUT = "sampling_param_max_tokens"
+LLMAPI_TRITON_BACKENDS = ("tensorrtllm", "python")
 
 
 class RequestKind(Enum):

@@ -56,7 +56,11 @@ def setup_server(
     model_repository: str,
     model_control_mode: tritonserver.ModelControlMode = tritonserver.ModelControlMode.NONE,
     load_models: Optional[List[str]] = None,
+    backend_directory: Optional[str] = None,
 ):
+    options = {}
+    if backend_directory is not None:
+        options["backend_directory"] = backend_directory
     server: tritonserver.Server = tritonserver.Server(
         model_repository=model_repository,
         model_control_mode=model_control_mode,
@@ -65,6 +69,7 @@ def setup_server(
         log_info=True,
         log_warn=True,
         log_error=True,
+        **options,
     ).start(wait_until_ready=True)
     return server
 

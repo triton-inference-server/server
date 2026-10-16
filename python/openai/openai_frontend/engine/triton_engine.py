@@ -58,6 +58,7 @@ from engine.utils.tool_call_parsers.utils import DEFAULT_MAX_TOOL_CALL_PARSE_BYT
 from engine.utils.triton import (
     LLMAPI_BACKEND,
     LLMAPI_MARKER_INPUT,
+    LLMAPI_TRITON_BACKENDS,
     RequestKind,
     TritonLoraConfig,
     _create_llmapi_generate_request,
@@ -557,9 +558,11 @@ class TritonLLMEngine(LLMEngine):
         backend = model.config()["backend"]
         if not backend and model.config()["platform"] == "ensemble":
             backend = "ensemble"
-        # The LLM API model is a Python-backend model; its inputs identify it.
+        # The LLM API model runs on the Python backend, either as the
+        # tensorrtllm Python-based backend or as a model.py in the model
+        # repository; its inputs tell it from other models on those backends.
         if self.backend == LLMAPI_BACKEND or (
-            backend == "python"
+            backend in LLMAPI_TRITON_BACKENDS
             and LLMAPI_MARKER_INPUT
             in [input["name"] for input in model.config()["input"]]
         ):

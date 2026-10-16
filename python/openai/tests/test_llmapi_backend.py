@@ -33,6 +33,7 @@ decoupled policy and cumulative streaming, so no GPU or engine is needed.
 
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -56,19 +57,59 @@ def tokenizer(tokenizer_model):
     return AutoTokenizer.from_pretrained(tokenizer_model)
 
 
-# The model is recognised by its inputs; --backend llmapi must behave the same.
+_MOCK_REPOSITORY = Path(__file__).parent / "llmapi_mock_models"
+_TRITON_BACKENDS = "/opt/tritonserver/backends"
+
+
+def _tensorrtllm_backend_setup(tmp_path):
+    """Serve the mock the way build.py installs the real model: as the
+    Python-based backend backends/tensorrtllm, with a model repository that
+    holds only config.pbtxt. Returns (model repository, backend directory)."""
+    backends = tmp_path / "backends"
+    (backends / "tensorrtllm").mkdir(parents=True)
+    (backends / "python").symlink_to(os.path.join(_TRITON_BACKENDS, "python"))
+    shutil.copy(_MOCK_REPOSITORY / _MODEL / "1" / "model.py", backends / "tensorrtllm")
+
+    model_dir = tmp_path / "models" / _MODEL
+    (model_dir / "1").mkdir(parents=True)
+    config = (_MOCK_REPOSITORY / _MODEL / "config.pbtxt").read_text()
+    assert 'backend: "python"' in config
+    (model_dir / "config.pbtxt").write_text(
+        config.replace('backend: "python"', 'backend: "tensorrtllm"')
+    )
+    return str(model_dir.parent), str(backends)
+
+
+# The model is recognised by its inputs, whether Triton reports the python
+# backend (model.py in the model repository) or the tensorrtllm Python-based
+# backend; --backend llmapi must behave the same.
 @pytest.fixture(
-    scope="module", params=[None, "llmapi"], ids=["autodetect", "backend-flag"]
+    scope="module",
+    params=[
+        ("python", None),
+        ("python", "llmapi"),
+        ("tensorrtllm", None),
+    ],
+    ids=["autodetect", "backend-flag", "tensorrtllm-backend"],
 )
-def client(request, tokenizer_model):
+def client(request, tokenizer_model, tmp_path_factory):
+    triton_backend, frontend_backend = request.param
+    if triton_backend == "tensorrtllm":
+        repository, backend_directory = _tensorrtllm_backend_setup(
+            tmp_path_factory.mktemp("tensorrtllm_backend")
+        )
+    else:
+        repository, backend_directory = str(_MOCK_REPOSITORY), None
     server = setup_server(
-        str(Path(__file__).parent / "llmapi_mock_models"),
+        repository,
         model_control_mode=tritonserver.ModelControlMode.EXPLICIT,
         load_models=[_MODEL],
+        backend_directory=backend_directory,
     )
     try:
+        assert server.model(_MODEL).config()["backend"] == triton_backend
         app = setup_fastapi_app(
-            tokenizer=tokenizer_model, server=server, backend=request.param
+            tokenizer=tokenizer_model, server=server, backend=frontend_backend
         )
         with TestClient(app) as test_client:
             yield test_client
