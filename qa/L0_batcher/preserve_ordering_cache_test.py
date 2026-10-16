@@ -69,8 +69,11 @@ class PreserveOrderingCacheTest(unittest.TestCase):
         stats = self._client.get_inference_statistics(_MODEL_NAME, as_json=True)
         for model_stat in stats["model_stats"]:
             if model_stat["name"] == _MODEL_NAME:
-                return int(model_stat["inference_stats"]["cache_hit"]["count"])
+                # gRPC JSON omits a statistic count when it is zero.
+                cache_hit = model_stat["inference_stats"].get("cache_hit", {})
+                return int(cache_hit.get("count", 0))
         self.fail(f"no statistics for model {_MODEL_NAME}")
+        return 0
 
     def test_request_after_cache_hit_receives_response(self):
         # The repeated request is a cache hit. The following request has
