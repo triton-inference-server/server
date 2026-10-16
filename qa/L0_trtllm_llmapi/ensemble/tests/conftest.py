@@ -185,6 +185,31 @@ def _tail(path, lines=30):
         return "".join(f.readlines()[-lines:])
 
 
+def _start_failure(server_log):
+    """Why the server did not start, for the error message.
+
+    The end of the Triton log is mostly shutdown messages by then, so the
+    errors it logged (a failed model load says why) are listed first. The
+    server's stdout, where TensorRT-LLM and the Python model write, follows
+    when the launcher captured it.
+    """
+    errors = []
+    if os.path.exists(server_log):
+        with open(server_log, errors="replace") as f:
+            errors = [line for line in f if re.match(r"E\d{4} ", line)]
+    report = "server log errors:\n%s\nserver log tail:\n%s" % (
+        "".join(errors[-20:]) or "(none)\n",
+        _tail(server_log),
+    )
+    launcher_log = server_log.replace(".log", "_launcher.log")
+    if os.path.exists(launcher_log):
+        report += "\nserver stdout tail (%s):\n%s" % (
+            launcher_log,
+            _tail(launcher_log, 60),
+        )
+    return report
+
+
 def _start(repo, server_log):
     """Start the server for `repo` with the image's launcher, as users do."""
     os.makedirs(os.path.dirname(server_log), exist_ok=True)
@@ -211,7 +236,7 @@ def _start(repo, server_log):
         _wait_for_ready([MODEL_NAME, "prompt_template", ENSEMBLE_NAME])
     except ServerStartError as e:
         _stop()
-        raise ServerStartError("%s; server log tail:\n%s" % (e, _tail(server_log)))
+        raise ServerStartError("%s; %s" % (e, _start_failure(server_log)))
 
 
 @contextlib.contextmanager
