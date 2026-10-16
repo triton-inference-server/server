@@ -90,7 +90,7 @@ class TestCompletions:
         if (
             sampling_parameter == "logprobs"
             and value is not None
-            and model == "tensorrt_llm_bls"
+            and model == "tensorrt_llm"
         ):
             assert response.status_code == 400
             assert (
@@ -197,15 +197,14 @@ class TestCompletions:
             raise ValueError(f"Unexpected {temperature=} for this test.")
 
     # Remove xfail when fix is released and this test returns xpass status
-    @pytest.mark.xfail(
-        reason="TRT-LLM BLS model will ignore temperature until a later release"
-    )
     # Simple tests to verify temperature roughly behaves as expected
-    def test_completions_temperature_tensorrtllm(
+    def test_completions_temperature_llmapi(
         self, client, backend: str, model: str, prompt: str
     ):
-        if backend != "tensorrtllm":
-            pytest.skip(reason="Only used to test vLLM-specific temperature behavior")
+        if backend != "llmapi":
+            pytest.skip(
+                reason="Only used to test LLM API-specific temperature behavior"
+            )
 
         responses = []
         payload1 = {

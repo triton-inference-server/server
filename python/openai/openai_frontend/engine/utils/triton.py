@@ -51,6 +51,14 @@ from schemas.openai import (
 )
 from utils.utils import ClientError, ServerError
 
+# The TensorRT-LLM LLM API model (all_models/llmapi in TensorRT-LLM). It runs
+# on the Python backend, so Triton reports its backend as "tensorrtllm" (the
+# Python-based backend build.py installs) or "python" (model.py in the model
+# repository); the frontend recognises it by its inputs, or by --backend llmapi.
+LLMAPI_BACKEND = "llmapi"
+LLMAPI_MARKER_INPUT = "sampling_param_max_tokens"
+LLMAPI_TRITON_BACKENDS = ("tensorrtllm", "python")
+
 
 class RequestKind(Enum):
     GENERATION = 1
@@ -247,6 +255,109 @@ def _create_trtllm_generate_request(
     inputs["return_num_input_tokens"] = np.bool_([[True]])
     inputs["return_num_output_tokens"] = np.bool_([[True]])
     return model.create_request(inputs=inputs)
+
+
+def _create_llmapi_generate_request(
+    model,
+    prompt,
+    request: CreateChatCompletionRequest | CreateCompletionRequest,
+    lora_config: TritonLoraConfig | None,
+    echo_tensor_name: str | None,
+    default_max_tokens: int,
+):
+    # The LLM API model is text-in / text-out without server-side batching, so
+    # every tensor is 1-D, and the sampling controls are sampling_param_*.
+    if lora_config is not None:
+        raise ClientError("LoRA is not currently supported for the LLM API backend")
+    if _get_guided_json_from_tool(request) is not None:
+        raise ClientError(
+            "tool calls that constrain the output to a schema are not "
+            "currently supported for the LLM API backend"
+        )
+
+    inputs = {}
+    inputs["text_input"] = [prompt]
+    inputs["streaming"] = np.bool_([request.stream])
+
+    # Indicates CreateChatCompletionRequest
+    if hasattr(request, "max_completion_tokens"):
+        if request.max_completion_tokens is not None:
+            max_tokens = request.max_completion_tokens
+        # Fallback to deprecated request.max_tokens
+        elif request.max_tokens is not None:
+            max_tokens = request.max_tokens
+        else:
+            max_tokens = default_max_tokens
+    # Indicates CreateCompletionRequest
+    elif request.max_tokens is not None:
+        max_tokens = request.max_tokens
+    else:
+        max_tokens = default_max_tokens
+    inputs["sampling_param_max_tokens"] = np.int32([max_tokens])
+
+    if request.stop:
+        inputs["sampling_param_stop"] = (
+            [request.stop] if isinstance(request.stop, str) else list(request.stop)
+        )
+    # Check "is not None" specifically, because values of zero are valid.
+    if request.top_p is not None:
+        inputs["sampling_param_top_p"] = np.float32([request.top_p])
+    if request.frequency_penalty is not None:
+        inputs["sampling_param_frequency_penalty"] = np.float32(
+            [request.frequency_penalty]
+        )
+    if request.presence_penalty is not None:
+        inputs["sampling_param_presence_penalty"] = np.float32(
+            [request.presence_penalty]
+        )
+    if request.seed is not None:
+        inputs["sampling_param_seed"] = np.uint64([request.seed])
+    if request.temperature is not None:
+        inputs["sampling_param_temperature"] = np.float32([request.temperature])
+
+    # The model echoes the prompt unless told otherwise; OpenAI clients do not
+    # expect that unless they ask for it with "echo".
+    exclude_input = True
+    echo = getattr(request, "echo", None)
+    if echo is not None:
+        exclude_input = not echo
+    inputs["sampling_param_exclude_input_from_output"] = np.bool_([exclude_input])
+    return model.create_request(inputs=inputs)
+
+
+class _LlmapiTextStream:
+    """Adapts an LLM API response stream to OpenAI streaming semantics.
+
+    Every response of the LLM API model carries the whole text generated so
+    far, not just the new tokens, and the model returns no token counts. This
+    turns each response into the new text only, and estimates the token usage
+    from the prompt and the completion with the frontend's tokenizer.
+    """
+
+    def __init__(self, tokenizer, prompt):
+        self._tokenizer = tokenizer
+        self._prompt = prompt
+        self.text = ""
+
+    def delta(self, text: str) -> str:
+        new_text = text[len(self.text) :]
+        self.text = text
+        return new_text
+
+    def usage(self, text: Optional[str] = None) -> Optional[CompletionUsage]:
+        completion = self.text if text is None else text
+        if self._tokenizer is None or not isinstance(self._prompt, str):
+            return None
+        # The model tokenizes the prompt as given, special tokens included.
+        prompt_tokens = len(self._tokenizer.encode(self._prompt))
+        completion_tokens = len(
+            self._tokenizer.encode(completion, add_special_tokens=False)
+        )
+        return CompletionUsage(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens,
+        )
 
 
 def _create_vllm_embedding_request(
@@ -586,7 +697,7 @@ def _validate_triton_responses_non_streaming(
 ):
     num_responses = len(responses)
     if 1 <= num_responses <= 2:
-        if responses[-1].final != True:
+        if responses[-1].final is not True:
             raise ServerError("Unexpected internal error with incorrect response flags")
     else:
         raise ServerError(
@@ -700,7 +811,7 @@ def _parse_lora_configs(
             except Exception:
                 # Model directory or model.json is malformed?
                 return None
-            if is_lora_enabled != True:
+            if is_lora_enabled is not True:
                 continue
         else:
             # TRT-LLM backend does not use model.json
@@ -723,7 +834,7 @@ def _parse_lora_configs(
                         lora_task_id += 1
         except ServerError as e:
             raise e
-        except Exception as e:
+        except Exception:
             # LoRA is enabled but its list is not provided or malformed?
             print(traceback.format_exc())
             return None

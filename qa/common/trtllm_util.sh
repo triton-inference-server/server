@@ -25,136 +25,197 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-function clone_tensorrt_llm_backend_repo {
-    rm -rf $TENSORRTLLM_BACKEND_DIR && mkdir $TENSORRTLLM_BACKEND_DIR
-    apt-get update && apt-get install git-lfs -y --no-install-recommends
-    git clone --single-branch --depth=1 -b ${TENSORRTLLM_BACKEND_REPO_TAG} ${TRITON_REPO_ORG}/tensorrtllm_backend.git $TENSORRTLLM_BACKEND_DIR
-    cd $TENSORRTLLM_BACKEND_DIR && git lfs install && git submodule update --init --recursive
+# Helpers to serve a TensorRT-LLM model through the LLM API (Python) model
+# that build.py installs with '--backend tensorrtllm': the model code is the
+# Python-based backend backends/tensorrtllm, and a model repository only holds
+# config.pbtxt and model.yaml. It is launched with launch_triton_server.py
+# (without MPI), so nothing here builds a TensorRT engine.
+#
+# Environment:
+#   TENSORRTLLM_DIR      directory build.py installed the sample model
+#                        repository and the launcher to
+#   LLMAPI_HF_MODEL      Hugging Face model the LLM API loads
+#   LLMAPI_KV_CACHE_FRACTION
+#                        free_gpu_memory_fraction for the KV cache. The LLM API
+#                        default claims most of the GPU, which leaves no room
+#                        for a second model instance or another test server.
+
+TENSORRTLLM_DIR=${TENSORRTLLM_DIR:="/opt/tritonserver/tensorrtllm"}
+LLMAPI_MODEL_NAME=${LLMAPI_MODEL_NAME:="tensorrt_llm"}
+LLMAPI_HF_MODEL=${LLMAPI_HF_MODEL:="Qwen/Qwen3-0.6B"}
+LLMAPI_KV_CACHE_FRACTION=${LLMAPI_KV_CACHE_FRACTION:="0.2"}
+LLMAPI_LAUNCHER=${TENSORRTLLM_DIR}/scripts/launch_triton_server.py
+# Launcher arguments. Multi-instance and TP=1 use a single process without MPI;
+# tensor-parallel runs need MPI ranks, e.g.
+#   LLMAPI_LAUNCH_ARGS="--world_size 2 --trtllm_llmapi_launch --oversubscribe"
+LLMAPI_LAUNCH_ARGS=${LLMAPI_LAUNCH_ARGS:="--no-mpi --world_size 1"}
+# Seconds to wait for the model to load. Not SERVER_TIMEOUT: util.sh defaults
+# that to 120 first, which is too short for a model download and load.
+LLMAPI_SERVER_TIMEOUT=${LLMAPI_SERVER_TIMEOUT:="900"}
+
+# PIDs of live tritonserver processes. Zombies are excluded: a server that was
+# killed stays listed by plain pgrep until its parent reaps it.
+function llmapi_server_pids {
+    pgrep -x -r R,S,D,I tritonserver
 }
 
-function build_gpt2_base_model {
-    # Download weights from HuggingFace Transformers
-    cd ${GPT_DIR} && rm -rf gpt2 && git clone https://huggingface.co/gpt2-medium gpt2 && cd gpt2
-    rm pytorch_model.bin model.safetensors
-    if ! wget -q https://huggingface.co/gpt2-medium/resolve/main/pytorch_model.bin; then
-        echo "Downloading pytorch_model.bin failed."
-        exit 1
+# Create an LLM API model repository.
+#
+#   prepare_llmapi_model_repository <repo-dir> [decoupled=0|1] [policy=0|1] [tp=1]
+#
+# decoupled: set triton_config.decoupled in model.yaml.
+# policy:    also declare model_transaction_policy in config.pbtxt. The launcher
+#            passes --disable-auto-complete-config, so auto_complete_config()
+#            never applies model.yaml's decoupled flag to the served model
+#            configuration; without the policy a decoupled model cannot send
+#            more than one response and streaming requests hang.
+# tp:        tensor_parallel_size.
+function prepare_llmapi_model_repository {
+    local repo=$1
+    local decoupled=${2:-0}
+    local policy=${3:-${decoupled}}
+    local tp=${4:-1}
+    local model_dir=${repo}/${LLMAPI_MODEL_NAME}
+    local yaml=${model_dir}/1/model.yaml
+
+    rm -rf ${repo} && mkdir -p ${repo}
+    cp -r ${TENSORRTLLM_DIR}/all_models/llmapi/tensorrt_llm ${model_dir}
+
+    sed -i "s|^model: .*|model: ${LLMAPI_HF_MODEL}|" ${yaml}
+    sed -i "s|^tensor_parallel_size: .*|tensor_parallel_size: ${tp}|" ${yaml}
+    printf 'kv_cache_config:\n  free_gpu_memory_fraction: %s\n' \
+        "${LLMAPI_KV_CACHE_FRACTION}" >> ${yaml}
+
+    if [ "${decoupled}" == "1" ]; then
+        sed -i "s|^\(\s*\)decoupled:.*|\1decoupled: True|" ${yaml}
     fi
-    cd ${GPT_DIR}
-
-    # Convert weights from HF Tranformers to FT format
-    python3 convert_checkpoint.py --model_dir gpt2 --dtype float16 --tp_size ${NUM_GPUS} --output_dir "./c-model/gpt2/${NUM_GPUS}-gpu/"
-    cd ${BASE_DIR}
+    if [ "${policy}" == "1" ]; then
+        sed -i "0,/^instance_group \[/s//model_transaction_policy {\n  decoupled: true\n}\n\ninstance_group [/" \
+            ${model_dir}/config.pbtxt
+    fi
 }
 
-function build_gpt2_tensorrt_engine {
-    # Build TensorRT engines
-    cd ${GPT_DIR}
-    trtllm-build --checkpoint_dir "./c-model/gpt2/${NUM_GPUS}-gpu/" \
-        --gpt_attention_plugin float16 \
-        --remove_input_padding enable \
-        --kv_cache_type paged \
-        --gemm_plugin float16 \
-        --workers "${NUM_GPUS}" \
-        --output_dir "${ENGINES_DIR}"
+# Wait until the LLM API model reports ready, tritonserver exits, or the timeout
+# expires. Sets WAIT_RET to 0 only when the model is ready.
+#
+# launch_triton_server.py starts tritonserver detached and returns at once, so
+# the launcher's own exit says nothing; watch the server process instead.
+function wait_for_llmapi_ready {
+    local timeout=${1:-${LLMAPI_SERVER_TIMEOUT}}
+    local waited=0
+    WAIT_RET=1
 
-    cd ${BASE_DIR}
-}
-
-function replace_config_tags {
-    tag_to_replace="${1}"
-    new_value="${2}"
-    config_file_path="${3}"
-    sed -i "s|${tag_to_replace}|${new_value}|g" ${config_file_path}
-}
-
-function prepare_model_repository {
-    rm -rf ${MODEL_REPOSITORY} && mkdir ${MODEL_REPOSITORY}
-    cp -r ${TENSORRTLLM_BACKEND_DIR}/tensorrt_llm/triton_backend/all_models/inflight_batcher_llm/* ${MODEL_REPOSITORY}
-    rm -rf ${MODEL_REPOSITORY}/tensorrt_llm_bls
-    mv "${MODEL_REPOSITORY}/ensemble" "${MODEL_REPOSITORY}/${MODEL_NAME}"
-
-    replace_config_tags "model_version: -1" "model_version: 1" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-    replace_config_tags 'name: "ensemble"' "name: \"$MODEL_NAME\"" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/${MODEL_NAME}/config.pbtxt"
-
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${preprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${max_queue_delay_microseconds}' "1000000" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-    replace_config_tags '${max_queue_size}' "0" "${MODEL_REPOSITORY}/preprocessing/config.pbtxt"
-
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-    replace_config_tags '${postprocessing_instance_count}' '1' "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-    replace_config_tags '${tokenizer_dir}' "${TOKENIZER_DIR}/" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/postprocessing/config.pbtxt"
-
-    replace_config_tags '${triton_max_batch_size}' "128" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${decoupled_mode}' 'true' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${max_queue_delay_microseconds}' "1000000" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${batching_strategy}' 'inflight_fused_batching' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${engine_dir}' "${ENGINES_DIR}" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${triton_backend}' "tensorrtllm" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${max_queue_size}' "0" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${logits_datatype}' "TYPE_FP32" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${encoder_input_features_data_type}' "TYPE_FP32" "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-    replace_config_tags '${prompt_embedding_table_data_type}' 'TYPE_FP16' "${MODEL_REPOSITORY}/tensorrt_llm/config.pbtxt"
-}
-
-# Wait until server health endpoint shows ready. Sets WAIT_RET to 0 on
-# success, 1 on failure
-function wait_for_server_ready() {
-    local wait_time_secs="${1:-30}"
-    shift
-    local spids=("$@")
-
-    WAIT_RET=0
-
-    for _ in $(seq "$wait_time_secs"); do
-        for pid in "${spids[@]}"; do
-            if ! kill -0 "$pid" >/dev/null 2>&1; then
-                echo "=== Server not running."
-                WAIT_RET=1
-                return
-            fi
-        done
-
-        sleep 1
-
-        if curl -s --fail localhost:8000/v2/health/ready &&
-            curl -s --fail -w "%{http_code}" -o /dev/null -d '{"log_verbose_level":1}' localhost:8000/v2/logging; then
+    while [ ${waited} -lt ${timeout} ]; do
+        if curl -sf -m 3 localhost:8000/v2/models/${LLMAPI_MODEL_NAME}/ready \
+            >/dev/null 2>&1; then
+            WAIT_RET=0
             return
         fi
+        # Allow a few seconds for the detached server process to appear.
+        if [ ${waited} -ge 10 ] && ! llmapi_server_pids >/dev/null; then
+            echo "*** tritonserver exited before ${LLMAPI_MODEL_NAME} was ready"
+            return
+        fi
+        sleep 2
+        waited=$((waited + 2))
     done
-
-    echo "=== Timeout $wait_time_secs secs. Server not ready."
-    WAIT_RET=1
+    echo "*** timed out after ${timeout}s waiting for ${LLMAPI_MODEL_NAME}"
 }
 
-function run_server {
-    python3 ${TENSORRTLLM_BACKEND_DIR}/tensorrt_llm/triton_backend/scripts/launch_triton_server.py --world_size="${NUM_GPUS}" --model_repo="${MODEL_REPOSITORY}" >${SERVER_LOG} 2>&1 &
-    sleep 2 # allow time to obtain the pid(s)
-    # Read PIDs into an array, trimming whitespaces
-    readarray -t SERVER_PID < <(pgrep "tritonserver")
+# Start the server on <repo-dir>. Extra arguments are passed to the launcher.
+# Sets SERVER_PID to the tritonserver PID, or to 0 when it did not come up.
+function run_llmapi_server {
+    local repo=$1
+    shift
+    SERVER_PID=0
 
-    wait_for_server_ready ${SERVER_TIMEOUT} "${SERVER_PID[@]}"
-    if [ "$WAIT_RET" != "0" ]; then
-        # Cleanup
-        kill "${SERVER_PID[@]}" >/dev/null 2>&1 || true
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
+    local launcher_log=${SERVER_LOG%.log}_launcher.log
+    python3 ${LLMAPI_LAUNCHER} ${LLMAPI_LAUNCH_ARGS} --model_repo ${repo} \
+        --log --log-file ${SERVER_LOG} "$@" > ${launcher_log} 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${launcher_log}
+        return 1
     fi
+
+    wait_for_llmapi_ready
+    if [ "${WAIT_RET}" != "0" ]; then
+        tail -n 20 ${launcher_log}
+        kill_llmapi_server
+        return 1
+    fi
+    SERVER_PID=$(llmapi_server_pids | head -n 1)
 }
 
-function kill_server {
-    pgrep tritonserver | xargs kill -SIGINT
-    for pid in "${SERVER_PID[@]}"; do
-        echo "Waiting for proc ${pid} to terminate..."
-        while kill -0 $pid >/dev/null 2>&1; do
-            sleep 1
-        done
+# Stop the server gracefully, then make sure nothing the LLM API spawned
+# (Python backend stubs, MPI helper processes) survives: a leftover worker keeps
+# the GPU memory and the next server cannot start.
+function kill_llmapi_server {
+    local pids=$(llmapi_server_pids)
+    if [ -n "${pids}" ]; then
+        kill -SIGINT ${pids} 2>/dev/null
+    fi
+
+    local waited=0
+    while [ ${waited} -lt 60 ] && llmapi_server_pids >/dev/null; do
+        sleep 2
+        waited=$((waited + 2))
     done
+
+    pkill -9 -x tritonserver 2>/dev/null || true
+    pkill -9 -f triton_python_backend_stub 2>/dev/null || true
+    pkill -9 -f mpi4py.futures 2>/dev/null || true
+    return 0
+}
+
+# Start tritonserver directly, with the flags launch_triton_server.py would use,
+# for tests that need server options the launcher does not expose (for example
+# explicit model control). Extra arguments are passed to tritonserver.
+# Sets SERVER_PID, or 0 when the model did not become ready.
+function run_llmapi_server_direct {
+    local repo=$1
+    shift
+    local server=${TRITON_DIR:-/opt/tritonserver}/bin/tritonserver
+    SERVER_PID=0
+
+    ${server} --model-repository=${repo} --log-verbose=3 \
+        --disable-auto-complete-config \
+        --backend-config=python,shm-region-prefix-name=prefix0_ "$@" \
+        > ${SERVER_LOG} 2>&1 &
+    wait_for_llmapi_ready
+    if [ "${WAIT_RET}" != "0" ]; then
+        tail -n 20 ${SERVER_LOG}
+        kill_llmapi_server
+        return 1
+    fi
+    SERVER_PID=$(llmapi_server_pids | head -n 1)
+}
+
+# Serve <count> instances of the model: gpu_device_ids is the per-instance GPU
+# assignment, e.g. "0;0" for two instances on GPU 0 or "0;1" for one per GPU.
+# Passing an empty gpu_device_ids leaves the parameter out, which the model
+# rejects when count > 1.
+function set_llmapi_instance_group {
+    local repo=$1
+    local count=$2
+    local gpu_device_ids=${3:-}
+    python3 - "${repo}/${LLMAPI_MODEL_NAME}/config.pbtxt" "${count}" \
+        "${gpu_device_ids}" <<'PYEOF'
+import re
+import sys
+
+path, count, gpu_device_ids = sys.argv[1:4]
+with open(path) as f:
+    config = f.read()
+config, replaced = re.subn(r"count:\s*1\b", f"count: {count}", config, count=1)
+assert replaced == 1, "instance_group count not found in config.pbtxt"
+if gpu_device_ids:
+    config += (
+        "\nparameters {\n"
+        '  key: "gpu_device_ids"\n'
+        f'  value: {{ string_value: "{gpu_device_ids}" }}\n'
+        "}\n"
+    )
+with open(path, "w") as f:
+    f.write(config)
+PYEOF
 }

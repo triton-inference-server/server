@@ -40,11 +40,11 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "asyncio: mark test as an asyncio test")
 
 
-### TEST ENVIRONMENT SETUP ###
+# TEST ENVIRONMENT SETUP
 def infer_test_environment(tool_call_parser):
     # Infer the test environment for simplicity in local dev/testing.
     try:
-        import vllm as _
+        import vllm as _  # noqa: F401
 
         backend = "vllm"
         if tool_call_parser == "mistral":
@@ -56,10 +56,10 @@ def infer_test_environment(tool_call_parser):
         print("No vllm installation found.")
 
     try:
-        import tensorrt_llm as _
+        import tensorrt_llm as _  # noqa: F401,F811
 
-        backend = "tensorrtllm"
-        model = "tensorrt_llm_bls"
+        backend = "llmapi"
+        model = "tensorrt_llm"
         return backend, model
     except ImportError:
         print("No tensorrt_llm installation found.")
@@ -75,7 +75,7 @@ def infer_test_model_repository(backend, tool_call_parser):
     return model_repository
 
 
-### FIXTURES - Refactored from global variables ###
+# FIXTURES - Refactored from global variables
 
 
 @pytest.fixture(scope="session")
