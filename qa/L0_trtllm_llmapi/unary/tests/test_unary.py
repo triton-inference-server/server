@@ -50,6 +50,11 @@ class LlmapiUnaryTest(unittest.TestCase):
 
     # Basic serving ---------------------------------------------------------
 
+    def test_served_by_tensorrtllm_backend(self):
+        # The model repository holds only config.pbtxt and model.yaml; the
+        # model code is the image's backends/tensorrtllm.
+        self.assertEqual(util.model_config()["backend"], "tensorrtllm")
+
     def test_http_generate(self):
         response = util.http_generate(
             {

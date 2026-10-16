@@ -26,13 +26,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Helpers to serve a TensorRT-LLM model through the LLM API (Python) model
-# repository that build.py installs with '--backend tensorrtllm'. The model is
-# an ordinary Python-backend model, launched with launch_triton_server.py
+# that build.py installs with '--backend tensorrtllm': the model code is the
+# Python-based backend backends/tensorrtllm, and a model repository only holds
+# config.pbtxt and model.yaml. It is launched with launch_triton_server.py
 # (without MPI), so nothing here builds a TensorRT engine.
 #
 # Environment:
-#   TENSORRTLLM_DIR      directory build.py installed the upstream
-#                        triton_backend/ layout to
+#   TENSORRTLLM_DIR      directory build.py installed the sample model
+#                        repository and the launcher to
 #   LLMAPI_HF_MODEL      Hugging Face model the LLM API loads
 #   LLMAPI_KV_CACHE_FRACTION
 #                        free_gpu_memory_fraction for the KV cache. The LLM API

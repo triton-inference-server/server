@@ -2161,13 +2161,16 @@ def tensorrtllm_clone(
     install_dir,
     github_organization,
 ):
-    # TensorRT-LLM is served through its LLM API model, which is a model
-    # repository artifact executed by the stock Python backend, not a Triton
-    # backend. Nothing is compiled: fetch the files needed to serve it and
-    # keep the upstream triton_backend/ layout, so that launch_triton_server.py
-    # still finds ../all_models/llmapi.
+    # TensorRT-LLM is served through its LLM API model, a Python model run by
+    # the stock Python backend. Nothing is compiled. Its model.py and
+    # helpers.py become the Python-based backend backends/tensorrtllm, so a
+    # model only needs config.pbtxt with backend: "tensorrtllm" and model.yaml,
+    # and the code always matches the image's tensorrt_llm. A sample model
+    # repository holding just those two files, and the launcher, keep the
+    # upstream triton_backend/ layout under tensorrtllm/, so that
+    # launch_triton_server.py still finds ../all_models/llmapi.
     clone_script.commentln(8)
-    clone_script.comment(f"'{be}' LLM API model repository (no compile)")
+    clone_script.comment(f"'{be}' Python-based backend (no compile)")
     clone_script.comment("Delete this section to remove backend from build")
     clone_script.comment()
     clone_script.mkdir(build_dir)
@@ -2177,14 +2180,30 @@ def tensorrtllm_clone(
     )
 
     source_dir = os.path.join(build_dir, be, "triton_backend")
+    model_dir = os.path.join(source_dir, "all_models", "llmapi", "tensorrt_llm")
+
+    backend_dir = os.path.join(install_dir, "backends", be)
+    clone_script.rmdir(backend_dir)
+    clone_script.mkdir(backend_dir)
+    for filename in ("model.py", "helpers.py"):
+        clone_script.cp(os.path.join(model_dir, "1", filename), backend_dir)
+
     target_dir = os.path.join(install_dir, be)
+    sample_dir = os.path.join(target_dir, "all_models", "llmapi", "tensorrt_llm")
     clone_script.rmdir(target_dir)
-    for subdir in ("all_models", "scripts", "tools"):
+    clone_script.mkdir(os.path.join(sample_dir, "1"))
+    for subdir in ("scripts", "tools"):
         clone_script.mkdir(os.path.join(target_dir, subdir))
-    clone_script.cpdir(
-        os.path.join(source_dir, "all_models", "llmapi"),
-        os.path.join(target_dir, "all_models"),
+    clone_script.cp(os.path.join(model_dir, "1", "model.yaml"), f"{sample_dir}/1")
+    # Upstream's config.pbtxt names the python backend, which loads model.py
+    # from the model's own version directory; point it at this backend
+    # instead, and fail the build if the template no longer matches.
+    sample_config = os.path.join(sample_dir, "config.pbtxt")
+    clone_script.cp(os.path.join(model_dir, "config.pbtxt"), sample_config)
+    clone_script.cmd(
+        f'sed -i \'s/^backend: "python"$/backend: "{be}"/\' {sample_config}'
     )
+    clone_script.cmd(f"grep -qx 'backend: \"{be}\"' {sample_config}")
     clone_script.cp(
         os.path.join(source_dir, "scripts", "launch_triton_server.py"),
         os.path.join(target_dir, "scripts"),
@@ -2195,7 +2214,7 @@ def tensorrtllm_clone(
     )
 
     clone_script.comment()
-    clone_script.comment(f"end '{be}' LLM API model repository")
+    clone_script.comment(f"end '{be}' Python-based backend")
     clone_script.commentln(8)
     clone_script.blankln()
 

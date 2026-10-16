@@ -27,8 +27,8 @@
 
 """Shared helpers for the TensorRT-LLM LLM API (Python) backend tests.
 
-The LLM API model is a Python-backend model with a text-in / text-out
-interface. Every tunable is an optional input named ``sampling_param_*`` (or
+The LLM API model runs on the Python backend, as the Python-based backend
+tensorrtllm, and has a text-in / text-out interface. Every tunable is an optional input named ``sampling_param_*`` (or
 ``return_*`` / ``lora_*``); the model does not use server-side batching, so
 all tensors have shape ``[1]``.
 """
@@ -211,6 +211,12 @@ def http_generate_stream(payload, timeout=120):
             if line.startswith(b"data:"):
                 events.append(json.loads(line[len(b"data:") :]))
         return response.status_code, events
+
+
+def model_config(model=MODEL_NAME):
+    response = requests.get(f"{HTTP_URL}/v2/models/{model}/config", timeout=30)
+    response.raise_for_status()
+    return response.json()
 
 
 def server_ready():
