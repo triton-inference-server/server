@@ -559,7 +559,12 @@ class LifeCycleTest(tu.TestResultCollector):
         # load. Make sure that it has a status and is ready.
         try:
             shutil.copytree(libtorch_name, "models/" + libtorch_name)
-            time.sleep(5)  # wait for model to load
+            tu.wait_for_model_state(
+                httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                libtorch_name,
+                True,
+                "1",
+            )
             for triton_client in (
                 httpclient.InferenceServerClient("localhost:8000", verbose=True),
                 grpcclient.InferenceServerClient("localhost:8001", verbose=True),
@@ -635,7 +640,12 @@ class LifeCycleTest(tu.TestResultCollector):
         # time to unload. Make sure that it is no longer available.
         try:
             shutil.rmtree("models/" + libtorch_name)
-            time.sleep(5)  # wait for model to unload
+            tu.wait_for_model_state(
+                httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                libtorch_name,
+                False,
+                "1",
+            )
             for triton_client in (
                 httpclient.InferenceServerClient("localhost:8000", verbose=True),
                 grpcclient.InferenceServerClient("localhost:8001", verbose=True),
@@ -675,7 +685,12 @@ class LifeCycleTest(tu.TestResultCollector):
         # Add back the same model. The status/stats should be reset.
         try:
             shutil.copytree(libtorch_name, "models/" + libtorch_name)
-            time.sleep(5)  # wait for model to load
+            tu.wait_for_model_state(
+                httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                libtorch_name,
+                True,
+                "1",
+            )
             for triton_client in (
                 httpclient.InferenceServerClient("localhost:8000", verbose=True),
                 grpcclient.InferenceServerClient("localhost:8001", verbose=True),
@@ -718,7 +733,12 @@ class LifeCycleTest(tu.TestResultCollector):
         # time to unload. Make sure that it is unavailable.
         try:
             shutil.rmtree("models/" + onnx_name)
-            time.sleep(5)  # wait for model to unload
+            tu.wait_for_model_state(
+                httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                onnx_name,
+                False,
+                "1",
+            )
             for triton_client in (
                 httpclient.InferenceServerClient("localhost:8000", verbose=True),
                 grpcclient.InferenceServerClient("localhost:8001", verbose=True),
@@ -929,7 +949,12 @@ class LifeCycleTest(tu.TestResultCollector):
         # unload. Make sure that it is unavailable.
         try:
             shutil.rmtree("models/" + libtorch_name + "/1")
-            time.sleep(5)  # wait for version to unload
+            tu.wait_for_model_state(
+                httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                libtorch_name,
+                False,
+                "1",
+            )
             for triton_client in (
                 httpclient.InferenceServerClient("localhost:8000", verbose=True),
                 grpcclient.InferenceServerClient("localhost:8001", verbose=True),
@@ -969,7 +994,12 @@ class LifeCycleTest(tu.TestResultCollector):
             shutil.copytree(
                 "models/" + libtorch_name + "/2", "models/" + libtorch_name + "/7"
             )
-            time.sleep(5)  # wait for version to load
+            tu.wait_for_model_state(
+                httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                libtorch_name,
+                True,
+                "7",
+            )
             for triton_client in (
                 httpclient.InferenceServerClient("localhost:8000", verbose=True),
                 grpcclient.InferenceServerClient("localhost:8001", verbose=True),
@@ -1090,7 +1120,13 @@ class LifeCycleTest(tu.TestResultCollector):
                 "models/" + model_name + "/config.pbtxt",
             )
 
-        time.sleep(5)  # wait for models to reload
+        for model_name in models:
+            tu.wait_for_model_state(
+                httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                model_name,
+                True,
+                str(version),
+            )
         for model_name in models:
             for model_name, model_shape in zip(models_base, models_shape):
                 try:
@@ -1119,7 +1155,13 @@ class LifeCycleTest(tu.TestResultCollector):
                 "config.pbtxt." + base_name, "models/" + model_name + "/config.pbtxt"
             )
 
-        time.sleep(5)  # wait for models to reload
+        for model_name in models:
+            tu.wait_for_model_state(
+                httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                model_name,
+                True,
+                "3",
+            )
         for model_name in models:
             try:
                 for triton_client in (
@@ -1217,7 +1259,13 @@ class LifeCycleTest(tu.TestResultCollector):
         for model_name in models:
             os.remove("models/" + model_name + "/config.pbtxt")
 
-        time.sleep(5)  # wait for models to reload
+        for model_name in models:
+            tu.wait_for_model_state(
+                httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                model_name,
+                True,
+                "3",
+            )
         for model_name in models:
             try:
                 for triton_client in (
@@ -1286,7 +1334,12 @@ class LifeCycleTest(tu.TestResultCollector):
         # Add the libtorch to the second model repository, should cause
         # it to be unloaded due to duplication
         shutil.copytree(libtorch_name, "models_0/" + libtorch_name)
-        time.sleep(5)  # wait for models to reload
+        tu.wait_for_model_state(
+            httpclient.InferenceServerClient("localhost:8000", verbose=True),
+            libtorch_name,
+            False,
+            "1",
+        )
         try:
             for triton_client in (
                 httpclient.InferenceServerClient("localhost:8000", verbose=True),
@@ -1306,7 +1359,12 @@ class LifeCycleTest(tu.TestResultCollector):
         # properly. In the second model repository libtorch should
         # have versions 1 and 3.
         shutil.rmtree("models/" + libtorch_name)
-        time.sleep(5)  # wait for model to unload
+        tu.wait_for_model_state(
+            httpclient.InferenceServerClient("localhost:8000", verbose=True),
+            libtorch_name,
+            True,
+            "1",
+        )
         self._infer_success_models(
             ["libtorch", "openvino", "onnx"], (1, 3), model_shape
         )
@@ -3441,7 +3499,13 @@ class LifeCycleTest(tu.TestResultCollector):
                 "models/" + model_name + "/configs/custom.pbtxt",
             )
 
-        time.sleep(5)  # wait for models to reload
+        for model_name in models:
+            tu.wait_for_model_state(
+                httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                model_name,
+                True,
+                "2",
+            )
         for model_name in models:
             try:
                 for triton_client in (
@@ -3483,7 +3547,13 @@ class LifeCycleTest(tu.TestResultCollector):
         for model_name in models:
             os.remove("models/" + model_name + "/configs/custom.pbtxt")
 
-        time.sleep(5)  # wait for models to reload
+        for model_name in models:
+            tu.wait_for_model_state(
+                httpclient.InferenceServerClient("localhost:8000", verbose=True),
+                model_name,
+                True,
+                "1",
+            )
         for model_name in models:
             try:
                 for triton_client in (
