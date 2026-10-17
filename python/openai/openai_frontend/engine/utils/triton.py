@@ -216,6 +216,8 @@ def _create_trtllm_generate_request(
     if request.presence_penalty is not None:
         inputs["presence_penalty"] = np.float32([[request.presence_penalty]])
     if request.seed is not None:
+        if request.seed < 0:
+            raise ClientError("seed must be non-negative")
         inputs["seed"] = np.uint64([[request.seed]])
     if request.temperature is not None:
         inputs["temperature"] = np.float32([[request.temperature]])
