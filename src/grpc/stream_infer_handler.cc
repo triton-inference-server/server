@@ -114,8 +114,7 @@ ModelStreamInferHandler::StartNewRequest()
   // each accepted stream posts exactly one replacement, so at most
   // kAcceptPrefetch are outstanding.
   int count = 1;
-  if (!accept_prefetch_posted_) {
-    accept_prefetch_posted_ = true;
+  if (!accept_prefetch_posted_.exchange(true)) {
     count = kAcceptPrefetch;
     LOG_VERBOSE(1) << Name() << " outstanding accept requests: " << count;
   }

@@ -25,6 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <atomic>
+
 #include "infer_handler.h"
 
 namespace triton { namespace server { namespace grpc {
@@ -132,9 +134,9 @@ class ModelStreamInferHandler
   // matched even while this handler's thread is busy. 16 matched bursts of up
   // to 40 new streams in the L0_simple_ensemble backpressure ensemble.
   static constexpr int kAcceptPrefetch = 16;
-  // Whether the accept requests have been posted. Only accessed on the handler
-  // thread.
-  bool accept_prefetch_posted_{false};
+  // Whether the accept requests have been posted. Atomic so they are posted
+  // exactly once, even if StartNewRequest() is ever called from another thread.
+  std::atomic<bool> accept_prefetch_posted_{false};
 };
 
 }}}  // namespace triton::server::grpc
