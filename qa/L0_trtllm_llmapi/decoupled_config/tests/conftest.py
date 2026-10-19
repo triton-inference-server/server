@@ -33,8 +33,10 @@ decoupled while Triton serves it as a non-decoupled model.
 """
 
 import contextlib
+import logging
 import os
 import re
+import shlex
 import shutil
 import signal
 import subprocess
@@ -144,6 +146,40 @@ def _wait_for_ready(models):
     )
 
 
+# The binary that must serve the tests; an empty value disables the check.
+EXPECTED_SERVER = os.environ.get(
+    "LLMAPI_EXPECT_TRITONSERVER", os.path.join(TRITON_DIR, "bin", "tritonserver")
+)
+
+
+def _check_server_binary():
+    """Log the binary and command line of the running server, and check it.
+
+    The launcher starts tritonserver without printing how, so /proc is the
+    only record of which binary loaded the models and serves the tests.
+    """
+    pids = _server_pids()
+    if not pids:
+        raise ServerStartError("no running tritonserver process")
+    log = logging.getLogger("tritonserver")
+    for pid in pids:
+        try:
+            exe = os.readlink("/proc/%d/exe" % pid)
+            with open("/proc/%d/cmdline" % pid, "rb") as f:
+                argv = [arg.decode(errors="replace") for arg in f.read().split(b"\0")]
+        except OSError as e:
+            raise ServerStartError("cannot inspect tritonserver pid %d: %s" % (pid, e))
+        log.info("tritonserver pid %d: /proc/%d/exe -> %s", pid, pid, exe)
+        log.info("tritonserver pid %d cmdline: %s", pid, shlex.join(filter(None, argv)))
+        if EXPECTED_SERVER and os.path.realpath(exe) != os.path.realpath(
+            EXPECTED_SERVER
+        ):
+            raise ServerStartError(
+                "tritonserver pid %d is %s, expected %s (LLMAPI_EXPECT_TRITONSERVER)"
+                % (pid, exe, EXPECTED_SERVER)
+            )
+
+
 def _stop():
     """Stop the server and every worker it started, gracefully first."""
     for pid in _server_pids():
@@ -216,6 +252,7 @@ def _start(repo, server_log):
         )
     try:
         _wait_for_ready([MODEL_NAME])
+        _check_server_binary()
     except ServerStartError as e:
         _stop()
         raise ServerStartError("%s; %s" % (e, _start_failure(server_log)))

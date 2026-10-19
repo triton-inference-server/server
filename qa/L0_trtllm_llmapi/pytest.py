@@ -53,10 +53,10 @@ given the owner of DIR, so a root container leaves no root-owned files there.
 Only directories this script created are ever emptied or replaced: they hold
 a marker file, and an existing non-empty directory without it is an error.
 
-pytest.ini next to this file holds the default options (-v -s -rs, pytest log
-file level), so running pytest directly in a scenario directory behaves the
-same. Remaining arguments are passed to pytest after them, so they add to or
-override them.
+pytest.ini next to this file holds the default options (-v -s -rs, the test
+log on the console as well as in the log file), so running pytest directly in a
+scenario directory behaves the same. Remaining arguments are passed to pytest
+after them, so they add to or override them.
 """
 
 import os
