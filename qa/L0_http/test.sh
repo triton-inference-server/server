@@ -946,6 +946,18 @@ fi
 
 ### Test HTTP parse memory budget ###
 
+# Unit tests for reading the memory limit and picking the budget, using a fake
+# /proc and /sys tree.
+TEST_LOG="./memory_limit_test.log"
+set +e
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH ./memory_limit_test >> $TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $TEST_LOG
+    echo -e "\n***\n*** memory_limit_test FAILED\n***"
+    RET=1
+fi
+set -e
+
 # Without the flag, the budget is 50% of the memory limit of the server, or
 # of physical RAM when no limit is set.
 if [ `grep -c "HTTP parse memory budget: .* (50% of " ./inference_server_default_limit.log` != "1" ]; then
