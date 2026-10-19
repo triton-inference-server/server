@@ -112,6 +112,29 @@ IsPathUnder(const std::string& path, const std::string& root)
          ((path.size() == root.size()) || (path[root.size()] == '/'));
 }
 
+// /proc/self/mountinfo writes a space, tab, newline or backslash in a path as
+// an octal escape (\040, \011, \012, \134). Returns the path with those
+// escapes decoded.
+std::string
+DecodeMountinfoPath(const std::string& path)
+{
+  std::string decoded;
+  decoded.reserve(path.size());
+  for (size_t i = 0; i < path.size(); ++i) {
+    if ((path[i] == '\\') && (i + 3 < path.size()) && (path[i + 1] >= '0') &&
+        (path[i + 1] <= '3') && (path[i + 2] >= '0') && (path[i + 2] <= '7') &&
+        (path[i + 3] >= '0') && (path[i + 3] <= '7')) {
+      decoded.push_back(static_cast<char>(
+          ((path[i + 1] - '0') << 6) | ((path[i + 2] - '0') << 3) |
+          (path[i + 3] - '0')));
+      i += 3;
+    } else {
+      decoded.push_back(path[i]);
+    }
+  }
+  return decoded;
+}
+
 // This process's cgroup paths, from /proc/self/cgroup. Each line is
 // "hierarchy-ID:controller-list:cgroup-path".
 struct ProcCgroup {
@@ -164,7 +187,8 @@ struct CgroupMount {
 // Finds the cgroup mount that contains 'cgroup_path'. For v1 only mounts that
 // carry the memory controller are considered. Each mountinfo line is
 // "id parent major:minor root mount-point options [optional...] - fstype
-// source super-options".
+// source super-options". The root and mount point are decoded, since
+// /proc/self/cgroup paths are not escaped.
 bool
 FindMount(
     const std::string& mountinfo, bool v2, const std::string& cgroup_path,
@@ -204,9 +228,10 @@ FindMount(
         continue;
       }
     }
-    if (IsPathUnder(cgroup_path, fields[3])) {
-      mount->root = fields[3];
-      mount->mount_point = fields[4];
+    const std::string root = DecodeMountinfoPath(fields[3]);
+    if (IsPathUnder(cgroup_path, root)) {
+      mount->root = root;
+      mount->mount_point = DecodeMountinfoPath(fields[4]);
       return true;
     }
   }
