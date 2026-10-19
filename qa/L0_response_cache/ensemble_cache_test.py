@@ -28,6 +28,7 @@
 import os
 import re
 import sys
+import time
 
 sys.path.append("../common")
 sys.path.append("../clients")
@@ -129,6 +130,16 @@ class EnsembleCacheTest(tu.TestResultCollector):
         """
         return model_stats["model_stats"][1]["inference_stats"]
 
+    def _wait_for_success_stats(self, model, timeout_s=10):
+        # The ensemble sends its response before it records the success
+        # stats, so a stats query right after inference can miss them.
+        deadline = time.time() + timeout_s
+        model_stats = self._get_model_statistics(model)
+        while "count" not in model_stats["success"] and time.time() < deadline:
+            time.sleep(0.1)
+            model_stats = self._get_model_statistics(model)
+        return model_stats
+
     def _run_inference_and_validate(self, model):
         """
         Helper function that takes model as a parameter to verify the corresponding model's stats
@@ -162,7 +173,7 @@ class EnsembleCacheTest(tu.TestResultCollector):
         )
 
         inference_output = self._run_ensemble()
-        model_stats = self._get_model_statistics(model)
+        model_stats = self._wait_for_success_stats(model)
         self.assertIn(
             "count", model_stats["success"], f"Failed inference for model '{model}'"
         )
