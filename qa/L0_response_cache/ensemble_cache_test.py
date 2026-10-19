@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,20 +25,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import logging
 import os
 import re
 import sys
 import time
-
-sys.path.append("../common")
-sys.path.append("../clients")
-import logging
 import unittest
 
 import numpy as np
-import test_util as tu
 import tritonclient.grpc as grpcclient
-from tritonclient.utils import *
+from tritonclient.utils import np_to_triton_dtype
+
+sys.path.append("../common")
+sys.path.append("../clients")
+import test_util as tu  # noqa: E402
 
 RESPONSE_CACHE_PATTERN = "response_cache"
 RESPONSE_CACHE_CONFIG = "response_cache {\n  enable:true\n}\n"
