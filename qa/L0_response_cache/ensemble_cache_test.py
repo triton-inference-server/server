@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,19 +25,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import logging
 import os
 import re
 import sys
-
-sys.path.append("../common")
-sys.path.append("../clients")
-import logging
+import time
 import unittest
 
 import numpy as np
-import test_util as tu
 import tritonclient.grpc as grpcclient
-from tritonclient.utils import *
+from tritonclient.utils import np_to_triton_dtype
+
+sys.path.append("../common")
+sys.path.append("../clients")
+import test_util as tu  # noqa: E402
 
 RESPONSE_CACHE_PATTERN = "response_cache"
 RESPONSE_CACHE_CONFIG = "response_cache {\n  enable:true\n}\n"
@@ -129,6 +130,16 @@ class EnsembleCacheTest(tu.TestResultCollector):
         """
         return model_stats["model_stats"][1]["inference_stats"]
 
+    def _wait_for_success_stats(self, model, timeout_s=10):
+        # The ensemble sends its response before it records the success
+        # stats, so a stats query right after inference can miss them.
+        deadline = time.time() + timeout_s
+        model_stats = self._get_model_statistics(model)
+        while "count" not in model_stats["success"] and time.time() < deadline:
+            time.sleep(0.1)
+            model_stats = self._get_model_statistics(model)
+        return model_stats
+
     def _run_inference_and_validate(self, model):
         """
         Helper function that takes model as a parameter to verify the corresponding model's stats
@@ -162,7 +173,7 @@ class EnsembleCacheTest(tu.TestResultCollector):
         )
 
         inference_output = self._run_ensemble()
-        model_stats = self._get_model_statistics(model)
+        model_stats = self._wait_for_success_stats(model)
         self.assertIn(
             "count", model_stats["success"], f"Failed inference for model '{model}'"
         )
