@@ -428,7 +428,7 @@ class ServerMetadataTest(tu.TestResultCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
 
-EXPECTED_MODEL_STATS: int = 144
+EXPECTED_MODEL_STATS: int = 145
 
 
 class ModelMetadataTest(tu.TestResultCollector):
