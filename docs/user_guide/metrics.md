@@ -218,8 +218,29 @@ metrics are used for latencies:
 |Category      |Metric          |Metric Name |Description                |Granularity|Frequency    |
 |--------------|----------------|------------|---------------------------|-----------|-------------|
 |Latency       |Request to First Response Time    |`nv_inference_first_response_histogram_ms` |Histogram of end-to-end inference request to the first response time |Per model  |Per request  |
+|Latency       |Request Time    |`nv_inference_request_histogram_us` |Histogram of end-to-end inference request handling time (includes cached requests) |Per model  |Per request  |
+|              |Queue Time      |`nv_inference_queue_histogram_us` |Histogram of time requests spend waiting in the scheduling queue (includes cached requests) |Per model  |Per request  |
+|              |Compute Input Time|`nv_inference_compute_input_histogram_us` |Histogram of time requests spend processing inference inputs (does not include cached requests) |Per model  |Per request  |
+|              |Compute Time    |`nv_inference_compute_infer_histogram_us` |Histogram of time requests spend executing the inference model (does not include cached requests) |Per model  |Per request  |
+|              |Compute Output Time|`nv_inference_compute_output_histogram_us` |Histogram of time requests spend processing inference outputs (does not include cached requests) |Per model  |Per request  |
 
-To enable these metrics specifically, you can set `--metrics-config histogram_latencies=true`
+Request, queue, and compute histograms are enabled by either
+`--metrics-config histogram_latencies=true` or
+`--metrics-config summary_latencies=true`. The first-response histogram is
+enabled only by `histogram_latencies=true`.
+
+These duration histograms are cumulative and are updated without taking the
+per-model statistics lock. Percentiles are computed in PromQL, for example the
+99th percentile of request latency over the last five minutes:
+
+```
+histogram_quantile(0.99, sum by (le, model) (rate(nv_inference_request_histogram_us_bucket[5m])))
+```
+
+Default bucket boundaries run from 1 microsecond to 60 seconds in a geometric
+sequence with ratio 1.2. `histogram_quantile` interpolates inside a bucket, so
+the relative error is about half a bucket, roughly 10%. Override the boundaries
+per family with `model_metrics`, using the metric names in the table above.
 
 Each histogram above is composed of several sub-metrics. For each histogram
 metric, there is a set of `le` (less than or equal to) thresholds tracking
@@ -265,73 +286,28 @@ model_metrics {
 
 Currently, the following histogram families support custom buckets.
 ```
-nv_inference_first_response_histogram_ms  // Time to First Response
+nv_inference_first_response_histogram_ms
+nv_inference_request_histogram_us
+nv_inference_queue_histogram_us
+nv_inference_compute_input_histogram_us
+nv_inference_compute_infer_histogram_us
+nv_inference_compute_output_histogram_us
+nv_cache_hit_histogram_us
+nv_cache_miss_histogram_us
 ```
 
 #### Summaries
 
-> **Note**
->
-> The following Summary feature is experimental for the time being and may be
-> subject to change based on user feedback.
+Prometheus Summary latency metrics (`nv_inference_*_summary_us` and
+`nv_cache_*_summary_per_model`) are no longer published. Recording those
+summaries ran a streaming quantile estimator while holding the per-model
+statistics lock, which dominated throughput when
+`--metrics-config summary_latencies=true`.
 
-To get configurable quantiles over a sliding time window, Triton supports
-a set a [Summary](https://prometheus.io/docs/concepts/metric_types/#summary)
-metrics for latencies as well. These metrics are disabled by default, but can
-be enabled by setting `--metrics-config summary_latencies=true`.
-
-For more information on how the quantiles are calculated, see
-[this explanation](https://grafana.com/blog/2022/03/01/how-summary-metrics-work-in-prometheus/).
-
-The following summary metrics are available:
-
-|Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
-|--------------|----------------|------------|---------------------------|-----------|-------------|
-|Latency       |Request Time    |`nv_inference_request_summary_us` |Summary of end-to-end inference request handling times (includes cached requests) |Per model  |Per request  |
-|              |Queue Time      |`nv_inference_queue_summary_us` |Summary of time requests spend waiting in the scheduling queue (includes cached requests) |Per model  |Per request  |
-|              |Compute Input Time|`nv_inference_compute_input_summary_us` |Summary time requests spend processing inference inputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
-|              |Compute Time    |`nv_inference_compute_infer_summary_us` |Summary of time requests spend executing the inference model (in the framework backend, does not include cached requests)     |Per model  |Per request  |
-|              |Compute Output Time|`nv_inference_compute_output_summary_us` |Summary of time requests spend processing inference outputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
-
-Each summary above is actually composed of several sub-metrics. For each
-metric, there is a set of `quantile` metrics tracking the latency for each
-quantile. Additionally, there are `_count` and `_sum` metrics that aggregate
-the count and observed values for each. For example, see the following
-information exposed by the Inference Queue Summary metrics:
-```
-# HELP nv_inference_queue_summary_us Summary of inference queuing duration in microseconds (includes cached requests)
-# TYPE nv_inference_queue_summary_us summary
-nv_inference_queue_summary_us_count{model="my_model",version="1"} 161
-nv_inference_queue_summary_us_sum{model="my_model",version="1"} 11110
-nv_inference_queue_summary_us{model="my_model",version="1",quantile="0.5"} 55
-nv_inference_queue_summary_us{model="my_model",version="1",quantile="0.9"} 97
-nv_inference_queue_summary_us{model="my_model",version="1",quantile="0.95"} 98
-nv_inference_queue_summary_us{model="my_model",version="1",quantile="0.99"} 101
-nv_inference_queue_summary_us{model="my_model",version="1",quantile="0.999"} 101
-```
-
-The count and sum for the summary above show that stats have been recorded for
-161 requests, and took a combined total of 11110 microseconds. The `_count` and
-`_sum` of a summary should generally match the counter metric equivalents when
-applicable, such as:
-```
-nv_inference_request_success{model="my_model",version="1"} 161
-nv_inference_queue_duration_us{model="my_model",version="1"} 11110
-```
-
-Triton has a set of default quantiles to track, as shown above. To set
-custom quantiles, you can use the `--metrics-config` CLI option. The format is:
-```
-tritonserver --metrics-config summary_quantiles="<quantile1>:<error1>,...,<quantileN>:<errorN>"`
-```
-
-For example:
-```
-tritonserver --metrics-config summary_quantiles="0.5:0.05,0.9:0.01,0.95:0.001,0.99:0.001"`
-```
-
-To better understand the setting of error values for computing each quantile, see the
-[best practices for histograms and summaries](https://prometheus.io/docs/practices/histograms/#histograms-and-summaries).
+`summary_latencies=true` now enables the duration histograms above.
+`summary_quantiles` is ignored. Use `histogram_quantile()` on the histogram
+buckets. See
+[histograms and summaries](https://prometheus.io/docs/practices/histograms/#histograms-and-summaries).
 
 
 ## GPU Metrics
@@ -412,15 +388,17 @@ be recorded as usual.
 |Latency       |Cache Hit Time |`nv_cache_hit_duration_per_model` |Cumulative time requests spend retrieving a cached response per model on cache hits (microseconds) |Per model |Per request |
 |              |Cache Miss Time |`nv_cache_miss_duration_per_model` |Cumulative time requests spend looking up and inserting responses into the cache on a cache miss (microseconds) |Per model |Per request |
 
-Similar to the Summaries section above for Inference Request Metrics, the
-per-model cache hit/miss latency metrics also support Summaries.
+When `summary_latencies=true` or `histogram_latencies=true`, cache hit and miss
+latency are also published as `nv_cache_hit_histogram_us` and
+`nv_cache_miss_histogram_us`.
 
 > **Note**
 >
-> For models with response caching enabled, the inference request **summary** metric
-> is currently disabled. This is due to extra time spent internally on cache
-> management that wouldn't be reflected correctly in the end to end request time.
-> Other summary metrics are unaffected.
+> For models with response caching enabled, the inference request histogram
+> (`nv_inference_request_histogram_us`) is not published. A cache miss is
+> reported by the backend and again after cache insertion, which would insert
+> two samples for one request. Queue, compute, and cache hit/miss histograms
+> are unaffected.
 
 ## Custom Metrics
 
