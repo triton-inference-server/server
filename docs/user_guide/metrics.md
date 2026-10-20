@@ -238,9 +238,12 @@ histogram_quantile(0.99, sum by (le, model) (rate(nv_inference_request_histogram
 ```
 
 Default bucket boundaries run from 1 microsecond to 60 seconds in a geometric
-sequence with ratio 1.2. `histogram_quantile` interpolates inside a bucket, so
-the relative error is about half a bucket, roughly 10%. Override the boundaries
-per family with `model_metrics`, using the metric names in the table above.
+sequence with ratio 1.2. `histogram_quantile` places the estimate inside the
+bucket that contains the rank. If the observations sit on one edge of that
+bucket and the estimate lands on the other, the relative error can be as large
+as the bucket width, about 20%. Observations spread through the bucket are
+closer. Override the boundaries per family with `model_metrics`, using the
+metric names in the table above.
 
 Each histogram above is composed of several sub-metrics. For each histogram
 metric, there is a set of `le` (less than or equal to) thresholds tracking

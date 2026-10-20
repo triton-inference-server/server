@@ -54,14 +54,14 @@ SUMMARY_NAMES = [
 ]
 
 
-def sample(metrics, name):
+def sample(metrics, name, model):
     match = re.search(
-        rf"^{re.escape(name)}\{{[^}}]*model=\"identity\"[^}}]*\}} (\d+(?:\.\d+)?)\s*$",
+        rf"^{re.escape(name)}\{{[^}}]*model=\"{re.escape(model)}\"[^}}]*\}} (\d+(?:\.\d+)?)\s*$",
         metrics,
         re.MULTILINE,
     )
     if match is None:
-        raise AssertionError(f"missing sample {name} for model identity")
+        raise AssertionError(f"missing sample {name} for model {model}")
     return float(match.group(1))
 
 
@@ -107,9 +107,11 @@ def main():
     if 'quantile="' in metrics:
         raise AssertionError("summary quantile label is still published")
 
-    request_count = sample(metrics, "nv_inference_request_histogram_us_count")
+    request_count = sample(
+        metrics, "nv_inference_request_histogram_us_count", args.model
+    )
     inf_match = re.search(
-        r'nv_inference_request_histogram_us_bucket\{[^}]*model="identity"[^}]*le="\+Inf"[^}]*\} (\d+)',
+        rf"nv_inference_request_histogram_us_bucket\{{[^}}]*model=\"{re.escape(args.model)}\"[^}}]*le=\"\+Inf\"[^}}]*\}} (\d+)",
         metrics,
     )
     if inf_match is None:
@@ -125,7 +127,7 @@ def main():
         )
 
     for name in DURATION_HISTOGRAMS:
-        count = sample(metrics, name + "_count")
+        count = sample(metrics, name + "_count", args.model)
         if count < args.requests:
             raise AssertionError(f"{name}_count {count} < {args.requests}")
         if name + "_sum" not in metrics or name + "_bucket" not in metrics:

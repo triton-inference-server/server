@@ -501,6 +501,16 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_missing 2>&1 | tee 
 check_unit_test
 kill_server
 
+# 1000 in-flight requests for 40 seconds is too heavy for the default L0 run.
+# Set RUN_LATENCY_HISTOGRAM_LOAD_TEST=1 to compare histogram throughput with
+# the counter-only baseline. The script rejects a run that drops requests.
+if [ "${RUN_LATENCY_HISTOGRAM_LOAD_TEST}" = "1" ]; then
+  bash ./run_latency_histogram_load_test.sh "${SERVER}" "${TRITON_DIR}/backends"
+  if [ $? -ne 0 ]; then
+    RET=1
+  fi
+fi
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else

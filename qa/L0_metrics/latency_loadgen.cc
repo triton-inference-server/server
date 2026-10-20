@@ -267,5 +267,5 @@ main(int argc, char** argv)
             << "failure " << g_failure.load() << "\n"
             << "seconds " << seconds << "\n"
             << "rps " << (static_cast<double>(success) / seconds) << std::endl;
-  return success == 0 ? 1 : 0;
+  return (success == 0 || g_failure.load() != 0) ? 1 : 0;
 }
