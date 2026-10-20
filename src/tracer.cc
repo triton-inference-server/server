@@ -44,7 +44,8 @@ namespace triton { namespace server {
 TRITONSERVER_Error*
 TraceManager::Create(
     TraceManager** manager, const TRITONSERVER_InferenceTraceLevel level,
-    const uint32_t rate, const int32_t count, const uint32_t log_frequency,
+    const uint32_t rate, const bool honor_parent_sampling,
+    const int32_t count, const uint32_t log_frequency,
     const std::string& filepath, const InferenceTraceMode mode,
     const triton::server::TraceConfigMap& config_map)
 {
@@ -52,27 +53,32 @@ TraceManager::Create(
   // can be updated at runtime even if tracing is not enable at start.
   // No trace should be sampled if the setting is not valid.
   *manager = new TraceManager(
-      level, rate, count, log_frequency, filepath, mode, config_map);
+      level, rate, honor_parent_sampling, count, log_frequency, filepath, mode,
+      config_map);
 
   return nullptr;  // success
 }
 
 TraceManager::TraceManager(
     const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
-    const int32_t count, const uint32_t log_frequency,
-    const std::string& filepath, const InferenceTraceMode mode,
-    const TraceConfigMap& config_map)
+    const bool honor_parent_sampling, const int32_t count,
+    const uint32_t log_frequency, const std::string& filepath,
+    const InferenceTraceMode mode, const TraceConfigMap& config_map)
 {
   std::shared_ptr<TraceFile> file(new TraceFile(filepath));
   global_default_.reset(new TraceSetting(
-      level, rate, count, log_frequency, file, mode, config_map,
+      level, rate, honor_parent_sampling, count, log_frequency, file, mode,
+      config_map,
       false /*level_specified*/, false /*rate_specified*/,
+      false /*honor_parent_sampling_specified*/,
       false /*count_specified*/, false /*log_frequency_specified*/,
       false /*filepath_specified*/, false /*mode_specified*/,
       false /*config_map_specified*/));
   global_setting_.reset(new TraceSetting(
-      level, rate, count, log_frequency, file, mode, config_map,
+      level, rate, honor_parent_sampling, count, log_frequency, file, mode,
+      config_map,
       false /*level_specified*/, false /*rate_specified*/,
+      false /*honor_parent_sampling_specified*/,
       false /*count_specified*/, false /*log_frequency_specified*/,
       false /*filepath_specified*/, false /*mode_specified*/,
       false /*config_map_specified*/));
@@ -129,6 +135,7 @@ TraceManager::UpdateTraceSettingInternal(
   //    use the specified value
   TRITONSERVER_InferenceTraceLevel level = fallback_setting->level_;
   uint32_t rate = fallback_setting->rate_;
+  bool honor_parent_sampling = fallback_setting->honor_parent_sampling_;
   int32_t count = fallback_setting->count_;
   uint32_t log_frequency = fallback_setting->log_frequency_;
   std::string filepath = fallback_setting->file_->FileName();
@@ -148,6 +155,11 @@ TraceManager::UpdateTraceSettingInternal(
                                : (((current_setting != nullptr) &&
                                    current_setting->rate_specified_) ||
                                   (new_setting.rate_ != nullptr)));
+  const bool honor_parent_sampling_specified =
+      (new_setting.clear_honor_parent_sampling_ ? false
+                               : (((current_setting != nullptr) &&
+                                   current_setting->honor_parent_sampling_specified_) ||
+                                  (new_setting.honor_parent_sampling_ != nullptr)));
   const bool count_specified =
       (new_setting.clear_count_ ? false
                                 : (((current_setting != nullptr) &&
@@ -170,6 +182,11 @@ TraceManager::UpdateTraceSettingInternal(
     rate = (new_setting.rate_ != nullptr) ? *new_setting.rate_
                                           : current_setting->rate_;
   }
+  if (honor_parent_sampling_specified) {
+    honor_parent_sampling = (new_setting.honor_parent_sampling_ != nullptr)
+                              ? *new_setting.honor_parent_sampling_
+                              : current_setting->honor_parent_sampling_;
+  }
   if (count_specified) {
     count = (new_setting.count_ != nullptr) ? *new_setting.count_
                                             : current_setting->count_;
@@ -186,11 +203,11 @@ TraceManager::UpdateTraceSettingInternal(
   // Some special case when updating model setting
   if (!model_name.empty()) {
     bool all_specified =
-        (level_specified & rate_specified & count_specified &
-         log_frequency_specified & filepath_specified);
+        (level_specified & rate_specified & honor_parent_sampling_specified &
+         count_specified & log_frequency_specified & filepath_specified);
     bool none_specified =
-        !(level_specified | rate_specified | count_specified |
-          log_frequency_specified | filepath_specified);
+        !(level_specified | rate_specified | honor_parent_sampling_specified |
+          count_specified | log_frequency_specified | filepath_specified);
     if (all_specified) {
       fallback_used_models_.erase(model_name);
     } else if (none_specified) {
@@ -219,8 +236,9 @@ TraceManager::UpdateTraceSettingInternal(
   }
 
   std::shared_ptr<TraceSetting> lts(new TraceSetting(
-      level, rate, count, log_frequency, file, mode, config_map,
-      level_specified, rate_specified, count_specified, log_frequency_specified,
+      level, rate, honor_parent_sampling, count, log_frequency, file, mode,
+      config_map, level_specified, rate_specified,
+      honor_parent_sampling_specified, count_specified, log_frequency_specified,
       filepath_specified, false /*mode_specified*/,
       false /*config_map_specified*/));
   // The only invalid setting allowed is if it disables tracing
@@ -259,9 +277,9 @@ TraceManager::UpdateTraceSettingInternal(
 void
 TraceManager::GetTraceSetting(
     const std::string& model_name, TRITONSERVER_InferenceTraceLevel* level,
-    uint32_t* rate, int32_t* count, uint32_t* log_frequency,
-    std::string* filepath, InferenceTraceMode* trace_mode,
-    TraceConfigMap* config_map)
+    uint32_t* rate, bool* honor_parent_sampling, int32_t* count,
+    uint32_t* log_frequency, std::string* filepath,
+    InferenceTraceMode* trace_mode, TraceConfigMap* config_map)
 {
   std::shared_ptr<TraceSetting> trace_setting;
   {
@@ -273,6 +291,7 @@ TraceManager::GetTraceSetting(
 
   *level = trace_setting->level_;
   *rate = trace_setting->rate_;
+  *honor_parent_sampling = trace_setting->honor_parent_sampling_;
   *count = trace_setting->count_;
   *log_frequency = trace_setting->log_frequency_;
   *filepath = trace_setting->file_->FileName();
@@ -308,7 +327,6 @@ TraceManager::GetTraceStartOptions(
         otel_trace_api::GetSpan(ctxt)->GetContext();
     if (span_context.IsValid()) {
       start_options.propagated_context = ctxt;
-      start_options.force_sample = true;
     }
 #else
     LOG_ERROR << "Unsupported trace mode: "
@@ -324,7 +342,7 @@ std::shared_ptr<TraceManager::Trace>
 TraceManager::SampleTrace(const TraceStartOptions& start_options)
 {
   std::shared_ptr<Trace> ts =
-      start_options.trace_setting->SampleTrace(start_options.force_sample);
+      start_options.trace_setting->SampleTrace(start_options);
   if (ts != nullptr) {
     ts->setting_ = start_options.trace_setting;
     if (ts->setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
@@ -1132,36 +1150,44 @@ TraceManager::TraceFile::SaveTraces(
 }
 
 std::shared_ptr<TraceManager::Trace>
-TraceManager::TraceSetting::SampleTrace(bool force_sample)
+TraceManager::TraceSetting::SampleTrace(const TraceStartOptions& start_options)
 {
-  bool count_rate_hit = false;
-  {
+  bool should_sample = false;
+
+#ifndef _WIN32
+  bool has_parent = false;
+  bool parent_is_sampled = false;
+  if (mode_ == TRACE_MODE_OPENTELEMETRY) {
+    auto active_span = otel_trace_api::GetSpan(start_options.propagated_context);
+    if (active_span->GetContext().IsValid()) {
+      has_parent = true;
+      parent_is_sampled = active_span->GetContext().IsSampled();
+    }
+  }
+#endif
+
+  // Imitate OTEL's ParentBased sampler (i.e. use parent's sampling flag, fallback on a root sampler, in our case the rate option).
+  if (honor_parent_sampling_ && has_parent) {
+    // ParentBased sampler: respect parent's sampling decision
+    should_sample = parent_is_sampled;
+  } else {
     std::lock_guard<std::mutex> lk(mu_);
-    // [FIXME: DLIS-6033]
-    // A current WAR for initiating trace based on propagated context only
-    // Currently this is implemented through setting trace rate as 0
     if (rate_ != 0) {
-      // If `count_` hits 0, `Valid()` returns false for this and all
-      // following requests (unless `count_` is updated by a user).
-      // At this point we only trace requests for which
-      // `force_sample` is true.
-      if (!Valid() && !force_sample) {
+      if (!Valid()) {
         return nullptr;
       }
-      // `sample_` counts all requests, coming to server.
-      count_rate_hit = (((++sample_) % rate_) == 0);
-      if (count_rate_hit && (count_ > 0)) {
-        --count_;
+      bool count_rate_hit = (((++sample_) % rate_) == 0);
+      if (count_rate_hit && (count_ > 0 || count_ == -1)) {
+        if (count_ > 0) {
+          --count_;
+        }
         ++created_;
-      } else if (count_rate_hit && (count_ == 0)) {
-        // This condition is reached, when `force_sample` is true,
-        // `count_rate_hit` is true, but `count_` is 0. Due to the
-        // latter, we explicitly set `count_rate_hit` to false.
-        count_rate_hit = false;
+        should_sample = true;
       }
     }
   }
-  if (count_rate_hit || force_sample) {
+
+  if (should_sample) {
     std::shared_ptr<TraceManager::Trace> lts(new Trace());
     // Split 'Trace' management to frontend and Triton trace separately
     // to avoid dependency between frontend request and Triton trace's
@@ -1226,15 +1252,18 @@ TraceManager::TraceSetting::WriteTrace(
 
 TraceManager::TraceSetting::TraceSetting(
     const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
-    const int32_t count, const uint32_t log_frequency,
-    const std::shared_ptr<TraceFile>& file, const InferenceTraceMode mode,
-    const TraceConfigMap& config_map, const bool level_specified,
-    const bool rate_specified, const bool count_specified,
+    const bool honor_parent_sampling, const int32_t count,
+    const uint32_t log_frequency, const std::shared_ptr<TraceFile>& file,
+    const InferenceTraceMode mode, const TraceConfigMap& config_map,
+    const bool level_specified, const bool rate_specified,
+    const bool honor_parent_sampling_specified, const bool count_specified,
     const bool log_frequency_specified, const bool filepath_specified,
     const bool mode_specified, const bool config_map_specified)
-    : level_(level), rate_(rate), count_(count), log_frequency_(log_frequency),
-      file_(file), mode_(mode), config_map_(config_map),
-      level_specified_(level_specified), rate_specified_(rate_specified),
+    : level_(level), rate_(rate), honor_parent_sampling_(honor_parent_sampling),
+      count_(count), log_frequency_(log_frequency), file_(file), mode_(mode),
+      config_map_(config_map), level_specified_(level_specified),
+      rate_specified_(rate_specified),
+      honor_parent_sampling_specified_(honor_parent_sampling_specified),
       count_specified_(count_specified),
       log_frequency_specified_(log_frequency_specified),
       filepath_specified_(filepath_specified), mode_specified_(mode_specified),
