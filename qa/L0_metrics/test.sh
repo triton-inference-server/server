@@ -290,14 +290,14 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_missing 2>&1 | te
 check_unit_test
 kill_server
 
-# Enable histograms. Duration histograms are included; summaries stay absent.
+# histogram_latencies enables only the first-response histogram.
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config histogram_latencies=true"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
@@ -309,16 +309,14 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_missing 2>&1 | te
 check_unit_test
 kill_server
 
-# summary_latencies enables duration histograms and does not publish summaries.
+# summary_latencies=true is verbose: CKMS summaries, no duration histograms.
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_missing 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
@@ -328,14 +326,14 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_missing 2>&1 | te
 check_unit_test
 kill_server
 
-# Enable duration histograms, disable counters
+# Enable summaries, disable counters
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true --metrics-config counter_latencies=false"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
@@ -345,30 +343,53 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_missing 2>&1 | te
 check_unit_test
 kill_server
 
-# Enable histograms and counters, check cache metrics
+# Enable summaries and counters, check cache metrics
 CACHE_ARGS="--cache-config local,size=1048576"
 SERVER_ARGS="${BASE_SERVER_ARGS} ${CACHE_ARGS} --load-model=identity_cache_on --metrics-config summary_latencies=true --metrics-config counter_latencies=true"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-# DLIS-4762: request histogram is not published when cache is enabled.
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_exist_with_cache 2>&1 | tee ${CLIENT_LOG}
-check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+# DLIS-4762: request summary is not published when cache is enabled.
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_exist_with_cache 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_exist 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill_server
 
-# summary_quantiles is ignored; duration histograms are still published.
+# summary_latencies=simplified publishes duration histograms, not summaries.
+SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=simplified"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill_server
+
+SERVER_ARGS="${BASE_SERVER_ARGS} ${CACHE_ARGS} --load-model=identity_cache_on --metrics-config summary_latencies=simplified"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_exist_with_cache 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill_server
+
+# Check setting custom summary quantiles. Applies only to true/verbose.
 export SUMMARY_QUANTILES="0.1:0.01,0.7:0.01,0.75:0.01"
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true --metrics-config summary_quantiles=${SUMMARY_QUANTILES}"
 run_and_check_server
-python3 ${PYTHON_TEST} MetricsConfigTest.test_summary_quantiles_ignored 2>&1 | tee ${CLIENT_LOG}
+python3 ${PYTHON_TEST} MetricsConfigTest.test_summaries_custom_quantiles 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill_server
 

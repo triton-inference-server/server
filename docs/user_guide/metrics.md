@@ -224,14 +224,16 @@ metrics are used for latencies:
 |              |Compute Time    |`nv_inference_compute_infer_histogram_us` |Histogram of time requests spend executing the inference model (does not include cached requests) |Per model  |Per request  |
 |              |Compute Output Time|`nv_inference_compute_output_histogram_us` |Histogram of time requests spend processing inference outputs (does not include cached requests) |Per model  |Per request  |
 
-Request, queue, and compute histograms are enabled by either
-`--metrics-config histogram_latencies=true` or
-`--metrics-config summary_latencies=true`. The first-response histogram is
-enabled only by `histogram_latencies=true`.
+Request, queue, and compute histograms are enabled by
+`--metrics-config summary_latencies=simplified`. The first-response histogram
+is enabled only by `histogram_latencies=true`. `summary_latencies=true` does
+not publish these histograms; it keeps the Prometheus summary series described
+below.
 
-These duration histograms are cumulative and are updated without taking the
-per-model statistics lock. Percentiles are computed in PromQL, for example the
-99th percentile of request latency over the last five minutes:
+These duration histograms are cumulative. Every completed request is recorded,
+and the update does not take the per-model statistics lock. Percentiles are
+computed in PromQL, for example the 99th percentile of request latency over
+the last five minutes:
 
 ```
 histogram_quantile(0.99, sum by (le, model) (rate(nv_inference_request_histogram_us_bucket[5m])))
@@ -299,18 +301,25 @@ nv_cache_hit_histogram_us
 nv_cache_miss_histogram_us
 ```
 
-#### Summaries
+#### Latency detail (`summary_latencies`)
 
-Prometheus Summary latency metrics (`nv_inference_*_summary_us` and
-`nv_cache_*_summary_per_model`) are no longer published. Recording those
-summaries ran a streaming quantile estimator while holding the per-model
-statistics lock, which dominated throughput when
-`--metrics-config summary_latencies=true`.
+`summary_latencies` chooses how much of the request-latency distribution to
+publish. Existing `true` and `false` values keep their previous meaning.
+`false` is the same as `none`, and `true` is the same as `verbose`.
 
-`summary_latencies=true` now enables the duration histograms above.
-`summary_quantiles` is ignored. Use `histogram_quantile()` on the histogram
-buckets. See
-[histograms and summaries](https://prometheus.io/docs/practices/histograms/#histograms-and-summaries).
+| Value | Also accepted as | What is published | How each request is recorded | Cost |
+| --- | --- | --- | --- | --- |
+| `none` | `false` (default) | Latency counters only, when `counter_latencies` is left at its default. No summary and no duration histogram. | Counters are incremented under the per-model statistics lock. | Same as a default server. |
+| `simplified` |  | The duration histograms in the table above: `nv_inference_{request,queue,compute_input,compute_infer,compute_output}_histogram_us`. With the response cache enabled, `nv_cache_hit_histogram_us` and `nv_cache_miss_histogram_us` are added and the request histogram is omitted. | Every completion adds one sample to a lock-free histogram after the statistics lock is released. Buckets run from 1 microsecond to 60 seconds with ratio 1.2. Read P99 with `histogram_quantile`, as shown above. The estimate can miss the true value by up to one bucket, about 20% relative, when samples sit on the opposite edge of the bucket. | Distribution updates are off the statistics lock, so throughput stays close to `none`. |
+| `verbose` | `true` | Prometheus summaries `nv_inference_*_summary_us`, with a `quantile` label. Cache hit and miss summaries are included when the response cache is enabled. The request summary is omitted when the cache is enabled. `summary_quantiles` overrides the default quantile/error pairs (`0.5:0.05`, `0.9:0.01`, `0.95:0.001`, `0.99:0.001`, `0.999:0.001`). | Every completion updates a CKMS quantile estimator while holding the per-model statistics lock. Each model has its own summary. | This is the historical `summary_latencies=true` behavior. The quantile update under that lock can drop throughput sharply on a small model. Issue [9003](https://github.com/triton-inference-server/server/issues/9003) saw identity HTTP traffic fall from about 85 thousand requests/s to about 5 thousand. Use `simplified` when an approximate P99 is enough. |
+
+`histogram_latencies=true` is unchanged. It publishes only
+`nv_inference_first_response_histogram_ms` and does not select a
+`summary_latencies` level. An unrecognized `summary_latencies` value is
+ignored and logged. `summary_quantiles` has no effect unless the level is
+`true` or `verbose`.
+
+See [histograms and summaries](https://prometheus.io/docs/practices/histograms/#histograms-and-summaries).
 
 
 ## GPU Metrics
@@ -391,9 +400,11 @@ be recorded as usual.
 |Latency       |Cache Hit Time |`nv_cache_hit_duration_per_model` |Cumulative time requests spend retrieving a cached response per model on cache hits (microseconds) |Per model |Per request |
 |              |Cache Miss Time |`nv_cache_miss_duration_per_model` |Cumulative time requests spend looking up and inserting responses into the cache on a cache miss (microseconds) |Per model |Per request |
 
-When `summary_latencies=true` or `histogram_latencies=true`, cache hit and miss
-latency are also published as `nv_cache_hit_histogram_us` and
-`nv_cache_miss_histogram_us`.
+When `summary_latencies=simplified`, cache hit and miss latency are also
+published as `nv_cache_hit_histogram_us` and `nv_cache_miss_histogram_us`.
+When `summary_latencies=true` (or `verbose`), the same intervals are published
+as the existing `nv_cache_hit_summary_per_model` and
+`nv_cache_miss_summary_per_model` summaries.
 
 > **Note**
 >

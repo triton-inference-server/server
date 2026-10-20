@@ -133,11 +133,21 @@ class MetricsConfigTest(tu.TestResultCollector):
         for metric in INF_DURATION_HISTOGRAM_PATTERNS:
             self.assertNotIn(metric, metrics)
 
-    # Summaries are no longer published. summary_latencies enables histograms.
+    # summary_latencies=true / verbose still publishes the CKMS summaries.
+    def test_inf_summaries_exist(self):
+        metrics = self._get_metrics()
+        for metric in INF_SUMMARY_PATTERNS:
+            self.assertIn(metric, metrics)
+
     def test_inf_summaries_missing(self):
         metrics = self._get_metrics()
         for metric in INF_SUMMARY_PATTERNS:
             self.assertNotIn(metric, metrics)
+
+    def test_cache_summaries_exist(self):
+        metrics = self._get_metrics()
+        for metric in CACHE_SUMMARY_PATTERNS:
+            self.assertIn(metric, metrics)
 
     def test_cache_summaries_missing(self):
         metrics = self._get_metrics()
@@ -155,11 +165,25 @@ class MetricsConfigTest(tu.TestResultCollector):
         for metric in CACHE_HISTOGRAM_PATTERNS:
             self.assertNotIn(metric, metrics)
 
-    def test_summary_quantiles_ignored(self):
+    def test_summaries_custom_quantiles(self):
         metrics = self._get_metrics()
-        self.assertNotIn('quantile="', metrics)
-        for metric in INF_DURATION_HISTOGRAM_PATTERNS:
-            self.assertIn(metric + "_bucket", metrics)
+        # This env var should be set by test.sh or caller
+        quantile_pairs = os.environ.get("SUMMARY_QUANTILES", None)
+        self.assertIsNotNone(quantile_pairs)
+
+        quantiles = [pair.split(":")[0] for pair in quantile_pairs.split(",")]
+        for quantile in quantiles:
+            self.assertIn(f'quantile="{quantile}"', metrics)
+
+    # DLIS-4762: Disable request summary when caching enabled for now
+    def test_inf_summaries_exist_with_cache(self):
+        metrics = self._get_metrics()
+        bad_patterns = ["nv_inference_request_summary"]
+        ok_patterns = list(set(INF_SUMMARY_PATTERNS) - set(bad_patterns))
+        for metric in ok_patterns:
+            self.assertIn(metric, metrics)
+        for metric in bad_patterns:
+            self.assertNotIn(metric, metrics)
 
     # DLIS-4762: request histogram is omitted when caching is enabled.
     def test_inf_duration_histograms_exist_with_cache(self):

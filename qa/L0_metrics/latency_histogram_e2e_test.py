@@ -27,8 +27,8 @@
 
 """Send identity requests and check lock-free latency histograms.
 
-The server must already be running with summary_latencies=true or
-histogram_latencies=true and the identity_latency model loaded.
+The server must already be running with summary_latencies=simplified and the
+identity_latency model loaded.
 """
 
 import argparse

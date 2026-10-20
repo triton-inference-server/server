@@ -26,8 +26,9 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Compare identity-model throughput with latency histograms off and on.
-# Histograms are what summary_latencies=true enables. The histogram run must
-# stay within 80% of the counter-only baseline.
+# summary_latencies=simplified enables the lock-free histograms. That run must
+# stay within 80% of the counter-only baseline. summary_latencies=true is the
+# historical CKMS path and is not the fast mode under test.
 #
 # Usage:
 #   run_latency_histogram_load_test.sh /path/to/tritonserver [/path/to/backends]
@@ -137,8 +138,8 @@ run_load "${WORKDIR}/baseline.txt"
 BASE_RPS="$(rps_of "${WORKDIR}/baseline.txt")"
 stop_server
 
-echo "=== histograms: summary_latencies=true ==="
-start_server --metrics-config summary_latencies=true
+echo "=== histograms: summary_latencies=simplified ==="
+start_server --metrics-config summary_latencies=simplified
 python3 "${SCRIPT_DIR}/latency_histogram_e2e_test.py" \
   --http "http://127.0.0.1:${HTTP_PORT}" \
   --metrics "http://127.0.0.1:${METRICS_PORT}/metrics" \
