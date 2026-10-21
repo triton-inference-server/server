@@ -37,8 +37,18 @@ import requests
 import tritonserver
 
 sys.path.append(os.path.join(Path(__file__).resolve().parent, "..", "openai_frontend"))
-from engine.triton_engine import TritonLLMEngine
-from frontend.fastapi_frontend import FastApiFrontend
+from engine.triton_engine import TritonLLMEngine  # noqa: E402
+from frontend.fastapi_frontend import FastApiFrontend  # noqa: E402
+
+# Why some tests are skipped for the TensorRT-LLM LLM API backend.
+LLMAPI_STOP_WORDS = (
+    "sampling_param_stop fails in TensorRT-LLM's llmapi model: the stop strings "
+    "reach the tokenizer as bytes"
+)
+LLMAPI_GUIDED_DECODING = (
+    "tool_choice that constrains the output to a schema needs guided decoding, "
+    "which the LLM API backend does not provide"
+)
 
 
 # TODO: Cleanup, refactor, mock, etc.
@@ -46,7 +56,11 @@ def setup_server(
     model_repository: str,
     model_control_mode: tritonserver.ModelControlMode = tritonserver.ModelControlMode.NONE,
     load_models: Optional[List[str]] = None,
+    backend_directory: Optional[str] = None,
 ):
+    options = {}
+    if backend_directory is not None:
+        options["backend_directory"] = backend_directory
     server: tritonserver.Server = tritonserver.Server(
         model_repository=model_repository,
         model_control_mode=model_control_mode,
@@ -55,6 +69,7 @@ def setup_server(
         log_info=True,
         log_warn=True,
         log_error=True,
+        **options,
     ).start(wait_until_ready=True)
     return server
 

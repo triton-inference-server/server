@@ -1,4 +1,4 @@
-# Copyright 2024-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,7 +32,7 @@ from typing import List
 import pytest
 import tritonserver
 from fastapi.testclient import TestClient
-from tests.utils import setup_fastapi_app, setup_server
+from tests.utils import LLMAPI_STOP_WORDS, setup_fastapi_app, setup_server
 
 
 class TestChatCompletions:
@@ -142,8 +142,16 @@ class TestChatCompletions:
         ],
     )
     def test_chat_completions_sampling_parameters(
-        self, client, param_key, param_value, model: str, messages: List[dict]
+        self,
+        client,
+        param_key,
+        param_value,
+        model: str,
+        messages: List[dict],
+        backend: str,
     ):
+        if backend == "llmapi" and param_key == "stop" and param_value:
+            pytest.skip(reason=LLMAPI_STOP_WORDS)
         response = client.post(
             "/v1/chat/completions",
             json={
@@ -161,11 +169,7 @@ class TestChatCompletions:
             return
 
         # TRT-LLM backend doesn't support logprobs
-        if (
-            param_key == "logprobs"
-            and param_value is True
-            and model == "tensorrt_llm_bls"
-        ):
+        if param_key == "logprobs" and param_value is True and model == "tensorrt_llm":
             assert response.status_code == 400
             assert (
                 "logprobs are currently available only for the vLLM backend"
@@ -347,16 +351,13 @@ class TestChatCompletions:
             raise ValueError(f"Unexpected {temperature=} for this test.")
 
     # Remove xfail when fix is released and this test returns xpass status
-    @pytest.mark.xfail(
-        reason="TRT-LLM BLS model will ignore temperature until a later release"
-    )
     # Simple tests to verify temperature roughly behaves as expected
-    def test_chat_completions_temperature_tensorrtllm(
+    def test_chat_completions_temperature_llmapi(
         self, client, backend: str, model: str, messages: List[dict]
     ):
-        if backend != "tensorrtllm":
+        if backend != "llmapi":
             pytest.skip(
-                reason="Only used to test TRT-LLM-specific temperature behavior"
+                reason="Only used to test LLM API-specific temperature behavior"
             )
 
         responses = []

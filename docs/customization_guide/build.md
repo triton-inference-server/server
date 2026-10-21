@@ -327,6 +327,66 @@ A ready-to-copy example lives at
 [`tools/build/build_presets.example.json`](../../tools/build/build_presets.example.json);
 the full schema is documented in `tools/build/build_presets.py`.
 
+#### Building With the TensorRT-LLM Backend
+
+TensorRT-LLM is served by the [LLM API](https://nvidia.github.io/TensorRT-LLM/)
+model, a Python model that ships with TensorRT-LLM, so
+`--backend=tensorrtllm` compiles nothing. It fetches the model files from the
+TensorRT-LLM repo at tag `v<version>` and installs the model code (`model.py`
+and `helpers.py`) as the
+[Python-based backend](https://github.com/triton-inference-server/backend/blob/main/docs/python_based_backends.md)
+/opt/tritonserver/backends/tensorrtllm, so the code always matches the
+TensorRT-LLM in the image. /opt/tritonserver/tensorrtllm holds the rest: a
+sample model repository in `all_models/llmapi` (`config.pbtxt` with
+`backend: "tensorrtllm"` and `1/model.yaml`), the
+`scripts/launch_triton_server.py` launcher and the `tools/llmapi_client.py`
+client. The Python backend is added to the build
+automatically, and the final image is based on
+`nvcr.io/nvidia/tensorrt-llm/release:<version>`, which provides TensorRT-LLM
+itself. `<version>` defaults to the latest supported TensorRT-LLM release
+and is set with `--tensorrtllm-version`; `--image=inference,<image>`
+replaces the runtime image.
+
+The backend needs a GPU build. Also include the `ensemble` backend if the
+LLM API model is to be used as a step of an ensemble. The following builds
+the image that the TensorRT-LLM CI tests:
+
+```bash
+$ ./build.py -v --no-container-interactive \
+    --enable-logging --enable-stats --enable-tracing \
+    --enable-metrics --enable-gpu-metrics --enable-cpu-metrics \
+    --filesystem=gcs --filesystem=s3 --filesystem=azure_storage \
+    --endpoint=http --endpoint=grpc --endpoint=sagemaker --endpoint=vertex-ai \
+    --backend=ensemble --enable-gpu \
+    --repoagent=checksum --cache=local --cache=redis \
+    --backend=tensorrtllm --backend=python
+```
+
+To serve a model, copy `all_models/llmapi/tensorrt_llm` into a model
+repository, set the Hugging Face model in its `1/model.yaml` and start the
+server with `launch_triton_server.py --model_repo <repository>`. The model
+directory needs no `model.py`. A decoupled
+(streaming) model must also declare `model_transaction_policy { decoupled:
+true }` in its config.pbtxt, because the launcher disables auto-complete of
+the model configuration. The tests in
+[qa/L0_trtllm_llmapi](../../qa/L0_trtllm_llmapi) show each of these setups.
+
+A model repository written for TensorRT-LLM's own template, with
+`backend: "python"` and `model.py` and `helpers.py` in the version directory,
+still works and runs that copy of the code instead, for example a patched one.
+Before this release, `backend: "tensorrtllm"` meant the TensorRT-LLM C++
+backend, which served prebuilt TensorRT engines through inputs such as
+`input_ids` and `request_output_len`. That backend is no longer built. A
+model configuration written for it now runs the LLM API model, which fails to
+load with `'model.yaml' containing TRT-LLM engine args not found`. Such a
+model must be moved to the LLM API model: start from the sample
+`config.pbtxt`, whose inputs are `text_input` and `sampling_param_*`, and name
+a Hugging Face model or checkpoint in `1/model.yaml`; no engine build is
+needed.
+
+The vLLM and TensorRT-LLM backends each default to their own runtime image,
+so building both requires `--image=inference,<image>`.
+
 #### CPU-Only Build
 
 If you want to build without GPU support you must specify individual

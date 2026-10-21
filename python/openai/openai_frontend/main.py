@@ -108,8 +108,9 @@ def parse_args():
         "--backend",
         type=str,
         default=None,
-        choices=["vllm", "tensorrtllm"],
-        help="Manual override of Triton backend request format (inputs/output names) to use for inference",
+        choices=["vllm", "tensorrtllm", "llmapi"],
+        help="Manual override of Triton backend request format (inputs/output names) to use for inference. "
+        "'llmapi' is the TensorRT-LLM LLM API (Python) model, which is also detected automatically",
     )
     triton_group.add_argument(
         "--lora-separator",

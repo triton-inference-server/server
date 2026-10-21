@@ -39,7 +39,7 @@ from openai.types.chat import (
     ChatCompletionNamedToolChoiceParam,
     ChatCompletionToolParam,
 )
-from tests.utils import setup_fastapi_app, setup_server
+from tests.utils import LLMAPI_GUIDED_DECODING, setup_fastapi_app, setup_server
 
 # resources for testing the tool callings
 WEATHER_TOOL: ChatCompletionToolParam = {
@@ -356,8 +356,10 @@ class TestAsyncClientToolCalling:
 
     @pytest.mark.asyncio
     async def test_tool_call_with_named_tool_choice(
-        self, client: openai.AsyncOpenAI, model: str
+        self, client: openai.AsyncOpenAI, model: str, backend: str
     ):
+        if backend == "llmapi":
+            pytest.skip(reason=LLMAPI_GUIDED_DECODING)
         chat_completion = await client.chat.completions.create(
             messages=MESSAGES_ASKING_FOR_TOOLS,
             temperature=0,
@@ -459,8 +461,10 @@ class TestAsyncClientToolCalling:
 
     @pytest.mark.asyncio
     async def test_tool_call_with_required_tool_choice(
-        self, client: openai.AsyncOpenAI, model: str
+        self, client: openai.AsyncOpenAI, model: str, backend: str
     ):
+        if backend == "llmapi":
+            pytest.skip(reason=LLMAPI_GUIDED_DECODING)
         chat_completion = await client.chat.completions.create(
             messages=MESSAGES_ASKING_FOR_TOOLS,
             temperature=0,
