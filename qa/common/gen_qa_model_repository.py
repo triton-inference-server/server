@@ -677,6 +677,13 @@ def build_stages(ctx):
             Generate(
                 "gen_qa_trt_format_models.py", [], "qa_trt_format_model_repository"
             ),
+            # Plans are built from the image ONNX models the PyTorch stage
+            # exported into the same repository.
+            Generate(
+                "gen_qa_image_trt_plans.py",
+                ["--resnet50", "--resnet152", "--vgg19"],
+                "qa_dynamic_batch_image_model_repository",
+            ),
             Shell(
                 "nvidia-smi --query-gpu=compute_cap | grep -qzE '10\\.7|11\\.0'"
                 " && echo -e '"
