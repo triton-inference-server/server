@@ -850,6 +850,19 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
+# dynamic_batch_scheduler_test: a merged payload's exec mutex must not be
+# unlocked after the payload is destroyed.
+DYNAMIC_BATCH_SCHEDULER_TEST_LOG="./dynamic_batch_scheduler_test.log"
+DYNAMIC_BATCH_SCHEDULER_TEST_EXEC=./dynamic_batch_scheduler_test
+set +e
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $DYNAMIC_BATCH_SCHEDULER_TEST_EXEC >>$DYNAMIC_BATCH_SCHEDULER_TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $DYNAMIC_BATCH_SCHEDULER_TEST_LOG
+    echo -e "\n***\n*** Dynamic Batch Scheduler Unit Test Failed\n***"
+    RET=1
+fi
+set -e
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
