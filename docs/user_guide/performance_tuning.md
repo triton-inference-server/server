@@ -319,7 +319,7 @@ kill ${SERVER_PID}
 
 # Install model analyzer
 pip install --upgrade pip
-pip install triton-model-analyzer wkhtmltopdf
+pip install triton-model-analyzer
 
 # Profile the model using local (default) mode
 # NOTE: This may take some time, in this example it took ~10 minutes
