@@ -2713,7 +2713,7 @@ if __name__ == "__main__":
         "--cuda-dl-base-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["cuda_dl_base_version"],
-        help="This flag sets the cuda-dl-base container train and its CUDA version, as a matched pair (e.g. 26.09-cuda13.4), used for the default build and runtime base images. Default: the latest supported version.",
+        help="This flag sets the cuda-dl-base container train and its CUDA version, as a matched pair (e.g. 26.09-cuda13.4), used for the default build base image. Default: the latest supported version.",
     )
     parser.add_argument(
         "--ort-version",
