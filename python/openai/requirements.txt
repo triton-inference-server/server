@@ -31,7 +31,8 @@ fastapi==0.136.3
 # Fix httpx version to avoid bug in openai library:
 # https://community.openai.com/t/error-with-openai-1-56-0-client-init-got-an-unexpected-keyword-argument-proxies/1040332/3
 httpx==0.27.2
-openai==1.107.3
+# vllm requires openai>=2.25.0; a lower pin breaks its tool_parsers import.
+openai>=2.25.0,<3
 partial-json-parser # used for parsing partial JSON outputs
 
 # FIXME [TRI-641]: The latest stable version of scipy is 1.17.0 which caused segfault during tests. See TRI-620.

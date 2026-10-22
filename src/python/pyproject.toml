@@ -52,7 +52,7 @@ classifiers = [
     "Natural Language :: English",
     "Operating System :: POSIX :: Linux",
 ]
-dependencies = ["tritonserver", "pydantic==2.10.6"]
+dependencies = ["tritonserver", "pydantic>=2.12.0,<3"]
 
 [project.urls]
 Homepage = "https://developer.nvidia.com/nvidia-triton-inference-server"

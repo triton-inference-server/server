@@ -158,6 +158,14 @@ $ tritonserver --model-repository=s3://https://host:port/bucket/path/to/model/re
 When using S3, the credentials and default region can be passed by using either the [aws config](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html) command or via the respective [environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html).
 If the environment variables are set they will take a higher priority and will be used by Triton instead of the credentials set using the aws config command.
 
+By default, Triton addresses S3 buckets using path-style addressing (`https://host:port/bucket/key`). Some S3-compatible object stores require virtual-hosted-style addressing (`https://bucket.host:port/key`) and will reject path-style requests. To make Triton use virtual-hosted-style addressing, set the `S3_USE_VIRTUAL_ADDRESSING` environment variable to `true`:
+
+```bash
+export S3_USE_VIRTUAL_ADDRESSING=true
+```
+
+Alternatively, set `"use_virtual_addressing": true` in the S3 credential block of the `TRITON_CLOUD_CREDENTIAL_PATH` file (see the cloud credential section below). The default is `false`, which preserves the existing path-style behavior. Note that virtual-hosted-style addressing only applies when the bucket name is a valid lowercase DNS label; bucket names containing uppercase letters or dots fall back to path-style addressing.
+
 By default, Triton makes a local copy of a remote model repository in a temporary folder, which is deleted after Triton server is shut down.
 If you would like to control where remote model repository is copied to, you may set the `TRITON_AWS_MOUNT_DIRECTORY` environment variable to a path pointing to the existing folder on your local machine.
 
@@ -270,7 +278,8 @@ export TRITON_CLOUD_CREDENTIAL_PATH="cloud_credential.json"
       "key_id": "AWS_ACCESS_KEY_ID_2",
       "region": "AWS_DEFAULT_REGION_2",
       "session_token": "AWS_SESSION_TOKEN_2",
-      "profile": "AWS_PROFILE_2"
+      "profile": "AWS_PROFILE_2",
+      "use_virtual_addressing": true
     }
   },
   "as": {
@@ -292,6 +301,8 @@ export TRITON_CLOUD_CREDENTIAL_PATH="cloud_credential.json"
 ```
 
 To match a credential, the longest matching credential name against the start of a given path is used. For example: `gs://gcs-bucket-002/model_repository` will match the "gs://gcs-bucket-002" GCS credential, and `gs://any-other-gcs-bucket` will match the "" GCS credential.
+
+The optional `"use_virtual_addressing"` boolean field in an S3 credential block controls the S3 addressing style for matching paths (default `false` = path-style). Set it to `true` for S3-compatible stores that require virtual-hosted-style addressing. This is equivalent to the `S3_USE_VIRTUAL_ADDRESSING` environment variable. When the field is present in the credential block it takes precedence; when it is omitted, Triton falls back to the `S3_USE_VIRTUAL_ADDRESSING` environment variable, so the environment variable remains effective even when `TRITON_CLOUD_CREDENTIAL_PATH` is set.
 
 This feature is intended for use-cases which multiple credentials are needed for each cloud storage provider. Be sure to replace any credential paths/keys with the actual paths/keys from the example above.
 
