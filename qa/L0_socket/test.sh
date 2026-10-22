@@ -391,7 +391,7 @@ for p in http grpc; do
     # listeners by hashing the client address/port, so a single batch of
     # clients can miss a server by chance. Keep sending batches until every
     # server has served a request, up to MAX_CLIENT_ROUNDS.
-    MAX_CLIENT_ROUNDS=10
+    MAX_CLIENT_ROUNDS=3
     for round in $(seq 1 $MAX_CLIENT_ROUNDS); do
         pids=()
         for i in {0..10}; do
