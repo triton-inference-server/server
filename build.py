@@ -1699,22 +1699,11 @@ def create_build_dockerfiles(
     else:
         base_image = "ubuntu:24.04"
 
-    if "inference" in images:
-        inference_image = images["inference"]
-    elif "base" in images:
-        # An explicit --image=base override has always supplied the runtime
-        # image as well. Leave it doing so, rather than silently swapping the
-        # final image for the default and discarding whatever runtime
-        # dependencies the override was chosen for.
-        inference_image = None
-    elif FLAGS.enable_gpu and target_platform() != "rhel" and "vllm" not in backends:
-        inference_image = (
-            "nvcr.io/nvidia/cuda-dl-base:{}-inference-runtime-ubuntu24.04".format(
-                FLAGS.cuda_dl_base_version
-            )
-        )
-    else:
-        inference_image = None
+    # Unless --image=inference is given, the runtime image is the build image.
+    # The cuda-dl-base inference-runtime image lacks libnvinfer-bin, so
+    # shipping on it drops trtexec from the tritonserver image and from every
+    # image built on top of it, such as the QA image.
+    inference_image = images.get("inference")
 
     dockerfileargmap = {
         "NVIDIA_BUILD_REF": "" if FLAGS.build_sha is None else FLAGS.build_sha,
@@ -2724,7 +2713,7 @@ if __name__ == "__main__":
         "--cuda-dl-base-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["cuda_dl_base_version"],
-        help="This flag sets the cuda-dl-base container train and its CUDA version, as a matched pair (e.g. 26.09-cuda13.4), used for the default build and runtime base images. Default: the latest supported version.",
+        help="This flag sets the cuda-dl-base container train and its CUDA version, as a matched pair, used for the default build base image. Default: the latest supported version.",
     )
     parser.add_argument(
         "--ort-version",
