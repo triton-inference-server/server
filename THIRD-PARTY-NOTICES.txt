@@ -60,30 +60,6 @@ Performance Libraries (NVPL). See the NVIDIA Deep Learning Container License
 (NVIDIA_Deep_Learning_Container_License.pdf) and the license of each product.
 These packages are marked "NVIDIA proprietary" in the inventory below.
 
-OPERATING SYSTEM PACKAGES
-
-The following Ubuntu packages are added to the tritonserver container image
-on top of the base image. Each package's copyright and license notice is
-installed with the package at /usr/share/doc/<package>/copyright, and its
-source code is available from the Ubuntu archive.
-
-  clang                                         Apache-2.0 WITH LLVM-exception
-  curl, libcurl4-openssl-dev                    curl
-  dirmngr                                       GPL-3.0-or-later
-  git                                           GPL-2.0-only
-  gperf                                         GPL-3.0-or-later
-  libarchive-dev                                BSD-2-Clause
-  libb64-0d                                     Public Domain
-  libgfortran5 (aarch64, PyTorch backend)       GPL-3.0-or-later WITH GCC-exception-3.1
-  libgomp1 (ONNX Runtime, PyTorch backends)     GPL-3.0-or-later WITH GCC-exception-3.1
-  libgoogle-perftools-dev                       BSD-3-Clause
-  libjemalloc-dev                               BSD-2-Clause
-  libnuma-dev                                   LGPL-2.1-only
-  libpython3-dev, python3                       PSF-2.0
-  libssl-dev                                    Apache-2.0
-  python3-pip, python3-setuptools, python3-wheel  MIT
-  wget                                          GPL-3.0-or-later
-
 THIRD-PARTY COMPONENTS
 
 _______________________________________________________________________________
