@@ -45,6 +45,13 @@ INF_COUNTER_PATTERNS = [
     "nv_inference_compute_output_duration",
 ]
 INF_HISTOGRAM_PATTERNS = ["nv_inference_first_response_histogram_ms"]
+INF_DURATION_HISTOGRAM_PATTERNS = [
+    "nv_inference_request_histogram_us",
+    "nv_inference_queue_histogram_us",
+    "nv_inference_compute_input_histogram_us",
+    "nv_inference_compute_infer_histogram_us",
+    "nv_inference_compute_output_histogram_us",
+]
 INF_SUMMARY_PATTERNS = [
     "nv_inference_request_summary",
     "nv_inference_queue_summary",
@@ -63,6 +70,10 @@ PINNED_MEMORY_PATTERNS = [
     "nv_pinned_memory_pool_used_bytes",
 ]
 CACHE_SUMMARY_PATTERNS = ["nv_cache_hit_summary", "nv_cache_miss_summary"]
+CACHE_HISTOGRAM_PATTERNS = [
+    "nv_cache_hit_histogram_us",
+    "nv_cache_miss_histogram_us",
+]
 
 
 class MetricsConfigTest(tu.TestResultCollector):
@@ -110,7 +121,19 @@ class MetricsConfigTest(tu.TestResultCollector):
         for metric in INF_HISTOGRAM_PATTERNS:
             self.assertNotIn(metric, metrics)
 
-    # Summaries
+    def test_inf_duration_histograms_exist(self):
+        metrics = self._get_metrics()
+        for metric in INF_DURATION_HISTOGRAM_PATTERNS:
+            for suffix in ["_count", "_sum", "_bucket"]:
+                self.assertIn(metric + suffix, metrics)
+        self.assertNotIn('quantile="', metrics)
+
+    def test_inf_duration_histograms_missing(self):
+        metrics = self._get_metrics()
+        for metric in INF_DURATION_HISTOGRAM_PATTERNS:
+            self.assertNotIn(metric, metrics)
+
+    # summary_latencies=true / verbose still publishes the CKMS summaries.
     def test_inf_summaries_exist(self):
         metrics = self._get_metrics()
         for metric in INF_SUMMARY_PATTERNS:
@@ -131,6 +154,17 @@ class MetricsConfigTest(tu.TestResultCollector):
         for metric in CACHE_SUMMARY_PATTERNS:
             self.assertNotIn(metric, metrics)
 
+    def test_cache_histograms_exist(self):
+        metrics = self._get_metrics()
+        for metric in CACHE_HISTOGRAM_PATTERNS:
+            for suffix in ["_count", "_sum", "_bucket"]:
+                self.assertIn(metric + suffix, metrics)
+
+    def test_cache_histograms_missing(self):
+        metrics = self._get_metrics()
+        for metric in CACHE_HISTOGRAM_PATTERNS:
+            self.assertNotIn(metric, metrics)
+
     def test_summaries_custom_quantiles(self):
         metrics = self._get_metrics()
         # This env var should be set by test.sh or caller
@@ -138,9 +172,7 @@ class MetricsConfigTest(tu.TestResultCollector):
         self.assertIsNotNone(quantile_pairs)
 
         quantiles = [pair.split(":")[0] for pair in quantile_pairs.split(",")]
-        print(metrics)
         for quantile in quantiles:
-            print(quantile)
             self.assertIn(f'quantile="{quantile}"', metrics)
 
     # DLIS-4762: Disable request summary when caching enabled for now
@@ -152,6 +184,15 @@ class MetricsConfigTest(tu.TestResultCollector):
             self.assertIn(metric, metrics)
         for metric in bad_patterns:
             self.assertNotIn(metric, metrics)
+
+    # DLIS-4762: request histogram is omitted when caching is enabled.
+    def test_inf_duration_histograms_exist_with_cache(self):
+        metrics = self._get_metrics()
+        self.assertNotIn("nv_inference_request_histogram_us", metrics)
+        for metric in INF_DURATION_HISTOGRAM_PATTERNS:
+            if metric == "nv_inference_request_histogram_us":
+                continue
+            self.assertIn(metric + "_bucket", metrics)
 
     def test_model_namespacing_label_with_namespace_on(self):
         metrics = self._get_metrics()
