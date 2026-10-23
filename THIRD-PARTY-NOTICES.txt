@@ -70,7 +70,7 @@ Copyright The Abseil Authors. - Apache License 2.0
 Upstream: https://github.com/abseil/abseil-cpp
 Used by: third_party, core, server, client, perf_analyzer
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/abseil/abseil-cpp/blob/master/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -285,7 +285,8 @@ Used by: third_party, core
 Component third-party notices: https://github.com/awslabs/aws-crt-cpp/tree/main/crt
 Note: Includes the AWS CRT C libraries aws-c-auth, aws-c-cal, aws-c-common, aws-c-compression, aws-c-event-stream, aws-c-http, aws-c-io, aws-c-mqtt, aws-c-s3, aws-c-sdkutils and aws-checksums at the commits pinned by this aws-crt-cpp revision; each is Copyright Amazon.com, Inc. or its affiliates and licensed under the Apache License 2.0 reproduced here.
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/awslabs/aws-crt-cpp/blob/main/LICENSE)
+License Text(https://github.com/awslabs/aws-crt-cpp/blob/main/NOTICE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -502,7 +503,8 @@ Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. - Apache Lice
 Upstream: https://github.com/aws/aws-sdk-cpp
 Used by: third_party, core
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/aws/aws-sdk-cpp/blob/main/LICENSE)
+License Text(https://github.com/aws/aws-sdk-cpp/blob/main/NOTICE.txt)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -732,7 +734,8 @@ Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. - Apache Lice
 Upstream: https://github.com/aws/eks-charts
 Used by: tutorials
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/aws/eks-charts/blob/master/LICENSE)
+License Text(https://github.com/aws/eks-charts/blob/master/NOTICE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -920,7 +923,7 @@ Copyright (c) Microsoft Corporation - MIT License
 Upstream: https://github.com/Azure/azure-iot-sdk-c
 Used by: third_party, core
 
-License Text(https://spdx.org/licenses/MIT.html)
+License Text(https://github.com/Azure/azure-iot-sdk-c/blob/main/LICENSE)
 
 Microsoft Azure IoT SDKs
 Copyright (c) Microsoft Corporation
@@ -953,7 +956,7 @@ Copyright (c) Microsoft Corporation. - MIT License
 Upstream: https://github.com/Azure/azure-sdk-for-cpp
 Used by: third_party, core
 
-License Text(https://spdx.org/licenses/MIT.html)
+License Text(https://github.com/Azure/azure-sdk-for-cpp/blob/main/LICENSE.txt)
 
     MIT License
 
@@ -986,7 +989,7 @@ Copyright the Boost C++ Libraries contributors (see individual source files) - B
 Upstream: https://www.boost.org
 Used by: core, server, python_backend, local_cache
 
-License Text(https://spdx.org/licenses/BSL-1.0.html)
+License Text(https://github.com/boostorg/boost/blob/master/LICENSE_1_0.txt)
 
 Boost Software License - Version 1.0 - August 17th, 2003
 
@@ -1021,7 +1024,7 @@ Copyright (c) 1991, 1993 The Regents of the University of California. All rights
 Upstream: https://cvsweb.openbsd.org/src/sys/sys/queue.h
 Used by: third_party, server
 
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
+License Text(https://github.com/triton-inference-server/third_party/blob/main/libevhtp/libevhtp/compat/sys/queue.h.in)
 
 /*
  * Copyright (c) 1991, 1993
@@ -1063,7 +1066,7 @@ Copyright 2002 Niels Provos - BSD 2-Clause License
 Upstream: https://cvsweb.openbsd.org/src/sys/sys/tree.h
 Used by: third_party, server
 
-License Text(https://spdx.org/licenses/BSD-2-Clause.html)
+License Text(https://github.com/triton-inference-server/third_party/blob/main/libevhtp/libevhtp/compat/sys/tree.h.in)
 
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
@@ -1099,7 +1102,7 @@ Copyright (c) 1998 Massachusetts Institute of Technology - MIT License
 Upstream: https://github.com/c-ares/c-ares
 Used by: third_party, server, client, perf_analyzer
 
-License Text(https://spdx.org/licenses/MIT.html)
+License Text(https://github.com/c-ares/c-ares/blob/main/LICENSE.md)
 
 MIT License
 
@@ -1135,8 +1138,7 @@ Copyright (c) NVIDIA CORPORATION & AFFILIATES - Apache License 2.0 with LLVM Exc
 Upstream: https://github.com/NVIDIA/cccl
 Used by: fil_backend
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
-License Text(https://spdx.org/licenses/LLVM-exception.html)
+License Text(https://github.com/NVIDIA/cccl/blob/main/LICENSE)
 
 ==============================================================================
 Thrust is under the Apache Licence v2.0, with some specific exceptions listed below
@@ -1558,7 +1560,7 @@ Copyright (c) 2015, NVIDIA CORPORATION. All rights reserved. - BSD 3-Clause Lice
 Upstream: https://github.com/NVIDIA/cnmem
 Used by: third_party, core
 
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
+License Text(https://github.com/triton-inference-server/third_party/blob/main/cnmem/cnmem/LICENSE)
 
 Copyright (c) 2015, NVIDIA CORPORATION. All rights reserved.
 
@@ -1595,7 +1597,7 @@ Copyright 2017, The CRC32C Authors. - BSD 3-Clause License
 Upstream: https://github.com/google/crc32c
 Used by: third_party, core
 
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
+License Text(https://github.com/google/crc32c/blob/main/LICENSE)
 
 Copyright 2017, The CRC32C Authors.
 
@@ -1635,7 +1637,7 @@ Copyright (c) NVIDIA CORPORATION - Apache License 2.0
 Upstream: https://github.com/rapidsai/cuml
 Used by: fil_backend
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/rapidsai/cuml/blob/main/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -1848,7 +1850,7 @@ Copyright (c) 1996 - 2022, Daniel Stenberg, , and many - curl License
 Upstream: https://github.com/curl/curl
 Used by: third_party, core, client, perf_analyzer
 
-License Text(https://spdx.org/licenses/curl.html)
+License Text(https://github.com/curl/curl/blob/master/COPYING)
 
 COPYRIGHT AND PERMISSION NOTICE
 
@@ -1882,7 +1884,7 @@ Copyright (c) 2019-present NAVER Corp. - Apache License 2.0
 Upstream: https://github.com/clovaai/deep-text-recognition-benchmark
 Used by: tutorials
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/clovaai/deep-text-recognition-benchmark/blob/master/LICENSE.md)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -2095,7 +2097,7 @@ Copyright 2017 by Contributors - Apache License 2.0
 Upstream: https://github.com/dmlc/dlpack
 Used by: python_backend, core
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/dmlc/dlpack/blob/main/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -2308,7 +2310,7 @@ Copyright (c) 2016-2021 Viktor Kirilov - MIT License
 Upstream: https://github.com/doctest/doctest
 Used by: perf_analyzer
 
-License Text(https://spdx.org/licenses/MIT.html)
+License Text(https://github.com/doctest/doctest/blob/master/LICENSE.txt)
 
 The MIT License (MIT)
 
@@ -2341,7 +2343,7 @@ Copyright Google LLC - Apache License 2.0
 Upstream: https://github.com/googleapis/google-cloud-cpp
 Used by: third_party, core
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/googleapis/google-cloud-cpp/blob/main/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -2554,9 +2556,8 @@ Copyright 2014 gRPC authors. - Apache License 2.0 and BSD 3-Clause License and M
 Upstream: https://github.com/grpc/grpc
 Used by: third_party, core, server, client, perf_analyzer
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
-License Text(https://spdx.org/licenses/MPL-2.0.html)
+License Text(https://github.com/grpc/grpc/blob/master/LICENSE)
+License Text(https://github.com/grpc/grpc/blob/master/NOTICE.txt)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -3204,7 +3205,7 @@ Copyright (c) 2009-2011, Salvatore Sanfilippo - BSD 3-Clause License
 Upstream: https://github.com/redis/hiredis
 Used by: redis_cache
 
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
+License Text(https://github.com/redis/hiredis/blob/master/COPYING)
 
 Copyright (c) 2009-2011, Salvatore Sanfilippo <antirez at gmail dot com>
 Copyright (c) 2010-2011, Pieter Noordhuis <pcnoordhuis at gmail dot com>
@@ -3245,7 +3246,7 @@ Copyright (c) 2013-2025 Niels Lohmann - MIT License
 Upstream: https://github.com/nlohmann/json
 Used by: third_party, core, server, tensorrtllm_backend
 
-License Text(https://spdx.org/licenses/MIT.html)
+License Text(https://github.com/nlohmann/json/blob/develop/LICENSE.MIT)
 
 MIT License
 
@@ -3278,6 +3279,7 @@ Copyright none claimed; dedicated to the public domain by the libb64 authors - P
 Upstream: https://github.com/libb64/libb64
 Used by: server, perf_analyzer
 
+License Text(https://github.com/libb64/libb64/blob/master/LICENSE.md)
 
 Copyright-Only Dedication (based on United States law) or Public Domain Certification
 
@@ -3298,7 +3300,7 @@ Copyright (c) 2000-2007 Niels Provos - BSD 3-Clause License
 Upstream: https://github.com/libevent/libevent
 Used by: third_party, server
 
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
+License Text(https://github.com/libevent/libevent/blob/master/LICENSE)
 
 Libevent is available for use under the following license, commonly known
 as the 3-clause (or "modified") BSD license:
@@ -3409,7 +3411,7 @@ Copyright (c) 2010-2018, Mark Ellzey, Nathan French, Marcus Sundberg - BSD 3-Cla
 Upstream: https://github.com/Yellow-Camper/libevhtp
 Used by: third_party, server
 
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
+License Text(https://github.com/triton-inference-server/third_party/blob/main/libevhtp/libevhtp/LICENSE)
 
 BSD 3-Clause License
 
@@ -3450,9 +3452,8 @@ Copyright (C) 2009-2026 D. R. Commander - Independent JPEG Group License and BSD
 Upstream: https://github.com/libjpeg-turbo/libjpeg-turbo
 Used by: pytorch_backend
 
-License Text(https://spdx.org/licenses/IJG.html)
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
-License Text(https://spdx.org/licenses/Zlib.html)
+License Text(https://github.com/libjpeg-turbo/libjpeg-turbo/blob/main/LICENSE.md)
+License Text(https://github.com/libjpeg-turbo/libjpeg-turbo/blob/main/README.ijg)
 
 libjpeg-turbo Licenses
 ======================
@@ -3872,7 +3873,7 @@ Copyright (c) 1995-2026 The PNG Reference Library Authors. - PNG Reference Libra
 Upstream: https://github.com/pnggroup/libpng
 Used by: pytorch_backend
 
-License Text(https://spdx.org/licenses/Libpng-2.0.html)
+License Text(https://github.com/pnggroup/libpng/blob/libpng16/LICENSE)
 
 COPYRIGHT NOTICE, DISCLAIMER, and LICENSE
 =========================================
@@ -4018,7 +4019,7 @@ Copyright (c) NVIDIA CORPORATION - Apache License 2.0
 Upstream: https://github.com/rapidsai/nvforest
 Used by: fil_backend
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/rapidsai/nvforest/blob/main/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4232,7 +4233,7 @@ Upstream: https://github.com/NVIDIA/DALI
 Used by: dali_backend
 Component third-party notices: https://github.com/NVIDIA/DALI/blob/main/Acknowledgements.txt
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/NVIDIA/DALI/blob/main/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4419,7 +4420,7 @@ Upstream: https://github.com/NVIDIA/TensorRT-LLM
 Used by: tensorrtllm_backend
 Component third-party notices: https://github.com/NVIDIA/TensorRT-LLM/tree/main (ATTRIBUTIONS-CPP-x86_64.md, ATTRIBUTIONS-CPP-aarch64.md, ATTRIBUTIONS-Python.md)
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/NVIDIA/TensorRT-LLM/blob/main/LICENSE)
 
 Copyright (c) 2011-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
@@ -4765,7 +4766,7 @@ Copyright (c) 2005-2023 Intel Corporation - Apache License 2.0
 Upstream: https://github.com/uxlfoundation/oneTBB
 Used by: openvino_backend, onnxruntime_backend
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/uxlfoundation/oneTBB/blob/master/LICENSE.txt)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4979,7 +4980,7 @@ Upstream: https://github.com/microsoft/onnxruntime
 Used by: onnxruntime_backend
 Component third-party notices: https://github.com/microsoft/onnxruntime/blob/main/ThirdPartyNotices.txt
 
-License Text(https://spdx.org/licenses/MIT.html)
+License Text(https://github.com/microsoft/onnxruntime/blob/main/LICENSE)
 
 MIT License
 
@@ -5012,7 +5013,7 @@ Copyright (c) OpenAI (https://openai.com) - MIT License
 Upstream: https://github.com/openai/openai-openapi
 Used by: server
 
-License Text(https://spdx.org/licenses/MIT.html)
+License Text(https://github.com/openai/openai-openapi/blob/main/LICENSE)
 
 The MIT License
 
@@ -5045,7 +5046,7 @@ Copyright The OpenTelemetry Authors - Apache License 2.0
 Upstream: https://github.com/open-telemetry/opentelemetry-cpp
 Used by: third_party, server
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/open-telemetry/opentelemetry-cpp/blob/main/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -5258,7 +5259,7 @@ Copyright The OpenTelemetry Authors - Apache License 2.0
 Upstream: https://github.com/open-telemetry/opentelemetry-proto
 Used by: third_party, server
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/open-telemetry/opentelemetry-proto/blob/main/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -5472,7 +5473,7 @@ Upstream: https://github.com/openvinotoolkit/openvino
 Used by: openvino_backend, onnxruntime_backend
 Component third-party notices: https://github.com/openvinotoolkit/openvino/blob/master/licensing/third-party-programs.txt
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/openvinotoolkit/openvino/blob/master/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -5685,7 +5686,7 @@ Copyright (c) 2016-2021 Jupp Mueller - MIT License
 Upstream: https://github.com/jupp0r/prometheus-cpp
 Used by: third_party, core
 
-License Text(https://spdx.org/licenses/MIT.html)
+License Text(https://github.com/jupp0r/prometheus-cpp/blob/master/LICENSE)
 
 MIT License
 
@@ -5722,7 +5723,7 @@ Copyright 2008 Google Inc.  All rights reserved. - BSD 3-Clause License
 Upstream: https://github.com/protocolbuffers/protobuf
 Used by: third_party, common, core, server, client, perf_analyzer
 
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
+License Text(https://github.com/protocolbuffers/protobuf/blob/main/LICENSE)
 
 Copyright 2008 Google Inc.  All rights reserved.
 
@@ -5766,7 +5767,7 @@ Copyright (c) 2016 Wenzel Jakob , All rights reserved. - BSD 3-Clause License
 Upstream: https://github.com/pybind/pybind11
 Used by: core, server, python_backend
 
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
+License Text(https://github.com/pybind/pybind11/blob/master/LICENSE)
 
 Copyright (c) 2016 Wenzel Jakob <wenzel.jakob@epfl.ch>, All rights reserved.
 
@@ -5808,7 +5809,8 @@ Upstream: https://github.com/pytorch/pytorch
 Used by: pytorch_backend
 Component third-party notices: https://github.com/pytorch/pytorch/blob/main/NOTICE
 
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
+License Text(https://github.com/pytorch/pytorch/blob/main/LICENSE)
+License Text(https://github.com/pytorch/pytorch/blob/main/NOTICE)
 
 From PyTorch:
 
@@ -6361,7 +6363,7 @@ Copyright (c) NVIDIA CORPORATION - Apache License 2.0
 Upstream: https://github.com/rapidsai/raft
 Used by: fil_backend
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/rapidsai/raft/blob/main/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -6574,7 +6576,7 @@ Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip.  All rights
 Upstream: https://github.com/Tencent/rapidjson
 Used by: common, core, server, client, perf_analyzer, fil_backend
 
-License Text(https://spdx.org/licenses/MIT.html)
+License Text(https://github.com/Tencent/rapidjson/blob/master/license.txt)
 
 Tencent is pleased to support the open source community by making RapidJSON available.
 
@@ -6643,7 +6645,7 @@ Copyright (c) NVIDIA CORPORATION - Apache License 2.0
 Upstream: https://github.com/rapidsai/rapids-logger
 Used by: fil_backend
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/rapidsai/rapids-logger/blob/main/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -6856,7 +6858,7 @@ Copyright (c) 2009 The RE2 Authors. All rights reserved. - BSD 3-Clause License
 Upstream: https://github.com/google/re2
 Used by: third_party, core, server, client, perf_analyzer
 
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
+License Text(https://github.com/google/re2/blob/main/LICENSE)
 
 // Copyright (c) 2009 The RE2 Authors. All rights reserved.
 //
@@ -6895,7 +6897,7 @@ Copyright (c) 2017 sewenew - Apache License 2.0
 Upstream: https://github.com/sewenew/redis-plus-plus
 Used by: redis_cache
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/sewenew/redis-plus-plus/blob/master/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7108,7 +7110,7 @@ Copyright (c) NVIDIA CORPORATION - Apache License 2.0
 Upstream: https://github.com/rapidsai/rmm
 Used by: fil_backend
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/rapidsai/rmm/blob/main/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7321,7 +7323,8 @@ Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. - Apache Lice
 Upstream: https://github.com/aws/s2n-tls
 Used by: third_party, core
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/aws/s2n-tls/blob/main/LICENSE)
+License Text(https://github.com/aws/s2n-tls/blob/main/NOTICE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -7556,7 +7559,7 @@ Copyright (c) 2016 - present, Gabi Melman and spdlog contributors. - MIT License
 Upstream: https://github.com/gabime/spdlog
 Used by: fil_backend
 
-License Text(https://spdx.org/licenses/MIT.html)
+License Text(https://github.com/gabime/spdlog/blob/v1.x/LICENSE)
 
 The MIT License (MIT)
 
@@ -7593,7 +7596,7 @@ Copyright ; 2007, Nick Galbreath -- nickg [at] client9 [dot] com - MIT License
 Upstream: https://github.com/client9/stringencoders
 Used by: third_party, server
 
-License Text(https://spdx.org/licenses/MIT.html)
+License Text(https://github.com/triton-inference-server/third_party/blob/main/libevhtp/libevhtp/numtoa.c)
 
 /*
  * DERIVED FROM the stringencoders library's modp_numtoa
@@ -7614,7 +7617,7 @@ Copyright (c) 2018, TensorFlow Authors. All rights reserved. - Apache License 2.
 Upstream: https://github.com/tensorflow/tensorflow
 Used by: common, core, server, client
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/tensorflow/tensorflow/blob/master/LICENSE)
 
 Copyright 2019 The TensorFlow Authors.  All rights reserved.
 
@@ -7829,7 +7832,7 @@ Copyright (c) Soumith Chintala 2016, - BSD 3-Clause License
 Upstream: https://github.com/pytorch/vision
 Used by: pytorch_backend
 
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
+License Text(https://github.com/pytorch/vision/blob/main/LICENSE)
 
 BSD 3-Clause License
 
@@ -7870,7 +7873,7 @@ Copyright (c) 2017-2026 by Contributors - Apache License 2.0
 Upstream: https://github.com/dmlc/treelite
 Used by: fil_backend
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/dmlc/treelite/blob/mainline/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -8083,7 +8086,7 @@ Copyright 2018-2020 Philippe Tillet - MIT License
 Upstream: https://github.com/triton-lang/triton
 Used by: tensorrtllm_backend
 
-License Text(https://spdx.org/licenses/MIT.html)
+License Text(https://github.com/triton-inference-server/TensorRT-LLM/blob/main/triton_kernels/LICENSE)
 
 /*
 * Copyright 2018-2020 Philippe Tillet
@@ -8118,7 +8121,7 @@ Copyright 2024 The vLLM team - Apache License 2.0
 Upstream: https://github.com/vllm-project/vllm
 Used by: server
 
-License Text(https://spdx.org/licenses/Apache-2.0.html)
+License Text(https://github.com/vllm-project/vllm/blob/main/LICENSE)
 
                                  Apache License
                            Version 2.0, January 2004
@@ -8331,7 +8334,7 @@ Copyright (c) 2012 - present, Victor Zverovich and {fmt} contributors - MIT Lice
 Upstream: https://github.com/fmtlib/fmt
 Used by: fil_backend
 
-License Text(https://spdx.org/licenses/MIT.html)
+License Text(https://github.com/fmtlib/fmt/blob/main/LICENSE)
 
 Copyright (c) 2012 - present, Victor Zverovich and {fmt} contributors
 
@@ -8889,8 +8892,6 @@ _______________________________________________________________________________
 
 BSD Zero Clause License
 
-License Text(https://spdx.org/licenses/0BSD.html)
-
 Copyright (C) YEAR by AUTHOR EMAIL
 
 Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted.
@@ -8902,8 +8903,6 @@ _______________________________________________________________________________
 Apache-2.0 - Apache License 2.0
 
 Apache License 2.0
-
-License Text(https://spdx.org/licenses/Apache-2.0.html)
 
 Apache License
 Version 2.0, January 2004
@@ -8985,8 +8984,6 @@ BSD-2-Clause - BSD 2-Clause "Simplified" License
 
 BSD 2-Clause "Simplified" License
 
-License Text(https://spdx.org/licenses/BSD-2-Clause.html)
-
 Copyright (c) <year> <owner>
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
@@ -9002,8 +8999,6 @@ _______________________________________________________________________________
 BSD-3-Clause - BSD 3-Clause "New" or "Revised" License
 
 BSD 3-Clause "New" or "Revised" License
-
-License Text(https://spdx.org/licenses/BSD-3-Clause.html)
 
 Copyright (c) <year> <owner>.
 
@@ -9023,8 +9018,6 @@ BSL-1.0 - Boost Software License 1.0
 
 Boost Software License 1.0
 
-License Text(https://spdx.org/licenses/BSL-1.0.html)
-
 Boost Software License - Version 1.0 - August 17th, 2003
 
 Permission is hereby granted, free of charge, to any person or organization obtaining a copy of the software and accompanying documentation covered by this license (the "Software") to use, reproduce, display, distribute, execute, and transmit the Software, and to prepare derivative works of the Software, and to permit third-parties to whom the Software is furnished to do so, all subject to the following:
@@ -9038,8 +9031,6 @@ _______________________________________________________________________________
 bzip2-1.0.6 - bzip2 and libbzip2 License v1.0.6
 
 bzip2 and libbzip2 License v1.0.6
-
-License Text(https://spdx.org/licenses/bzip2-1.0.6.html)
 
 This program, "bzip2", the associated library "libbzip2", and all documentation, are copyright (C) 1996-2010 Julian R Seward. All rights reserved.
 
@@ -9062,8 +9053,6 @@ _______________________________________________________________________________
 CDDL-1.1 - Common Development and Distribution License 1.1
 
 Common Development and Distribution License 1.1
-
-License Text(https://spdx.org/licenses/CDDL-1.1.html)
 
 COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL)
 Version 1.1
@@ -9195,8 +9184,6 @@ CDLA-Permissive-2.0 - Community Data License Agreement Permissive 2.0
 
 Community Data License Agreement Permissive 2.0
 
-License Text(https://spdx.org/licenses/CDLA-Permissive-2.0.html)
-
 Community Data License Agreement - Permissive - Version 2.0
 
 This is the Community Data License Agreement - Permissive, Version 2.0 (the "agreement"). Data Provider(s) and Data Recipient(s) agree as follows:
@@ -9239,8 +9226,6 @@ Classpath-exception-2.0 - Classpath exception 2.0
 
 Classpath exception 2.0
 
-License Text(https://spdx.org/licenses/Classpath-exception-2.0.html)
-
 Linking this library statically or dynamically with other modules is making a combined work based on this library. Thus, the terms and conditions of the GNU General Public License cover the whole combination.
 
 As a special exception, the copyright holders of this library give you permission to link this library with independent modules to produce an executable, regardless of the license terms of these independent modules, and to copy and distribute the resulting executable under terms of your choice, provided that you also meet, for each linked independent module, the terms and conditions of the license of that module. An independent module is a module which is not derived from or based on this library. If you modify this library, you may extend this exception to your version of the library, but you are not obligated to do so. If you do not wish to do so, delete this exception statement from your version.
@@ -9250,8 +9235,6 @@ _______________________________________________________________________________
 GPL-2.0-only - GNU General Public License v2.0 only
 
 GNU General Public License v2.0 only
-
-License Text(https://spdx.org/licenses/GPL-2.0-only.html)
 
 GNU GENERAL PUBLIC LICENSE
 Version 2, June 1991
@@ -9377,8 +9360,6 @@ GPL-2.0-or-later - GNU General Public License v2.0 or later
 
 GNU General Public License v2.0 or later
 
-License Text(https://spdx.org/licenses/GPL-2.0-or-later.html)
-
 GNU GENERAL PUBLIC LICENSE
 Version 2, June 1991
 
@@ -9503,8 +9484,6 @@ ISC - ISC License
 
 ISC License
 
-License Text(https://spdx.org/licenses/ISC.html)
-
 ISC License
 
 Copyright <year> <owner>
@@ -9518,8 +9497,6 @@ _______________________________________________________________________________
 LGPL-3.0-or-later - GNU Lesser General Public License v3.0 or later
 
 GNU Lesser General Public License v3.0 or later
-
-License Text(https://spdx.org/licenses/LGPL-3.0-or-later.html)
 
 GNU LESSER GENERAL PUBLIC LICENSE
 Version 3, 29 June 2007
@@ -9832,8 +9809,6 @@ LLVM-exception - LLVM Exception
 
 LLVM Exception
 
-License Text(https://spdx.org/licenses/LLVM-exception.html)
-
 ---- LLVM Exceptions to the Apache 2.0 License ----
 
    As an exception, if, as a result of your compiling your source code, portions
@@ -9855,8 +9830,6 @@ _______________________________________________________________________________
 MIT - MIT License
 
 MIT License
-
-License Text(https://spdx.org/licenses/MIT.html)
 
 MIT License
 
@@ -9882,8 +9855,6 @@ _______________________________________________________________________________
 MPL-2.0 - Mozilla Public License 2.0
 
 Mozilla Public License 2.0
-
-License Text(https://spdx.org/licenses/MPL-2.0.html)
 
 Mozilla Public License Version 2.0
 ==================================
@@ -10265,8 +10236,6 @@ OpenSSL - OpenSSL License
 
 OpenSSL License
 
-License Text(https://spdx.org/licenses/OpenSSL.html)
-
 OpenSSL License
 
 Copyright (c) 1998-2008 The OpenSSL Project. All rights reserved.
@@ -10322,8 +10291,6 @@ PSF-2.0 - Python Software Foundation License 2.0
 
 Python Software Foundation License 2.0
 
-License Text(https://spdx.org/licenses/PSF-2.0.html)
-
 PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
 
 1. This LICENSE AGREEMENT is between the Python Software Foundation
@@ -10378,8 +10345,6 @@ Unicode-3.0 - Unicode License v3
 
 Unicode License v3
 
-License Text(https://spdx.org/licenses/Unicode-3.0.html)
-
 UNICODE LICENSE V3
 
 COPYRIGHT AND PERMISSION NOTICE
@@ -10426,8 +10391,6 @@ Unlicense - The Unlicense
 
 The Unlicense
 
-License Text(https://spdx.org/licenses/Unlicense.html)
-
 This is free and unencumbered software released into the public domain.
 
 Anyone is free to copy, modify, publish, use, compile, sell, or distribute this software, either in source code form or as a compiled binary, for any purpose, commercial or non-commercial, and by any means.
@@ -10444,8 +10407,6 @@ _______________________________________________________________________________
 Zlib - zlib License
 
 zlib License
-
-License Text(https://spdx.org/licenses/Zlib.html)
 
 zlib License
 
