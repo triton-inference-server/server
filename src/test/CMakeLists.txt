@@ -32,6 +32,48 @@ cmake_minimum_required (VERSION 3.31.8)
 find_package(GTest REQUIRED)
 
 #
+# Unit test for gRPC metadata propagation
+#
+if(${TRITON_ENABLE_GRPC} AND ${TRITON_ENABLE_TRACING} AND NOT WIN32)
+  add_executable(
+    grpc_carrier_test
+    grpc_carrier_test.cc
+  )
+
+  target_compile_features(
+    grpc_carrier_test PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD}
+  )
+  target_compile_options(
+    grpc_carrier_test
+    PRIVATE
+      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+  )
+  target_compile_definitions(
+    grpc_carrier_test
+    PRIVATE TRITON_ENABLE_TRACING=1
+  )
+  target_include_directories(
+    grpc_carrier_test
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/..
+      ${GTEST_INCLUDE_DIRS}
+  )
+  target_link_libraries(
+    grpc_carrier_test
+    PRIVATE
+      grpc-endpoint-library
+      tracing-library
+      GTest::gtest
+      GTest::gtest_main
+  )
+
+  install(
+    TARGETS grpc_carrier_test
+    RUNTIME DESTINATION bin
+  )
+endif()
+
+#
 # Unit test for DataCompressor
 #
 if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
