@@ -57,9 +57,13 @@ Performance Libraries (NVPL). See the NVIDIA Deep Learning Container License
 
 THIRD-PARTY COMPONENTS
 
+Each entry starts with a "Component: <name>" line followed by an
+"SPDX License: <SPDX license expression>" line.
+
 _______________________________________________________________________________
 
-Abseil C++
+Component: Abseil C++
+SPDX License: Apache-2.0
 
 Copyright The Abseil Authors. - Apache License 2.0
 
@@ -269,7 +273,8 @@ License Text(https://github.com/abseil/abseil-cpp/blob/master/LICENSE)
 
 _______________________________________________________________________________
 
-AWS Common Runtime (aws-crt-cpp)
+Component: AWS Common Runtime (aws-crt-cpp)
+SPDX License: Apache-2.0
 
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. - Apache License 2.0
 
@@ -487,7 +492,8 @@ SPDX-License-Identifier: Apache-2.0.
 
 _______________________________________________________________________________
 
-AWS SDK for C++ (s3)
+Component: AWS SDK for C++ (s3)
+SPDX License: Apache-2.0
 
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. - Apache License 2.0
 
@@ -715,7 +721,8 @@ The licenses for these third party components are included in LICENSE.txt
 
 _______________________________________________________________________________
 
-aws-efa-k8s-device-plugin Helm chart
+Component: aws-efa-k8s-device-plugin Helm chart
+SPDX License: Apache-2.0
 
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. - Apache License 2.0
 
@@ -901,7 +908,8 @@ Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 _______________________________________________________________________________
 
-Azure IoT C SDK
+Component: Azure IoT C SDK
+SPDX License: MIT
 
 Copyright (c) Microsoft Corporation - MIT License
 
@@ -931,7 +939,8 @@ THE SOFTWARE.
 
 _______________________________________________________________________________
 
-Azure SDK for C++ (core, identity, storage-blobs, storage-common)
+Component: Azure SDK for C++ (core, identity, storage-blobs, storage-common)
+SPDX License: MIT
 
 Copyright (c) Microsoft Corporation. - MIT License
 
@@ -961,7 +970,8 @@ License Text(https://github.com/Azure/azure-sdk-for-cpp/blob/main/LICENSE.txt)
 
 _______________________________________________________________________________
 
-Boost C++ Libraries (headers)
+Component: Boost C++ Libraries (headers)
+SPDX License: BSL-1.0
 
 Copyright the Boost C++ Libraries contributors (see individual source files) - Boost Software License 1.0
 
@@ -993,7 +1003,8 @@ DEALINGS IN THE SOFTWARE.
 
 _______________________________________________________________________________
 
-BSD sys/queue.h (in libevhtp)
+Component: BSD sys/queue.h (in libevhtp)
+SPDX License: BSD-3-Clause
 
 Copyright (c) 1991, 1993 The Regents of the University of California. All rights reserved. - BSD 3-Clause License
 
@@ -1032,7 +1043,8 @@ License Text(https://github.com/triton-inference-server/third_party/blob/main/li
 
 _______________________________________________________________________________
 
-BSD sys/tree.h (in libevhtp)
+Component: BSD sys/tree.h (in libevhtp)
+SPDX License: BSD-2-Clause
 
 Copyright 2002 Niels Provos - BSD 2-Clause License
 
@@ -1065,7 +1077,8 @@ License Text(https://github.com/triton-inference-server/third_party/blob/main/li
 
 _______________________________________________________________________________
 
-c-ares
+Component: c-ares
+SPDX License: MIT
 
 Copyright (c) 1998 Massachusetts Institute of Technology - MIT License
 
@@ -1098,7 +1111,8 @@ SOFTWARE.
 
 _______________________________________________________________________________
 
-CCCL (CUDA C++ Core Libraries)
+Component: CCCL (CUDA C++ Core Libraries)
+SPDX License: Apache-2.0 WITH LLVM-exception
 
 Copyright (c) NVIDIA CORPORATION & AFFILIATES - Apache License 2.0 with LLVM Exception
 
@@ -1517,7 +1531,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 _______________________________________________________________________________
 
-cnmem
+Component: cnmem
+SPDX License: BSD-3-Clause
 
 Copyright (c) 2015, NVIDIA CORPORATION. All rights reserved. - BSD 3-Clause License
 
@@ -1551,7 +1566,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 _______________________________________________________________________________
 
-CRC32C
+Component: CRC32C
+SPDX License: BSD-3-Clause
 
 Copyright 2017, The CRC32C Authors. - BSD 3-Clause License
 
@@ -1588,7 +1604,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 _______________________________________________________________________________
 
-cuML
+Component: cuML
+SPDX License: Apache-2.0
 
 Copyright (c) NVIDIA CORPORATION - Apache License 2.0
 
@@ -1798,7 +1815,8 @@ License Text(https://github.com/rapidsai/cuml/blob/main/LICENSE)
 
 _______________________________________________________________________________
 
-curl
+Component: curl
+SPDX License: curl
 
 Copyright (c) 1996 - 2022, Daniel Stenberg, , and many - curl License
 
@@ -1829,7 +1847,8 @@ in this Software without prior written authorization of the copyright holder.
 
 _______________________________________________________________________________
 
-deep-text-recognition-benchmark (CRAFT model definition)
+Component: deep-text-recognition-benchmark (CRAFT model definition)
+SPDX License: Apache-2.0
 
 Copyright (c) 2019-present NAVER Corp. - Apache License 2.0
 
@@ -2039,7 +2058,8 @@ License Text(https://github.com/clovaai/deep-text-recognition-benchmark/blob/mas
 
 _______________________________________________________________________________
 
-DLPack
+Component: DLPack
+SPDX License: Apache-2.0
 
 Copyright 2017 by Contributors - Apache License 2.0
 
@@ -2249,7 +2269,8 @@ License Text(https://github.com/dmlc/dlpack/blob/main/LICENSE)
 
 _______________________________________________________________________________
 
-doctest
+Component: doctest
+SPDX License: MIT
 
 Copyright (c) 2016-2021 Viktor Kirilov - MIT License
 
@@ -2279,7 +2300,8 @@ SOFTWARE.
 
 _______________________________________________________________________________
 
-Google Cloud C++ Client Libraries (storage)
+Component: Google Cloud C++ Client Libraries (storage)
+SPDX License: Apache-2.0
 
 Copyright Google LLC - Apache License 2.0
 
@@ -2489,7 +2511,8 @@ License Text(https://github.com/googleapis/google-cloud-cpp/blob/main/LICENSE)
 
 _______________________________________________________________________________
 
-gRPC
+Component: gRPC
+SPDX License: Apache-2.0 AND BSD-3-Clause AND MPL-2.0
 
 Copyright 2014 gRPC authors. - Apache License 2.0 and BSD 3-Clause License and Mozilla Public License 2.0
 
@@ -3135,7 +3158,8 @@ limitations under the License.
 
 _______________________________________________________________________________
 
-hiredis
+Component: hiredis
+SPDX License: BSD-3-Clause
 
 Copyright (c) 2009-2011, Salvatore Sanfilippo - BSD 3-Clause License
 
@@ -3173,7 +3197,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 _______________________________________________________________________________
 
-JSON for Modern C++ (nlohmann/json)
+Component: JSON for Modern C++ (nlohmann/json)
+SPDX License: MIT
 
 Copyright (c) 2013-2025 Niels Lohmann - MIT License
 
@@ -3203,7 +3228,8 @@ SOFTWARE.
 
 _______________________________________________________________________________
 
-libb64
+Component: libb64
+SPDX License: LicenseRef-libb64-public-domain
 
 Copyright none claimed; dedicated to the public domain by the libb64 authors - Public Domain (libb64 dedication)
 
@@ -3221,7 +3247,8 @@ Dedicator recognizes that, once placed in the public domain, the Work may be fre
 
 _______________________________________________________________________________
 
-libevent
+Component: libevent
+SPDX License: BSD-3-Clause
 
 Copyright (c) 2000-2007 Niels Provos - BSD 3-Clause License
 
@@ -3329,7 +3356,8 @@ THE SOFTWARE.
 
 _______________________________________________________________________________
 
-libevhtp
+Component: libevhtp
+SPDX License: BSD-3-Clause
 
 Copyright (c) 2010-2018, Mark Ellzey, Nathan French, Marcus Sundberg - BSD 3-Clause License
 
@@ -3367,7 +3395,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 _______________________________________________________________________________
 
-libjpeg-turbo
+Component: libjpeg-turbo
+SPDX License: IJG AND BSD-3-Clause AND Zlib
 
 Copyright (C) 2009-2026 D. R. Commander - Independent JPEG Group License and BSD 3-Clause License and zlib License
 
@@ -3785,7 +3814,8 @@ Please send bug reports, offers of help, etc. to jpeg-info@jpegclub.org.
 
 _______________________________________________________________________________
 
-libpng
+Component: libpng
+SPDX License: Libpng-2.0
 
 Copyright (c) 1995-2026 The PNG Reference Library Authors. - PNG Reference Library License v2
 
@@ -3928,7 +3958,8 @@ be appreciated.
 
 _______________________________________________________________________________
 
-nvForest
+Component: nvForest
+SPDX License: Apache-2.0
 
 Copyright (c) NVIDIA CORPORATION - Apache License 2.0
 
@@ -4138,7 +4169,8 @@ License Text(https://github.com/rapidsai/nvforest/blob/main/LICENSE)
 
 _______________________________________________________________________________
 
-NVIDIA DALI
+Component: NVIDIA DALI
+SPDX License: Apache-2.0
 
 Copyright (c) NVIDIA CORPORATION & AFFILIATES - Apache License 2.0
 
@@ -4323,7 +4355,8 @@ License Text(https://github.com/NVIDIA/DALI/blob/main/LICENSE)
 
 _______________________________________________________________________________
 
-NVIDIA TensorRT-LLM
+Component: NVIDIA TensorRT-LLM
+SPDX License: Apache-2.0
 
 Copyright (c) NVIDIA CORPORATION & AFFILIATES - Apache License 2.0
 
@@ -4668,7 +4701,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 _______________________________________________________________________________
 
-oneAPI Threading Building Blocks (oneTBB)
+Component: oneAPI Threading Building Blocks (oneTBB)
+SPDX License: Apache-2.0
 
 Copyright (c) 2005-2023 Intel Corporation - Apache License 2.0
 
@@ -4878,7 +4912,8 @@ License Text(https://github.com/uxlfoundation/oneTBB/blob/master/LICENSE.txt)
 
 _______________________________________________________________________________
 
-ONNX Runtime
+Component: ONNX Runtime
+SPDX License: MIT
 
 Copyright (c) Microsoft Corporation - MIT License
 
@@ -4910,7 +4945,8 @@ SOFTWARE.
 
 _______________________________________________________________________________
 
-OpenAI OpenAPI specification (generated schemas)
+Component: OpenAI OpenAPI specification (generated schemas)
+SPDX License: MIT
 
 Copyright (c) OpenAI (https://openai.com) - MIT License
 
@@ -4940,7 +4976,8 @@ THE SOFTWARE.
 
 _______________________________________________________________________________
 
-OpenTelemetry C++
+Component: OpenTelemetry C++
+SPDX License: Apache-2.0
 
 Copyright The OpenTelemetry Authors - Apache License 2.0
 
@@ -5150,7 +5187,8 @@ License Text(https://github.com/open-telemetry/opentelemetry-cpp/blob/main/LICEN
 
 _______________________________________________________________________________
 
-OpenTelemetry Protocol (opentelemetry-proto)
+Component: OpenTelemetry Protocol (opentelemetry-proto)
+SPDX License: Apache-2.0
 
 Copyright The OpenTelemetry Authors - Apache License 2.0
 
@@ -5360,7 +5398,8 @@ License Text(https://github.com/open-telemetry/opentelemetry-proto/blob/main/LIC
 
 _______________________________________________________________________________
 
-OpenVINO toolkit
+Component: OpenVINO toolkit
+SPDX License: Apache-2.0
 
 Copyright (C) 2018-2026 Intel Corporation - Apache License 2.0
 
@@ -5572,7 +5611,8 @@ License Text(https://github.com/openvinotoolkit/openvino/blob/master/LICENSE)
 
 _______________________________________________________________________________
 
-prometheus-cpp
+Component: prometheus-cpp
+SPDX License: MIT
 
 Copyright (c) 2016-2021 Jupp Mueller - MIT License
 
@@ -5606,7 +5646,8 @@ SOFTWARE.
 
 _______________________________________________________________________________
 
-Protocol Buffers
+Component: Protocol Buffers
+SPDX License: BSD-3-Clause
 
 Copyright 2008 Google Inc.  All rights reserved. - BSD 3-Clause License
 
@@ -5647,7 +5688,8 @@ support library is itself covered by the above license.
 
 _______________________________________________________________________________
 
-pybind11
+Component: pybind11
+SPDX License: BSD-3-Clause
 
 Copyright (c) 2016 Wenzel Jakob , All rights reserved. - BSD 3-Clause License
 
@@ -5685,7 +5727,8 @@ external contributions to this project including patches, pull requests, etc.
 
 _______________________________________________________________________________
 
-PyTorch (libtorch)
+Component: PyTorch (libtorch)
+SPDX License: BSD-3-Clause
 
 Copyright (c) 2016-     Facebook, Inc            (Adam Paszke) - BSD 3-Clause License
 
@@ -6238,7 +6281,8 @@ and reference the following license:
 
 _______________________________________________________________________________
 
-RAFT
+Component: RAFT
+SPDX License: Apache-2.0
 
 Copyright (c) NVIDIA CORPORATION - Apache License 2.0
 
@@ -6448,7 +6492,8 @@ License Text(https://github.com/rapidsai/raft/blob/main/LICENSE)
 
 _______________________________________________________________________________
 
-RapidJSON
+Component: RapidJSON
+SPDX License: MIT
 
 Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip.  All rights reserved. - MIT License
 
@@ -6514,7 +6559,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 _______________________________________________________________________________
 
-rapids-logger
+Component: rapids-logger
+SPDX License: Apache-2.0
 
 Copyright (c) NVIDIA CORPORATION - Apache License 2.0
 
@@ -6724,7 +6770,8 @@ License Text(https://github.com/rapidsai/rapids-logger/blob/main/LICENSE)
 
 _______________________________________________________________________________
 
-RE2
+Component: RE2
+SPDX License: BSD-3-Clause
 
 Copyright (c) 2009 The RE2 Authors. All rights reserved. - BSD 3-Clause License
 
@@ -6760,7 +6807,8 @@ License Text(https://github.com/google/re2/blob/main/LICENSE)
 
 _______________________________________________________________________________
 
-redis-plus-plus
+Component: redis-plus-plus
+SPDX License: Apache-2.0
 
 Copyright (c) 2017 sewenew - Apache License 2.0
 
@@ -6970,7 +7018,8 @@ License Text(https://github.com/sewenew/redis-plus-plus/blob/master/LICENSE)
 
 _______________________________________________________________________________
 
-RMM (RAPIDS Memory Manager)
+Component: RMM (RAPIDS Memory Manager)
+SPDX License: Apache-2.0
 
 Copyright (c) NVIDIA CORPORATION - Apache License 2.0
 
@@ -7180,7 +7229,8 @@ License Text(https://github.com/rapidsai/rmm/blob/main/LICENSE)
 
 _______________________________________________________________________________
 
-s2n-tls
+Component: s2n-tls
+SPDX License: Apache-2.0
 
 Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. - Apache License 2.0
 
@@ -7413,7 +7463,8 @@ Copyright 2014-2015 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 _______________________________________________________________________________
 
-spdlog (bundled in rapids-logger)
+Component: spdlog (bundled in rapids-logger)
+SPDX License: MIT
 
 Copyright (c) 2016 - present, Gabi Melman and spdlog contributors. - MIT License
 
@@ -7447,7 +7498,8 @@ and users must comply to its license: https://raw.githubusercontent.com/fmtlib/f
 
 _______________________________________________________________________________
 
-stringencoders numtoa (in libevhtp)
+Component: stringencoders numtoa (in libevhtp)
+SPDX License: MIT
 
 Copyright ; 2007, Nick Galbreath -- nickg [at] client9 [dot] com - MIT License
 
@@ -7465,7 +7517,8 @@ License Text(https://github.com/triton-inference-server/third_party/blob/main/li
 
 _______________________________________________________________________________
 
-TensorFlow (DataType enum in model_config.proto)
+Component: TensorFlow (DataType enum in model_config.proto)
+SPDX License: Apache-2.0
 
 Copyright (c) 2018, TensorFlow Authors. All rights reserved. - Apache License 2.0
 
@@ -7677,7 +7730,8 @@ Copyright 2019 The TensorFlow Authors.  All rights reserved.
 
 _______________________________________________________________________________
 
-torchvision
+Component: torchvision
+SPDX License: BSD-3-Clause
 
 Copyright (c) Soumith Chintala 2016, - BSD 3-Clause License
 
@@ -7715,7 +7769,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 _______________________________________________________________________________
 
-Treelite
+Component: Treelite
+SPDX License: Apache-2.0
 
 Copyright (c) 2017-2026 by Contributors - Apache License 2.0
 
@@ -7925,7 +7980,8 @@ License Text(https://github.com/dmlc/treelite/blob/mainline/LICENSE)
 
 _______________________________________________________________________________
 
-triton_kernels (from the Triton language project)
+Component: triton_kernels (from the Triton language project)
+SPDX License: MIT
 
 Copyright 2018-2020 Philippe Tillet - MIT License
 
@@ -7957,7 +8013,8 @@ License Text(https://github.com/triton-inference-server/TensorRT-LLM/blob/main/t
 
 _______________________________________________________________________________
 
-vLLM (adapted tokenizer and tool-call parser code)
+Component: vLLM (adapted tokenizer and tool-call parser code)
+SPDX License: Apache-2.0
 
 Copyright 2024 The vLLM team - Apache License 2.0
 
@@ -8167,7 +8224,8 @@ License Text(https://github.com/vllm-project/vllm/blob/main/LICENSE)
 
 _______________________________________________________________________________
 
-{fmt} (bundled in rapids-logger)
+Component: {fmt} (bundled in rapids-logger)
+SPDX License: MIT
 
 Copyright (c) 2012 - present, Victor Zverovich and {fmt} contributors - MIT License
 
