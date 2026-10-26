@@ -4360,8 +4360,6 @@ SPDX License: Apache-2.0
 
 Copyright (c) NVIDIA CORPORATION & AFFILIATES - Apache License 2.0
 
-Component third-party notices: https://github.com/NVIDIA/TensorRT-LLM/tree/main (ATTRIBUTIONS-CPP-x86_64.md, ATTRIBUTIONS-CPP-aarch64.md, ATTRIBUTIONS-Python.md)
-
 License Text(https://github.com/NVIDIA/TensorRT-LLM/blob/main/LICENSE)
 
 Copyright (c) 2011-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
