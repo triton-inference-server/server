@@ -144,29 +144,37 @@ python3 "${SCRIPT_DIR}/latency_histogram_e2e_test.py" \
   --http "http://127.0.0.1:${HTTP_PORT}" \
   --metrics "http://127.0.0.1:${METRICS_PORT}/metrics" \
   --model identity --requests 50
+curl -sf "http://127.0.0.1:${METRICS_PORT}/metrics" >"${WORKDIR}/metrics_before.txt"
 run_load "${WORKDIR}/histogram.txt"
 HIST_RPS="$(rps_of "${WORKDIR}/histogram.txt")"
-curl -sf "http://127.0.0.1:${METRICS_PORT}/metrics" >"${WORKDIR}/metrics.txt"
+curl -sf "http://127.0.0.1:${METRICS_PORT}/metrics" >"${WORKDIR}/metrics_after.txt"
 stop_server
 
-python3 - "${WORKDIR}/histogram.txt" "${WORKDIR}/metrics.txt" <<'PY'
+python3 - "${WORKDIR}/histogram.txt" "${WORKDIR}/metrics_before.txt" "${WORKDIR}/metrics_after.txt" <<'PY'
 import re, sys
 success = None
 for line in open(sys.argv[1]):
     if line.startswith("success "):
-        success = float(line.split()[1])
-metrics = open(sys.argv[2]).read()
-match = re.search(
-    r'nv_inference_request_histogram_us_count\{[^}]*model="identity"[^}]*\} (\d+)',
-    metrics,
-)
-if match is None or success is None:
-    raise SystemExit("could not compare histogram count with successful requests")
-count = float(match.group(1))
-# The functional check above also recorded 50 requests.
-if count + 1 < success:
-    raise SystemExit(f"histogram count {count} is far below successes {success}")
-print(f"histogram_count={int(count)} load_success={int(success)}")
+        success = int(line.split()[1])
+
+def histogram_count(path):
+    metrics = open(path).read()
+    match = re.search(
+        r'nv_inference_request_histogram_us_count\{[^}]*model="identity"[^}]*\} (\d+)',
+        metrics,
+    )
+    if match is None:
+        raise SystemExit(f"missing request histogram count in {path}")
+    return int(match.group(1))
+
+before = histogram_count(sys.argv[2])
+after = histogram_count(sys.argv[3])
+delta = after - before
+if success is None or delta != success:
+    raise SystemExit(
+        f"histogram increase {delta} != load successes {success} "
+        f"(before={before} after={after})")
+print(f"histogram_increase={delta} load_success={success}")
 PY
 
 python3 - <<PY
