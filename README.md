@@ -63,7 +63,7 @@ Major features include:
 - Supports writing custom backends in python, a.k.a.
   [Python-based backends.](https://github.com/triton-inference-server/backend/blob/main/docs/python_based_backends.md#python-based-backends)
 - Model pipelines using
-  [Ensembling](docs/user_guide/architecture.md#ensemble-models) or [Business
+  [Ensembling](docs/user_guide/ensemble_models.md#ensemble-models) or [Business
   Logic Scripting
   (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting)
 - [HTTP/REST and GRPC inference
@@ -149,7 +149,7 @@ the model, you may need to create a [model
 configuration](docs/user_guide/model_configuration.md) for the model.
 
 - [Add custom operations to Triton if needed by your model](docs/user_guide/custom_operations.md)
-- Enable model pipelining with [Model Ensemble](docs/user_guide/architecture.md#ensemble-models)
+- Enable model pipelining with [Model Ensemble](docs/user_guide/ensemble_models.md#ensemble-models)
   and [Business Logic Scripting (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting)
 - Optimize your models setting [scheduling and batching](docs/user_guide/architecture.md#models-and-schedulers)
   parameters and [model instances](docs/user_guide/model_configuration.md#instance-groups).
