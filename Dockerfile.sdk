@@ -41,7 +41,7 @@ ARG TRITON_ENABLE_GPU=ON
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
 ARG JAVA_BINDINGS_MAVEN_URL=https://archive.apache.org/dist/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz
 # DCGM version to install for Model Analyzer
-ARG DCGM_VERSION=4.7.0-2
+ARG DCGM_VERSION=4.7.1-2
 
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown
@@ -249,9 +249,14 @@ RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/${arch}/cuda-keyring_1.1-1_all.deb" \
         && apt -y install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
         apt update && \
+        V=1:${DCGM_VERSION} && \
+        DEPS=$(apt-cache show datacenter-gpu-manager-4-core=${V} \
+               | sed -n 's/^Depends: //p' | tr ',' '\n' \
+               | awk -v v="(= ${V})" -v V="${V}" 'index($0, v) {print $1"="V}') && \
         apt install --yes --no-install-recommends \
-               datacenter-gpu-manager-4-core=1:${DCGM_VERSION} \
-               datacenter-gpu-manager-4-dev=1:${DCGM_VERSION}; \
+               datacenter-gpu-manager-4-core=${V} \
+               datacenter-gpu-manager-4-dev=${V} \
+               ${DEPS}; \
     fi
 
 # Build expects "python" executable (not python3).
