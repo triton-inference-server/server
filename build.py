@@ -81,7 +81,7 @@ DEFAULT_TRITON_VERSION_MAP = {
     "ort_version": "1.30.0",
     "ort_openvino_version": "2026.4.1",
     "standalone_openvino_version": "2026.4.1",
-    "dcgm_version": "4.7.0-2",
+    "dcgm_version": "4.7.1-2",
 }
 
 CORE_BACKENDS = ["ensemble"]
@@ -802,66 +802,45 @@ def install_dcgm_libraries(dcgm_version, target_machine):
             )
         )
         return ""
+
+    # The -core package pins every sub-package (libdcgm, modules, ...) to its
+    # own exact version, so they are discovered from its metadata rather than
+    # listed by name, which differs between DCGM releases.
+    if target_platform() == "rhel":
+        install = r"""
+RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/@ARCH@/cuda-rhel8.repo \
+    && dnf clean expire-cache \
+    && dnf makecache --refresh \
+    && V=1:$DCGM_VERSION \
+    && DEPS=$(dnf -q repoquery --requires datacenter-gpu-manager-4-core-$V \
+              | awk -v v="= $V" 'index($0, v) {print $1"-"$3}') \
+    && dnf install --assumeyes \
+              datacenter-gpu-manager-4-core-$V \
+              datacenter-gpu-manager-4-devel-$V \
+              $DEPS
+"""
     else:
-        # RHEL has the same install instructions for both aarch64 and x86
-        if target_platform() == "rhel":
-            if target_machine == "aarch64":
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo \\
-    && dnf clean expire-cache \\
-    && dnf makecache --refresh \\
-    && dnf install --assumeyes \\
-                 datacenter-gpu-manager-4-core-1:{} \\
-                 datacenter-gpu-manager-4-devel-1:{}
-""".format(
-                    dcgm_version, dcgm_version, dcgm_version
-                )
-            else:
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo \\
-    && dnf clean expire-cache \\
-    && dnf makecache --refresh \\
-    && dnf install --assumeyes \\
-                 datacenter-gpu-manager-4-core-1:{} \\
-                 datacenter-gpu-manager-4-devel-1:{}
-""".format(
-                    dcgm_version, dcgm_version, dcgm_version
-                )
-        else:
-            if target_machine == "aarch64":
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \\
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb \\
-      && apt install /tmp/cuda-keyring.deb \\
-      && rm /tmp/cuda-keyring.deb \\
-      && apt update -qq \\
-      && apt install --yes --no-install-recommends \\
-                  datacenter-gpu-manager-4-core=1:{} \\
-                  datacenter-gpu-manager-4-dev=1:{}
-""".format(
-                    dcgm_version, dcgm_version, dcgm_version
-                )
-            else:
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \\
-          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \\
-      && apt install /tmp/cuda-keyring.deb \\
-      && rm /tmp/cuda-keyring.deb \\
-      && apt update -qq \\
-      && apt install --yes --no-install-recommends \\
-                   datacenter-gpu-manager-4-core=1:{} \\
-                   datacenter-gpu-manager-4-dev=1:{}
-""".format(
-                    dcgm_version, dcgm_version, dcgm_version
-                )
+        install = r"""
+RUN curl -o /tmp/cuda-keyring.deb \
+          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/@ARCH@/cuda-keyring_1.1-1_all.deb \
+      && apt install /tmp/cuda-keyring.deb \
+      && rm /tmp/cuda-keyring.deb \
+      && apt update -qq \
+      && V=1:$DCGM_VERSION \
+      && DEPS=$(apt-cache show datacenter-gpu-manager-4-core=$V \
+                | sed -n 's/^Depends: //p' | tr ',' '\n' \
+                | awk -v v="(= $V)" -v V="$V" 'index($0, v) {print $1"="V}') \
+      && apt install --yes --no-install-recommends \
+                datacenter-gpu-manager-4-core=$V \
+                datacenter-gpu-manager-4-dev=$V \
+                $DEPS
+"""
+    arch = "sbsa" if target_machine == "aarch64" else "x86_64"
+    return (
+        "\nENV DCGM_VERSION {}\n".format(dcgm_version)
+        + "# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads"
+        + install.replace("@ARCH@", arch)
+    )
 
 
 # Keys that 'docker build --secret' accepts. A spec may also carry keys that
@@ -1351,8 +1330,9 @@ COPY docker/sagemaker/serve /usr/bin/.
     # This is required since libcublasLt.so is not present during the build
     # stage of the PyTorch backend
     if not FLAGS.enable_gpu and ("pytorch" in backends):
-        df += """
-RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.13 backends/pytorch/libtorch_cuda.so
+        cuda_arch = "sbsa" if target_machine() == "aarch64" else "x86_64"
+        df += f"""
+RUN patchelf --add-needed /usr/local/cuda/targets/{cuda_arch}-linux/lib/libcublasLt.so.13 backends/pytorch/libtorch_cuda.so
 """
     if "tensorrtllm" in backends:
         df += """
@@ -1612,8 +1592,6 @@ COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusolver.so /usr/local/cuda/lib64/stubs/libcusolver.so.12
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcurand.so /usr/local/cuda/lib64/stubs/libcurand.so.10
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cuda/lib64/stubs/libcufft.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.13
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.13
 
 RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
 COPY --from=min_container /usr/local/cuda/lib64/libcudart.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
@@ -1623,6 +1601,8 @@ COPY --from=min_container /usr/local/cuda/lib64/libcufile.so.0 /usr/local/cuda/t
 COPY --from=min_container /usr/local/cuda/lib64/libnvrtc.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libcusparseLt.so.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libnvshmem_host.so.3 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libcublasLt.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libcublas.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
 COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1
@@ -1698,22 +1678,11 @@ def create_build_dockerfiles(
     else:
         base_image = "ubuntu:24.04"
 
-    if "inference" in images:
-        inference_image = images["inference"]
-    elif "base" in images:
-        # An explicit --image=base override has always supplied the runtime
-        # image as well. Leave it doing so, rather than silently swapping the
-        # final image for the default and discarding whatever runtime
-        # dependencies the override was chosen for.
-        inference_image = None
-    elif FLAGS.enable_gpu and target_platform() != "rhel" and "vllm" not in backends:
-        inference_image = (
-            "nvcr.io/nvidia/cuda-dl-base:{}-inference-runtime-ubuntu24.04".format(
-                FLAGS.cuda_dl_base_version
-            )
-        )
-    else:
-        inference_image = None
+    # Unless --image=inference is given, the runtime image is the build image.
+    # The cuda-dl-base inference-runtime image lacks libnvinfer-bin, so
+    # shipping on it drops trtexec from the tritonserver image and from every
+    # image built on top of it, such as the QA image.
+    inference_image = images.get("inference")
 
     dockerfileargmap = {
         "NVIDIA_BUILD_REF": "" if FLAGS.build_sha is None else FLAGS.build_sha,
@@ -2723,7 +2692,7 @@ if __name__ == "__main__":
         "--cuda-dl-base-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["cuda_dl_base_version"],
-        help="This flag sets the cuda-dl-base container train and its CUDA version, as a matched pair (e.g. 26.09-cuda13.4), used for the default build and runtime base images. Default: the latest supported version.",
+        help="This flag sets the cuda-dl-base container train and its CUDA version, as a matched pair, used for the default build base image. Default: the latest supported version.",
     )
     parser.add_argument(
         "--ort-version",
