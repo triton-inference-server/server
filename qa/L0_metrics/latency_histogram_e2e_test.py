@@ -122,9 +122,7 @@ def main():
             f"request histogram count {request_count} < requests {args.requests}"
         )
     if request_inf != request_count:
-        raise AssertionError(
-            f"+Inf bucket {request_inf} != count {request_count}"
-        )
+        raise AssertionError(f"+Inf bucket {request_inf} != count {request_count}")
 
     for name in DURATION_HISTOGRAMS:
         count = sample(metrics, name + "_count", args.model)

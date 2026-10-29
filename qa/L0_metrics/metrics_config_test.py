@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,10 +30,10 @@ import sys
 
 sys.path.append("../common")
 
-import unittest
+import unittest  # noqa: E402
 
-import requests
-import test_util as tu
+import requests  # noqa: E402
+import test_util as tu  # noqa: E402
 
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 

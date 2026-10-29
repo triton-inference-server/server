@@ -92,9 +92,8 @@ ReadResponse(int fd, std::string* buf)
     if (header_end != std::string::npos) {
       const std::string headers = buf->substr(0, header_end);
       const auto status_end = headers.find("\r\n");
-      const std::string status =
-          headers.substr(0, status_end == std::string::npos ? headers.size()
-                                                            : status_end);
+      const std::string status = headers.substr(
+          0, status_end == std::string::npos ? headers.size() : status_end);
       const bool ok = status.find(" 200 ") != std::string::npos;
       auto cl = headers.find("Content-Length:");
       if (cl == std::string::npos) {
@@ -103,7 +102,8 @@ ReadResponse(int fd, std::string* buf)
       size_t body = 0;
       if (cl != std::string::npos) {
         body = static_cast<size_t>(std::strtoul(
-            headers.c_str() + cl + std::strlen("Content-Length:"), nullptr, 10));
+            headers.c_str() + cl + std::strlen("Content-Length:"), nullptr,
+            10));
       }
       const size_t total = header_end + 4 + body;
       while (buf->size() < total) {
@@ -152,7 +152,8 @@ std::string
 BuildRequest()
 {
   const std::string body =
-      "{\"inputs\":[{\"name\":\"INPUT0\",\"datatype\":\"FP32\",\"shape\":[1,16],"
+      "{\"inputs\":[{\"name\":\"INPUT0\",\"datatype\":\"FP32\",\"shape\":[1,16]"
+      ","
       "\"data\":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}]}";
   std::ostringstream req;
   req << "POST /v2/models/" << g_model << "/infer HTTP/1.1\r\n"
@@ -195,8 +196,9 @@ Worker(const std::string& request)
 void
 Usage(const char* argv0)
 {
-  std::cerr << "Usage: " << argv0
-            << " [--host H] [--port P] [--model M] [--concurrency N] [--seconds S]\n";
+  std::cerr
+      << "Usage: " << argv0
+      << " [--host H] [--port P] [--model M] [--concurrency N] [--seconds S]\n";
 }
 
 }  // namespace
@@ -259,9 +261,9 @@ main(int argc, char** argv)
     thread.join();
   }
 
-  const double seconds = std::chrono::duration<double>(
-                             std::chrono::steady_clock::now() - start)
-                             .count();
+  const double seconds =
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
+          .count();
   const uint64_t success = g_success.load();
   std::cout << "success " << success << "\n"
             << "failure " << g_failure.load() << "\n"
