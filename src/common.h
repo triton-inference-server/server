@@ -76,6 +76,14 @@ constexpr int32_t HTTP_MAX_JSON_NESTING_DEPTH = 100;
 // Default maximum allowed HTTP request input size in bytes (64MB)
 constexpr size_t HTTP_DEFAULT_MAX_INPUT_SIZE = 1 << 26;
 
+// Value of --http-parse-memory-budget when it is not set. The budget is then
+// worked out from the memory limit of the server.
+constexpr int64_t HTTP_PARSE_MEMORY_BUDGET_AUTO = -1;
+
+// Default HTTP parse memory budget, as a percent of the memory limit of the
+// server (or of physical RAM when no limit is set).
+constexpr uint64_t HTTP_PARSE_MEMORY_BUDGET_PERCENT = 50;
+
 /// Reserved parameter keys for Triton usage (also HTTP/gRPC header forward).
 /// Other locations:
 /// - client/src/python/library/tritonclient/utils/__init__.py

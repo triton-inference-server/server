@@ -944,6 +944,108 @@ elif [ `grep -c "Error: --http-max-input-size must be greater than 0." ${SERVER_
     RET=1
 fi
 
+### Test HTTP parse memory budget ###
+
+# Unit tests for reading the memory limit and picking the budget, using a fake
+# /proc and /sys tree.
+TEST_LOG="./memory_limit_test.log"
+set +e
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH ./memory_limit_test >> $TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $TEST_LOG
+    echo -e "\n***\n*** memory_limit_test FAILED\n***"
+    RET=1
+fi
+set -e
+
+# Without the flag, the budget is 50% of the memory limit of the server, or
+# of physical RAM when no limit is set.
+if [ `grep -c "HTTP parse memory budget: .* (50% of " ./inference_server_default_limit.log` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected the default HTTP parse memory budget to be found in log\n***"
+    cat ./inference_server_default_limit.log
+    RET=1
+fi
+
+MODELDIR=http_parse_memory_budget_test_models
+mkdir -p $MODELDIR
+rm -rf ${MODELDIR}/*
+cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float32 ${MODELDIR}/.
+
+# A 256 MiB budget fits one of the large test requests at a time.
+SERVER_ARGS="--model-repository=${MODELDIR} --http-parse-memory-budget=$((256 * 2**20))"
+SERVER_LOG="./inference_server_parse_memory_budget.log"
+CLIENT_LOG="./http_parse_memory_budget.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER with HTTP parse memory budget\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+if [ `grep -c "HTTP parse memory budget: 256 MiB (set by --http-parse-memory-budget)" ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected the HTTP parse memory budget to be found in log\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+for TEST in test_request_within_budget test_request_too_large_for_budget test_concurrent_requests_over_budget; do
+    python http_parse_memory_budget_test.py ParseMemoryBudgetTest.$TEST >> $CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** HTTP Parse Memory Budget Test Failed: $TEST\n***"
+        RET=1
+    fi
+done
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# A budget of 0 turns it off.
+SERVER_ARGS="--model-repository=${MODELDIR} --http-parse-memory-budget=0"
+SERVER_LOG="./inference_server_parse_memory_budget_off.log"
+CLIENT_LOG="./http_parse_memory_budget_off.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER with HTTP parse memory budget turned off\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+if [ `grep -c "HTTP parse memory budget: turned off by --http-parse-memory-budget=0" ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected the HTTP parse memory budget to be turned off in log\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+python http_parse_memory_budget_test.py ParseMemoryBudgetTest.test_large_request_without_budget >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** HTTP Parse Memory Budget Test Failed: test_large_request_without_budget\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# A negative budget is an error.
+SERVER_ARGS="--model-repository=${MODELDIR} --http-parse-memory-budget=-1"
+SERVER_LOG="./inference_server_parse_memory_budget_negative.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Server should not start with a negative HTTP parse memory budget\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+elif [ `grep -c "Error: --http-parse-memory-budget must be 0 or greater." ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected '--http-parse-memory-budget must be 0 or greater' to be found in log\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
 ### Test HTTP Requests Containing Many Chunks ###
 MODELDIR="`pwd`/models"
 REQUEST_MANY_CHUNKS_PY="http_request_many_chunks.py"

@@ -41,6 +41,7 @@
 #include <thread>
 
 #include "classification.h"
+#include "memory_limit.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \
@@ -96,6 +97,11 @@ constexpr uint64_t kMaxChunkedChunks =
 
 
 namespace {
+
+// Parse memory budget shared by all HTTP endpoints. Set once by
+// HTTPAPIServer::ConfigureParseMemoryBudget().
+std::once_flag parse_memory_budget_once;
+ParseMemoryBudget parse_memory_budget;
 
 int
 HttpCodeFromError(TRITONSERVER_Error* error)
@@ -1548,48 +1554,54 @@ HTTPAPIServer::HandleRepositoryControl(
       std::list<std::vector<char>> binary_files;
       // WAR for the const-ness check
       std::vector<const TRITONSERVER_Parameter*> const_params;
-      triton::common::TritonJson::Value load_request;
-      size_t buffer_len = 0;
-      RETURN_AND_RESPOND_IF_ERR(
-          req, EVRequestToJson(req, "load model", &load_request, &buffer_len));
+      {
+        // The parsed request counts against the HTTP parse memory budget
+        // until it is destroyed, so destroy it before the load, which can
+        // take a long time. The parameters keep copies of what they need.
+        triton::common::TritonJson::Value load_request;
+        size_t buffer_len = 0;
+        RETURN_AND_RESPOND_IF_ERR(
+            req,
+            EVRequestToJson(req, "load model", &load_request, &buffer_len));
 
-      if (buffer_len > 0) {
-        // Parse request body for parameters
-        triton::common::TritonJson::Value param_json;
-        if (load_request.Find("parameters", &param_json)) {
-          // Iterate over each member in 'param_json'
-          std::vector<std::string> members;
-          RETURN_AND_RESPOND_IF_ERR(req, param_json.Members(&members));
-          for (const auto& m : members) {
-            const char* param_str = nullptr;
-            size_t param_len = 0;
-            RETURN_AND_RESPOND_IF_ERR(
-                req,
-                param_json.MemberAsString(m.c_str(), &param_str, &param_len));
-
-            TRITONSERVER_Parameter* param = nullptr;
-            if (m == "config") {
-              param = TRITONSERVER_ParameterNew(
-                  m.c_str(), TRITONSERVER_PARAMETER_STRING, param_str);
-            } else if (m.rfind("file:", 0) == 0) {
-              size_t decoded_size;
-              binary_files.emplace_back(std::vector<char>());
+        if (buffer_len > 0) {
+          // Parse request body for parameters
+          triton::common::TritonJson::Value param_json;
+          if (load_request.Find("parameters", &param_json)) {
+            // Iterate over each member in 'param_json'
+            std::vector<std::string> members;
+            RETURN_AND_RESPOND_IF_ERR(req, param_json.Members(&members));
+            for (const auto& m : members) {
+              const char* param_str = nullptr;
+              size_t param_len = 0;
               RETURN_AND_RESPOND_IF_ERR(
-                  req, DecodeBase64(
-                           param_str, param_len, binary_files.back(),
-                           decoded_size, m));
-              param = TRITONSERVER_ParameterBytesNew(
-                  m.c_str(), binary_files.back().data(), decoded_size);
-            }
+                  req,
+                  param_json.MemberAsString(m.c_str(), &param_str, &param_len));
 
-            if (param != nullptr) {
-              params->emplace_back(param);
-              const_params.emplace_back(param);
-            } else {
-              RETURN_AND_RESPOND_IF_ERR(
-                  req, TRITONSERVER_ErrorNew(
-                           TRITONSERVER_ERROR_INTERNAL,
-                           "unexpected error on creating Triton parameter"));
+              TRITONSERVER_Parameter* param = nullptr;
+              if (m == "config") {
+                param = TRITONSERVER_ParameterNew(
+                    m.c_str(), TRITONSERVER_PARAMETER_STRING, param_str);
+              } else if (m.rfind("file:", 0) == 0) {
+                size_t decoded_size;
+                binary_files.emplace_back(std::vector<char>());
+                RETURN_AND_RESPOND_IF_ERR(
+                    req, DecodeBase64(
+                             param_str, param_len, binary_files.back(),
+                             decoded_size, m));
+                param = TRITONSERVER_ParameterBytesNew(
+                    m.c_str(), binary_files.back().data(), decoded_size);
+              }
+
+              if (param != nullptr) {
+                params->emplace_back(param);
+                const_params.emplace_back(param);
+              } else {
+                RETURN_AND_RESPOND_IF_ERR(
+                    req, TRITONSERVER_ErrorNew(
+                             TRITONSERVER_ERROR_INTERNAL,
+                             "unexpected error on creating Triton parameter"));
+              }
             }
           }
         }
@@ -3272,7 +3284,35 @@ HTTPAPIServer::EVBufferToJson(
             .c_str());
   }
 
-  RETURN_IF_ERR(document->Parse(json_base, length));
+  // The parsed JSON can take many times more memory than the request, so its
+  // memory is counted against the parse memory budget shared by all HTTP
+  // requests (--http-parse-memory-budget) until 'document' is destroyed. The
+  // errors do not show the budget, which can reveal the memory limit of the
+  // server; it is in the server log.
+  triton::common::TritonJsonParseBudget::Error budget_error;
+  TRITONSERVER_Error* err =
+      document->ParseWithBudget(json_base, length, &budget_error);
+  if (budget_error == triton::common::TritonJsonParseBudget::Error::BUSY) {
+    TRITONSERVER_ErrorDelete(err);
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE,
+        ("the HTTP parse memory budget is in use by other requests, so the "
+         "request JSON of " +
+         std::to_string(length) +
+         " bytes cannot be parsed now. Try again later, or use "
+         "--http-parse-memory-budget to increase the budget.")
+            .c_str());
+  }
+  if (budget_error == triton::common::TritonJsonParseBudget::Error::TOO_LARGE) {
+    TRITONSERVER_ErrorDelete(err);
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        ("request JSON of " + std::to_string(length) +
+         " bytes needs more memory to parse than the HTTP parse memory "
+         "budget. Use --http-parse-memory-budget to increase the budget.")
+            .c_str());
+  }
+  RETURN_IF_ERR(err);
 
   return nullptr;  // success
 }
@@ -3562,18 +3602,23 @@ HTTPAPIServer::HandleGenerate(
   //   Also, there is limitation on Triton JSON library that makes forming
   //   arbitrary JSON message convoluted (added key is reference to a string and
   //   thus the string must live as long as the JSON message).
-  triton::common::TritonJson::Value request;
-  RETURN_AND_CALLBACK_IF_ERR(
-      EVRequestToJsonAllowsEmpty(req, "generate", &request), error_callback);
-  RETURN_AND_CALLBACK_IF_ERR(
-      ParseJsonTritonRequestID(request, irequest), error_callback);
+  {
+    // The parsed request counts against the HTTP parse memory budget until
+    // it is destroyed, so destroy it before TRITONSERVER_ServerInferAsync(),
+    // which can block. The inference request keeps copies of what it needs.
+    triton::common::TritonJson::Value request;
+    RETURN_AND_CALLBACK_IF_ERR(
+        EVRequestToJsonAllowsEmpty(req, "generate", &request), error_callback);
+    RETURN_AND_CALLBACK_IF_ERR(
+        ParseJsonTritonRequestID(request, irequest), error_callback);
 
-  size_t consumed_input_size{0};
-  RETURN_AND_CALLBACK_IF_ERR(
-      generate_request->ConvertGenerateRequest(
-          input_metadata, generate_request->RequestSchema(), request,
-          consumed_input_size),
-      error_callback);
+    size_t consumed_input_size{0};
+    RETURN_AND_CALLBACK_IF_ERR(
+        generate_request->ConvertGenerateRequest(
+            input_metadata, generate_request->RequestSchema(), request,
+            consumed_input_size),
+        error_callback);
+  }
 
   auto request_release_payload =
       std::make_unique<RequestReleasePayload>(irequest_shared, nullptr);
@@ -5047,10 +5092,32 @@ HTTPAPIServer::Create(
       GetValue(options, "header_forward_pattern", &header_forward_pattern));
   RETURN_IF_ERR(GetValue(options, "thread_count", &thread_count));
 
+  // The in-process Python frontend has no --http-parse-memory-budget, so it
+  // uses the automatic budget.
+  ConfigureParseMemoryBudget(HTTP_PARSE_MEMORY_BUDGET_AUTO);
+
   return Create(
       server, trace_manager, shm_manager, port, reuse_port, address,
       header_forward_pattern, thread_count, HTTP_DEFAULT_MAX_INPUT_SIZE,
       restricted_features, service);
+}
+
+void
+HTTPAPIServer::ConfigureParseMemoryBudget(int64_t flag_bytes)
+{
+  std::call_once(parse_memory_budget_once, [flag_bytes]() {
+    parse_memory_budget = ResolveParseMemoryBudget(flag_bytes);
+    // A limit of 0 means no limit.
+    triton::common::TritonJsonParseBudget::SetLimit(
+        parse_memory_budget.enabled ? parse_memory_budget.bytes : 0);
+    if (parse_memory_budget.warn) {
+      LOG_WARNING << "HTTP parse memory budget: "
+                  << parse_memory_budget.description;
+    } else {
+      LOG_INFO << "HTTP parse memory budget: "
+               << parse_memory_budget.description;
+    }
+  });
 }
 
 
