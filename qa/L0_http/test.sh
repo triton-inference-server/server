@@ -726,6 +726,24 @@ else
 fi
 set -e
 
+CLIENT_LOG="./generate_error_status_test.log"
+PYTHON_TEST=generate_error_status_test.py
+EXPECTED_NUM_TESTS=1
+set +e
+python $PYTHON_TEST > $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
 kill $SERVER_PID
 wait $SERVER_PID
 
