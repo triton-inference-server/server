@@ -81,7 +81,7 @@ DEFAULT_TRITON_VERSION_MAP = {
     "ort_version": "1.30.0",
     "ort_openvino_version": "2026.4.1",
     "standalone_openvino_version": "2026.4.1",
-    "dcgm_version": "4.7.0-2",
+    "dcgm_version": "4.7.1-2",
 }
 
 CORE_BACKENDS = ["ensemble"]
@@ -802,66 +802,45 @@ def install_dcgm_libraries(dcgm_version, target_machine):
             )
         )
         return ""
+
+    # The -core package pins every sub-package (libdcgm, modules, ...) to its
+    # own exact version, so they are discovered from its metadata rather than
+    # listed by name, which differs between DCGM releases.
+    if target_platform() == "rhel":
+        install = r"""
+RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/@ARCH@/cuda-rhel8.repo \
+    && dnf clean expire-cache \
+    && dnf makecache --refresh \
+    && V=1:$DCGM_VERSION \
+    && DEPS=$(dnf -q repoquery --requires datacenter-gpu-manager-4-core-$V \
+              | awk -v v="= $V" 'index($0, v) {print $1"-"$3}') \
+    && dnf install --assumeyes \
+              datacenter-gpu-manager-4-core-$V \
+              datacenter-gpu-manager-4-devel-$V \
+              $DEPS
+"""
     else:
-        # RHEL has the same install instructions for both aarch64 and x86
-        if target_platform() == "rhel":
-            if target_machine == "aarch64":
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo \\
-    && dnf clean expire-cache \\
-    && dnf makecache --refresh \\
-    && dnf install --assumeyes \\
-                 datacenter-gpu-manager-4-core-1:{} \\
-                 datacenter-gpu-manager-4-devel-1:{}
-""".format(
-                    dcgm_version, dcgm_version, dcgm_version
-                )
-            else:
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo \\
-    && dnf clean expire-cache \\
-    && dnf makecache --refresh \\
-    && dnf install --assumeyes \\
-                 datacenter-gpu-manager-4-core-1:{} \\
-                 datacenter-gpu-manager-4-devel-1:{}
-""".format(
-                    dcgm_version, dcgm_version, dcgm_version
-                )
-        else:
-            if target_machine == "aarch64":
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \\
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb \\
-      && apt install /tmp/cuda-keyring.deb \\
-      && rm /tmp/cuda-keyring.deb \\
-      && apt update -qq \\
-      && apt install --yes --no-install-recommends \\
-                  datacenter-gpu-manager-4-core=1:{} \\
-                  datacenter-gpu-manager-4-dev=1:{}
-""".format(
-                    dcgm_version, dcgm_version, dcgm_version
-                )
-            else:
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \\
-          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \\
-      && apt install /tmp/cuda-keyring.deb \\
-      && rm /tmp/cuda-keyring.deb \\
-      && apt update -qq \\
-      && apt install --yes --no-install-recommends \\
-                   datacenter-gpu-manager-4-core=1:{} \\
-                   datacenter-gpu-manager-4-dev=1:{}
-""".format(
-                    dcgm_version, dcgm_version, dcgm_version
-                )
+        install = r"""
+RUN curl -o /tmp/cuda-keyring.deb \
+          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/@ARCH@/cuda-keyring_1.1-1_all.deb \
+      && apt install /tmp/cuda-keyring.deb \
+      && rm /tmp/cuda-keyring.deb \
+      && apt update -qq \
+      && V=1:$DCGM_VERSION \
+      && DEPS=$(apt-cache show datacenter-gpu-manager-4-core=$V \
+                | sed -n 's/^Depends: //p' | tr ',' '\n' \
+                | awk -v v="(= $V)" -v V="$V" 'index($0, v) {print $1"="V}') \
+      && apt install --yes --no-install-recommends \
+                datacenter-gpu-manager-4-core=$V \
+                datacenter-gpu-manager-4-dev=$V \
+                $DEPS
+"""
+    arch = "sbsa" if target_machine == "aarch64" else "x86_64"
+    return (
+        "\nENV DCGM_VERSION {}\n".format(dcgm_version)
+        + "# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads"
+        + install.replace("@ARCH@", arch)
+    )
 
 
 # Keys that 'docker build --secret' accepts. A spec may also carry keys that
