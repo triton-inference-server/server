@@ -36,10 +36,12 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -56,6 +58,9 @@ int g_seconds = 20;
 std::atomic<bool> g_run{true};
 std::atomic<uint64_t> g_success{0};
 std::atomic<uint64_t> g_failure{0};
+std::mutex g_start_mu;
+std::condition_variable g_start_cv;
+bool g_started = false;
 
 bool
 SendAll(int fd, const std::string& data)
@@ -168,6 +173,10 @@ BuildRequest()
 void
 Worker(const std::string& request)
 {
+  {
+    std::unique_lock<std::mutex> lock(g_start_mu);
+    g_start_cv.wait(lock, [] { return g_started; });
+  }
   int fd = -1;
   std::string buf;
   while (g_run.load(std::memory_order_relaxed)) {
@@ -242,7 +251,15 @@ main(int argc, char** argv)
     threads.emplace_back(Worker, std::cref(request));
   }
 
+  // Workers block until this point, so successes are not counted before the
+  // clock starts. With a large --concurrency that startup gap was inflating
+  // rps.
   const auto start = std::chrono::steady_clock::now();
+  {
+    std::lock_guard<std::mutex> lock(g_start_mu);
+    g_started = true;
+  }
+  g_start_cv.notify_all();
   uint64_t last = 0;
   for (int elapsed = 5; elapsed <= g_seconds; elapsed += 5) {
     std::this_thread::sleep_until(start + std::chrono::seconds(elapsed));
