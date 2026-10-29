@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -278,39 +278,51 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CL
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
 kill_server
 
-# Enable histograms
+# histogram_latencies enables only the first-response histogram.
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config histogram_latencies=true"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
 kill_server
 
-# Enable summaries, counters still enabled by default
+# summary_latencies=true is verbose: CKMS summaries, no duration histograms.
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill_server
 
@@ -321,9 +333,13 @@ python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_missing 2>&1 | tee ${
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill_server
 
@@ -333,18 +349,44 @@ SERVER_ARGS="${BASE_SERVER_ARGS} ${CACHE_ARGS} --load-model=identity_cache_on --
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
-# DLIS-4762: Asserts that request summary is not published when cache is
-# enabled for a model, until this if fixed.
+# DLIS-4762: request summary is not published when cache is enabled.
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_exist_with_cache 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_counters_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_exist 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
 kill_server
 
-# Check setting custom summary quantiles
-export SUMMARY_QUANTILES="0.1:0.0.1,0.7:0.01,0.75:0.01"
+# summary_latencies=simplified publishes duration histograms, not summaries.
+SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=simplified"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill_server
+
+SERVER_ARGS="${BASE_SERVER_ARGS} ${CACHE_ARGS} --load-model=identity_cache_on --metrics-config summary_latencies=simplified"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_duration_histograms_exist_with_cache 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_histograms_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsConfigTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill_server
+
+# Check setting custom summary quantiles. Applies only to true/verbose.
+export SUMMARY_QUANTILES="0.1:0.01,0.7:0.01,0.75:0.01"
 SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true --metrics-config summary_quantiles=${SUMMARY_QUANTILES}"
 run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_summaries_custom_quantiles 2>&1 | tee ${CLIENT_LOG}
@@ -479,6 +521,16 @@ run_and_check_server
 python3 ${PYTHON_TEST} MetricsConfigTest.test_inf_histograms_missing 2>&1 | tee ${CLIENT_LOG}
 check_unit_test
 kill_server
+
+# 1000 in-flight requests for 40 seconds is too heavy for the default L0 run.
+# Set RUN_LATENCY_HISTOGRAM_LOAD_TEST=1 to compare histogram throughput with
+# the counter-only baseline. The script rejects a run that drops requests.
+if [ "${RUN_LATENCY_HISTOGRAM_LOAD_TEST}" = "1" ]; then
+  bash ./run_latency_histogram_load_test.sh "${SERVER}" "${TRITON_DIR}/backends"
+  if [ $? -ne 0 ]; then
+    RET=1
+  fi
+fi
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
