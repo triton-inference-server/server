@@ -89,6 +89,33 @@ class UserData:
         self._completed_requests = queue.Queue()
 
 
+class TritonTraceGate:
+    """
+    Mirrors TraceManager::TraceSetting::SampleTrace: Triton's `rate` and
+    `count` gate, which runs before the OpenTelemetry SDK sampler.
+    Requests with a valid propagated context are force-sampled, but still
+    consume `count` while it is positive.
+    """
+
+    def __init__(self, rate, count):
+        self.rate = rate
+        self.count = count
+        self.sample = 0
+
+    def sample_trace(self, force_sample):
+        if self.rate == 0:
+            return force_sample
+        if self.count == 0 and not force_sample:
+            return False
+        self.sample += 1
+        rate_hit = self.sample % self.rate == 0
+        if rate_hit and self.count > 0:
+            self.count -= 1
+        elif rate_hit and self.count == 0:
+            rate_hit = False
+        return rate_hit or force_sample
+
+
 class OpenTelemetryTest(tu.TestResultCollector):
     def setUp(self):
         self.collector_subprocess = subprocess.Popen(
@@ -649,11 +676,27 @@ class OpenTelemetryTest(tu.TestResultCollector):
             expected_parent_span_dict=expected_parent_span_dict,
         )
 
+    def _expect_exported(self, sampler, context, triton_gate):
+        """
+        Returns whether a request with the given propagated `context` is
+        expected to be exported. Triton's gate runs first and must be called
+        once per request, in request order. The SDK sampler then follows a
+        valid parent's sampled flag for parent-based samplers, and otherwise
+        applies its root decision.
+        """
+        has_parent = context in ("sampled", "unsampled")
+        if not triton_gate.sample_trace(force_sample=has_parent):
+            return False
+        if has_parent and sampler.startswith("parentbased_"):
+            return context == "sampled"
+        return sampler != "parentbased_always_off"
+
     def test_sdk_sampler(self):
         sampler = os.environ.get("OTEL_TRACES_SAMPLER", "").lower()
-        parent_based = sampler in ("parentbased_always_on", "parentbased_always_off")
-        rate = int(os.environ.get("TEST_TRACE_RATE", "1"))
-        count = int(os.environ.get("TEST_TRACE_COUNT", "-1"))
+        triton_gate = TritonTraceGate(
+            rate=int(os.environ.get("TEST_TRACE_RATE", "1")),
+            count=int(os.environ.get("TEST_TRACE_COUNT", "-1")),
+        )
         expected_requests = set()
         parent_trace_ids = {}
         for model in (self.simple_model_name, self.ensemble_model_name):
@@ -663,7 +706,6 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 ("grpc_stream", grpcclient, 8001),
             ):
                 with client_module.InferenceServerClient(f"localhost:{port}") as client:
-                    # The first root request consumes a finite count before parents.
                     for context in ("root", "sampled", "unsampled", "invalid"):
                         request_id = f"{model}_{protocol}_{context}"
                         headers = None
@@ -696,19 +738,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
                                 request_id=request_id,
                                 headers=headers,
                             )
-                        if (
-                            context == "sampled"
-                            or (context == "unsampled" and not parent_based)
-                            or (
-                                context in ("root", "invalid")
-                                and sampler != "parentbased_always_off"
-                                and rate != 0
-                                and (
-                                    count == -1
-                                    or (count == 1 and request_id == "simple_http_root")
-                                )
-                            )
-                        ):
+                        if self._expect_exported(sampler, context, triton_gate):
                             expected_requests.add(request_id)
 
         time.sleep(2 * COLLECTOR_TIMEOUT)
