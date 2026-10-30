@@ -749,13 +749,13 @@ class OpenTelemetryTest(tu.TestResultCollector):
             for scope in resource["scopeSpans"]
             for span in scope["spans"]
         ]
-        requests = {
+        exported_requests = {
             attribute["value"]["stringValue"]
             for span in spans
             for attribute in span.get("attributes", [])
             if attribute["key"] == "triton.request_id"
         }
-        self.assertSetEqual(requests, expected_requests)
+        self.assertSetEqual(exported_requests, expected_requests)
         for request_id, trace_id in parent_trace_ids.items():
             if request_id not in expected_requests:
                 self.assertFalse(any(span["traceId"] == trace_id for span in spans))
