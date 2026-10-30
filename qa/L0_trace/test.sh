@@ -921,26 +921,29 @@ set +e
 for sampler_config in "parentbased_always_on:0:-1" "ParentBased_Always_On:1:-1" \
                       "parentbased_always_off:1:-1" "unsupported:1:-1" ":1:-1" \
                       "always_on:1:-1" "parentbased_always_on:1:1" \
-                      "parentbased_always_off:1:1" "parentbased_always_on:1:0"; do
-    IFS=: read -r OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT <<< "$sampler_config"
-    export OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT
+                      "parentbased_always_off:1:1" "parentbased_always_on:1:0" \
+                      "always_off:1:-1" "traceidratio:1:-1:0" \
+                      "parentbased_traceidratio:1:-1:0" \
+                      "parentbased_traceidratio:1:-1:invalid"; do
+    IFS=: read -r OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT OTEL_TRACES_SAMPLER_ARG <<< "$sampler_config"
+    export OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT OTEL_TRACES_SAMPLER_ARG
     SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=$TEST_TRACE_RATE --trace-config=count=$TEST_TRACE_COUNT \
                  --trace-config=mode=opentelemetry \
                  --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
                  --model-repository=$MODELSDIR"
-    SERVER_LOG="./inference_server_sampler_${OTEL_TRACES_SAMPLER}_${TEST_TRACE_RATE}_${TEST_TRACE_COUNT}.log"
+    SERVER_LOG="./inference_server_sampler_${OTEL_TRACES_SAMPLER}_${TEST_TRACE_RATE}_${TEST_TRACE_COUNT}_${OTEL_TRACES_SAMPLER_ARG}.log"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER with OTEL_TRACES_SAMPLER=$OTEL_TRACES_SAMPLER\n***"
         cat "$SERVER_LOG"
         exit 1
     fi
-    echo "SDK sampler=$OTEL_TRACES_SAMPLER rate=$TEST_TRACE_RATE count=$TEST_TRACE_COUNT" >> "$OPENTELEMETRY_LOG"
+    echo "SDK sampler=$OTEL_TRACES_SAMPLER arg=$OTEL_TRACES_SAMPLER_ARG rate=$TEST_TRACE_RATE count=$TEST_TRACE_COUNT" >> "$OPENTELEMETRY_LOG"
     python -m unittest opentelemetry_unittest.OpenTelemetryTest.test_sdk_sampler \
         >> "$OPENTELEMETRY_LOG" 2>&1
     if [ $? -ne 0 ]; then
         cat "$OPENTELEMETRY_LOG"
-        echo -e "\n***\n*** SDK sampler test failed with OTEL_TRACES_SAMPLER=$OTEL_TRACES_SAMPLER rate=$TEST_TRACE_RATE count=$TEST_TRACE_COUNT\n***"
+        echo -e "\n***\n*** SDK sampler test failed with OTEL_TRACES_SAMPLER=$OTEL_TRACES_SAMPLER OTEL_TRACES_SAMPLER_ARG=$OTEL_TRACES_SAMPLER_ARG rate=$TEST_TRACE_RATE count=$TEST_TRACE_COUNT\n***"
         RET=1
     fi
     if [ "$OTEL_TRACES_SAMPLER" == "unsupported" ] && \
@@ -949,10 +952,16 @@ for sampler_config in "parentbased_always_on:0:-1" "ParentBased_Always_On:1:-1" 
         echo -e "\n***\n*** Expected an unsupported OTEL_TRACES_SAMPLER warning in $SERVER_LOG\n***"
         RET=1
     fi
+    if [ "$OTEL_TRACES_SAMPLER_ARG" == "invalid" ] && \
+       ! grep -q "Invalid OTEL_TRACES_SAMPLER_ARG" "$SERVER_LOG"; then
+        cat "$SERVER_LOG"
+        echo -e "\n***\n*** Expected an invalid OTEL_TRACES_SAMPLER_ARG warning in $SERVER_LOG\n***"
+        RET=1
+    fi
     kill "$SERVER_PID"
     wait "$SERVER_PID"
 done
-unset OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT
+unset OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT OTEL_TRACES_SAMPLER_ARG
 
 # Testing OTel WAR with trace rate = 0
 rm collected_traces.json

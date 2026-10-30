@@ -625,12 +625,18 @@ Supported values are case-insensitive:
 | Value | SDK sampling behavior |
 | --- | --- |
 | `always_on` | Export all traces selected by Triton (the default). |
+| `always_off` | Drop all traces. |
+| `traceidratio` | Export a ratio of the traces selected by Triton, ignoring parents' sampled flags. |
 | `parentbased_always_on` | Follow valid parents' sampled flags; export root traces selected by Triton. |
 | `parentbased_always_off` | Follow valid parents' sampled flags; drop root traces. |
+| `parentbased_traceidratio` | Follow valid parents' sampled flags; export a ratio of root traces selected by Triton. |
 
 An unset or empty value preserves the default. Unsupported values produce a
-warning and fall back to `always_on`. `OTEL_TRACES_SAMPLER_ARG` is not used by
-these samplers.
+warning and fall back to `always_on`. For the `traceidratio` samplers, set the
+ratio in `[0, 1]` with `OTEL_TRACES_SAMPLER_ARG`; an unset or invalid value
+uses `1.0`, and an invalid value also produces a warning. The ratio applies on
+top of Triton's `rate`, so `rate=10` with a ratio of `0.5` exports about one in
+twenty root requests.
 
 SDK sampling applies after Triton's existing sampling logic. It cannot enable
 root traces rejected by Triton's `rate` or `count` settings, and dropping spans

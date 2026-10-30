@@ -676,7 +676,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
             expected_parent_span_dict=expected_parent_span_dict,
         )
 
-    def _expect_exported(self, sampler, context, triton_gate):
+    def _expect_exported(self, sampler, ratio, context, triton_gate):
         """
         Returns whether a request with the given propagated `context` is
         expected to be exported. Triton's gate runs first and must be called
@@ -689,10 +689,19 @@ class OpenTelemetryTest(tu.TestResultCollector):
             return False
         if has_parent and sampler.startswith("parentbased_"):
             return context == "sampled"
-        return sampler != "parentbased_always_off"
+        if sampler.endswith("always_off"):
+            return False
+        if sampler.endswith("traceidratio"):
+            return ratio == 1.0
+        return True
 
     def test_sdk_sampler(self):
         sampler = os.environ.get("OTEL_TRACES_SAMPLER", "").lower()
+        # The server uses a ratio of 1.0 when OTEL_TRACES_SAMPLER_ARG is
+        # unset or invalid. Only ratios 0 and 1 give deterministic results.
+        ratio_arg = os.environ.get("OTEL_TRACES_SAMPLER_ARG", "")
+        ratio = 1.0 if ratio_arg in ("", "invalid") else float(ratio_arg)
+        self.assertIn(ratio, (0.0, 1.0))
         triton_gate = TritonTraceGate(
             rate=int(os.environ.get("TEST_TRACE_RATE", "1")),
             count=int(os.environ.get("TEST_TRACE_COUNT", "-1")),
@@ -738,7 +747,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
                                 request_id=request_id,
                                 headers=headers,
                             )
-                        if self._expect_exported(sampler, context, triton_gate):
+                        if self._expect_exported(sampler, ratio, context, triton_gate):
                             expected_requests.add(request_id)
 
         time.sleep(2 * COLLECTOR_TIMEOUT)

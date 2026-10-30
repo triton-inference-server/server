@@ -43,10 +43,73 @@
 #include "opentelemetry/sdk/trace/samplers/always_off_factory.h"
 #include "opentelemetry/sdk/trace/samplers/always_on_factory.h"
 #include "opentelemetry/sdk/trace/samplers/parent_factory.h"
+#include "opentelemetry/sdk/trace/samplers/trace_id_ratio_factory.h"
 namespace otel_common = opentelemetry::common;
 #endif
 
 namespace triton { namespace server {
+
+#ifndef _WIN32
+namespace {
+
+// Returns the OTEL_TRACES_SAMPLER_ARG ratio for the traceidratio samplers,
+// or 1.0 if it is unset or not a number in [0, 1].
+double
+GetOtelSamplerRatio()
+{
+  const auto arg =
+      GetEnvironmentVariableOrDefault("OTEL_TRACES_SAMPLER_ARG", "");
+  if (arg.empty()) {
+    return 1.0;
+  }
+  char* end = nullptr;
+  const double ratio = std::strtod(arg.c_str(), &end);
+  if ((end == arg.c_str()) || (*end != '\0') ||
+      !((ratio >= 0.0) && (ratio <= 1.0))) {
+    LOG_WARNING << "Invalid OTEL_TRACES_SAMPLER_ARG: " << arg << "; using 1.0";
+    return 1.0;
+  }
+  return ratio;
+}
+
+// Creates the SDK sampler selected by OTEL_TRACES_SAMPLER. Unset, empty and
+// unsupported values use always_on, the SDK default.
+std::unique_ptr<otel_trace_sdk::Sampler>
+CreateOtelSampler()
+{
+  auto name = GetEnvironmentVariableOrDefault("OTEL_TRACES_SAMPLER", "");
+  std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
+    return std::tolower(c);
+  });
+  if (name == "always_off") {
+    return otel_trace_sdk::AlwaysOffSamplerFactory::Create();
+  }
+  if (name == "traceidratio") {
+    return otel_trace_sdk::TraceIdRatioBasedSamplerFactory::Create(
+        GetOtelSamplerRatio());
+  }
+  if (name == "parentbased_always_on") {
+    return otel_trace_sdk::ParentBasedSamplerFactory::Create(
+        otel_trace_sdk::AlwaysOnSamplerFactory::Create());
+  }
+  if (name == "parentbased_always_off") {
+    return otel_trace_sdk::ParentBasedSamplerFactory::Create(
+        otel_trace_sdk::AlwaysOffSamplerFactory::Create());
+  }
+  if (name == "parentbased_traceidratio") {
+    return otel_trace_sdk::ParentBasedSamplerFactory::Create(
+        otel_trace_sdk::TraceIdRatioBasedSamplerFactory::Create(
+            GetOtelSamplerRatio()));
+  }
+  if (!name.empty() && (name != "always_on")) {
+    LOG_WARNING << "Unsupported OTEL_TRACES_SAMPLER: " << name
+                << "; using always_on";
+  }
+  return otel_trace_sdk::AlwaysOnSamplerFactory::Create();
+}
+
+}  // namespace
+#endif  // _WIN32
 
 TRITONSERVER_Error*
 TraceManager::Create(
@@ -458,25 +521,9 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
       auto processor = otel_trace_sdk::BatchSpanProcessorFactory::Create(
           std::move(exporter), processor_options);
       auto resource = otel_resource::Resource::Create(attributes);
-      auto sampler_name =
-          GetEnvironmentVariableOrDefault("OTEL_TRACES_SAMPLER", "");
-      std::transform(
-          sampler_name.begin(), sampler_name.end(), sampler_name.begin(),
-          [](unsigned char c) { return std::tolower(c); });
-      auto sampler = otel_trace_sdk::AlwaysOnSamplerFactory::Create();
-      if (sampler_name == "parentbased_always_on") {
-        sampler = otel_trace_sdk::ParentBasedSamplerFactory::Create(
-            std::move(sampler));
-      } else if (sampler_name == "parentbased_always_off") {
-        sampler = otel_trace_sdk::ParentBasedSamplerFactory::Create(
-            otel_trace_sdk::AlwaysOffSamplerFactory::Create());
-      } else if (!sampler_name.empty() && sampler_name != "always_on") {
-        LOG_WARNING << "Unsupported OTEL_TRACES_SAMPLER: " << sampler_name
-                    << "; using always_on";
-      }
       std::shared_ptr<otel_trace_api::TracerProvider> provider =
           otel_trace_sdk::TracerProviderFactory::Create(
-              std::move(processor), resource, std::move(sampler));
+              std::move(processor), resource, CreateOtelSampler());
 
       otel_trace_api::Provider::SetTracerProvider(provider);
       otel_cntxt::propagation::GlobalTextMapPropagator::SetGlobalPropagator(
