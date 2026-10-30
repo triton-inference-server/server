@@ -1,4 +1,4 @@
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,25 +24,25 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-
-sys.path.append("../common")
 import concurrent.futures
 import json
 import queue
 import re
 import shutil
 import subprocess
+import sys
 import time
 import unittest
 from functools import partial
 
 import numpy as np
 import requests
-import test_util as tu
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 from tritonclient.utils import InferenceServerException
+
+sys.path.append("../common")
+import test_util as tu  # noqa: E402
 
 NO_PARENT_SPAN_ID = ""
 COLLECTOR_TIMEOUT = 10
@@ -226,7 +226,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         elif span_name == self.root_span:
             # Check that root span has INFER_RESPONSE_COMPLETE, _RECV/_WAITREAD
             # and _SEND events (and only them)
-            if is_cancelled == True:
+            if is_cancelled:
                 root_events_http = cancel_root_events_http
                 root_events_grpc = cancel_root_events_grpc
 
@@ -240,7 +240,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 self.assertFalse(all(entry in events for entry in root_events_http))
                 self.assertEqual(len(events), len(root_events_grpc))
 
-            if is_cancelled == False:
+            if not is_cancelled:
                 self.assertFalse(all(entry in events for entry in request_events))
                 self.assertFalse(all(entry in events for entry in compute_events))
 
@@ -402,7 +402,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         """
         parent_span_id = NO_PARENT_SPAN_ID
 
-        if headers != None:
+        if headers is not None:
             parent_span_id = headers["traceparent"].split("-")[2]
             parent_trace_id = headers["traceparent"].split("-")[1]
             self.assertEqual(
@@ -427,7 +427,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         # The idea here is to wait before we try and read the traces from the file.
         time.sleep(2 * COLLECTOR_TIMEOUT)
         traces = self._parse_trace_log(self.filename)
-        if is_queued == False:
+        if not is_queued:
             expected_counts = dict(
                 {"compute": 1, self.input_all_required_model_name: 1, self.root_span: 1}
             )
