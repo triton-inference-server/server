@@ -26,6 +26,7 @@
 
 import concurrent.futures
 import json
+import os
 import queue
 import re
 import shutil
@@ -647,6 +648,98 @@ class OpenTelemetryTest(tu.TestResultCollector):
             expected_counts=expected_counts,
             expected_parent_span_dict=expected_parent_span_dict,
         )
+
+    def test_sdk_sampler(self):
+        sampler = os.environ.get("OTEL_TRACES_SAMPLER", "").lower()
+        parent_based = sampler in ("parentbased_always_on", "parentbased_always_off")
+        rate = int(os.environ.get("TEST_TRACE_RATE", "1"))
+        count = int(os.environ.get("TEST_TRACE_COUNT", "-1"))
+        expected_requests = set()
+        parent_trace_ids = {}
+        for model in (self.simple_model_name, self.ensemble_model_name):
+            for protocol, client_module, port in (
+                ("http", httpclient, 8000),
+                ("grpc", grpcclient, 8001),
+                ("grpc_stream", grpcclient, 8001),
+            ):
+                with client_module.InferenceServerClient(f"localhost:{port}") as client:
+                    # The first root request consumes a finite count before parents.
+                    for context in ("root", "sampled", "unsampled", "invalid"):
+                        request_id = f"{model}_{protocol}_{context}"
+                        headers = None
+                        if context in ("sampled", "unsampled"):
+                            trace_id = f"{len(parent_trace_ids) + 1:032x}"
+                            parent_trace_ids[request_id] = trace_id
+                            flags = "01" if context == "sampled" else "00"
+                            headers = {
+                                "traceparent": f"00-{trace_id}-b7ad6b7169242424-{flags}"
+                            }
+                        elif context == "invalid":
+                            headers = {"traceparent": "invalid"}
+                        if protocol == "grpc_stream":
+                            responses = queue.Queue()
+                            client.start_stream(
+                                callback=partial(callback, responses), headers=headers
+                            )
+                            client.async_stream_infer(
+                                model,
+                                prepare_data(client_module),
+                                request_id=request_id,
+                            )
+                            response = responses.get(timeout=10)
+                            client.stop_stream()
+                            self.assertNotIsInstance(response, InferenceServerException)
+                        else:
+                            client.infer(
+                                model,
+                                prepare_data(client_module),
+                                request_id=request_id,
+                                headers=headers,
+                            )
+                        if (
+                            context == "sampled"
+                            or (context == "unsampled" and not parent_based)
+                            or (
+                                context in ("root", "invalid")
+                                and sampler != "parentbased_always_off"
+                                and rate != 0
+                                and (
+                                    count == -1
+                                    or (count == 1 and request_id == "simple_http_root")
+                                )
+                            )
+                        ):
+                            expected_requests.add(request_id)
+
+        time.sleep(2 * COLLECTOR_TIMEOUT)
+        spans = [
+            span
+            for trace in self._parse_trace_log(self.filename)
+            for resource in trace["resourceSpans"]
+            for scope in resource["scopeSpans"]
+            for span in scope["spans"]
+        ]
+        requests = {
+            attribute["value"]["stringValue"]
+            for span in spans
+            for attribute in span.get("attributes", [])
+            if attribute["key"] == "triton.request_id"
+        }
+        self.assertSetEqual(requests, expected_requests)
+        for request_id, trace_id in parent_trace_ids.items():
+            if request_id not in expected_requests:
+                self.assertFalse(any(span["traceId"] == trace_id for span in spans))
+        for span in spans:
+            if span["name"] == self.ensemble_model_name:
+                self.assertTrue(
+                    any(
+                        child["name"] == self.simple_model_name
+                        and child["traceId"] == span["traceId"]
+                        and child["parentSpanId"] == span["spanId"]
+                        for child in spans
+                    ),
+                    "Ensemble trace is missing its child model span",
+                )
 
     def test_http_trace_simple_model(self):
         """

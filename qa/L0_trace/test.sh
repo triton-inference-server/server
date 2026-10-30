@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -851,7 +851,7 @@ rm collected_traces.json*
 # Unittests then check that produced spans have expected format and events
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-EXPECTED_NUM_TESTS="19"
+EXPECTED_NUM_TESTS="20"
 
 # Set up repo and args for SageMaker
 export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME="simple"
@@ -916,6 +916,39 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 set +e
+
+# Test SDK sampler configuration, preserving Triton's root sampling gate.
+for sampler_config in "parentbased_always_on:0:-1" "ParentBased_Always_On:1:-1" \
+                      "parentbased_always_off:1:-1" "unsupported:1:-1" ":1:-1" \
+                      "always_on:1:-1" "parentbased_always_on:1:1" \
+                      "parentbased_always_off:1:1" "parentbased_always_on:1:0"; do
+    IFS=: read -r OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT <<< "$sampler_config"
+    export OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT
+    SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=$TEST_TRACE_RATE --trace-config=count=$TEST_TRACE_COUNT \
+                 --trace-config=mode=opentelemetry \
+                 --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                 --model-repository=$MODELSDIR"
+    SERVER_LOG="./inference_server_sampler_${OTEL_TRACES_SAMPLER}_${TEST_TRACE_RATE}_${TEST_TRACE_COUNT}.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        cat "$SERVER_LOG"
+        exit 1
+    fi
+    echo "SDK sampler=$OTEL_TRACES_SAMPLER rate=$TEST_TRACE_RATE count=$TEST_TRACE_COUNT" >> "$OPENTELEMETRY_LOG"
+    python -m unittest opentelemetry_unittest.OpenTelemetryTest.test_sdk_sampler \
+        >> "$OPENTELEMETRY_LOG" 2>&1
+    if [ $? -ne 0 ]; then
+        cat "$OPENTELEMETRY_LOG"
+        RET=1
+    fi
+    if [ "$OTEL_TRACES_SAMPLER" == "unsupported" ] && \
+       ! grep -q "Unsupported OTEL_TRACES_SAMPLER" "$SERVER_LOG"; then
+        RET=1
+    fi
+    kill "$SERVER_PID"
+    wait "$SERVER_PID"
+done
+unset OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT
 
 # Testing OTel WAR with trace rate = 0
 rm collected_traces.json

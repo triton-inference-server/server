@@ -595,7 +595,7 @@ The following table shows available OpenTelemetry trace APIs settings for
 ### OpenTelemetry Context Propagation
 
 Triton supports [context propagation](https://opentelemetry.io/docs/concepts/context-propagation/)
-in OpenTelemetry mode starting in version 24.01. Note, that every request
+in OpenTelemetry mode starting in version 24.01. By default, every request
 with propagated OpenTelemetry context will be traced, regardless of `rate` and
 `count` trace settings. If a user wishes to trace only those requests, for which
 OpenTelemetry context was injected on the client side, please start Triton with
@@ -608,6 +608,33 @@ $ tritonserver \
     --trace-config mode=opentelemetry
 ```
 Please, be aware that this option is subject to change in future releases.
+
+To honor the incoming context's sampled flag, set the standard OpenTelemetry
+environment variable `OTEL_TRACES_SAMPLER=parentbased_always_on`. With `rate=0`,
+only requests with a valid, sampled parent are exported:
+
+```bash
+OTEL_TRACES_SAMPLER=parentbased_always_on tritonserver \
+    --trace-config rate=0 \
+    --trace-config level=TIMESTAMPS \
+    --trace-config mode=opentelemetry
+```
+
+Supported values are case-insensitive:
+
+| Value | SDK sampling behavior |
+| --- | --- |
+| `always_on` | Export all traces selected by Triton (the default). |
+| `parentbased_always_on` | Follow valid parents' sampled flags; export root traces selected by Triton. |
+| `parentbased_always_off` | Follow valid parents' sampled flags; drop root traces. |
+
+An unset or empty value preserves the default. Unsupported values produce a
+warning and fall back to `always_on`. `OTEL_TRACES_SAMPLER_ARG` is not used by
+these samplers.
+
+SDK sampling applies after Triton's existing sampling logic. It cannot enable
+root traces rejected by Triton's `rate` or `count` settings, and dropping spans
+does not eliminate Triton's trace collection overhead.
 
 #### How to inject OpenTelemetry context on the client side
 

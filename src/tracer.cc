@@ -1,4 +1,4 @@
-// Copyright 2019-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -28,6 +28,9 @@
 
 #include <stdlib.h>
 
+#include <algorithm>
+#include <cctype>
+
 #include "common.h"
 #include "triton/common/logging.h"
 #ifdef TRITON_ENABLE_GPU
@@ -36,6 +39,10 @@
 #ifndef _WIN32
 #include "opentelemetry/sdk/resource/semantic_conventions.h"
 #include "opentelemetry/sdk/trace/batch_span_processor_factory.h"
+#include "opentelemetry/sdk/trace/sampler.h"
+#include "opentelemetry/sdk/trace/samplers/always_off_factory.h"
+#include "opentelemetry/sdk/trace/samplers/always_on_factory.h"
+#include "opentelemetry/sdk/trace/samplers/parent_factory.h"
 namespace otel_common = opentelemetry::common;
 #endif
 
@@ -451,9 +458,25 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
       auto processor = otel_trace_sdk::BatchSpanProcessorFactory::Create(
           std::move(exporter), processor_options);
       auto resource = otel_resource::Resource::Create(attributes);
+      auto sampler_name =
+          GetEnvironmentVariableOrDefault("OTEL_TRACES_SAMPLER", "");
+      std::transform(
+          sampler_name.begin(), sampler_name.end(), sampler_name.begin(),
+          [](unsigned char c) { return std::tolower(c); });
+      auto sampler = otel_trace_sdk::AlwaysOnSamplerFactory::Create();
+      if (sampler_name == "parentbased_always_on") {
+        sampler = otel_trace_sdk::ParentBasedSamplerFactory::Create(
+            std::move(sampler));
+      } else if (sampler_name == "parentbased_always_off") {
+        sampler = otel_trace_sdk::ParentBasedSamplerFactory::Create(
+            otel_trace_sdk::AlwaysOffSamplerFactory::Create());
+      } else if (!sampler_name.empty() && sampler_name != "always_on") {
+        LOG_WARNING << "Unsupported OTEL_TRACES_SAMPLER: " << sampler_name
+                    << "; using always_on";
+      }
       std::shared_ptr<otel_trace_api::TracerProvider> provider =
           otel_trace_sdk::TracerProviderFactory::Create(
-              std::move(processor), resource);
+              std::move(processor), resource, std::move(sampler));
 
       otel_trace_api::Provider::SetTracerProvider(provider);
       otel_cntxt::propagation::GlobalTextMapPropagator::SetGlobalPropagator(
