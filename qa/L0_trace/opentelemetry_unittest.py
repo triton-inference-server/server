@@ -902,6 +902,37 @@ class OpenTelemetryTest(tu.TestResultCollector):
         self.assertEqual(1, res.as_numpy("OUT")[0])
         self.assertEqual(0, res.as_numpy("IDX")[0])
 
+    def test_grpc_trace_context_propagation_many_requests(self):
+        """
+        Tests that every unary gRPC request keeps its propagated trace id.
+        The traceparent metadata value must be read with its length, so many
+        requests are sent to catch reads past the end of the value.
+        """
+        sent_trace_ids = {}
+        with grpcclient.InferenceServerClient("localhost:8001") as client:
+            for i in range(200):
+                request_id = f"grpc_context_{i}"
+                trace_id = f"{i + 1:032x}"
+                sent_trace_ids[request_id] = trace_id
+                client.infer(
+                    self.simple_model_name,
+                    prepare_data(grpcclient),
+                    request_id=request_id,
+                    headers={"traceparent": f"00-{trace_id}-b7ad6b7169242424-01"},
+                )
+
+        time.sleep(2 * COLLECTOR_TIMEOUT)
+        received_trace_ids = {
+            attribute["value"]["stringValue"]: span["traceId"]
+            for trace in self._parse_trace_log(self.filename)
+            for resource in trace["resourceSpans"]
+            for scope in resource["scopeSpans"]
+            for span in scope["spans"]
+            for attribute in span.get("attributes", [])
+            if attribute["key"] == "triton.request_id"
+        }
+        self.assertDictEqual(received_trace_ids, sent_trace_ids)
+
     def test_grpc_trace_simple_model_context_propagation(self):
         """
         Tests trace, collected from executing one inference request
