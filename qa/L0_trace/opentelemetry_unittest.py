@@ -706,7 +706,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 ("grpc_stream", grpcclient, 8001),
             ):
                 with client_module.InferenceServerClient(f"localhost:{port}") as client:
-                    for context in ("root", "sampled", "unsampled", "invalid"):
+                    for context in ("missing", "sampled", "unsampled", "invalid"):
                         request_id = f"{model}_{protocol}_{context}"
                         headers = None
                         if context in ("sampled", "unsampled"):
