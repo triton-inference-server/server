@@ -918,13 +918,26 @@ wait $SERVER_PID
 set +e
 
 # Test SDK sampler configuration, preserving Triton's root sampling gate.
-for sampler_config in "parentbased_always_on:0:-1" "ParentBased_Always_On:1:-1" \
-                      "parentbased_always_off:1:-1" "unsupported:1:-1" ":1:-1" \
-                      "always_on:1:-1" "parentbased_always_on:1:1" \
-                      "parentbased_always_off:1:1" "parentbased_always_on:1:0" \
-                      "always_off:1:-1" "traceidratio:1:-1:0" \
-                      "parentbased_traceidratio:1:-1:0" \
-                      "parentbased_traceidratio:1:-1:invalid"; do
+# Each entry is sampler:rate:count[:sampler_arg]. SDK_SAMPLER_TEST_SCOPE=quick
+# runs one configuration per sampler behavior; full (the default) also covers
+# case, empty/explicit default and rate/count combinations.
+SDK_SAMPLER_TEST_SCOPE=${SDK_SAMPLER_TEST_SCOPE:-full}
+SDK_SAMPLER_QUICK_CONFIGS=("parentbased_always_on:0:-1" "parentbased_always_off:1:1" \
+                           "unsupported:1:-1" "always_off:1:-1" "traceidratio:1:-1:0" \
+                           "parentbased_traceidratio:1:-1:invalid")
+SDK_SAMPLER_FULL_CONFIGS=("${SDK_SAMPLER_QUICK_CONFIGS[@]}" "ParentBased_Always_On:1:-1" \
+                          "parentbased_always_off:1:-1" ":1:-1" "always_on:1:-1" \
+                          "parentbased_always_on:1:1" "parentbased_always_on:1:0" \
+                          "parentbased_traceidratio:1:-1:0")
+if [ "$SDK_SAMPLER_TEST_SCOPE" == "quick" ]; then
+    SDK_SAMPLER_CONFIGS=("${SDK_SAMPLER_QUICK_CONFIGS[@]}")
+elif [ "$SDK_SAMPLER_TEST_SCOPE" == "full" ]; then
+    SDK_SAMPLER_CONFIGS=("${SDK_SAMPLER_FULL_CONFIGS[@]}")
+else
+    echo -e "\n***\n*** Invalid SDK_SAMPLER_TEST_SCOPE: $SDK_SAMPLER_TEST_SCOPE (expected quick or full)\n***"
+    exit 1
+fi
+for sampler_config in "${SDK_SAMPLER_CONFIGS[@]}"; do
     IFS=: read -r OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT OTEL_TRACES_SAMPLER_ARG <<< "$sampler_config"
     export OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT OTEL_TRACES_SAMPLER_ARG
     SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=$TEST_TRACE_RATE --trace-config=count=$TEST_TRACE_COUNT \
