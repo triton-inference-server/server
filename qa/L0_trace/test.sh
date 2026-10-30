@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -851,7 +851,7 @@ rm collected_traces.json*
 # Unittests then check that produced spans have expected format and events
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-EXPECTED_NUM_TESTS="19"
+EXPECTED_NUM_TESTS="21"
 
 # Set up repo and args for SageMaker
 export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME="simple"
@@ -916,6 +916,65 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 set +e
+
+# Test SDK sampler configuration, preserving Triton's root sampling gate.
+# Each entry is sampler:rate:count[:sampler_arg]. SDK_SAMPLER_TEST_SCOPE=quick
+# runs one configuration per sampler behavior; full (the default) also covers
+# case, empty/explicit default and rate/count combinations.
+SDK_SAMPLER_TEST_SCOPE=${SDK_SAMPLER_TEST_SCOPE:-full}
+SDK_SAMPLER_QUICK_CONFIGS=("parentbased_always_on:0:-1" "parentbased_always_off:1:1" \
+                           "unsupported:1:-1" "always_off:1:-1" "traceidratio:1:-1:0" \
+                           "parentbased_traceidratio:1:-1:invalid")
+SDK_SAMPLER_FULL_CONFIGS=("${SDK_SAMPLER_QUICK_CONFIGS[@]}" "ParentBased_Always_On:1:-1" \
+                          "parentbased_always_off:1:-1" ":1:-1" "always_on:1:-1" \
+                          "parentbased_always_on:1:1" "parentbased_always_on:1:0" \
+                          "parentbased_traceidratio:1:-1:0")
+if [ "$SDK_SAMPLER_TEST_SCOPE" == "quick" ]; then
+    SDK_SAMPLER_CONFIGS=("${SDK_SAMPLER_QUICK_CONFIGS[@]}")
+elif [ "$SDK_SAMPLER_TEST_SCOPE" == "full" ]; then
+    SDK_SAMPLER_CONFIGS=("${SDK_SAMPLER_FULL_CONFIGS[@]}")
+else
+    echo -e "\n***\n*** Invalid SDK_SAMPLER_TEST_SCOPE: $SDK_SAMPLER_TEST_SCOPE (expected quick or full)\n***"
+    exit 1
+fi
+for sampler_config in "${SDK_SAMPLER_CONFIGS[@]}"; do
+    IFS=: read -r OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT OTEL_TRACES_SAMPLER_ARG <<< "$sampler_config"
+    export OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT OTEL_TRACES_SAMPLER_ARG
+    SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=$TEST_TRACE_RATE --trace-config=count=$TEST_TRACE_COUNT \
+                 --trace-config=mode=opentelemetry \
+                 --trace-config=opentelemetry,url=localhost:$OTLP_PORT/v1/traces \
+                 --model-repository=$MODELSDIR"
+    SERVER_LOG="./inference_server_sampler_${OTEL_TRACES_SAMPLER}_${TEST_TRACE_RATE}_${TEST_TRACE_COUNT}_${OTEL_TRACES_SAMPLER_ARG}.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER with OTEL_TRACES_SAMPLER=$OTEL_TRACES_SAMPLER\n***"
+        cat "$SERVER_LOG"
+        exit 1
+    fi
+    echo "SDK sampler=$OTEL_TRACES_SAMPLER arg=$OTEL_TRACES_SAMPLER_ARG rate=$TEST_TRACE_RATE count=$TEST_TRACE_COUNT" >> "$OPENTELEMETRY_LOG"
+    python -m unittest opentelemetry_unittest.OpenTelemetryTest.test_sdk_sampler \
+        >> "$OPENTELEMETRY_LOG" 2>&1
+    if [ $? -ne 0 ]; then
+        cat "$OPENTELEMETRY_LOG"
+        echo -e "\n***\n*** SDK sampler test failed with OTEL_TRACES_SAMPLER=$OTEL_TRACES_SAMPLER OTEL_TRACES_SAMPLER_ARG=$OTEL_TRACES_SAMPLER_ARG rate=$TEST_TRACE_RATE count=$TEST_TRACE_COUNT\n***"
+        RET=1
+    fi
+    if [ "$OTEL_TRACES_SAMPLER" == "unsupported" ] && \
+       ! grep -q "Unsupported OTEL_TRACES_SAMPLER" "$SERVER_LOG"; then
+        cat "$SERVER_LOG"
+        echo -e "\n***\n*** Expected an unsupported OTEL_TRACES_SAMPLER warning in $SERVER_LOG\n***"
+        RET=1
+    fi
+    if [ "$OTEL_TRACES_SAMPLER_ARG" == "invalid" ] && \
+       ! grep -q "Invalid OTEL_TRACES_SAMPLER_ARG" "$SERVER_LOG"; then
+        cat "$SERVER_LOG"
+        echo -e "\n***\n*** Expected an invalid OTEL_TRACES_SAMPLER_ARG warning in $SERVER_LOG\n***"
+        RET=1
+    fi
+    kill "$SERVER_PID"
+    wait "$SERVER_PID"
+done
+unset OTEL_TRACES_SAMPLER TEST_TRACE_RATE TEST_TRACE_COUNT OTEL_TRACES_SAMPLER_ARG
 
 # Testing OTel WAR with trace rate = 0
 rm collected_traces.json
