@@ -931,6 +931,7 @@ for sampler_config in "parentbased_always_on:0:-1" "ParentBased_Always_On:1:-1" 
     SERVER_LOG="./inference_server_sampler_${OTEL_TRACES_SAMPLER}_${TEST_TRACE_RATE}_${TEST_TRACE_COUNT}.log"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER with OTEL_TRACES_SAMPLER=$OTEL_TRACES_SAMPLER\n***"
         cat "$SERVER_LOG"
         exit 1
     fi
@@ -939,10 +940,13 @@ for sampler_config in "parentbased_always_on:0:-1" "ParentBased_Always_On:1:-1" 
         >> "$OPENTELEMETRY_LOG" 2>&1
     if [ $? -ne 0 ]; then
         cat "$OPENTELEMETRY_LOG"
+        echo -e "\n***\n*** SDK sampler test failed with OTEL_TRACES_SAMPLER=$OTEL_TRACES_SAMPLER rate=$TEST_TRACE_RATE count=$TEST_TRACE_COUNT\n***"
         RET=1
     fi
     if [ "$OTEL_TRACES_SAMPLER" == "unsupported" ] && \
        ! grep -q "Unsupported OTEL_TRACES_SAMPLER" "$SERVER_LOG"; then
+        cat "$SERVER_LOG"
+        echo -e "\n***\n*** Expected an unsupported OTEL_TRACES_SAMPLER warning in $SERVER_LOG\n***"
         RET=1
     fi
     kill "$SERVER_PID"
