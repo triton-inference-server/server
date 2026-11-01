@@ -49,9 +49,21 @@ ARCH=${ARCH:="x86_64"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 MODEL_REPO="${PWD}/models"
-PERF_CLIENT=perf_analyzer
+# Use the artifact copied from the SDK build, rather than an index-installed
+# Python launcher that may contain an older native binary.
+PERF_CLIENT="${TRITON_DIR}/qa/clients/perf_analyzer"
 SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
+
+if [ ! -x "${PERF_CLIENT}" ]; then
+    echo "Perf Analyzer build artifact not found: ${PERF_CLIENT}"
+    exit 1
+fi
+echo "Perf Analyzer executable: ${PERF_CLIENT}"
+"${PERF_CLIENT}" --version || exit 1
+sha256sum "${PERF_CLIENT}"
+# Check source identity and both installed copies before collecting any data.
+python3 "${TRITON_DIR}/qa/clients/verify_perf_analyzer.py" --require-main || exit 1
 
 # DATADIR is already set in environment variable for aarch64
 if [ "$ARCH" != "aarch64" ]; then
@@ -199,7 +211,10 @@ for BACKEND in $BACKENDS; do
     set +e
     set -o pipefail
     PA_MAX_TRIALS=${PA_MAX_TRIALS:-"50"}
-    $PERF_CLIENT -v \
+    # A failed run must not reuse an earlier result file.
+    rm -f "${RESULTDIR}/${NAME}.csv"
+    MEASUREMENT_OK=1
+    "$PERF_CLIENT" -v \
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
                  ${PERF_CLIENT_EXTRA_ARGS} \
@@ -213,6 +228,11 @@ for BACKEND in $BACKENDS; do
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
         RET=1
+        MEASUREMENT_OK=0
+    elif [ ! -s "${RESULTDIR}/${NAME}.csv" ]; then
+        echo "Perf Analyzer returned success without producing ${RESULTDIR}/${NAME}.csv"
+        RET=1
+        MEASUREMENT_OK=0
     fi
     echo "Time after perf analyzer trials: $(date)"
     set +o pipefail
@@ -238,7 +258,7 @@ for BACKEND in $BACKENDS; do
         wait $SERVER_PID
     fi
 
-    if [ -f $REPORTER ]; then
+    if [ "${MEASUREMENT_OK}" -eq 1 ] && [ -f $REPORTER ]; then
         set +e
 
         URL_FLAG=
