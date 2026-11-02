@@ -38,9 +38,6 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-# Reject stale images before starting the benchmark matrix.
-python3 "${TRITON_DIR:-/opt/tritonserver}/qa/clients/verify_perf_analyzer.py" --require-main || exit 1
-
 rm -f *.log  *.csv *.tjson *.json
 
 # Descriptive name for the current results

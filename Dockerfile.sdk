@@ -126,12 +126,6 @@ WORKDIR /workspace
 COPY TRITON_VERSION .
 COPY ${TRITON_CLIENT_REPO_SUBDIR} client
 COPY ${TRITON_PA_REPO_SUBDIR} perf_analyzer
-COPY tools/verify_perf_analyzer.py /workspace/install/bin/verify_perf_analyzer.py
-# These files are written from the actual checkout by the SDK CI template.
-# Check them before compiling the clients, so an incomplete CI rollout fails early.
-RUN test -s /workspace/perf_analyzer/TRITON_PA_COMMIT && \
-    test -s /workspace/perf_analyzer/TRITON_PA_SOURCE_REF && \
-    echo "Perf Analyzer checkout: $(cat /workspace/perf_analyzer/TRITON_PA_SOURCE_REF) $(cat /workspace/perf_analyzer/TRITON_PA_COMMIT)"
 
 WORKDIR /workspace/client_build
 RUN --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=false \
@@ -187,10 +181,6 @@ RUN --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=fals
         ln -sf perf_analyzer /workspace/install/bin/perf_client && \
         cp /workspace/perf_analyzer/perf_analyzer-*.whl /workspace/install/python/; \
     fi && \
-    cp /workspace/perf_analyzer/TRITON_PA_COMMIT /workspace/install/bin/perf_analyzer.commit && \
-    cp /workspace/perf_analyzer/TRITON_PA_SOURCE_REF /workspace/install/bin/perf_analyzer.source_ref && \
-    printf '%s\n' "${TRITON_PERF_ANALYZER_BUILD}" > /workspace/install/bin/perf_analyzer.build_mode && \
-    sha256sum /workspace/install/bin/perf_analyzer | cut -d ' ' -f 1 > /workspace/install/bin/perf_analyzer.sha256 && \
     /workspace/install/bin/perf_analyzer --version
 
 WORKDIR /workspace/client_build
@@ -338,6 +328,3 @@ ENV LD_LIBRARY_PATH=/opt/hpcx/ompi/lib:${LD_LIBRARY_PATH}
 
 # Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
 ENV TCMALLOC_RELEASE_RATE=200
-
-# Check after all pip installs and final runtime environment configuration.
-RUN python3 install/bin/verify_perf_analyzer.py

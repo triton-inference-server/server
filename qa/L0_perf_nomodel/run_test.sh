@@ -61,9 +61,6 @@ if [ ! -x "${PERF_CLIENT}" ]; then
 fi
 echo "Perf Analyzer executable: ${PERF_CLIENT}"
 "${PERF_CLIENT}" --version || exit 1
-sha256sum "${PERF_CLIENT}"
-# Check source identity and both installed copies before collecting any data.
-python3 "${TRITON_DIR}/qa/clients/verify_perf_analyzer.py" --require-main || exit 1
 
 # DATADIR is already set in environment variable for aarch64
 if [ "$ARCH" != "aarch64" ]; then

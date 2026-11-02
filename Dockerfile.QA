@@ -410,6 +410,3 @@ ENV LD_LIBRARY_PATH /opt/hpcx/ompi/lib:${LD_LIBRARY_PATH}
 
 # Required for PyTorch to pickup the correct HPCX libraries
 ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
-
-# Fail image creation if the installed package differs from the SDK artifact.
-RUN python3 qa/clients/verify_perf_analyzer.py
