@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -227,9 +227,9 @@ kill_server
 
 # Test metrics interval by querying host and checking energy
 METRICS_INTERVAL_MS=500
-# Below time interval is larger than actual metrics interval in case
-# the update is not ready for unexpected reason
-WAIT_INTERVAL_SECS=0.6
+# Poll at twice the metrics interval so a late DCGM sample cannot leave two
+# consecutive reads unchanged, while still failing for the 2000ms default.
+WAIT_INTERVAL_SECS=1.0
 
 SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=${METRICS_INTERVAL_MS}"
 run_and_check_server
