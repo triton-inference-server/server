@@ -203,9 +203,12 @@ COPY NVIDIA_Deep_Learning_Container_License.pdf .
 COPY THIRD-PARTY-NOTICES.txt .
 COPY --from=sdk_build /workspace/client/ client/
 COPY --from=sdk_build /workspace/install/ install/
+# The clients tarball is built from install/, so ship the notices file there.
+COPY THIRD-PARTY-NOTICES.txt install/
 WORKDIR /workspace/install
 RUN export VERSION=`cat /workspace/TRITON_VERSION` && \
-    tar zcf /workspace/v"$VERSION".clients.tar.gz ./*
+    tar zcf /workspace/v"$VERSION".clients.tar.gz ./* && \
+    tar tzf /workspace/v"$VERSION".clients.tar.gz | grep -q 'THIRD-PARTY-NOTICES.txt$'
 
 WORKDIR /workspace
 
