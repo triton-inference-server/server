@@ -99,6 +99,7 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
     df += """
 WORKDIR /opt/tritonserver
 COPY --from=full /opt/tritonserver/LICENSE .
+COPY --from=full /opt/tritonserver/THIRD-PARTY-NOTICES.txt .
 COPY --from=full /opt/tritonserver/TRITON_VERSION .
 COPY --from=full /opt/tritonserver/NVIDIA_Deep_Learning_Container_License.pdf .
 COPY --from=full /opt/tritonserver/bin bin/
