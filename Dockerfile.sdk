@@ -32,8 +32,6 @@
 ARG BASE_IMAGE=nvcr.io/nvidia/cuda-dl-base:26.10-cuda13.4-inference-runtime-ubuntu24.04
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
-ARG TRITON_PA_REPO_SUBDIR=perfanalyzerrepo
-ARG TRITON_PERF_ANALYZER_BUILD=1
 ARG TRITON_REPO_ORGANIZATION=http://github.com/triton-inference-server
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_CORE_REPO_TAG=main
@@ -110,8 +108,6 @@ RUN rm -f /usr/bin/python && \
 # Build the client library and examples
 ARG TRITON_REPO_ORGANIZATION
 ARG TRITON_CLIENT_REPO_SUBDIR
-ARG TRITON_PA_REPO_SUBDIR
-ARG TRITON_PERF_ANALYZER_BUILD
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
 ARG TRITON_CLIENT_REPO_TAG
@@ -125,7 +121,6 @@ ARG TRITON_CLIENT_BUILD_PARALLEL
 WORKDIR /workspace
 COPY TRITON_VERSION .
 COPY ${TRITON_CLIENT_REPO_SUBDIR} client
-COPY ${TRITON_PA_REPO_SUBDIR} perf_analyzer
 
 WORKDIR /workspace/client_build
 RUN --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=false \
@@ -136,6 +131,7 @@ RUN --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=fals
           -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
           -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
           -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
+          -DTRITON_ENABLE_PERF_ANALYZER=OFF \
           -DTRITON_ENABLE_CC_HTTP=ON -DTRITON_ENABLE_CC_GRPC=ON \
           -DTRITON_ENABLE_PYTHON_HTTP=ON -DTRITON_ENABLE_PYTHON_GRPC=ON \
           -DTRITON_ENABLE_JAVA_HTTP=ON \
@@ -146,44 +142,6 @@ RUN --mount=type=secret,id=maven_settings,target=/run/secrets/maven_settings,req
     export GIT_CONFIG_GLOBAL=/run/secrets/gitconfig && \
     if [ -f /run/secrets/maven_settings ]; then export MAVEN_ARGS="--settings /run/secrets/maven_settings"; fi && \
     cmake --build . -v --parallel ${TRITON_CLIENT_BUILD_PARALLEL} --target cc-clients java-clients python-clients
-
-# Build the Perf Analyzer checkout selected by CI. Installing tritonclient[all]
-# alone resolves PA from a package index and can miss unreleased fixes.
-# Prebuilt wheels retain their layout for auditwheel-bundled libraries.
-WORKDIR /workspace/pa_build
-RUN --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=false \
-    export GIT_CONFIG_GLOBAL=/run/secrets/gitconfig && \
-    if [ "${TRITON_PERF_ANALYZER_BUILD}" = "1" ]; then \
-        cmake -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_INSTALL_PREFIX=/workspace/install \
-              -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
-              -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
-              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
-              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
-              -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
-              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
-              -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
-              -DTRITON_ENABLE_PERF_ANALYZER_OPENAI=ON \
-              -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} \
-              /workspace/perf_analyzer && \
-        cmake --build . -v --parallel ${TRITON_CLIENT_BUILD_PARALLEL} --target perf-analyzer && \
-        mkdir -p /workspace/perf_analyzer/src/perf_analyzer/bin && \
-        cp /workspace/install/bin/perf_analyzer /workspace/perf_analyzer/src/perf_analyzer/bin/ && \
-        sed -i "s/^__version__ = .*/__version__ = \"$(cat /workspace/TRITON_VERSION)\"/" \
-            /workspace/perf_analyzer/src/perf_analyzer/__init__.py && \
-        python3 -m build --wheel --outdir /workspace/install/python /workspace/perf_analyzer; \
-    else \
-        python3 -m pip install --no-deps --target=/workspace/install/bin/pa-artifact \
-            /workspace/perf_analyzer/perf_analyzer-*.whl && \
-        chmod +x /workspace/install/bin/pa-artifact/perf_analyzer/bin/perf_analyzer && \
-        ln -sf pa-artifact/perf_analyzer/bin/perf_analyzer /workspace/install/bin/perf_analyzer && \
-        ln -sf perf_analyzer /workspace/install/bin/perf_client && \
-        cp /workspace/perf_analyzer/perf_analyzer-*.whl /workspace/install/python/; \
-    fi && \
-    /workspace/install/bin/perf_analyzer --version
-
-WORKDIR /workspace/client_build
 
 # Install Java API Bindings
 RUN --mount=type=secret,id=maven_settings,target=/run/secrets/maven_settings,required=false \
@@ -268,17 +226,21 @@ COPY qa/images/mug.jpg images/mug.jpg
 RUN pip3 install --upgrade "numpy<2" pillow attrdict
 
 RUN --mount=type=secret,id=triton_ci_pip_extra_values,env=TRITON_CI_PYPI_EXTRA_VALUES \
-    set -e; \
-    pip3 uninstall -y perf-analyzer && \
-    for wheel in install/python/tritonclient-*any*.whl; do \
-        pip3 install --upgrade ${TRITON_CI_PYPI_EXTRA_VALUES} \
-            install/python/perf_analyzer-*.whl "${wheel}[all]"; \
-    done
+    if [ -n "${TRITON_CI_PYPI_EXTRA_VALUES}" ]; then \
+        find install/python/ -maxdepth 1 -type f -name \
+            "tritonclient-*any*.whl" -exec pip3 install --upgrade ${TRITON_CI_PYPI_EXTRA_VALUES} {}[all] \; ; \
+    else \
+        find install/python/ -maxdepth 1 -type f -name \
+            "tritonclient-*any*.whl" -exec pip3 install --upgrade {}[all] \; ; \
+    fi
 
-# Install GenAI-Perf, constraining PA to the same locally built wheel.
+# Install GenAI-Perf
 RUN --mount=type=secret,id=triton_ci_pip_extra_values,env=TRITON_CI_PYPI_EXTRA_VALUES \
-    pip3 install --upgrade ${TRITON_CI_PYPI_EXTRA_VALUES} \
-        install/python/perf_analyzer-*.whl genai-perf
+    if [ -n "${TRITON_CI_PYPI_EXTRA_VALUES}" ]; then \
+       pip3 install --upgrade ${TRITON_CI_PYPI_EXTRA_VALUES} genai-perf ; \
+    else \
+        pip3 install --upgrade genai-perf ; \
+    fi
 
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \

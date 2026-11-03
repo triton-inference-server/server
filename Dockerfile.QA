@@ -30,6 +30,9 @@ ARG SDK_IMAGE=tritonserver_sdk
 ARG TRITON_REPO_ORGANIZATION=http://github.com/triton-inference-server
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_CORE_REPO_TAG=main
+ARG TRITON_CLIENT_REPO_TAG=main
+ARG TRITON_PA_REPO_SUBDIR=perfanalyzerrepo
+ARG TRITON_PA_BUILD_PARALLEL=4
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_BACKEND_REPO_TAG=main
 ARG TRITONTMP_DIR=/tmp
@@ -45,6 +48,9 @@ ARG TRITONTMP_DIR
 ARG TRITON_REPO_ORGANIZATION
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
+ARG TRITON_CLIENT_REPO_TAG
+ARG TRITON_PA_REPO_SUBDIR
+ARG TRITON_PA_BUILD_PARALLEL
 ARG TRITON_THIRD_PARTY_REPO_TAG
 ARG TRITON_BACKEND_REPO_TAG
 ARG IGPU_BUILD
@@ -55,19 +61,29 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=secret,id=apt_sources,target=/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list,required=false \
     apt-get update && \
     apt-get install -y --no-install-recommends \
+            autoconf \
+            automake \
             build-essential \
+            ca-certificates \
+            git \
+            gperf \
             libarchive-dev \
             libboost-dev \
+            libssl-dev \
+            libtool \
+            pkg-config \
             python3-dev \
             python3-pip \
             python3-setuptools \
             python3-venv \
             python3-wheel \
             rapidjson-dev \
-            software-properties-common && \
+            software-properties-common \
+            wget \
+            zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install cmake==4.0.3
+RUN pip3 install build cmake==4.0.3
 ENV CMAKE_POLICY_VERSION_MINIMUM=3.5
 
 # Add densenet_onnx model to example repo
@@ -292,6 +308,33 @@ RUN mkdir -p qa/L0_passive_instance/models/distributed_int32_int32_int32/1 && \
         qa/L0_passive_instance/models/distributed_int32_int32_int32/1/.
 
 ############################################################################
+## Build Perf Analyzer for QA
+############################################################################
+WORKDIR /workspace/pa_build
+COPY ${TRITON_PA_REPO_SUBDIR} /workspace/perf_analyzer
+COPY TRITON_VERSION .
+RUN --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=false \
+    export GIT_CONFIG_GLOBAL=/run/secrets/gitconfig && \
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=/workspace/pa_install \
+          -DTRITON_VERSION=`cat TRITON_VERSION` \
+          -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
+          -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+          -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+          -DTRITON_CLIENT_REPO_TAG=${TRITON_CLIENT_REPO_TAG} \
+          -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
+          -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_OPENAI=ON \
+          /workspace/perf_analyzer && \
+    cmake --build . -v --parallel ${TRITON_PA_BUILD_PARALLEL} --target perf-analyzer && \
+    mkdir -p /workspace/perf_analyzer/src/perf_analyzer/bin && \
+    cp /workspace/pa_install/bin/perf_analyzer /workspace/perf_analyzer/src/perf_analyzer/bin/ && \
+    sed -i "s/^__version__ = .*/__version__ = \"$(cat TRITON_VERSION)\"/" \
+        /workspace/perf_analyzer/src/perf_analyzer/__init__.py && \
+    python3 -m build --wheel --outdir /workspace/qa/pkgs /workspace/perf_analyzer
+
+############################################################################
 ## Copy artifacts from sdk container
 ############################################################################
 FROM ${SDK_IMAGE} AS sdk
@@ -305,7 +348,6 @@ RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp install/lib/libhttpclient.so qa/clients/. && \
     cp install/python/*.py qa/clients/. && \
     cp install/python/triton*.whl qa/pkgs/. && \
-    cp install/python/perf_analyzer-*.whl qa/pkgs/. && \
     cp install/java/examples/*.jar qa/clients/.
 RUN cp client/src/grpc_generated/go/*.go qa/L0_simple_go_client/. && \
     cp client/src/grpc_generated/javascript/*.js qa/L0_simple_nodejs_client/. && \
@@ -392,17 +434,15 @@ COPY --chown=1000:1000 --from=sdk /workspace/qa/ qa/
 RUN rm -fr qa/L0_copyrights qa/L0_build_variants
 
 
-# Remove any base-image PA package and install the SDK wheel explicitly.
+# Remove any base-image PA package and install the QA-built wheel explicitly.
 # Passing that wheel with tritonclient[all] prevents index PA resolution.
 RUN --mount=type=secret,id=triton_ci_pip_extra_values,env=TRITON_CI_PYPI_EXTRA_VALUES \
-    set -e; \
+    set -- qa/pkgs/tritonclient-*any*.whl; \
+    test "$#" -eq 1 && test -f "$1" && \
     pip3 uninstall -y perf-analyzer && \
-    for wheel in qa/pkgs/tritonclient-*any*.whl; do \
-        pip3 install --upgrade ${TRITON_CI_PYPI_EXTRA_VALUES} \
-            qa/pkgs/perf_analyzer-*.whl "${wheel}[all]"; \
-    done
+    pip3 install --upgrade ${TRITON_CI_PYPI_EXTRA_VALUES} \
+        qa/pkgs/perf_analyzer-*.whl "${1}[all]"
 
-ENV PATH=/opt/tritonserver/qa/clients:${PATH}
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
 
 # DLIS-3631: Needed to run Perf Analyzer CI tests correctly
