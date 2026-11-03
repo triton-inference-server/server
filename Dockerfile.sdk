@@ -204,7 +204,6 @@ COPY THIRD-PARTY-NOTICES.txt .
 COPY LICENSE .
 COPY --from=sdk_build /workspace/client/ client/
 COPY --from=sdk_build /workspace/install/ install/
-# The clients tarball is built from install/, so ship the notices file there.
 WORKDIR /workspace/install
 RUN export VERSION=`cat /workspace/TRITON_VERSION` && \
     tar zcf /workspace/v"$VERSION".clients.tar.gz ./* ../THIRD-PARTY-NOTICES.txt ../LICENSE && \
