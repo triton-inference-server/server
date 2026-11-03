@@ -2001,6 +2001,7 @@ def core_build(
     )
 
     cmake_script.cp(os.path.join(repo_dir, "LICENSE"), install_dir)
+    cmake_script.cp(os.path.join(repo_dir, "THIRD-PARTY-NOTICES.txt"), install_dir)
     cmake_script.cp(os.path.join(repo_dir, "TRITON_VERSION"), install_dir)
 
     # If requested, package the source code for all OSS used to build.
