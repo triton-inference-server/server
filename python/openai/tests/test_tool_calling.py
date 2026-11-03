@@ -741,3 +741,23 @@ class TestStreamingToolParseLimit:
 
         _, status = self._stream(client, "cancellation-status", with_tools=False)
         assert status == "cancelled"
+
+
+# OpenAI allows a function without "parameters": it takes no arguments.
+@pytest.mark.parametrize(
+    "tool_choice",
+    [{"type": "function", "function": {"name": "get_current_time"}}, "required"],
+)
+def test_guided_json_for_tool_without_parameters(tool_choice):
+    from engine.utils.triton import _get_guided_json_from_tool
+    from schemas.openai import CreateChatCompletionRequest
+
+    request = CreateChatCompletionRequest(
+        model="test-model",
+        messages=[{"role": "user", "content": "What time is it?"}],
+        tools=[{"type": "function", "function": {"name": "get_current_time"}}],
+        tool_choice=tool_choice,
+    )
+
+    guided_json = _get_guided_json_from_tool(request)
+    assert json.loads(guided_json) == {"type": "object", "properties": {}}
