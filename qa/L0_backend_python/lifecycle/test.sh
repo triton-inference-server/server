@@ -221,8 +221,18 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
             pkill -9 -f "init_unresponsive/1/model.py"
             sleep 1
             RET=1
+            wait $SERVER_PID
+        else
+            # The server exits with status 1 when a model fails to load. A
+            # crash exits with a different status.
+            wait $SERVER_PID
+            SERVER_EXIT=$?
+            if [ $SERVER_EXIT -ne 1 ]; then
+                cat $SERVER_LOG
+                echo -e "\n***\n*** init_unresponsive: expected server exit status 1, got $SERVER_EXIT \n***"
+                RET=1
+            fi
         fi
-        wait $SERVER_PID
     fi
 
     current_num_pages=`get_shm_pages`
