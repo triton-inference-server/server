@@ -860,6 +860,17 @@ APT_SOURCES_DEFAULT_TARGET = "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.
 GIT_CONFIG_CONTENT_ENV = "TRITON_GITCONFIG"
 GIT_CONFIG_CONTAINER_PATH = "/tmp/gitconfig"
 
+# Conan remote the OpenVINO backend reuses and pushes binaries through; the
+# backend gets OpenVINO from Conan by default. The URL carries the credentials
+# (https://<user>:<token>@host/...), so it is forwarded to the build container
+# by name only and its value stays out of the generated scripts. It is not a
+# build arg: the build runs in 'docker run', which a build arg never reaches,
+# and a build arg would be recorded in the image history.
+CONAN_SECRET_ENVS = ("CONAN_REMOTE_URL",)
+
+# Conan release the OpenVINO backend's Conan build was validated with.
+CONAN_VERSION = "2.33.0"
+
 
 def parse_secret_spec(spec):
     """Split a Docker secret spec into ordered (key, value) pairs.
@@ -936,6 +947,29 @@ def apt_sources_secret_mount():
             APT_SOURCES_SECRET_ID, target
         )
     return ""
+
+
+def openvino_conan_enabled():
+    """True when the OpenVINO backend is built; it gets OpenVINO from Conan.
+
+    The backend decides between Conan and its Docker build itself
+    (TRITON_OPENVINO_USE_CONAN, default ON on Linux); build.py only prepares
+    the build container for it. Pass
+    --extra-backend-cmake-arg openvino:TRITON_OPENVINO_USE_CONAN=OFF to use the
+    Docker build, which still receives TRITON_BUILD_CONTAINER.
+    """
+    return any(be.split(":", 1)[0] == "openvino" for be in FLAGS.backend or [])
+
+
+def conan_install():
+    """Dockerfile step installing Conan when the OpenVINO backend uses it."""
+    if not openvino_conan_enabled():
+        return ""
+    return """
+RUN pip3 install conan=={}
+""".format(
+        CONAN_VERSION
+    )
 
 
 def mount_apt_sources_secret(df):
@@ -1055,6 +1089,7 @@ RUN pip3 install --upgrade pip \\
           virtualenv \\
           wheel
 """
+    df += conan_install()
     df += f"""
 # Install boost version >= 1.78 for boost::span
 # Current libboost-dev apt packages are < 1.78, so install from tar.gz
@@ -1168,6 +1203,7 @@ RUN pip3 install --upgrade \\
           cmake==4.0.3 \\
           pybind11[global]
 """
+    df += conan_install()
 
     df += f"""
 # Install boost version >= 1.78 for boost::span
@@ -1827,6 +1863,13 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         if os.environ.get(GIT_CONFIG_CONTENT_ENV):
             runargs += ["-e", GIT_CONFIG_CONTENT_ENV]
 
+        # Conan remote credentials for the OpenVINO backend, by name for the
+        # same reason as the git config above.
+        if openvino_conan_enabled():
+            for var in CONAN_SECRET_ENVS:
+                if os.environ.get(var):
+                    runargs += ["-e", var]
+
         if "TRITON_RELEASE_VERSION" in os.environ:
             runargs += [
                 "-e",
@@ -2087,6 +2130,16 @@ def backend_build(
         backend_cmake_args(images, components, be, repo_install_dir, library_paths)
     )
     cmake_script.makeinstall()
+
+    if be == "openvino" and openvino_conan_enabled():
+        # Push only the Conan packages this build compiled from source. The
+        # remote is checked inside the container, where the credentials are. A
+        # failed upload only costs cache reuse, so it does not fail the build.
+        cmake_script.cmd(
+            'if [[ -n "${CONAN_REMOTE_URL:-}" ]]; then '
+            f"cmake --build . --config {FLAGS.build_type} -t conan-upload || "
+            'echo "WARNING: conan-upload failed"; fi'
+        )
 
     if be == "tensorrtllm":
         tensorrtllm_be_dir = os.path.join(build_dir, be)
