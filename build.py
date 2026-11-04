@@ -74,8 +74,8 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.75.0dev",
-    "triton_container_version": "26.11dev",
+    "release_version": "2.76.0dev",
+    "triton_container_version": "26.12dev",
     "upstream_container_version": "26.10",
     "cuda_dl_base_version": "26.10-cuda13.4",
     "ort_version": "1.31.1",
