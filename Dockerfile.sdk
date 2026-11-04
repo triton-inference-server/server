@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/cuda-dl-base:26.09-cuda13.4-inference-runtime-ubuntu24.04
+ARG BASE_IMAGE=nvcr.io/nvidia/cuda-dl-base:26.10-cuda13.4-inference-runtime-ubuntu24.04
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_REPO_ORGANIZATION=http://github.com/triton-inference-server
@@ -200,11 +200,14 @@ RUN --mount=type=secret,id=apt_sources,target=/etc/apt/sources.list.d/nvidia-art
 WORKDIR /workspace
 COPY TRITON_VERSION .
 COPY NVIDIA_Deep_Learning_Container_License.pdf .
+COPY THIRD-PARTY-NOTICES.txt .
+COPY LICENSE .
 COPY --from=sdk_build /workspace/client/ client/
 COPY --from=sdk_build /workspace/install/ install/
 WORKDIR /workspace/install
 RUN export VERSION=`cat /workspace/TRITON_VERSION` && \
-    tar zcf /workspace/v"$VERSION".clients.tar.gz ./*
+    tar zcf /workspace/v"$VERSION".clients.tar.gz ./* ../THIRD-PARTY-NOTICES.txt ../LICENSE && \
+    tar tzf /workspace/v"$VERSION".clients.tar.gz | grep -q 'THIRD-PARTY-NOTICES.txt$'
 
 WORKDIR /workspace
 
