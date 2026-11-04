@@ -182,6 +182,76 @@ if [[ ${TEST_WINDOWS} == 0 ]]; then
     set -e
 fi
 
+# A stub that stops responding while its model initializes must fail the model
+# load instead of hanging the server. The model freezes its own stub until the
+# server gives up on it, so the server has to terminate a stub that still
+# considers itself initialized and then exit because a model failed to load.
+# SIGSTOP is not available on Windows.
+if [[ ${TEST_WINDOWS} == 0 ]]; then
+    rm -rf models/
+    mkdir -p models/init_unresponsive/1/
+    cp ../../python_models/init_unresponsive/model.py ./models/init_unresponsive/1/
+    cp ../../python_models/init_unresponsive/config.pbtxt ./models/init_unresponsive/
+
+    # Use a fixed stub timeout, independent of platform defaults, that is long
+    # enough for the stub to resume and sit idle before it is killed.
+    UNRESPONSIVE_STUB_TIMEOUT=20
+    SAVED_SERVER_ARGS="${SERVER_ARGS}"
+    SERVER_ARGS="--model-repository=${MODELDIR}/lifecycle/models --backend-directory=${BACKEND_DIR} --log-verbose=1 --backend-config=python,stub-timeout-seconds=${UNRESPONSIVE_STUB_TIMEOUT}"
+
+    set +e
+    prev_num_pages=`get_shm_pages`
+    run_server_nowait
+    SERVER_ARGS="${SAVED_SERVER_ARGS}"
+
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        RET=1
+    else
+        # Startup, the 15 second stall and the stub timeout fit well inside
+        # this deadline.
+        for i in $(seq 1 $((UNRESPONSIVE_STUB_TIMEOUT + 100))); do
+            kill -0 $SERVER_PID 2> /dev/null || break
+            sleep 1
+        done
+        if kill -0 $SERVER_PID 2> /dev/null; then
+            cat $SERVER_LOG
+            echo -e "\n***\n*** init_unresponsive: server did not exit after the model failed to load \n***"
+            kill -9 $SERVER_PID
+            pkill -9 -f "init_unresponsive/1/model.py"
+            sleep 1
+            RET=1
+        fi
+        wait $SERVER_PID
+    fi
+
+    current_num_pages=`get_shm_pages`
+    if [ $current_num_pages -ne $prev_num_pages ]; then
+        ls /dev/shm
+        echo -e "\n***\n*** Test Failed. Shared memory pages were not cleaned properly.
+    Shared memory pages before starting triton equals to $prev_num_pages
+    and shared memory pages after starting triton equals to $current_num_pages \n***"
+        RET=1
+    fi
+
+    # The load must fail because the server gave up on the stub, not because
+    # of some other error in the model. If the stub is stopped while holding
+    # the health mutex, the server reports that instead.
+    grep -E "failed to load 'init_unresponsive'.*(Stub process 'init_unresponsive_0_0' is not healthy|Failed to obtain the health mutex)" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** init_unresponsive model test failed \n***"
+        RET=1
+    fi
+
+    if pgrep -f "init_unresponsive/1/model.py" > /dev/null; then
+        ps -eo pid,stat,args | grep "[i]nit_unresponsive"
+        echo -e "\n***\n*** init_unresponsive: stub process was left running \n***"
+        RET=1
+    fi
+    set -e
+fi
+
 rm -rf models/
 mkdir -p models/auto_complete_error/1/
 cp ../../python_models/auto_complete_error/model.py ./models/auto_complete_error/1/
