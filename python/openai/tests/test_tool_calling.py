@@ -760,4 +760,8 @@ def test_guided_json_for_tool_without_parameters(tool_choice):
     )
 
     guided_json = _get_guided_json_from_tool(request)
-    assert json.loads(guided_json) == {"type": "object", "properties": {}}
+    assert json.loads(guided_json) == {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": False,
+    }

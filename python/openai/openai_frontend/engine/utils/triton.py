@@ -615,7 +615,9 @@ def _get_guided_json_from_tool(
         # A function without "parameters" takes no arguments, so constrain
         # the call to an empty JSON object.
         if tool.parameters is None:
-            return json.dumps({"type": "object", "properties": {}})
+            return json.dumps(
+                {"type": "object", "properties": {}, "additionalProperties": False}
+            )
         return tool.parameters.model_dump_json()
 
     return None
