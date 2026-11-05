@@ -472,15 +472,16 @@ class PBCustomMetricsTest(unittest.TestCase):
             thread.join()
         self.assertEqual(errors, [])
 
-        metrics = self._get_metrics()
+        # Compare whole lines, so that a total with extra digits does not pass.
+        metric_lines = self._get_metrics().splitlines()
         total = len(values) * observation_count
-        self.assertIn(f"{name}_count{{{labels}}} {total}", metrics)
+        self.assertIn(f"{name}_count{{{labels}}} {total}", metric_lines)
         # The values add up to 8 per round of observations.
-        self.assertIn(f"{name}_sum{{{labels}}} {8 * observation_count}", metrics)
+        self.assertIn(f"{name}_sum{{{labels}}} {8 * observation_count}", metric_lines)
         for i, le in enumerate(["1", "2", "3", "4"]):
             count = (i + 1) * observation_count
-            self.assertIn(f'{name}_bucket{{{labels},le="{le}"}} {count}', metrics)
-        self.assertIn(f'{name}_bucket{{{labels},le="+Inf"}} {total}', metrics)
+            self.assertIn(f'{name}_bucket{{{labels},le="{le}"}} {count}', metric_lines)
+        self.assertIn(f'{name}_bucket{{{labels},le="+Inf"}} {total}', metric_lines)
 
 
 class TritonPythonModel:
