@@ -49,6 +49,7 @@ from tritonclient.utils import *
 # By default, find tritonserver on "localhost", but for windows tests
 # we overwrite the IP address with the TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get("TRITONSERVER_IPADDR", "localhost")
+_test_windows = bool(int(os.environ.get("TEST_WINDOWS", 0)))
 
 
 class UserData:
@@ -163,6 +164,55 @@ class LifecycleTest(unittest.TestCase):
             log_text = f.read()
             self.assertIn("[execute_cancel] Request not cancelled at 1.0 s", log_text)
             self.assertIn("[execute_cancel] Request cancelled at ", log_text)
+
+    @unittest.skipIf(_test_windows, "The model stops its stub with POSIX signals.")
+    def test_execute_unresponsive(self):
+        model_name = "execute_unresponsive"
+        log_path = "lifecycle_server.log"
+        finished_message = "Execution with input -1 finished"
+
+        def read_log():
+            with open(log_path, mode="r", encoding="utf-8") as f:
+                return f.read()
+
+        def infer(client, value):
+            input_data = np.array([value], dtype=np.float32)
+            inputs = [
+                httpclient.InferInput(
+                    "IN", input_data.shape, np_to_triton_dtype(input_data.dtype)
+                )
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            return client.infer(model_name, inputs).as_numpy("OUT")
+
+        with self._shm_leak_detector.Probe():
+            with httpclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8000"
+            ) as client:
+                finished_count = read_log().count(finished_message)
+                # A negative input stops the stub while it executes the request,
+                # so the server stops waiting for the response.
+                with self.assertRaises(InferenceServerException) as e:
+                    infer(client, -1.0)
+                self.assertRegex(
+                    str(e.exception),
+                    "is not healthy|Failed to obtain the health mutex",
+                )
+                # Without further requests, the stub finishes the execution and
+                # its Python threads keep running.
+                deadline = time.time() + 30
+                while read_log().count(finished_message) == finished_count:
+                    self.assertLess(time.time(), deadline)
+                    time.sleep(0.5)
+                # Each later request receives its own response.
+                for value in [1.0, 2.0, 3.0]:
+                    np.testing.assert_array_equal(infer(client, value), [value])
+
+        self.assertIn(
+            "Stub process 'execute_unresponsive_0_0' was not healthy while "
+            "executing requests.",
+            read_log(),
+        )
 
     def test_batch_error(self):
         # The execute_error model returns an error for the first and third
