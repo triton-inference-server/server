@@ -90,11 +90,18 @@ KINDS="CPU"
 if [ "$TRITON_SERVER_CPU_ONLY" != "1" ]; then
     KINDS="CPU GPU"
 fi
-for base in add_sub_static add_sub_dynamic passthrough int4_initializer shape_mismatch; do
+for base in add_sub_static add_sub_batched add_sub_dynamic passthrough int4_initializer shape_mismatch; do
     for kind in $KINDS; do
         for pooling in on off default; do
             model=io_pooling_repo/${base}_${kind,,}_${pooling}
-            cp -r io_pooling_models/$base $model
+            if [ "$base" == "add_sub_batched" ]; then
+                # add_sub_static whose batcher waits until a batch is full, so
+                # that requests sent together share one execution
+                cp -r io_pooling_models/add_sub_static $model
+                sed -i 's/max_queue_delay_microseconds: [0-9]*/max_queue_delay_microseconds: 5000000/' $model/config.pbtxt
+            else
+                cp -r io_pooling_models/$base $model
+            fi
             echo "instance_group [ { kind: KIND_$kind count: 1 } ]" >> $model/config.pbtxt
             if [ "$pooling" == "on" ]; then
                 echo "parameters { key: \"io_pooling\" value: { string_value: \"true\" } }" >> $model/config.pbtxt
