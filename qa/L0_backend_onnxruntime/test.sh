@@ -47,7 +47,7 @@ CLIENT_LOG="./test.log"
 source ../common/util.sh
 
 rm -f *.log
-rm -rf models
+rm -rf models io_pooling_repo
 
 RET=0
 
@@ -81,6 +81,70 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# io_pooling test: every variant is a copy of a base model with its own
+# instance kind and io_pooling value; "default" leaves the parameter unset,
+# which must behave like false since pooling is opt-in
+mkdir -p io_pooling_repo
+KINDS="CPU"
+if [ "$TRITON_SERVER_CPU_ONLY" != "1" ]; then
+    KINDS="CPU GPU"
+fi
+for base in add_sub_static add_sub_dynamic passthrough int4_initializer shape_mismatch; do
+    for kind in $KINDS; do
+        for pooling in on off default; do
+            model=io_pooling_repo/${base}_${kind,,}_${pooling}
+            cp -r io_pooling_models/$base $model
+            echo "instance_group [ { kind: KIND_$kind count: 1 } ]" >> $model/config.pbtxt
+            if [ "$pooling" == "on" ]; then
+                echo "parameters { key: \"io_pooling\" value: { string_value: \"true\" } }" >> $model/config.pbtxt
+            elif [ "$pooling" == "off" ]; then
+                echo "parameters { key: \"io_pooling\" value: { string_value: \"false\" } }" >> $model/config.pbtxt
+            fi
+        done
+    done
+done
+cp -r io_pooling_models/add_sub_static io_pooling_repo/bad_pooling_value
+echo "instance_group [ { kind: KIND_CPU count: 1 } ]" >> io_pooling_repo/bad_pooling_value/config.pbtxt
+echo "parameters { key: \"io_pooling\" value: { string_value: \"maybe\" } }" >> io_pooling_repo/bad_pooling_value/config.pbtxt
+
+# The second run has no pinned and (almost) no CUDA pool memory, so pooled
+# buffers must take the direct allocation fallback.
+NO_POOL_ARGS="--pinned-memory-pool-byte-size=0 --cuda-memory-pool-byte-size=0:1024"
+if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
+    NO_POOL_ARGS="--pinned-memory-pool-byte-size=0"
+fi
+for run in 1 2; do
+    POOL_ARGS=""
+    POOL_DESC="default memory pools"
+    if [ $run -eq 2 ]; then
+        POOL_ARGS=$NO_POOL_ARGS
+        POOL_DESC="no memory pools"
+    fi
+    SERVER_ARGS="--model-repository=`pwd`/io_pooling_repo --model-control-mode=explicit --allow-client-shm=true --log-verbose=1 $POOL_ARGS"
+    SERVER_LOG="./io_pooling_server_${run}.log"
+    CLIENT_LOG="./io_pooling_test_${run}.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+
+    python3 io_pooling_test.py >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed (io_pooling, $POOL_DESC)\n***"
+        RET=1
+    fi
+
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
