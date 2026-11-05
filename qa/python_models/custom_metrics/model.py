@@ -438,6 +438,50 @@ class PBCustomMetricsTest(unittest.TestCase):
             thread.join()
         self.assertEqual(unexpected_results, [])
 
+    def test_metric_shared_between_threads(self):
+        # Several Python threads may use the same metric at the same time.
+        name = "test_metric_shared_between_threads"
+        metric_family = pb_utils.MetricFamily(
+            name=name,
+            description="test metric shared between threads",
+            kind=pb_utils.MetricFamily.HISTOGRAM,
+        )
+        labels = 'example1="histogram_label1"'
+        metric = metric_family.Metric(
+            labels={"example1": "histogram_label1"}, buckets=[1.0, 2.0, 3.0, 4.0]
+        )
+        # Each thread observes its own value, which falls in its own bucket, so
+        # an observation with another thread's value changes the buckets.
+        values = [0.5, 1.5, 2.5, 3.5]
+        observation_count = 1000
+        errors = []
+        lock = threading.Lock()
+
+        def observe(value):
+            try:
+                for _ in range(observation_count):
+                    metric.observe(value)
+            except Exception as ex:
+                with lock:
+                    errors.append(repr(ex))
+
+        threads = [threading.Thread(target=observe, args=(v,)) for v in values]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(errors, [])
+
+        metrics = self._get_metrics()
+        total = len(values) * observation_count
+        self.assertIn(f"{name}_count{{{labels}}} {total}", metrics)
+        # The values add up to 8 per round of observations.
+        self.assertIn(f"{name}_sum{{{labels}}} {8 * observation_count}", metrics)
+        for i, le in enumerate(["1", "2", "3", "4"]):
+            count = (i + 1) * observation_count
+            self.assertIn(f'{name}_bucket{{{labels},le="{le}"}} {count}', metrics)
+        self.assertIn(f'{name}_bucket{{{labels},le="+Inf"}} {total}', metrics)
+
 
 class TritonPythonModel:
     def execute(self, requests):
