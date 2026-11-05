@@ -27,6 +27,7 @@
 
 import os
 import queue
+import time
 import unittest
 
 import numpy as np
@@ -41,6 +42,12 @@ POOLINGS = ["on", "off", "default"]
 # Wq values of the int4_initializer model, dequantized with scale 0.5.
 _I, _J = np.indices((16, 16))
 INT4_WF = ((((_I * 5 + _J * 3) % 16) - 8) * 0.5).astype(np.float32)
+
+
+# Batch sizes of the requests sent together, one round at a time. Each round
+# adds up to max_batch_size, so the add_sub_batched models, whose batcher waits
+# until a batch is full, run every round as exactly one execution.
+ROUNDS = [[1, 2, 5], [3, 3, 2], [1] * 8]
 
 
 def variants(base):
@@ -74,6 +81,41 @@ class IOPoolingTest(unittest.TestCase):
     def _randn(self, *shape):
         return self.rs_.standard_normal(shape).astype(np.float32)
 
+    def _counts(self, name):
+        stats = self.client_.get_inference_statistics(name).model_stats[0]
+        return stats.execution_count, stats.inference_count
+
+    def _send_together(self, name, requests):
+        # Sends (inputs, outputs) pairs without waiting for each other and
+        # returns their results in the order of 'requests'.
+        responses = queue.Queue()
+        for i, (inputs, outputs) in enumerate(requests):
+            self.client_.async_infer(
+                name,
+                inputs,
+                callback=lambda result, error: responses.put((result, error)),
+                outputs=outputs,
+                request_id=str(i),
+            )
+        results = [None] * len(requests)
+        for _ in requests:
+            result, error = responses.get(timeout=60)
+            self.assertIsNone(error)
+            results[int(result.get_response().id)] = result
+        return results
+
+    def _assert_executions(self, name, before, executions, inferences):
+        # The backend reports statistics after sending the responses, so wait
+        # until every inference is counted before comparing.
+        deadline = time.monotonic() + 10
+        while True:
+            after = self._counts(name)
+            delta = (after[0] - before[0], after[1] - before[1])
+            if delta[1] >= inferences or time.monotonic() > deadline:
+                break
+            time.sleep(0.05)
+        self.assertEqual(delta, (executions, inferences))
+
     def test_add_sub_static(self):
         for name in variants("add_sub_static"):
             with self.subTest(model=name):
@@ -92,26 +134,24 @@ class IOPoolingTest(unittest.TestCase):
                     self._check_add_sub(self._add_sub(name, a, b), a, b)
 
     def test_add_sub_concurrent(self):
-        for name in variants("add_sub_static"):
+        for name in variants("add_sub_batched"):
             with self.subTest(model=name):
                 self._load(name)
-                responses = queue.Queue()
-                sent = {}
-                for i in range(24):
-                    bs = 1 + i % 3
-                    a, b = self._randn(bs, 16), self._randn(bs, 16)
-                    sent[str(i)] = (a, b)
-                    self.client_.async_infer(
+                before = self._counts(name)
+                for sizes in ROUNDS:
+                    sent = [(self._randn(bs, 16), self._randn(bs, 16)) for bs in sizes]
+                    results = self._send_together(
                         name,
-                        [make_input("INPUT0", a), make_input("INPUT1", b)],
-                        callback=lambda result, error: responses.put((result, error)),
-                        request_id=str(i),
+                        [
+                            ([make_input("INPUT0", a), make_input("INPUT1", b)], None)
+                            for a, b in sent
+                        ],
                     )
-                for _ in sent:
-                    result, error = responses.get(timeout=60)
-                    self.assertIsNone(error)
-                    a, b = sent[result.get_response().id]
-                    self._check_add_sub(result, a, b)
+                    for result, (a, b) in zip(results, sent):
+                        self._check_add_sub(result, a, b)
+                self._assert_executions(
+                    name, before, len(ROUNDS), sum(map(sum, ROUNDS))
+                )
 
     def test_passthrough(self):
         for name in variants("passthrough"):
@@ -195,40 +235,40 @@ class IOPoolingTest(unittest.TestCase):
                     else:
                         self._check_add_sub(self._add_sub(name, a, b), a, b)
 
-                responses = queue.Queue()
-                sent = {}
-                for i in range(16):
-                    a, b = self._randn(1, 16), self._randn(1, 16)
-                    handles, outputs = None, None
-                    if i % 2 == 0:
-                        handles = [
-                            self._shm_region(f"{name}_conc_{i}_{j}", 16 * 4)
-                            for j in range(2)
-                        ]
-                        outputs = self._shm_outputs(
-                            [f"{name}_conc_{i}_0", f"{name}_conc_{i}_1"], 1
+                # Batches of 8 single-row requests whose outputs alternate
+                # between CUDA shared memory and the response, twice with the
+                # destinations swapped. The regions are registered first so
+                # that nothing delays the requests of a batch.
+                batched = name.replace("add_sub_static", "add_sub_batched")
+                self._load(batched)
+                regions = [[f"{batched}_{i}_{j}" for j in range(2)] for i in range(8)]
+                handles = [
+                    [self._shm_region(r, 16 * 4) for r in pair] for pair in regions
+                ]
+                before = self._counts(batched)
+                for shm_parity in (0, 1):
+                    sent = [(self._randn(1, 16), self._randn(1, 16)) for _ in range(8)]
+                    requests = [
+                        (
+                            [make_input("INPUT0", a), make_input("INPUT1", b)],
+                            self._shm_outputs(regions[i], 1)
+                            if i % 2 == shm_parity
+                            else None,
                         )
-                    sent[str(i)] = (a, b, handles)
-                    self.client_.async_infer(
-                        name,
-                        [make_input("INPUT0", a), make_input("INPUT1", b)],
-                        callback=lambda result, error: responses.put((result, error)),
-                        outputs=outputs,
-                        request_id=str(i),
-                    )
-                for _ in sent:
-                    result, error = responses.get(timeout=60)
-                    self.assertIsNone(error)
-                    a, b, handles = sent[result.get_response().id]
-                    if handles is None:
-                        self._check_add_sub(result, a, b)
-                    else:
-                        got = [
-                            cudashm.get_contents_as_numpy(h, np.float32, [1, 16])
-                            for h in handles
-                        ]
-                        np.testing.assert_array_equal(got[0], a + b)
-                        np.testing.assert_array_equal(got[1], a - b)
+                        for i, (a, b) in enumerate(sent)
+                    ]
+                    results = self._send_together(batched, requests)
+                    for i, (result, (a, b)) in enumerate(zip(results, sent)):
+                        if i % 2 == shm_parity:
+                            got = [
+                                cudashm.get_contents_as_numpy(h, np.float32, [1, 16])
+                                for h in handles[i]
+                            ]
+                            np.testing.assert_array_equal(got[0], a + b)
+                            np.testing.assert_array_equal(got[1], a - b)
+                        else:
+                            self._check_add_sub(result, a, b)
+                self._assert_executions(batched, before, 2, 16)
 
     def test_invalid_io_pooling_value(self):
         with self.assertRaises(InferenceServerException) as ctx:
