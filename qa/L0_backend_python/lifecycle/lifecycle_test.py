@@ -179,7 +179,6 @@ class LifecycleTest(unittest.TestCase):
     def test_execute_unresponsive(self):
         model_name = "execute_unresponsive"
         log_path = "lifecycle_server.log"
-        finished_message = "Execution with input -1 finished"
 
         def read_log():
             with open(log_path, mode="r", encoding="utf-8") as f:
@@ -188,36 +187,45 @@ class LifecycleTest(unittest.TestCase):
         def infer(client, value):
             return self._infer_in_out(client, model_name, value)
 
+        def infer_unresponsive(client, value):
+            # A negative input stops the stub while it executes the request,
+            # so the server stops waiting for the response.
+            with self.assertRaises(InferenceServerException) as e:
+                infer(client, value)
+            self.assertRegex(
+                str(e.exception),
+                "is not healthy|Failed to obtain the health mutex",
+            )
+
+        def finished_count(value):
+            return read_log().count(f"Execution with input {value:.0f} finished")
+
+        def wait_finished(value, count):
+            deadline = time.time() + 30
+            while finished_count(value) == count:
+                self.assertLess(time.time(), deadline)
+                time.sleep(0.5)
+
         with self._shm_leak_detector.Probe():
             with httpclient.InferenceServerClient(
                 f"{_tritonserver_ipaddr}:8000"
             ) as client:
-                finished_count = read_log().count(finished_message)
-                # A negative input stops the stub while it executes the request,
-                # so the server stops waiting for the response.
-                with self.assertRaises(InferenceServerException) as e:
-                    infer(client, -1.0)
-                self.assertRegex(
-                    str(e.exception),
-                    "is not healthy|Failed to obtain the health mutex",
-                )
+                count = finished_count(-1)
+                infer_unresponsive(client, -1.0)
                 # Without further requests, the stub finishes the execution and
                 # its Python threads keep running.
-                deadline = time.time() + 30
-                while read_log().count(finished_message) == finished_count:
-                    self.assertLess(time.time(), deadline)
-                    time.sleep(0.5)
+                wait_finished(-1, count)
                 # Each later request receives its own response.
                 for value in [1.0, 2.0, 3.0]:
                     np.testing.assert_array_equal(infer(client, value), [value])
                 # An input below -1 also raises an error after the stall.
-                with self.assertRaises(InferenceServerException) as e:
-                    infer(client, -2.0)
-                self.assertRegex(
-                    str(e.exception),
-                    "is not healthy|Failed to obtain the health mutex",
-                )
+                count = finished_count(-2)
+                infer_unresponsive(client, -2.0)
                 np.testing.assert_array_equal(infer(client, 4.0), [4.0])
+                # The stub's Python thread logs after the execution. Wait for
+                # it, so that its log message is not in shared memory when the
+                # leak probe measures it.
+                wait_finished(-2, count)
 
         self.assertIn(
             "Stub process 'execute_unresponsive_0_0' was not healthy while "
