@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,19 +26,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import math
-import sys
-
-sys.path.append("../common")
-
+import abc
+import csv
+import json
 import math
 import os
+import re
 import subprocess
+import sys
 import threading
 import time
+from functools import partial
 
 import numpy as np
-import test_util as tu
 import tritonclient.grpc as grpcclient
 from PIL import Image
 from tritonclient.utils import np_to_triton_dtype
@@ -48,11 +48,9 @@ if sys.version_info >= (3, 0):
 else:
     import Queue as queue
 
-import abc
-import csv
-import json
-import re
-from functools import partial
+sys.path.append("../common")
+
+import test_util as tu  # noqa: E402
 
 DEFAULT_TIMEOUT_MS = 25000
 SEQUENCE_LENGTH_MEAN = 16
@@ -173,7 +171,7 @@ class PerfAnalyzerScenario(Scenario):
                         self.concurrency_range_[2] = min(
                             self.concurrency_range_[2] + 1, self.concurrency_range_[1]
                         )
-                    elif current_queue_us > self.queue_latency_range_us_[0]:
+                    elif current_queue_us > self.queue_latency_range_us_[1]:
                         self.concurrency_range_[2] = max(
                             self.concurrency_range_[2] - 1, self.concurrency_range_[0]
                         )
@@ -604,7 +602,7 @@ class SequenceScenario(Scenario):
 
             (_, value, expected, _) = steps[processed_count]
             processed_count += 1
-            if timeout_ms != None:
+            if timeout_ms is not None:
                 now_ms = int(round(time.time() * 1000))
                 if (now_ms - seq_start_ms) > timeout_ms:
                     raise TimeoutException(
@@ -672,7 +670,7 @@ class SequenceNoEndScenario(SequenceScenario):
             return None
 
         # Track that the sequence id of the model is used for no-end sequence
-        if not model_name in self.sequence_constraints_:
+        if model_name not in self.sequence_constraints_:
             self.sequence_constraints_[model_name] = {}
         self.sequence_constraints_[model_name][client_metadata[1]] = True
 
@@ -741,7 +739,7 @@ class SequenceValidNoEndScenario(SequenceScenario):
             return None
 
         # Track that the sequence id of the model is used for no-end sequence
-        if not model_name in self.sequence_constraints_:
+        if model_name not in self.sequence_constraints_:
             self.sequence_constraints_[model_name] = {}
         self.sequence_constraints_[model_name][client_metadata[1]] = True
 
@@ -821,7 +819,7 @@ class SequenceValidValidScenario(SequenceScenario):
             return None
 
         # Track that the sequence id of the model is used for no-end sequence
-        if not model_name in self.sequence_constraints_:
+        if model_name not in self.sequence_constraints_:
             self.sequence_constraints_[model_name] = {}
         self.sequence_constraints_[model_name][client_metadata[1]] = False
 
@@ -903,7 +901,7 @@ class SequenceNoStartScenario(SequenceScenario):
             return None
 
         # Track that the sequence id of the model is used for no-end sequence
-        if not model_name in self.sequence_constraints_:
+        if model_name not in self.sequence_constraints_:
             self.sequence_constraints_[model_name] = {}
         self.sequence_constraints_[model_name][client_metadata[1]] = False
 
@@ -973,7 +971,7 @@ class SequenceValidScenario(SequenceScenario):
             return None
 
         # Track that the sequence id of the model is used for no-end sequence
-        if not model_name in self.sequence_constraints_:
+        if model_name not in self.sequence_constraints_:
             self.sequence_constraints_[model_name] = {}
         self.sequence_constraints_[model_name][client_metadata[1]] = False
 
