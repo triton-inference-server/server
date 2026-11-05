@@ -34,7 +34,7 @@ import triton_python_backend_utils as pb_utils
 
 # A negative input stops the stub process for longer than the server waits for
 # a health update, so the server stops waiting for the response while the
-# request is still being executed.
+# request is still being executed. An input below -1 then raises an error.
 STALL_SECONDS = 3
 
 
@@ -54,6 +54,8 @@ class TritonPythonModel:
                 # This thread logs after the execution has finished, which it
                 # can only do once the stub releases the GIL.
                 threading.Thread(target=self._log_finished, args=(value,)).start()
+                if value < -1:
+                    raise pb_utils.TritonModelException("Error after the stall")
             out_tensor = pb_utils.Tensor("OUT", in_tensor.as_numpy())
             responses.append(pb_utils.InferenceResponse([out_tensor]))
         return responses

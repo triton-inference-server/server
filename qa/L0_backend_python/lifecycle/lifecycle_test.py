@@ -165,6 +165,16 @@ class LifecycleTest(unittest.TestCase):
             self.assertIn("[execute_cancel] Request not cancelled at 1.0 s", log_text)
             self.assertIn("[execute_cancel] Request cancelled at ", log_text)
 
+    def _infer_in_out(self, client, model_name, value):
+        input_data = np.array([value], dtype=np.float32)
+        inputs = [
+            httpclient.InferInput(
+                "IN", input_data.shape, np_to_triton_dtype(input_data.dtype)
+            )
+        ]
+        inputs[0].set_data_from_numpy(input_data)
+        return client.infer(model_name, inputs).as_numpy("OUT")
+
     @unittest.skipIf(_test_windows, "The model stops its stub with POSIX signals.")
     def test_execute_unresponsive(self):
         model_name = "execute_unresponsive"
@@ -176,14 +186,7 @@ class LifecycleTest(unittest.TestCase):
                 return f.read()
 
         def infer(client, value):
-            input_data = np.array([value], dtype=np.float32)
-            inputs = [
-                httpclient.InferInput(
-                    "IN", input_data.shape, np_to_triton_dtype(input_data.dtype)
-                )
-            ]
-            inputs[0].set_data_from_numpy(input_data)
-            return client.infer(model_name, inputs).as_numpy("OUT")
+            return self._infer_in_out(client, model_name, value)
 
         with self._shm_leak_detector.Probe():
             with httpclient.InferenceServerClient(
@@ -207,12 +210,42 @@ class LifecycleTest(unittest.TestCase):
                 # Each later request receives its own response.
                 for value in [1.0, 2.0, 3.0]:
                     np.testing.assert_array_equal(infer(client, value), [value])
+                # An input below -1 also raises an error after the stall.
+                with self.assertRaises(InferenceServerException) as e:
+                    infer(client, -2.0)
+                self.assertRegex(
+                    str(e.exception),
+                    "is not healthy|Failed to obtain the health mutex",
+                )
+                np.testing.assert_array_equal(infer(client, 4.0), [4.0])
 
         self.assertIn(
             "Stub process 'execute_unresponsive_0_0' was not healthy while "
             "executing requests.",
             read_log(),
         )
+
+    @unittest.skipIf(_test_windows, "The model stops its stub with POSIX signals.")
+    def test_execute_error_after_final(self):
+        model_name = "execute_error_after_final"
+        with self._shm_leak_detector.Probe():
+            with httpclient.InferenceServerClient(
+                f"{_tritonserver_ipaddr}:8000"
+            ) as client:
+                # The model raises an error after it has sent the final response
+                # through the response sender. A negative input also stops the
+                # stub, so the server stops waiting for the execution.
+                for value in [1.0, -1.0, 2.0]:
+                    np.testing.assert_array_equal(
+                        self._infer_in_out(client, model_name, value), [value]
+                    )
+
+        with open("lifecycle_server.log", mode="r", encoding="utf-8") as f:
+            self.assertIn(
+                "Stub process 'execute_error_after_final_0_0' was not healthy "
+                "while executing requests.",
+                f.read(),
+            )
 
     def test_batch_error(self):
         # The execute_error model returns an error for the first and third
