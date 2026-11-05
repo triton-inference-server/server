@@ -951,6 +951,7 @@ for sampler_config in "${SDK_SAMPLER_CONFIGS[@]}"; do
         cat "$SERVER_LOG"
         exit 1
     fi
+    set +e
     echo "SDK sampler=$OTEL_TRACES_SAMPLER arg=$OTEL_TRACES_SAMPLER_ARG rate=$TEST_TRACE_RATE count=$TEST_TRACE_COUNT" >> "$OPENTELEMETRY_LOG"
     python -m unittest opentelemetry_unittest.OpenTelemetryTest.test_sdk_sampler \
         >> "$OPENTELEMETRY_LOG" 2>&1
