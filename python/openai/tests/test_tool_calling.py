@@ -434,6 +434,7 @@ class TestAsyncClientToolCalling:
                     # if the function name is defined, set it. it should be streamed
                     # IN ENTIRETY, exactly one time.
                     if tool_call.function.name:
+                        assert function_name is None
                         assert isinstance(tool_call.function.name, str)
                         function_name = tool_call.function.name
                     if tool_call.function.arguments:
@@ -537,6 +538,7 @@ class TestAsyncClientToolCalling:
                     # if the function name is defined, set it. it should be streamed
                     # IN ENTIRETY, exactly one time.
                     if tool_call.function.name:
+                        assert function_name is None
                         assert isinstance(tool_call.function.name, str)
                         function_name = tool_call.function.name
                     if tool_call.function.arguments:
