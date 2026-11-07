@@ -140,6 +140,7 @@ RUN mkdir -p qa/common && \
     mkdir qa/L0_data_compression/models && \
     cp -r docs/examples/model_repository/simple qa/L0_data_compression/models && \
     cp bin/data_compressor_test qa/L0_data_compression/. && \
+    cp bin/memory_limit_test qa/L0_http/. && \
     cp bin/tensor_size_test qa/L0_input_validation/. && \
     cp bin/metrics_api_test qa/L0_metrics/. && \
     cp bin/response_cache_test qa/L0_response_cache/. && \

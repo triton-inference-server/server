@@ -134,6 +134,8 @@ StartHttpService(
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
+  triton::server::HTTPAPIServer::ConfigureParseMemoryBudget(
+      g_triton_params.http_parse_memory_budget_);
   TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.http_port_,
       g_triton_params.reuse_http_port_, g_triton_params.http_address_,
@@ -181,17 +183,22 @@ StartSagemakerService(
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   size_t max_input_size = triton::server::HTTP_DEFAULT_MAX_INPUT_SIZE;
+  int64_t parse_memory_budget = triton::server::HTTP_PARSE_MEMORY_BUDGET_AUTO;
   triton::server::RestrictedFeatures restricted_apis{};
 #ifdef TRITON_ENABLE_HTTP
   // Reuse HTTP server settings for SageMaker endpoint behavior. In
-  // particular, --http-restricted-api and --http-max-input-size also apply
-  // to SageMaker requests. Without TRITON_ENABLE_HTTP, SageMaker falls back to
-  // default input size and unrestricted APIs (no command-line configuration for
-  // restricted APIs).
+  // particular, --http-restricted-api, --http-max-input-size and
+  // --http-parse-memory-budget also apply to SageMaker requests. Without
+  // TRITON_ENABLE_HTTP, SageMaker falls back to default input size, the
+  // automatic parse memory budget and unrestricted APIs (no command-line
+  // configuration for restricted APIs).
   max_input_size = g_triton_params.http_max_input_size_;
+  parse_memory_budget = g_triton_params.http_parse_memory_budget_;
   restricted_apis = g_triton_params.http_restricted_apis_;
 #endif  // TRITON_ENABLE_HTTP
 
+  triton::server::HTTPAPIServer::ConfigureParseMemoryBudget(
+      parse_memory_budget);
   TRITONSERVER_Error* err = triton::server::SagemakerAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.sagemaker_port_,
       g_triton_params.sagemaker_address_, g_triton_params.sagemaker_thread_cnt_,
@@ -217,17 +224,22 @@ StartVertexAiService(
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   size_t max_input_size = triton::server::HTTP_DEFAULT_MAX_INPUT_SIZE;
+  int64_t parse_memory_budget = triton::server::HTTP_PARSE_MEMORY_BUDGET_AUTO;
   triton::server::RestrictedFeatures restricted_apis{};
 #ifdef TRITON_ENABLE_HTTP
   // Reuse HTTP server settings for Vertex AI endpoint behavior. In
-  // particular, --http-restricted-api and --http-max-input-size also apply
-  // to Vertex AI requests. Without TRITON_ENABLE_HTTP, Vertex AI falls back to
-  // default input size and unrestricted APIs (no command-line configuration for
-  // restricted APIs).
+  // particular, --http-restricted-api, --http-max-input-size and
+  // --http-parse-memory-budget also apply to Vertex AI requests. Without
+  // TRITON_ENABLE_HTTP, Vertex AI falls back to default input size, the
+  // automatic parse memory budget and unrestricted APIs (no command-line
+  // configuration for restricted APIs).
   max_input_size = g_triton_params.http_max_input_size_;
+  parse_memory_budget = g_triton_params.http_parse_memory_budget_;
   restricted_apis = g_triton_params.http_restricted_apis_;
 #endif  // TRITON_ENABLE_HTTP
 
+  triton::server::HTTPAPIServer::ConfigureParseMemoryBudget(
+      parse_memory_budget);
   TRITONSERVER_Error* err = triton::server::VertexAiAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.vertex_ai_port_,
       g_triton_params.vertex_ai_address_, g_triton_params.vertex_ai_thread_cnt_,
