@@ -435,6 +435,29 @@ curl -s http://localhost:9000/v1/embeddings \
 
 </details>
 
+4. To embed multiple texts, pass an array of non-empty strings:
+
+```bash
+curl -s http://localhost:9000/v1/embeddings \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "all-MiniLM-L6-v2",
+    "input": ["The food was delicious.", "The service was excellent."],
+    "encoding_format": "float"
+  }'
+```
+
+The response contains one embedding per text, with `index` matching its input
+position and token usage summed across the inputs. Texts within one request are
+processed sequentially; this provides API compatibility, not native inference
+batching. A failure returns an error rather than a partial result. A flat array
+of integer token IDs still represents one input; arrays of token arrays are not
+supported.
+
+Text batches are limited to 2,048 inputs per request. Larger batches return
+HTTP 400 before any inference is submitted. This limit counts texts, not the
+characters or token IDs in a single input.
+
 ## TensorRT-LLM
 
 0. Prepare your model repository for a TensorRT-LLM model, build the engine, etc. You can try any of the following options:
