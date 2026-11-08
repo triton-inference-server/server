@@ -161,6 +161,14 @@ set -e
 
 kill_server
 
+# A response factory the server never deletes keeps its model from unloading.
+# On Windows the server is force-killed, so no models are unloaded.
+if [[ ${TEST_WINDOWS} == 0 ]] && \
+        [ `grep -c "successfully unloaded 'is_cancelled_after_release" $SERVER_LOG` -ne 2 ]; then
+    echo -e "\n***\n*** is cancelled after release models were not unloaded\n***"
+    RET=1
+fi
+
 #
 # Test async response sender under decoupled / non-decoupled
 #
