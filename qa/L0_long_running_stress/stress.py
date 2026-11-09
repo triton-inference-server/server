@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,15 +26,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-
-from scenarios import *
-
-sys.path.append("../common")
-
 import argparse
 import bisect
 import os
+import sys
 import threading
 import time
 import traceback
@@ -44,6 +39,17 @@ from functools import partial
 import numpy as np
 import prettytable
 import tritonclient.grpc as grpcclient
+from scenarios import (
+    CrashingScenario,
+    PerfAnalyzerScenario,
+    ResNetScenario,
+    SequenceNoEndScenario,
+    SequenceNoStartScenario,
+    SequenceValidNoEndScenario,
+    SequenceValidScenario,
+    SequenceValidValidScenario,
+    TimeoutScenario,
+)
 
 FLAGS = None
 CORRELATION_ID_BLOCK_SIZE = 1024 * 1024
@@ -133,10 +139,6 @@ def stress_thread(
     failed_test_case_count,
     sequence_request_count,
 ):
-    # Thread responsible for generating sequences of inference
-    # requests.
-    global _thread_exceptions
-
     # Write any thread output to dedicated file
     with open("{}.log".format(name), "w") as out_file:
         print("Starting thread {} with seed {}".format(name, seed), file=out_file)
@@ -281,7 +283,7 @@ def stress_thread(
                 res = scenario.run(client_metadata_list[client_idx])
                 if res is not None:
                     update_counter_fn(scenario.scenario_name(), count=res)
-            except Exception as ex:
+            except Exception:
                 update_counter_fn(scenario.scenario_name(), False)
                 _thread_exceptions_mutex.acquire()
                 try:
@@ -309,10 +311,6 @@ def load_thread(
     failed_test_case_count,
     sequence_request_count,
 ):
-    # Thread responsible for generating sequences of inference
-    # requests.
-    global _thread_exceptions
-
     # Write any thread output to dedicated file
     with open("{}.log".format(name), "w") as out_file:
         print("Starting thread {} with seed {}".format(name, seed), file=out_file)
@@ -354,7 +352,7 @@ def load_thread(
                 res = scenario.run(None)
                 if res is not None:
                     update_counter_fn(scenario.scenario_name(), count=res)
-            except Exception as ex:
+            except Exception:
                 update_counter_fn(scenario.scenario_name(), False)
                 _thread_exceptions_mutex.acquire()
                 try:
@@ -427,7 +425,12 @@ def generate_report(
         )
     )
 
-    t = prettytable.PrettyTable(hrules=prettytable.ALL)
+    hrules = (
+        prettytable.HRuleStyle.ALL
+        if hasattr(prettytable, "HRuleStyle")
+        else prettytable.ALL
+    )
+    t = prettytable.PrettyTable(hrules=hrules)
     t.field_names = [
         "Test Case",
         "Number of Failures",
@@ -535,7 +538,7 @@ if __name__ == "__main__":
     # Initialize the random seed. For reproducibility each thread
     # maintains its own RNG which is initialized based on this seed.
     randseed = 0
-    if FLAGS.random_seed != None:
+    if FLAGS.random_seed is not None:
         randseed = FLAGS.random_seed
     else:
         randseed = int(time.time())
