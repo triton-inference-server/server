@@ -353,7 +353,11 @@ class DecoupledTest(unittest.TestCase):
             self.assertIn("[execute_cancel] Request cancelled at ", log_text)
 
     def test_decoupled_bls_cancel(self):
-        model_names = ["decoupled_bls_cancel", "decoupled_bls_async_cancel"]
+        model_names = [
+            "decoupled_bls_cancel",
+            "decoupled_bls_async_cancel",
+            "decoupled_bls_cancel_after_release",
+        ]
         input_value = 1
         max_sum_value = 10
         ignore_cancel = False
@@ -395,7 +399,11 @@ class DecoupledTest(unittest.TestCase):
                     check_result(result)
 
     def test_decoupled_bls_ignore_cancel(self):
-        model_names = ["decoupled_bls_cancel", "decoupled_bls_async_cancel"]
+        model_names = [
+            "decoupled_bls_cancel",
+            "decoupled_bls_async_cancel",
+            "decoupled_bls_cancel_after_release",
+        ]
         input_value = 1
         max_sum_value = 10
         ignore_cancel = True
