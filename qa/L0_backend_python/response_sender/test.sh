@@ -168,6 +168,11 @@ if [[ ${TEST_WINDOWS} == 0 ]] && \
     echo -e "\n***\n*** is cancelled after release models were not unloaded\n***"
     RET=1
 fi
+# The threads checking the last requests run until the models are finalized.
+if [ `grep -c "Request reported as cancelled" $SERVER_LOG` -ne 0 ]; then
+    echo -e "\n***\n*** is cancelled after release models reported a cancellation\n***"
+    RET=1
+fi
 
 #
 # Test async response sender under decoupled / non-decoupled

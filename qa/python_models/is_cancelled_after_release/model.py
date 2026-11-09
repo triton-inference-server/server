@@ -29,6 +29,9 @@ import threading
 
 import triton_python_backend_utils as pb_utils
 
+# Nothing cancels the requests, so the test fails if the log has this message.
+CANCELLED_MESSAGE = "Request reported as cancelled"
+
 
 class TritonPythonModel:
     """Asks whether requests were cancelled after the server released them.
@@ -81,8 +84,11 @@ class TritonPythonModel:
 
         def poll():
             while not stop.is_set():
-                request.is_cancelled()
+                cancelled = request.is_cancelled()
                 started.set()
+                if cancelled:
+                    pb_utils.Logger.log_error(CANCELLED_MESSAGE)
+                    return
 
         thread = threading.Thread(target=poll)
         thread.start()
@@ -100,5 +106,5 @@ class TritonPythonModel:
         if request.is_cancelled() or request.get_response_sender().is_cancelled():
             # The error response of a request that already sent its final
             # response is dropped, so the log carries the failure too.
-            pb_utils.Logger.log_error("Released request is cancelled")
-            raise pb_utils.TritonModelException("Released request is cancelled")
+            pb_utils.Logger.log_error(CANCELLED_MESSAGE)
+            raise pb_utils.TritonModelException(CANCELLED_MESSAGE)

@@ -84,7 +84,7 @@ class IsCancelledAfterReleaseTest(unittest.TestCase):
 
         time.sleep(1)  # make sure the logs are written before checking
         with open(os.environ["SERVER_LOG"]) as f:
-            self.assertNotIn("Released request is cancelled", f.read())
+            self.assertNotIn("Request reported as cancelled", f.read())
 
     def test_response_returned(self):
         self._test_released_requests("is_cancelled_after_release")
