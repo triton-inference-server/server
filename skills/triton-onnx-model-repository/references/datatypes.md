@@ -9,22 +9,22 @@ Canonical source: [`docs/customization_guide/inference_protocols.md`](../../../d
 
 Three different spellings for every datatype. Mismatch is the single most common client-side bug.
 
-| In `config.pbtxt` | In KFServing v2 client (`InferInput`) | In numpy |
-|---|---|---|
-| `TYPE_FP32` | `"FP32"` | `np.float32` |
-| `TYPE_FP16` | `"FP16"` | `np.float16` |
-| `TYPE_BF16` | `"BF16"` | no native numpy, use `ml_dtypes.bfloat16` or `np.uint16` wire |
-| `TYPE_FP64` | `"FP64"` | `np.float64` |
-| `TYPE_INT8` | `"INT8"` | `np.int8` |
-| `TYPE_INT16` | `"INT16"` | `np.int16` |
-| `TYPE_INT32` | `"INT32"` | `np.int32` |
-| `TYPE_INT64` | `"INT64"` | `np.int64` |
-| `TYPE_UINT8` | `"UINT8"` | `np.uint8` |
-| `TYPE_UINT16` | `"UINT16"` | `np.uint16` |
-| `TYPE_UINT32` | `"UINT32"` | `np.uint32` |
-| `TYPE_UINT64` | `"UINT64"` | `np.uint64` |
-| `TYPE_BOOL` | `"BOOL"` | `np.bool_` |
-| `TYPE_STRING` | `"BYTES"` | `np.object_` |
+| In `config.pbtxt` | In KFServing v2 client (`InferInput`) | In numpy                                          |
+|-------------------|---------------------------------------|---------------------------------------------------|
+| `TYPE_FP32`       | `"FP32"`                              | `np.float32`                                      |
+| `TYPE_FP16`       | `"FP16"`                              | `np.float16`                                      |
+| `TYPE_BF16`       | `"BF16"`                              | `ml_dtypes.bfloat16` or `np.uint16` wire          |
+| `TYPE_FP64`       | `"FP64"`                              | `np.float64`                                      |
+| `TYPE_INT8`       | `"INT8"`                              | `np.int8`                                         |
+| `TYPE_INT16`      | `"INT16"`                             | `np.int16`                                        |
+| `TYPE_INT32`      | `"INT32"`                             | `np.int32`                                        |
+| `TYPE_INT64`      | `"INT64"`                             | `np.int64`                                        |
+| `TYPE_UINT8`      | `"UINT8"`                             | `np.uint8`                                        |
+| `TYPE_UINT16`     | `"UINT16"`                            | `np.uint16`                                       |
+| `TYPE_UINT32`     | `"UINT32"`                            | `np.uint32`                                       |
+| `TYPE_UINT64`     | `"UINT64"`                            | `np.uint64`                                       |
+| `TYPE_BOOL`       | `"BOOL"`                              | `np.bool_`                                        |
+| `TYPE_STRING`     | `"BYTES"`                             | `np.object_`                                      |
 
 ## Server-side rules
 
@@ -38,19 +38,21 @@ Writing `httpclient.InferInput("x", shape, "float32")` or `"TYPE_FP32"` on the c
 
 The ONNX `TensorProto.DataType` enum values map to the config spelling:
 
-| ONNX enum | Config |
-|---|---|
-| `TensorProto.FLOAT` (1) | `TYPE_FP32` |
-| `TensorProto.UINT8` (2) | `TYPE_UINT8` |
-| `TensorProto.INT8` (3) | `TYPE_INT8` |
-| `TensorProto.UINT16` (4) | `TYPE_UINT16` |
-| `TensorProto.INT16` (5) | `TYPE_INT16` |
-| `TensorProto.INT32` (6) | `TYPE_INT32` |
-| `TensorProto.INT64` (7) | `TYPE_INT64` |
-| `TensorProto.STRING` (8) | `TYPE_STRING` |
-| `TensorProto.BOOL` (9) | `TYPE_BOOL` |
-| `TensorProto.FLOAT16` (10) | `TYPE_FP16` |
-| `TensorProto.BFLOAT16` (16) | `TYPE_BF16` |
-| `TensorProto.DOUBLE` (11) | `TYPE_FP64` |
-| `TensorProto.UINT32` (12) | `TYPE_UINT32` |
-| `TensorProto.UINT64` (13) | `TYPE_UINT64` |
+| ONNX enum                    | Config        |
+|------------------------------|---------------|
+| `TensorProto.FLOAT` (1)      | `TYPE_FP32`   |
+| `TensorProto.UINT8` (2)      | `TYPE_UINT8`  |
+| `TensorProto.INT8` (3)       | `TYPE_INT8`   |
+| `TensorProto.UINT16` (4)     | `TYPE_UINT16` |
+| `TensorProto.INT16` (5)      | `TYPE_INT16`  |
+| `TensorProto.INT32` (6)      | `TYPE_INT32`  |
+| `TensorProto.INT64` (7)      | `TYPE_INT64`  |
+| `TensorProto.STRING` (8)     | `TYPE_STRING` |
+| `TensorProto.BOOL` (9)       | `TYPE_BOOL`   |
+| `TensorProto.FLOAT16` (10)   | `TYPE_FP16`   |
+| `TensorProto.DOUBLE` (11)    | `TYPE_FP64`   |
+| `TensorProto.UINT32` (12)    | `TYPE_UINT32` |
+| `TensorProto.UINT64` (13)    | `TYPE_UINT64` |
+| `TensorProto.BFLOAT16` (16)  | `TYPE_BF16`   |
+
+Verified on Triton 26.10: a fixed-shape BF16 ONNX model (`TensorProto.BFLOAT16` inputs and outputs) auto-completes to `TYPE_BF16` in `/v2/models/<model>/config` and loads to `READY`.

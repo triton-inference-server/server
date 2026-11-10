@@ -878,6 +878,19 @@
         "Point at references/errors.md Unsupported operator on target device"
       ],
       "ground_truth": "Op not implemented for the target device means the op exists in ORT only for the other device. Fix by switching instance_group or re-exporting."
+    },
+    {
+      "id": "bf16-datatype-crosswalk",
+      "category": "positive",
+      "prompt": "My ONNX model uses bfloat16 (BF16). What datatypes should I put in config.pbtxt and on the client side?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Point to references/datatypes.md",
+        "Use TYPE_BF16 in config.pbtxt input and output data_type",
+        "Use \"BF16\" on the KFServing v2 client InferInput",
+        "Note numpy has no native bfloat16; suggest ml_dtypes.bfloat16 or np.uint16 wire"
+      ],
+      "ground_truth": "config.pbtxt uses TYPE_BF16. Client InferInput uses \"BF16\". numpy has no native bfloat16: ml_dtypes.bfloat16 is the practical type, or np.uint16 can carry the wire bytes. Verified on Triton 26.10: a fixed-shape BF16 ONNX model auto-completes to TYPE_BF16 and loads to READY."
     }
   ]
 }
