@@ -1,4 +1,4 @@
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import threading
 import unittest
 
 import numpy as np
@@ -395,6 +396,47 @@ class PBCustomMetricsTest(unittest.TestCase):
             with self.assertRaises(pb_utils.TritonModelException) as ex:
                 metric.value()
             self.assertIn(error_msg, str(ex.exception))
+
+    def test_metric_error_message(self):
+        # Every failed metric operation must report the error from the server.
+        # Several threads run the operations, which makes it likely that the
+        # server frees an error message before a stub that reads it late.
+        metric_family = pb_utils.MetricFamily(
+            name="test_metric_error_message",
+            description="test metric error message",
+            kind=pb_utils.MetricFamily.COUNTER,
+        )
+        metrics = [metric_family.Metric(labels={"thread": str(i)}) for i in range(8)]
+        # Counter should not accept negative values
+        with self.assertRaises(pb_utils.TritonModelException) as ex:
+            metrics[0].increment(-1)
+        expected_message = str(ex.exception)
+        self.assertIn("message: ", expected_message)
+        unexpected_results = []
+        lock = threading.Lock()
+
+        def decrement(metric):
+            for _ in range(1000):
+                try:
+                    metric.increment(-1)
+                except pb_utils.TritonModelException as ex:
+                    result = str(ex)
+                except Exception as ex:
+                    result = repr(ex)
+                else:
+                    result = "no error"
+                if result != expected_message:
+                    with lock:
+                        unexpected_results.append(result)
+
+        threads = [
+            threading.Thread(target=decrement, args=(metric,)) for metric in metrics
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(unexpected_results, [])
 
 
 class TritonPythonModel:
