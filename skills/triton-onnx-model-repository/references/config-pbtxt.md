@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-4.0
 
 # `config.pbtxt` field reference
 
-Every field this skill may write, with the rule and a tested example.
+Canonical source: [`docs/user_guide/model_configuration.md`](../../../docs/user_guide/model_configuration.md). This file is a quick reference of ONNX-specific usage and examples for the skill. Defer to the canonical doc when a field is added or changed.
 
 ## Backend and platform
 

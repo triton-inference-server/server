@@ -3,6 +3,8 @@ SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All 
 SPDX-License-Identifier: CC-BY-4.0
 -->
 
+Canonical source for loading and inference behavior: [`docs/user_guide/model_management.md`](../../../docs/user_guide/model_management.md) and [`docs/user_guide/model_repository.md`](../../../docs/user_guide/model_repository.md). This file lists the exact error strings and recovery steps the skill matches on.
+
 # Error catalog (Triton 26.05)
 
 Every row verified against a live server on ONNX models. Match the symptom, apply the fix.

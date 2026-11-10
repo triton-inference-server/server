@@ -3,6 +3,8 @@ SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All 
 SPDX-License-Identifier: CC-BY-4.0
 -->
 
+Canonical source: [`docs/customization_guide/inference_protocols.md`](../../../docs/customization_guide/inference_protocols.md) and [`docs/user_guide/model_configuration.md`](../../../docs/user_guide/model_configuration.md). Quick reference only.
+
 # Datatype crosswalk
 
 Three different spellings for every datatype. Mismatch is the single most common client-side bug.

@@ -3,6 +3,8 @@ SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All 
 SPDX-License-Identifier: CC-BY-4.0
 -->
 
+Canonical source: [`docs/user_guide/metrics.md`](../../../docs/user_guide/metrics.md). This file is a quick reference of the counters, latency histograms, and cache / GPU metrics the skill reads.
+
 # Metrics catalog (port 8002)
 
 ```
