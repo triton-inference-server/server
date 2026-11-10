@@ -13,6 +13,7 @@ Three different spellings for every datatype. Mismatch is the single most common
 |---|---|---|
 | `TYPE_FP32` | `"FP32"` | `np.float32` |
 | `TYPE_FP16` | `"FP16"` | `np.float16` |
+| `TYPE_BF16` | `"BF16"` | no native numpy, use `ml_dtypes.bfloat16` or `np.uint16` wire |
 | `TYPE_FP64` | `"FP64"` | `np.float64` |
 | `TYPE_INT8` | `"INT8"` | `np.int8` |
 | `TYPE_INT16` | `"INT16"` | `np.int16` |
@@ -49,6 +50,7 @@ The ONNX `TensorProto.DataType` enum values map to the config spelling:
 | `TensorProto.STRING` (8) | `TYPE_STRING` |
 | `TensorProto.BOOL` (9) | `TYPE_BOOL` |
 | `TensorProto.FLOAT16` (10) | `TYPE_FP16` |
+| `TensorProto.BFLOAT16` (16) | `TYPE_BF16` |
 | `TensorProto.DOUBLE` (11) | `TYPE_FP64` |
 | `TensorProto.UINT32` (12) | `TYPE_UINT32` |
 | `TensorProto.UINT64` (13) | `TYPE_UINT64` |
