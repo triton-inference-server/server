@@ -556,6 +556,37 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 
+######## Test that the gRPC streaming handler keeps 16 accept requests outstanding ########
+# The handler posts them all at startup (one "New request handler" line each;
+# no streams are opened here), so a burst of new streams is matched without
+# waiting for the handler thread.
+EMPTY_MODEL_DIR="`pwd`/empty_models"
+rm -rf ${EMPTY_MODEL_DIR} && mkdir -p ${EMPTY_MODEL_DIR}
+SERVER_LOG="./stream_accept_requests_server.log"
+SERVER_ARGS="--model-repository=${EMPTY_MODEL_DIR} --log-verbose=1"
+EXPECTED_ACCEPT_REQUESTS=16
+rm -f $SERVER_LOG
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+posted=`grep -c "New request handler for ModelStreamInferHandler" $SERVER_LOG`
+if [ "$posted" != "$EXPECTED_ACCEPT_REQUESTS" ]; then
+    echo -e "\n***\n*** FAILED: expected ${EXPECTED_ACCEPT_REQUESTS} stream accept requests at startup, found ${posted}\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+rm -rf ${EMPTY_MODEL_DIR}
+
+
 ######## Test invalid values for 'max_inflight_requests' config option ########
 INVALID_PARAM_MODEL_DIR="`pwd`/invalid_param_test_models"
 SERVER_ARGS="--model-repository=${INVALID_PARAM_MODEL_DIR}"

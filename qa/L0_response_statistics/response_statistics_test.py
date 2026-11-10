@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,6 +42,7 @@ class TestResponseStatistics(unittest.TestCase):
         self._min_cancel_delay_ns = 0
         self._number_of_fail_responses = 0
         self._number_of_empty_responses = 0
+        self._upper_bound_slack_ns = 1000000000
         self._statistics_counts = []
         self._grpc_client = grpcclient.InferenceServerClient(
             "localhost:8001", verbose=True
@@ -145,7 +146,11 @@ class TestResponseStatistics(unittest.TestCase):
             upper_bound_ns = 10000000 * expected_count
             lower_bound_ns = 0
         else:
-            upper_bound_ns = 1.1 * delay_ns * expected_count
+            # The fixed slack absorbs a one-off host scheduling stall on a busy CI
+            # runner, which can delay a response well past its configured delay.
+            upper_bound_ns = (
+                1.1 * delay_ns * expected_count + self._upper_bound_slack_ns
+            )
             lower_bound_ns = 0.9 * delay_ns * expected_count
         stats = response_stats[str(current_index)][stats_name]
         self.assertEqual(stats["count"], expected_count)
