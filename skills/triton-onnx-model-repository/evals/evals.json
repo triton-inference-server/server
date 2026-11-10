@@ -1,6 +1,6 @@
 {
   "skill": "triton-onnx-model-repository",
-  "description": "SkillEvaluator dataset for the Triton ONNX Model Repository skill. 34 positive and 12 negative cases, one per unique feature or failure mode. Verified against Triton 26.05 on an A100 host.",
+  "description": "SkillEvaluator dataset for the Triton ONNX Model Repository skill. 34 positive and 12 negative cases, one per unique feature or failure mode. Verified against Triton 26.10 on an A100 host.",
   "cases": [
     {
       "id": "basic-fixed-shape",
@@ -45,7 +45,7 @@
     {
       "id": "handwritten-platform-form",
       "category": "positive",
-      "prompt": "My existing config.pbtxt uses `platform: \"onnxruntime_onnx\"`. Does that still work on Triton 26.05, or do I need to migrate?",
+      "prompt": "My existing config.pbtxt uses `platform: \"onnxruntime_onnx\"`. Does that still work on Triton 26.10, or do I need to migrate?",
       "expected_skill": "triton-onnx-model-repository",
       "expected_behavior": [
         "Confirm `platform: \"onnxruntime_onnx\"` still loads",
@@ -860,11 +860,11 @@
       "expected_skill": "triton-onnx-model-repository",
       "expected_behavior": [
         "Diagnose: ONNX graph uses an op at an opset version the bundled ONNX Runtime does not support",
-        "Fix: re-export the model at a lower supported opset. Safe range on recent Triton (verified 26.05: opset 23 still works for common ops)",
+        "Fix: re-export the model at a lower supported opset. Safe range on recent Triton (verified 26.10: opset 23 still works for common ops)",
         "Alternative: upgrade Triton to a container with a newer ORT",
         "Note: the exact opset threshold depends on the Triton release"
       ],
-      "ground_truth": "`NOT_IMPLEMENTED` with an opset number means that particular op at that opset is beyond the bundled ORT. Verified on Triton 26.05: opset 23 common ops still load. The failure threshold is version-dependent."
+      "ground_truth": "`NOT_IMPLEMENTED` with an opset number means that particular op at that opset is beyond the bundled ORT. Verified on Triton 26.10: opset 23 common ops still load. The failure threshold is version-dependent."
     },
     {
       "id": "unsupported-op",

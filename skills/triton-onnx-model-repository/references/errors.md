@@ -5,7 +5,7 @@ SPDX-License-Identifier: CC-BY-4.0
 
 Canonical source for loading and inference behavior: [`docs/user_guide/model_management.md`](../../../docs/user_guide/model_management.md) and [`docs/user_guide/model_repository.md`](../../../docs/user_guide/model_repository.md). This file lists the exact error strings and recovery steps the skill matches on.
 
-# Error catalog (Triton 26.05)
+# Error catalog (Triton 26.10)
 
 Every row verified against a live server on ONNX models. Match the symptom, apply the fix.
 
@@ -158,7 +158,7 @@ Fatal error: <OpType> is not a registered function/op
 
 **Cause.** The ONNX graph uses an op at an opset the bundled ONNX Runtime does not implement. Each Triton release ships a specific ORT version with a specific per-op opset coverage; the failure threshold varies per op, not just the model's import opset.
 
-**Fix.** Re-export the model at a lower opset. Verified on Triton 26.05: common ops at opset 23 still load; the failure appears on ops beyond what the bundled ORT covers. Or upgrade Triton to a container that bundles a newer ORT.
+**Fix.** Re-export the model at a lower opset. Verified on Triton 26.10: common ops at opset 23 still load; the failure appears on ops beyond what the bundled ORT covers. Or upgrade Triton to a container that bundles a newer ORT.
 
 ### Unsupported operator on target device
 
