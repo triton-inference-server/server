@@ -5,15 +5,11 @@ license: CC-BY-4.0
 metadata:
   author: Vinya Kestur <vinyak@nvidia.com>
   tags:
-    - triton
-    - inference
-    - onnx
-    - model-repository
-    - config-pbtxt
-  permissions:
-    - file_read
-    - network
-    - shell_exec
+  - triton
+  - inference
+  - onnx
+  - model-repository
+  - config-pbtxt
 ---
 
 # Triton ONNX Model Repository
