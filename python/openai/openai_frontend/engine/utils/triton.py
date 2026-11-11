@@ -612,6 +612,12 @@ def _get_guided_json_from_tool(
         if tool_name not in tools:
             raise ClientError(f"Tool '{tool_name}' has not been passed in `tools`.")
         tool = tools[tool_name]
+        # A function without "parameters" takes no arguments, so constrain
+        # the call to an empty JSON object.
+        if tool.parameters is None:
+            return json.dumps(
+                {"type": "object", "properties": {}, "additionalProperties": False}
+            )
         return tool.parameters.model_dump_json()
 
     return None
