@@ -465,6 +465,17 @@ def _get_logprobs_from_response(
         return None
 
 
+def _get_sampled_token_logprob(token_logprobs_dict: Dict) -> Dict:
+    """
+    Returns the entry of the token that was actually generated at a position.
+
+    vLLM inserts the sampled token first, with its rank in the vocabulary,
+    followed by the top-k tokens. The sampled token is not rank 1 whenever
+    sampling picks a less likely token, so it cannot be found by rank.
+    """
+    return next(iter(token_logprobs_dict.values()))
+
+
 def _get_openai_chat_format_logprobs_from_vllm_response(
     response: tritonserver._api._response.InferenceResponse,
 ) -> Optional[List[ChatCompletionTokenLogprob]]:
@@ -487,13 +498,12 @@ def _get_openai_chat_format_logprobs_from_vllm_response(
         if not token_logprobs_dict:
             continue
 
-        # Sort by rank to identify the selected token (rank=1 is always the chosen token)
+        # Sort by rank to list the top logprobs from most to least likely
         sorted_tokens = sorted(
             token_logprobs_dict.items(), key=lambda x: x[1].get("rank", sys.maxsize)
         )
 
-        # The first token (lowest rank) is the selected token
-        selected_token_id, selected_token_data = sorted_tokens[0]
+        selected_token_data = _get_sampled_token_logprob(token_logprobs_dict)
         selected_token = selected_token_data["decoded_token"]
         selected_logprob = selected_token_data["logprob"]
 
@@ -550,13 +560,12 @@ def _get_openai_completion_format_logprobs_from_vllm_response(
         if not token_logprobs_dict:
             continue
 
-        # Sort by rank to identify the selected token (rank=1 is always the chosen token)
+        # Sort by rank to list the top logprobs from most to least likely
         sorted_tokens = sorted(
             token_logprobs_dict.items(), key=lambda x: x[1].get("rank", sys.maxsize)
         )
 
-        # The first token (lowest rank) is the selected token
-        selected_token_id, selected_token_data = sorted_tokens[0]
+        selected_token_data = _get_sampled_token_logprob(token_logprobs_dict)
         selected_token = selected_token_data["decoded_token"]
         selected_logprob = selected_token_data["logprob"]
 
