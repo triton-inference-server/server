@@ -137,6 +137,7 @@ images.
 - Examples for deploying Triton Inference Server with Kubernetes and Helm on [GCP](deploy/gcp/README.md),
   [AWS](deploy/aws/README.md), and [NVIDIA FleetCommand](deploy/fleetcommand/README.md)
 - [Secure Deployment Considerations](docs/customization_guide/deploy.md)
+- [Deploy an HTTP Endpoint on Nebius Serverless](deploy/nebius/README.md)
 
 ### Using Triton
 
