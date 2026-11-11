@@ -142,6 +142,13 @@ Content-Length: <yy>
 }
 ```
 
+Label association is accomplished by setting the `label_filename` for the 
+given output parameter in the model configuration. See the
+[proto](https://github.com/triton-inference-server/common/blob/578491fc3944f77d16a6a38e3d7691c485c47ba0/protobuf/model_config.proto#L462)
+for further details. An example label file can be found
+[here](https://github.com/triton-inference-server/server/blob/35033413d3d6f9d4ff679ef65a2a92a37ecfba64/docs/examples/model_repository/inception_graphdef/inception_labels.txt)
+in the sample model repository for image classification.
+
 ## GRPC
 
 The classification extension requires that the “classification”
