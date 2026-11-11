@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2024-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -125,6 +125,54 @@ fi
 set -e
 
 kill_server
+
+#
+# Test that asking whether a request was cancelled after its response factory
+# is released returns the last observed state instead of reading the factory
+#
+rm -rf models && mkdir models
+mkdir -p models/is_cancelled_after_release/1 && \
+    cp ../../python_models/is_cancelled_after_release/model.py models/is_cancelled_after_release/1 && \
+    cp ../../python_models/is_cancelled_after_release/config.pbtxt models/is_cancelled_after_release
+mkdir -p models/is_cancelled_after_release_decoupled/1 && \
+    cp ../../python_models/is_cancelled_after_release/model.py models/is_cancelled_after_release_decoupled/1 && \
+    cp ../../python_models/is_cancelled_after_release/config.pbtxt models/is_cancelled_after_release_decoupled && \
+    echo "model_transaction_policy { decoupled: True }" >> models/is_cancelled_after_release_decoupled/config.pbtxt
+
+TEST_LOG="is_cancelled_after_release_test.log"
+SERVER_LOG="is_cancelled_after_release_test.server.log"
+SERVER_ARGS="--model-repository=${MODELDIR}/response_sender/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+SERVER_LOG=$SERVER_LOG python3 -m pytest --junitxml=is_cancelled_after_release_test.report.xml is_cancelled_after_release_test.py > $TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** is cancelled after release test FAILED\n***"
+    cat $TEST_LOG
+    RET=1
+fi
+set -e
+
+kill_server
+
+# A response factory the server never deletes keeps its model from unloading.
+# On Windows the server is force-killed, so no models are unloaded.
+if [[ ${TEST_WINDOWS} == 0 ]] && \
+        [ `grep -c "successfully unloaded 'is_cancelled_after_release" $SERVER_LOG` -ne 2 ]; then
+    echo -e "\n***\n*** is cancelled after release models were not unloaded\n***"
+    RET=1
+fi
+# The threads checking the last requests run until the models are finalized.
+if [ `grep -c "Request reported as cancelled" $SERVER_LOG` -ne 0 ]; then
+    echo -e "\n***\n*** is cancelled after release models reported a cancellation\n***"
+    RET=1
+fi
 
 #
 # Test async response sender under decoupled / non-decoupled
