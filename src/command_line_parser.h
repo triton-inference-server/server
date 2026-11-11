@@ -182,6 +182,7 @@ struct TritonServerParameters {
   TRITONSERVER_InferenceTraceLevel trace_level_{
       TRITONSERVER_TRACE_LEVEL_DISABLED};
   int32_t trace_rate_{1000};
+  bool trace_honor_parent_sampling_{false};
   int32_t trace_count_{-1};
   int32_t trace_log_frequency_{0};
   InferenceTraceMode trace_mode_{TRACE_MODE_TRITON};
