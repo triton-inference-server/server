@@ -28,6 +28,7 @@
 
 import json
 import os
+import time
 import unittest
 
 import ml_dtypes
@@ -77,6 +78,48 @@ def wait_for_stable_rss(server, rss_tolerance_bytes=0.1 * MIB, stable_threshold=
             break
         time.sleep(0.1)
     return
+
+
+def wait_for_model_state(
+    triton_client,
+    model_name,
+    expected_ready,
+    model_version="",
+    timeout_sec=30,
+    interval_sec=1,
+):
+    """Poll ``is_model_ready`` until it matches *expected_ready* or timeout.
+
+    Replaces blind ``time.sleep`` calls that wait for model load/unload
+    with a deterministic polling loop, reducing flaky failures under CI
+    resource contention.
+
+    Args:
+        triton_client: A Triton ``InferenceServerClient`` (HTTP or gRPC).
+        model_name: Name of the model to check.
+        expected_ready: ``True`` to wait for the model to become ready,
+            ``False`` to wait for it to become *not* ready.
+        model_version: Version string (empty string for default/latest).
+        timeout_sec: Maximum seconds to wait before raising.
+        interval_sec: Seconds between consecutive polls.
+
+    Raises:
+        AssertionError: If the model does not reach the expected state
+            within *timeout_sec*.
+    """
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        if triton_client.is_model_ready(model_name, model_version) == expected_ready:
+            return
+        time.sleep(interval_sec)
+    actual = triton_client.is_model_ready(model_name, model_version)
+    if actual != expected_ready:
+        raise AssertionError(
+            "Model '{}' version '{}' did not reach expected ready={} "
+            "within {}s (actual ready={})".format(
+                model_name, model_version, expected_ready, timeout_sec, actual
+            )
+        )
 
 
 def shape_element_count(shape):
