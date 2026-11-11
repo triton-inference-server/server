@@ -135,7 +135,7 @@ images.
 - [Build a custom Triton Inference Server Docker container](docs/customization_guide/compose.md)
 - [Build Triton Inference Server from source](docs/customization_guide/build.md#building-on-unsupported-platforms)
 - Examples for deploying Triton Inference Server with Kubernetes and Helm on [GCP](deploy/gcp/README.md),
-  [AWS](deploy/aws/README.md), and [NVIDIA FleetCommand](deploy/fleetcommand/README.md)
+  [AWS](deploy/aws/README.md), [OCI](deploy/oci/README.md), and [NVIDIA FleetCommand](deploy/fleetcommand/README.md)
 - [Secure Deployment Considerations](docs/customization_guide/deploy.md)
 
 ### Using Triton
