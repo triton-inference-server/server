@@ -78,6 +78,49 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
 endif()
 
 #
+# Unit test for memory limit detection and the HTTP parse memory budget
+#
+if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
+    ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
+  add_executable(
+    memory_limit_test
+    memory_limit_test.cc
+    ../memory_limit.cc
+    ../memory_limit.h
+    ../common.h
+  )
+
+  set_target_properties(
+    memory_limit_test
+    PROPERTIES
+      SKIP_BUILD_RPATH TRUE
+      BUILD_WITH_INSTALL_RPATH TRUE
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+      INSTALL_RPATH ""
+  )
+
+  target_include_directories(
+    memory_limit_test
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/..
+      ${GTEST_INCLUDE_DIRS}
+  )
+
+  target_link_libraries(
+    memory_limit_test
+    PRIVATE
+      triton-core-serverapi   # from repo-core
+      GTest::gtest
+      GTest::gtest_main
+  )
+
+  install(
+    TARGETS memory_limit_test
+    RUNTIME DESTINATION bin
+  )
+endif()
+
+#
 # Unit test for Backend + Common + Core tensor size APIs (GetElementCount,
 # GetByteSize). Core template headers are used directly; the few core symbols
 # not available via libtritonserver.so (hidden by linker script) are defined
