@@ -1,6 +1,6 @@
 {
   "skill": "triton-onnx-model-repository",
-  "description": "SkillEvaluator dataset for the Triton ONNX Model Repository skill. 34 positive and 12 negative cases, one per unique feature or failure mode. Verified against Triton 26.10 on an A100 host.",
+  "description": "SkillEvaluator dataset for the Triton ONNX Model Repository skill. 34 positive and 12 negative cases, one per unique feature or failure mode.",
   "cases": [
     {
       "id": "basic-fixed-shape",
@@ -100,7 +100,7 @@
         "Confirm version 3 is served",
         "Mention `/v2/models/<model>` reports the versions array"
       ],
-      "ground_truth": "Default policy serves version 3. Verified against a repo with 1/, 2/, and 3/."
+      "ground_truth": "Default policy serves version 3."
     },
     {
       "id": "version-policy-specific",
@@ -185,7 +185,7 @@
         "Warn that without the server flag, the model-level flag is a no-op",
         "Point at nv_cache_num_hits_per_model, nv_cache_num_misses_per_model, nv_cache_num_lookups_per_model"
       ],
-      "ground_truth": "Both the server --cache-config flag AND the model config response_cache block are required. Verified: 3 identical + 1 different \u2192 2 hits / 2 misses."
+      "ground_truth": "Both the server --cache-config flag AND the model config response_cache block are required."
     },
     {
       "id": "model-warmup",
@@ -860,11 +860,11 @@
       "expected_skill": "triton-onnx-model-repository",
       "expected_behavior": [
         "Diagnose: ONNX graph uses an op at an opset version the bundled ONNX Runtime does not support",
-        "Fix: re-export the model at a lower supported opset. Safe range on recent Triton (verified 26.10: opset 23 still works for common ops)",
+        "Fix: re-export the model at a lower supported opset. Safe range on recent Triton",
         "Alternative: upgrade Triton to a container with a newer ORT",
         "Note: the exact opset threshold depends on the Triton release"
       ],
-      "ground_truth": "`NOT_IMPLEMENTED` with an opset number means that particular op at that opset is beyond the bundled ORT. Verified on Triton 26.10: opset 23 common ops still load. The failure threshold is version-dependent."
+      "ground_truth": "`NOT_IMPLEMENTED` with an opset number means that particular op at that opset is beyond the bundled ORT."
     },
     {
       "id": "unsupported-op",
@@ -890,7 +890,7 @@
         "Use \"BF16\" on the KFServing v2 client InferInput",
         "Note numpy has no native bfloat16; suggest ml_dtypes.bfloat16 or np.uint16 wire"
       ],
-      "ground_truth": "config.pbtxt uses TYPE_BF16. Client InferInput uses \"BF16\". numpy has no native bfloat16: ml_dtypes.bfloat16 is the practical type, or np.uint16 can carry the wire bytes. Verified on Triton 26.10: a fixed-shape BF16 ONNX model auto-completes to TYPE_BF16 and loads to READY."
+      "ground_truth": "config.pbtxt uses TYPE_BF16. Client InferInput uses \"BF16\". numpy has no native bfloat16: ml_dtypes.bfloat16 is the practical type, or np.uint16 can carry the wire bytes."
     }
   ]
 }

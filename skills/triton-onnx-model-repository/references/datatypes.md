@@ -55,4 +55,4 @@ The ONNX `TensorProto.DataType` enum values map to the config spelling:
 | `TensorProto.UINT64` (13)    | `TYPE_UINT64` |
 | `TensorProto.BFLOAT16` (16)  | `TYPE_BF16`   |
 
-Verified on Triton 26.10: a fixed-shape BF16 ONNX model (`TensorProto.BFLOAT16` inputs and outputs) auto-completes to `TYPE_BF16` in `/v2/models/<model>/config` and loads to `READY`.
+A fixed-shape BF16 ONNX model (`TensorProto.BFLOAT16` inputs and outputs) auto-completes to `TYPE_BF16` in `/v2/models/<model>/config` and loads to `READY`.
