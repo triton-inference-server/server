@@ -1,6 +1,6 @@
 <!--
 SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-SPDX-License-Identifier: CC-BY-4.0
+SPDX-License-Identifier: Apache-2.0
 -->
 
 Canonical source for loading and inference behavior: [`docs/user_guide/model_management.md`](../../../docs/user_guide/model_management.md) and [`docs/user_guide/model_repository.md`](../../../docs/user_guide/model_repository.md). This file lists the exact error strings and recovery steps the skill matches on.

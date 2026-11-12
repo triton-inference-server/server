@@ -1,7 +1,7 @@
 ---
 name: triton-onnx-model-repository
 description: Deploy a user's ONNX file as a working Triton Inference Server endpoint, end to end. Use when the user has a .onnx file and wants it served, wants a config.pbtxt generated from the ONNX graph, or wants to debug a Triton load or inference failure on an ONNX model. Use triton-pytorch-model-repository for .pt files and triton-tensorrt-model-repository for .plan engines.
-license: CC-BY-4.0
+license: Apache-2.0
 metadata:
   author: Vinya Kestur <vinyak@nvidia.com>
   tags:
@@ -16,7 +16,7 @@ metadata:
 
 <!--
 SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-SPDX-License-Identifier: CC-BY-4.0
+SPDX-License-Identifier: Apache-2.0
 -->
 
 ## When to Use This Skill
