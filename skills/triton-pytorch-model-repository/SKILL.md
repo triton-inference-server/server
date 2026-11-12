@@ -68,8 +68,10 @@ instance_group [ { kind: KIND_GPU } ]
 Launch:
 
 ```bash
-tritonserver --model-repository=/models --disable-auto-complete-config
+tritonserver --model-repository=/models
 ```
+
+`--disable-auto-complete-config` is **optional** and only silences the PyTorch backend's "auto-complete not supported" warning at startup. Do not add it when the same model repository also holds ONNX, TensorFlow, or TensorRT models that rely on auto-complete: the flag is server-wide and those models will fail to load.
 
 ## Deploy PT2
 
