@@ -120,7 +120,7 @@ The path must be reachable from inside the server process (a path in the mounted
 
 Skip when all of these hold: `batching` is `auto`, `versioning` is `single`, `cache` is `off`, `accelerator` is `none`, no graph name contains `:0` or `/`, and the graph has no custom ops. Auto-complete handles the rest.
 
-When `batching` is `none` on a batchable graph, DO write `config.pbtxt` with `max_batch_size: 0`. Auto-complete would otherwise set `max_batch_size: 4` (from the backend's `default-max-batch-size`) and attach a `dynamic_batching { }` block, overriding the user's intent.
+When `batching` is `none` on a batchable graph, DO write a complete `config.pbtxt` with `max_batch_size: 0` plus full `input` and `output` blocks. A complete config leaves nothing for auto-complete to fill in; auto-complete would otherwise set `max_batch_size: 4` (from the backend's `default-max-batch-size`) and attach a `dynamic_batching { }` block, overriding the user's intent. Do not use `--disable-auto-complete-config` for this: it is a server-wide flag and would break other models in the repository.
 
 Otherwise, write the file using `references/config-pbtxt.md`. Use `backend: "onnxruntime"`, not `platform:`. Match input and output names to the graph exactly.
 
