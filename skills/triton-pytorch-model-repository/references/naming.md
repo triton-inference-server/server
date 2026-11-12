@@ -55,7 +55,7 @@ A PT2 model returning a bare Tensor has a single output named `RESULT` by defaul
 
 ## Sequence batching naming
 
-Sequence control and implicit-state tensors on PT2 must use ordinal `INPUT__<index>` / `OUTPUT__<index>` names; call-spec names are rejected (`pt2/model_instance_state.cc`). See [`sequence-batching.md`](sequence-batching.md).
+Sequence control and implicit-state tensors on PT2 accept either ordinal `INPUT__<index>` / `OUTPUT__<index>` names or the PT2 call-spec forward-argument names (`ARGS[...]`, `KWARGS[...]`, `RESULT[...]`). Source: `pt2/model_instance_state.cc`. See [`sequence-batching.md`](sequence-batching.md).
 
 ## PT2 input count check
 

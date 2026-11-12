@@ -22,7 +22,7 @@ Canonical source: `pytorch_backend/src/libtorch_utils.cc`. Both `pytorch_libtorc
 | `TYPE_FP64`   | `kDouble` | `libtorch_utils.cc` |
 | `TYPE_STRING` | special-cased, TorchScript only | `pt/model_instance_state.cc` |
 
-The shipped [`docs/user_guide/model_configuration.md`](../../../docs/user_guide/model_configuration.md) datatype table shows the FP16 cell blank for PyTorch. The backend accepts it; `qa/L0_torch_aoti/infer_test.py` exercises it on PT2.
+The shipped [`docs/user_guide/model_configuration.md`](../../../docs/user_guide/model_configuration.md) datatype table shows the FP16 cell blank for PyTorch. The backend accepts it; `qa/L0_torch_aoti/torch_aoti_infer_test.py` exercises it on PT2.
 
 ## Not supported
 

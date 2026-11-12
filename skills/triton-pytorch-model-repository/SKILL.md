@@ -38,7 +38,7 @@ Trigger on `.pt`, `.pt2`, `config.pbtxt` for a PyTorch model, or a Triton load o
 | Form | `config.pbtxt` | Model file |
 |---|---|---|
 | TorchScript, C++ runtime | `platform: "pytorch_libtorch"` | `model.pt` |
-| TorchScript, Python runtime | `backend: "pytorch"` + `runtime: "model.py"` | `model.py` + `model.pt` |
+| TorchScript, Python runtime | `backend: "pytorch"` + `runtime: "model.py"` | `model.pt` (the `runtime: "model.py"` value names the backend's shipped Python runtime, not a user file; if a user authors their own `model.py` in the version directory it takes priority over `model.pt`) |
 | AOT Inductor (PT2) | `backend: "pytorch"` + `platform: "torch_aoti"` | `model.pt2` |
 
 Default filenames overridable with `default_model_filename`.
@@ -80,11 +80,11 @@ Build the archive with a dynamic batch dim; sample input must have batch > 1 so 
 ```python
 import torch
 
-m = Model().eval()                              # add .cuda() for KIND_GPU
-sample = (torch.randn(2, 4), torch.randn(2, 4)) # .cuda() each for KIND_GPU
+m = Model().eval()                # add .cuda() for KIND_GPU
+sample = (torch.randn(2, 4),)     # one entry per forward() argument; .cuda() each for KIND_GPU
 batch = torch.export.Dim("batch", min=1, max=8)
 exported = torch.export.export(
-    m, sample, dynamic_shapes=({0: batch}, {0: batch})
+    m, sample, dynamic_shapes=({0: batch},)
 )
 torch._inductor.aoti_compile_and_package(exported, package_path="model.pt2")
 ```

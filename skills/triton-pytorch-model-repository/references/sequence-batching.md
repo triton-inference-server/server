@@ -72,14 +72,14 @@ The sequence scheduler delivers control and state tensors as regular request inp
 
 Constraints:
 
-- **Naming**: sequence control and implicit-state tensors must use ordinal `INPUT__<index>` / `OUTPUT__<index>` names; call-spec names (`ARGS[...]`KWARGS[...]`) are rejected (`pt2/model_instance_state.cc`).
+- **Naming**: sequence control and implicit-state tensors must resolve to one of the model's inputs. Two naming schemes are accepted: ordinal `INPUT__<index>` / `OUTPUT__<index>` names, or the PT2 call-spec forward-argument names (`ARGS[0]`, `KWARGS[kwarg_name]`, `RESULT[0]`, etc.). The QA test `qa/L0_torch_aoti/torch_aoti_infer_test.py` exercises both schemes against the same stateful model. Source: `pt2/model_instance_state.cc`.
 - **Correlation ID**: must be numeric. `TYPE_STRING` CORRID is rejected on PT2 (`pt2/model_instance_state.cc`). Use `TYPE_INT32` or `TYPE_INT64`.
-- **Input accounting**: the regular `input [ ... ]` array only lists data inputs. Sequence control, implicit-state, and batch inputs are declared separately but still contribute to the model's expected input count (`pt2/model_instance_state.cc`).
+- **Input accounting**: the regular `input [ ... ]` array only lists data inputs. Sequence control inputs and batch inputs are declared separately and each contributes one input toward the model's forward arity. Each `state` block contributes one input (the `input_name`) and one output (the `output_name`). Source: `pt2/model_instance_state.cc`.
 - **Dynamic batch dim** still required on the PT2 archive. See [`torch-aoti.md`](torch-aoti.md).
 
 ## Debugging
 
-If `forward()` takes 5 tensors (2 data + 2 state + 1 CORRID), the config must declare 2 regular inputs, 1 state block, and 3 control inputs. A short sequence (3-4 requests on one correlation ID) is the quickest way to validate the plumbing before scaling.
+If `forward()` takes 5 tensors (2 data + 1 state + 2 controls), the config must declare 2 regular inputs, 1 state block (contributing 1 input), and 2 control inputs. A short sequence (3-4 requests on one correlation ID) is the quickest way to validate the plumbing before scaling.
 
 ## Recommendations
 
