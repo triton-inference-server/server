@@ -36,7 +36,9 @@ max_batch_size: 16
 dynamic_batching { preferred_batch_size: [8] max_queue_delay_microseconds: 100000 }
 ```
 
-Dynamic batching with explicit scheduler. Triton prepends a batch dim: a `dims: [4]` input becomes `[-1, 4]` at the wire. A hand-written `max_batch_size > 0` does NOT implicitly enable `dynamic_batching`. Add the block if you want the batcher.
+Dynamic batching with explicit scheduler. Triton prepends a batch dim: a `dims: [4]` input becomes `[-1, 4]` at the wire.
+
+Auto-complete behavior: with auto-complete enabled (the default), a `max_batch_size > 1` and no scheduler causes Triton to attach a `dynamic_batching { }` block automatically. To take the batcher explicitly, write the block as shown above so the parameters are not left to the defaults. To opt out of batching entirely, write `max_batch_size: 0` and disable auto-complete at the server level with `--disable-auto-complete-config`.
 
 ## Inputs and outputs
 

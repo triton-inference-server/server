@@ -62,9 +62,9 @@
       "expected_behavior": [
         "Write max_batch_size: 16",
         "Add a dynamic_batching { preferred_batch_size: [8] max_queue_delay_microseconds: 100000 } block",
-        "Warn that hand-written mbs>0 does NOT implicitly enable the batcher without the block"
+        "Note: with auto-complete on, max_batch_size > 1 and no scheduler would auto-attach a dynamic_batching block with defaults; an explicit block pins the parameters"
       ],
-      "ground_truth": "A hand-written config needs an explicit dynamic_batching block. Auto-complete adds it; a hand-written config does not."
+      "ground_truth": "Explicit dynamic_batching block pins the parameters (preferred_batch_size, max_queue_delay). Without the block and with auto-complete on, Triton attaches a default dynamic_batching block when max_batch_size > 1."
     },
     {
       "id": "gpu-placement",
@@ -756,12 +756,12 @@
       "prompt": "How can I tell from the Triton metrics whether dynamic batching is actually coalescing my requests?",
       "expected_skill": "triton-onnx-model-repository",
       "expected_behavior": [
-        "Scrape `/metrics` on port 8002",
+        "Scrape /metrics on the host's metrics port",
         "Compare `nv_inference_count` to `nv_inference_exec_count`",
-        "Ratio of count / exec_count is batcher efficiency; higher ratio means more coalescing",
-        "Point at references/metrics.md"
+        "Qualify: `nv_inference_count / nv_inference_exec_count` measures the average execution batch size. When clients send batch-1 requests, a ratio > 1 means the dynamic batcher is coalescing; when clients already send batched requests, the ratio reflects client batching too",
+        "Point at references/errors.md for the related load-time errors"
       ],
-      "ground_truth": "`nv_inference_count / nv_inference_exec_count` is the coalescing ratio. 1.0 means no batching happening; higher means the batcher is working."
+      "ground_truth": "`nv_inference_count / nv_inference_exec_count` is the average execution batch size. With batch-1 client requests, a value above 1.0 shows the batcher coalescing. With pre-batched client requests, the value conflates client and server batching."
     },
     {
       "id": "index-entry-shapes",
@@ -769,12 +769,12 @@
       "prompt": "Why do some of my models show up in /v2/repository/index with a state of READY, some with UNAVAILABLE, some with just a name field, and some are missing entirely?",
       "expected_skill": "triton-onnx-model-repository",
       "expected_behavior": [
-        "Explain the four shapes: READY+version, UNAVAILABLE+reason, name-only, absent",
-        "Name-only means `config.pbtxt` failed to parse",
-        "Absent means the version directory was not an integer",
-        "Point at the index-shape list in Step 6 and references/errors.md"
+        "Explain the three observable shapes: READY+version, UNAVAILABLE+reason, absent",
+        "Absent means either the version directory is not an integer, OR config.pbtxt failed to parse (silent parse failure)",
+        "UNAVAILABLE means the model config parsed but loading failed",
+        "Point at references/errors.md"
       ],
-      "ground_truth": "`/v2/repository/index` returns four distinct entry shapes; each corresponds to a different failure or success state."
+      "ground_truth": "`/v2/repository/index` shows READY+version for success, UNAVAILABLE+reason for post-parse load failures, and omits the model entirely for parse failures or non-integer version directories."
     },
     {
       "id": "health-endpoints-breakdown",
@@ -784,8 +784,7 @@
       "expected_behavior": [
         "`/v2/health/live` means the server process is up; use for liveness probes",
         "`/v2/health/ready` means every loaded model is READY; strict, False if any model failed",
-        "`/v2/models/<model>/ready` means that specific model is READY; use for routing decisions",
-        "Point at Step 6's health-endpoints table"
+        "`/v2/models/<model>/ready` means that specific model is READY; use for routing decisions"
       ],
       "ground_truth": "Three endpoints, three granularities: process, catalog, individual model. Server-ready is strict."
     },

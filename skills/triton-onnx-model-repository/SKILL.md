@@ -66,7 +66,7 @@ Run read-only checks first. Do not mutate anything yet.
 
 ```bash
 test -f "${onnx_path}"
-python3 -c "import onnx; onnx.checker.check_model('${onnx_path}')"
+python3 -c 'import sys, onnx; onnx.checker.check_model(sys.argv[1])' "${onnx_path}"
 docker version >/dev/null
 # GPU target only:
 docker run --rm --gpus all nvcr.io/nvidia/tritonserver:26.10-py3 nvidia-smi -L
@@ -85,7 +85,7 @@ inputs  = [(i.name, i.type.tensor_type.elem_type, [d.dim_value or d.dim_param fo
 outputs = [(o.name, o.type.tensor_type.elem_type, [d.dim_value or d.dim_param for d in o.type.tensor_type.shape.dim]) for o in m.graph.output]
 ```
 
-If any input's leading axis is a string (e.g., `"N"`), treat the graph as batchable.
+A graph is batchable only if EVERY input AND EVERY output has a string leading axis that resolves to the same symbol (e.g., `"N"`). A graph where inputs are `[N, 4]` and `[4]` is NOT batchable. Walk every `(name, type, shape)` tuple from Step 2 and confirm the leading axis on all of them before treating the graph as batchable.
 
 ### 3. Build the model repository
 
@@ -98,19 +98,29 @@ ${repo}/
 
 The file must be named `model.onnx`. The version directory must be a positive integer.
 
-If the ONNX file has sidecar files (external weights, custom ops), either keep them next to `model.onnx` in the version directory, or wrap the whole set in a directory also named `model.onnx/` with the main file inside:
+For **external weights**, either keep the sidecar files next to `model.onnx` in the version directory, or wrap the whole set in a directory also named `model.onnx/` with the main file inside:
 
 ```
 ${model_name}/
   1/
     model.onnx/
       model.onnx
-      <sidecar files>
+      <external weight files>
 ```
+
+For **custom operators**, copying the shared library into the version directory does NOT register the ops. Add a `model_operations` block to `config.pbtxt`:
+
+```
+model_operations { op_library_filename: "/path/to/libmycustom.so" }
+```
+
+The path must be reachable from inside the server process (a path in the mounted repository works).
 
 ### 4. Write config.pbtxt only if required
 
-Skip when all of these hold: `batching` is `none` or `auto`, `versioning` is `single`, `cache` is `off`, `accelerator` is `none`, and no graph name contains `:0` or `/`. Auto-complete handles the rest.
+Skip when all of these hold: `batching` is `auto`, `versioning` is `single`, `cache` is `off`, `accelerator` is `none`, no graph name contains `:0` or `/`, and the graph has no custom ops. Auto-complete handles the rest.
+
+When `batching` is `none` on a batchable graph, DO write `config.pbtxt` with `max_batch_size: 0`. Auto-complete would otherwise set `max_batch_size: 4` (from the backend's `default-max-batch-size`) and attach a `dynamic_batching { }` block, overriding the user's intent.
 
 Otherwise, write the file using `references/config-pbtxt.md`. Use `backend: "onnxruntime"`, not `platform:`. Match input and output names to the graph exactly.
 
@@ -146,14 +156,14 @@ METRICS_PORT="$(echo ${ports} | cut -d, -f3)"
 
 docker run -d --rm --name triton \
   --gpus all \
-  -p "${HTTP_PORT}":8000 -p "${GRPC_PORT}":8001 -p "${METRICS_PORT}":8002 \
+  -p "127.0.0.1:${HTTP_PORT}":8000 -p "127.0.0.1:${GRPC_PORT}":8001 -p "127.0.0.1:${METRICS_PORT}":8002 \
   -v "${repo}:/models:ro" \
   nvcr.io/nvidia/tritonserver:26.10-py3 \
   tritonserver --model-repository=/models --exit-on-error=false \
   $( [ "${cache}" = "on" ] && echo --cache-config local,size=1048576 )
 ```
 
-For CPU targets, drop `--gpus all`. Wait for `/v2/health/live` to return 200 before continuing.
+Ports bind to loopback by default. Drop the `127.0.0.1:` prefix only when remote access is an explicit requirement and the deployment target can authorize external callers. For CPU targets, drop `--gpus all`. Wait for `/v2/health/live` to return 200 before continuing.
 
 ### 6. Verify the load
 
@@ -194,7 +204,7 @@ Return to the user:
 - **Server command.** The literal `docker run` or `tritonserver` command.
 - **Client snippet.** Python code that matches the graph's names and shapes exactly.
 - **Smoke-test result.** The output tensor (shape, dtype, first few values). "Not executed" if `execute` is `false`.
-- **Metrics URL.** `http://<host>:8002/metrics`.
+- **Metrics URL.** `http://<host>:<metrics_port>/metrics`, using the host metrics port from `ports`.
 - **Blockers.** Any step that failed, with the exact error and the row from `references/errors.md` that matches.
 
 ## Available Scripts

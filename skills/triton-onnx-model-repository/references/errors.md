@@ -61,9 +61,9 @@ Could not determine backend for model '<model>' with no backend in model configu
     Expected model name of the form 'model.<backend_name>'.
 ```
 
-**Cause.** The version directory is empty or has no file, AND the config does not set `backend:`.
+**Cause.** The version directory has no model file (so Triton cannot infer the backend from a filename like `model.onnx`), AND the config does not set `backend:`.
 
-**Fix.** Put `model.onnx` in the version directory, or add `backend: "onnxruntime"` to `config.pbtxt`.
+**Fix.** Put a usable `model.onnx` in the version directory. Adding `backend: "onnxruntime"` alone fixes the backend detection but the load still fails because the model file is missing; the file must be restored for the model to load.
 
 ### Input name mismatch
 
