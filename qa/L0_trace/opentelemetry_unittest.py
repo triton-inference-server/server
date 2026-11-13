@@ -1,4 +1,4 @@
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,25 +24,26 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-
-sys.path.append("../common")
 import concurrent.futures
 import json
+import os
 import queue
 import re
 import shutil
 import subprocess
+import sys
 import time
 import unittest
 from functools import partial
 
 import numpy as np
 import requests
-import test_util as tu
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 from tritonclient.utils import InferenceServerException
+
+sys.path.append("../common")
+import test_util as tu  # noqa: E402
 
 NO_PARENT_SPAN_ID = ""
 COLLECTOR_TIMEOUT = 10
@@ -86,6 +87,33 @@ def send_bls_request(model_name="simple", headers=None):
 class UserData:
     def __init__(self):
         self._completed_requests = queue.Queue()
+
+
+class TritonTraceGate:
+    """
+    Mirrors TraceManager::TraceSetting::SampleTrace: Triton's `rate` and
+    `count` gate, which runs before the OpenTelemetry SDK sampler.
+    Requests with a valid propagated context are force-sampled, but still
+    consume `count` while it is positive.
+    """
+
+    def __init__(self, rate, count):
+        self.rate = rate
+        self.count = count
+        self.sample = 0
+
+    def sample_trace(self, force_sample):
+        if self.rate == 0:
+            return force_sample
+        if self.count == 0 and not force_sample:
+            return False
+        self.sample += 1
+        rate_hit = self.sample % self.rate == 0
+        if rate_hit and self.count > 0:
+            self.count -= 1
+        elif rate_hit and self.count == 0:
+            rate_hit = False
+        return rate_hit or force_sample
 
 
 class OpenTelemetryTest(tu.TestResultCollector):
@@ -226,7 +254,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         elif span_name == self.root_span:
             # Check that root span has INFER_RESPONSE_COMPLETE, _RECV/_WAITREAD
             # and _SEND events (and only them)
-            if is_cancelled == True:
+            if is_cancelled:
                 root_events_http = cancel_root_events_http
                 root_events_grpc = cancel_root_events_grpc
 
@@ -240,7 +268,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 self.assertFalse(all(entry in events for entry in root_events_http))
                 self.assertEqual(len(events), len(root_events_grpc))
 
-            if is_cancelled == False:
+            if not is_cancelled:
                 self.assertFalse(all(entry in events for entry in request_events))
                 self.assertFalse(all(entry in events for entry in compute_events))
 
@@ -402,7 +430,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         """
         parent_span_id = NO_PARENT_SPAN_ID
 
-        if headers != None:
+        if headers is not None:
             parent_span_id = headers["traceparent"].split("-")[2]
             parent_trace_id = headers["traceparent"].split("-")[1]
             self.assertEqual(
@@ -427,7 +455,7 @@ class OpenTelemetryTest(tu.TestResultCollector):
         # The idea here is to wait before we try and read the traces from the file.
         time.sleep(2 * COLLECTOR_TIMEOUT)
         traces = self._parse_trace_log(self.filename)
-        if is_queued == False:
+        if not is_queued:
             expected_counts = dict(
                 {"compute": 1, self.input_all_required_model_name: 1, self.root_span: 1}
             )
@@ -648,6 +676,110 @@ class OpenTelemetryTest(tu.TestResultCollector):
             expected_parent_span_dict=expected_parent_span_dict,
         )
 
+    def _expect_exported(self, sampler, ratio, context, triton_gate):
+        """
+        Returns whether a request with the given propagated `context` is
+        expected to be exported. Triton's gate runs first and must be called
+        once per request, in request order. The SDK sampler then follows a
+        valid parent's sampled flag for parent-based samplers, and otherwise
+        applies its root decision.
+        """
+        has_parent = context in ("sampled", "unsampled")
+        if not triton_gate.sample_trace(force_sample=has_parent):
+            return False
+        if has_parent and sampler.startswith("parentbased_"):
+            return context == "sampled"
+        if sampler.endswith("always_off"):
+            return False
+        if sampler.endswith("traceidratio"):
+            return ratio == 1.0
+        return True
+
+    def test_sdk_sampler(self):
+        sampler = os.environ.get("OTEL_TRACES_SAMPLER", "").lower()
+        # The server uses a ratio of 1.0 when OTEL_TRACES_SAMPLER_ARG is
+        # unset or invalid. Only ratios 0 and 1 give deterministic results.
+        ratio_arg = os.environ.get("OTEL_TRACES_SAMPLER_ARG", "")
+        ratio = 1.0 if ratio_arg in ("", "invalid") else float(ratio_arg)
+        self.assertIn(ratio, (0.0, 1.0))
+        triton_gate = TritonTraceGate(
+            rate=int(os.environ.get("TEST_TRACE_RATE", "1")),
+            count=int(os.environ.get("TEST_TRACE_COUNT", "-1")),
+        )
+        expected_requests = set()
+        parent_trace_ids = {}
+        for model in (self.simple_model_name, self.ensemble_model_name):
+            for protocol, client_module, port in (
+                ("http", httpclient, 8000),
+                ("grpc", grpcclient, 8001),
+                ("grpc_stream", grpcclient, 8001),
+            ):
+                with client_module.InferenceServerClient(f"localhost:{port}") as client:
+                    for context in ("missing", "sampled", "unsampled", "invalid"):
+                        request_id = f"{model}_{protocol}_{context}"
+                        headers = None
+                        if context in ("sampled", "unsampled"):
+                            trace_id = f"{len(parent_trace_ids) + 1:032x}"
+                            parent_trace_ids[request_id] = trace_id
+                            flags = "01" if context == "sampled" else "00"
+                            headers = {
+                                "traceparent": f"00-{trace_id}-b7ad6b7169242424-{flags}"
+                            }
+                        elif context == "invalid":
+                            headers = {"traceparent": "invalid"}
+                        if protocol == "grpc_stream":
+                            responses = queue.Queue()
+                            client.start_stream(
+                                callback=partial(callback, responses), headers=headers
+                            )
+                            client.async_stream_infer(
+                                model,
+                                prepare_data(client_module),
+                                request_id=request_id,
+                            )
+                            response = responses.get(timeout=10)
+                            client.stop_stream()
+                            self.assertNotIsInstance(response, InferenceServerException)
+                        else:
+                            client.infer(
+                                model,
+                                prepare_data(client_module),
+                                request_id=request_id,
+                                headers=headers,
+                            )
+                        if self._expect_exported(sampler, ratio, context, triton_gate):
+                            expected_requests.add(request_id)
+
+        time.sleep(2 * COLLECTOR_TIMEOUT)
+        spans = [
+            span
+            for trace in self._parse_trace_log(self.filename)
+            for resource in trace["resourceSpans"]
+            for scope in resource["scopeSpans"]
+            for span in scope["spans"]
+        ]
+        exported_requests = {
+            attribute["value"]["stringValue"]
+            for span in spans
+            for attribute in span.get("attributes", [])
+            if attribute["key"] == "triton.request_id"
+        }
+        self.assertSetEqual(exported_requests, expected_requests)
+        for request_id, trace_id in parent_trace_ids.items():
+            if request_id not in expected_requests:
+                self.assertFalse(any(span["traceId"] == trace_id for span in spans))
+        for span in spans:
+            if span["name"] == self.ensemble_model_name:
+                self.assertTrue(
+                    any(
+                        child["name"] == self.simple_model_name
+                        and child["traceId"] == span["traceId"]
+                        and child["parentSpanId"] == span["spanId"]
+                        for child in spans
+                    ),
+                    "Ensemble trace is missing its child model span",
+                )
+
     def test_http_trace_simple_model(self):
         """
         Tests trace, collected from executing one inference request
@@ -769,6 +901,37 @@ class OpenTelemetryTest(tu.TestResultCollector):
         self._test_non_decoupled_trace()
         self.assertEqual(1, res.as_numpy("OUT")[0])
         self.assertEqual(0, res.as_numpy("IDX")[0])
+
+    def test_grpc_trace_context_propagation_many_requests(self):
+        """
+        Tests that every unary gRPC request keeps its propagated trace id.
+        The traceparent metadata value must be read with its length, so many
+        requests are sent to catch reads past the end of the value.
+        """
+        sent_trace_ids = {}
+        with grpcclient.InferenceServerClient("localhost:8001") as client:
+            for i in range(200):
+                request_id = f"grpc_context_{i}"
+                trace_id = f"{i + 1:032x}"
+                sent_trace_ids[request_id] = trace_id
+                client.infer(
+                    self.simple_model_name,
+                    prepare_data(grpcclient),
+                    request_id=request_id,
+                    headers={"traceparent": f"00-{trace_id}-b7ad6b7169242424-01"},
+                )
+
+        time.sleep(2 * COLLECTOR_TIMEOUT)
+        received_trace_ids = {
+            attribute["value"]["stringValue"]: span["traceId"]
+            for trace in self._parse_trace_log(self.filename)
+            for resource in trace["resourceSpans"]
+            for scope in resource["scopeSpans"]
+            for span in scope["spans"]
+            for attribute in span.get("attributes", [])
+            if attribute["key"] == "triton.request_id"
+        }
+        self.assertDictEqual(received_trace_ids, sent_trace_ids)
 
     def test_grpc_trace_simple_model_context_propagation(self):
         """
