@@ -76,8 +76,8 @@ import requests
 DEFAULT_TRITON_VERSION_MAP = {
     "release_version": "2.76.0dev",
     "triton_container_version": "26.12dev",
-    "upstream_container_version": "26.10",
-    "cuda_dl_base_version": "26.10-cuda13.4",
+    "upstream_container_version": "26.11",
+    "cuda_dl_base_version": "26.11-cuda13.5",
     "ort_version": "1.31.1",
     "ort_openvino_version": "2026.4.1",
     "standalone_openvino_version": "2026.4.1",
