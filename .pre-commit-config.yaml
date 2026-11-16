@@ -90,4 +90,4 @@ repos:
     # license headers out of them. Workflows ARE processed.
     # THIRD-PARTY-NOTICES.txt reproduces upstream notices verbatim, including
     # NVIDIA copyright lines whose years must not be rewritten.
-    exclude: ^(\.github/(ISSUE_TEMPLATE/|PULL_REQUEST_TEMPLATE|pull_request_template)|THIRD-PARTY-NOTICES\.txt$)
+    exclude: ^(\.github/(ISSUE_TEMPLATE/|PULL_REQUEST_TEMPLATE|pull_request_template|workflows/request-nvskills-ci\.yml$)|THIRD-PARTY-NOTICES\.txt$|skills/)
