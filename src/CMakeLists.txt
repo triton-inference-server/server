@@ -305,13 +305,11 @@ if(${TRITON_ENABLE_HTTP}
   list(APPEND
     HTTP_ENDPOINT_SRCS
     http_server.cc
-    memory_limit.cc
     orca_http.cc
   )
   list(APPEND
     HTTP_ENDPOINT_HDRS
     http_server.h
-    memory_limit.h
     orca_http.h
   )
 
