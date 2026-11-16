@@ -833,6 +833,13 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+python http_input_size_limit_test.py InferSizeLimitTest.test_default_limit_parsed_json >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Default Input Size Limit Test Failed for parsed JSON input\n***"
+    RET=1
+fi
+
 python http_input_size_limit_test.py InferSizeLimitTest.test_large_string_in_json >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -901,10 +908,41 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+python http_input_size_limit_test.py InferSizeLimitTest.test_large_input_parsed_json >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Input Size Limit Test Failed for parsed JSON input with increased limits\n***"
+    RET=1
+fi
+
 python http_input_size_limit_test.py InferSizeLimitTest.test_large_input_compressed >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Input Size Limit Test Failed for compressed input with increased limits\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Now run with decreased size limit (64KB) - small JSON inputs should still succeed
+SERVER_ARGS="--model-repository=${MODELDIR} --http-max-input-size=$((2**16))"
+SERVER_LOG="./inference_server_decreased_limit.log"
+CLIENT_LOG="./http_input_size_limit_decreased.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER with decreased HTTP input size limit\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python http_input_size_limit_test.py InferSizeLimitTest.test_decreased_limit_json >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Input Size Limit Test Failed for JSON input with decreased limits\n***"
     RET=1
 fi
 set -e
