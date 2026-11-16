@@ -3272,7 +3272,24 @@ HTTPAPIServer::EVBufferToJson(
             .c_str());
   }
 
-  RETURN_IF_ERR(document->Parse(json_base, length));
+  // The parsed JSON uses more memory than the request body, so the maximum
+  // input size also limits the memory used to parse it.
+  const size_t parse_memory_limit =
+      std::max(max_input_size_, HTTP_MIN_JSON_PARSE_MEMORY_LIMIT);
+  bool limit_exceeded = false;
+  TRITONSERVER_Error* err = document->ParseWithMemoryLimit(
+      json_base, length, parse_memory_limit, &limit_exceeded);
+  if (limit_exceeded) {
+    TRITONSERVER_ErrorDelete(err);
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        ("request JSON of " + std::to_string(length) +
+         " bytes exceeds the maximum allowed input size of " +
+         std::to_string(parse_memory_limit) +
+         " bytes when parsed. Use --http-max-input-size to increase the limit.")
+            .c_str());
+  }
+  RETURN_IF_ERR(err);
 
   return nullptr;  // success
 }
