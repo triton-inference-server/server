@@ -356,6 +356,97 @@ unset TRITONCACHE_REDIS_PASSWORD
 unset_redis_auth
 stop_redis
 
+# Verify that request metadata and model namespaces separate cache entries.
+CACHE_KEY_REPOS=$(mktemp -d "${PWD}/cache_key_models.XXXXXX")
+python3 - "$CACHE_KEY_REPOS" <<'PYMODELS'
+from pathlib import Path
+import shutil
+import sys
+
+root = Path(sys.argv[1])
+fixture = Path("models/cache_key")
+config = (fixture / "config.pbtxt").read_text()
+
+
+def model(repository, name, batched=False, enabled=True, maxima=False):
+    target = root / repository / name
+    shutil.copytree(fixture, target)
+    text = config.replace('name: "cache_key"', f'name: "{name}"')
+    if batched:
+        text = text.replace("max_batch_size: 0", "max_batch_size: 8")
+        text = text.replace("dims: [-1, -1]", "dims: [-1]")
+        for output in ("SUM", "MAX"):
+            dtype = "INT64" if output == "SUM" else "INT32"
+            text = text.replace(
+                f'name: "{output}" data_type: TYPE_{dtype} dims: [-1]',
+                f'name: "{output}" data_type: TYPE_{dtype} dims: [1]',
+            )
+    if not enabled:
+        text = text.replace("enable: true", "enable: false")
+    if maxima:
+        text += 'parameters { key: "reduction" value { string_value: "max" } }\n'
+    (target / "config.pbtxt").write_text(text)
+
+
+def ensemble(repository, name, component, enabled=True):
+    target = root / repository / name
+    (target / "1").mkdir(parents=True)
+    text = config.replace('name: "cache_key"', f'name: "{name}"')
+    text = text.replace('backend: "python"', 'platform: "ensemble"')
+    text = text.replace("instance_group [{ kind: KIND_CPU }]", "")
+    if not enabled:
+        text = text.replace("enable: true", "enable: false")
+    text += 'ensemble_scheduling { step [{ model_name: "' + component + '" '
+    text += 'model_version: -1 input_map { key: "INPUT" value: "INPUT" } '
+    for output in ("SUM", "MAX", "PARAMETERS"):
+        text += f'output_map {{ key: "{output}" value: "{output}" }} '
+    text += '}] }\n'
+    (target / "config.pbtxt").write_text(text)
+
+
+model("repoA", "cache_key")
+model("repoA", "cache_key_batched", batched=True)
+model("repoA", "cache_key_uncached", enabled=False)
+ensemble("repoA", "cache_key_ensemble", "cache_key_uncached")
+model("repoA", "X")
+model("repoB", "X", maxima=True)
+ensemble("repoA", "ensA", "X", enabled=False)
+ensemble("repoB", "ensB", "X", enabled=False)
+PYMODELS
+
+CACHE_KEY_SAVED_SERVER_LOG=$SERVER_LOG
+for CACHE_BACKEND in local redis; do
+    if [ "$CACHE_BACKEND" == "local" ]; then
+        CACHE_KEY_ARGS="--cache-config=local,size=16777216"
+    else
+        start_redis
+        CACHE_KEY_ARGS="${REDIS_ENDPOINT}"
+    fi
+    SERVER_LOG="./cache_key.${CACHE_BACKEND}.server.log"
+    SERVER_ARGS="--model-repository=${CACHE_KEY_REPOS}/repoA --model-repository=${CACHE_KEY_REPOS}/repoB --model-namespacing=true --model-control-mode=explicit --load-model=* ${CACHE_KEY_ARGS}"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        cat "$SERVER_LOG"
+        RET=1
+    else
+        rm -f "$TEST_RESULT_FILE"
+        if ! python3 cache_key_test.py > "cache_key.${CACHE_BACKEND}.client.log" 2>&1; then
+            cat "cache_key.${CACHE_BACKEND}.client.log"
+            RET=1
+        elif ! check_test_results "$TEST_RESULT_FILE" 5; then
+            cat "cache_key.${CACHE_BACKEND}.client.log"
+            RET=1
+        fi
+        kill "$SERVER_PID"
+        wait "$SERVER_PID"
+    fi
+    if [ "$CACHE_BACKEND" == "redis" ]; then
+        stop_redis
+    fi
+done
+SERVER_LOG=$CACHE_KEY_SAVED_SERVER_LOG
+rm -rf "$CACHE_KEY_REPOS"
+
 # Test ensemble model with cache and decoupled mode enabled
 check_server_failure_decoupled_model ${ENSEMBLE_CACHE_DECOUPLED} ${ENSEMBLE_MODEL}
 

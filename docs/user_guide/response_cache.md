@@ -1,5 +1,5 @@
 <!--
-# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,10 +30,11 @@
 
 ## Overview
 
-In this document an *inference request* is the model name, model version, and
-input tensors (name, shape, datatype and tensor data) that make up a request
-submitted to Triton. An inference result is the output tensors (name, shape,
-datatype and tensor data) produced by an inference execution. The response cache
+In this document an *inference request* includes the model namespace, model
+name, model version, input tensors (name, shape, datatype and tensor data),
+request parameters (name, type and value), and requested output names submitted
+to Triton. An inference result is the output tensors (name, shape, datatype and
+tensor data) produced by an inference execution. The response cache
 is used by Triton to hold inference results generated for previous executed
 inference requests. Triton will maintain the response cache so that inference
 requests that hit in the cache will not need to execute a model to produce
@@ -41,13 +42,13 @@ results and will instead extract their results from the cache. For some use
 cases this can significantly reduce the inference request latency.
 
 Triton accesses the response cache with a hash of the inference request that
-includes the model name, model version and model inputs. If the hash is found in
-the cache, the corresponding inference result is extracted from the cache and
-used for the request. When this happens there is no need for Triton to execute
-the model to produce the inference result. If the hash is not found in the
-cache, Triton executes the model to produce the inference result, and then
-records that result in the cache so that subsequent inference requests can
-(re)use those results.
+includes the model namespace, model name, model version, model inputs, request
+parameters and requested output names. If the hash is found in the cache, the
+corresponding inference result is extracted from the cache and used for the
+request. When this happens there is no need for Triton to execute the model to
+produce the inference result. If the hash is not found in the cache, Triton
+executes the model to produce the inference result, and then records that result
+in the cache so that subsequent inference requests can (re)use those results.
 
 ## Usage
 
