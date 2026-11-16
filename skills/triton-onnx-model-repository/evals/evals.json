@@ -1,0 +1,895 @@
+{
+  "skill": "triton-onnx-model-repository",
+  "description": "SkillEvaluator dataset for the Triton ONNX Model Repository skill. 34 positive and 12 negative cases, one per unique feature or failure mode.",
+  "cases": [
+    {
+      "id": "basic-fixed-shape",
+      "category": "positive",
+      "prompt": "I have an ONNX file with fixed input shape [4]. Set it up to serve on Triton locally.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Inspect the ONNX graph to confirm no dynamic axis",
+        "Build <repo>/<model>/1/model.onnx",
+        "Start tritonserver without config.pbtxt (auto-complete)",
+        "Confirm /v2/repository/index shows state READY",
+        "Return the Output Contract including server command and a Python client snippet"
+      ],
+      "ground_truth": "Auto-complete sets max_batch_size: 0, backend: onnxruntime, dims matching the graph. No config.pbtxt file written."
+    },
+    {
+      "id": "batchable-autocomplete",
+      "category": "positive",
+      "prompt": "My ONNX model has a dynamic batch dimension. Serve it with Triton and let batching happen automatically.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Read the graph and confirm leading axis is dynamic",
+        "Skip config.pbtxt",
+        "Start the server with defaults",
+        "Verify /v2/models/<model>/config shows max_batch_size: 4 and dynamic_batching enabled"
+      ],
+      "ground_truth": "Auto-complete sets max_batch_size: 4 (server default) and attaches a dynamic_batching block with preferred_batch_size [4]."
+    },
+    {
+      "id": "handwritten-backend-form",
+      "category": "positive",
+      "prompt": "Write me a config.pbtxt for a FP32 add model with two inputs of shape [4] using the modern backend syntax.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Produce a config.pbtxt using `backend: \"onnxruntime\"`",
+        "Include input and output sections with TYPE_FP32 dims [4]",
+        "Include instance_group KIND_CPU",
+        "Set max_batch_size: 0"
+      ],
+      "ground_truth": "The config uses `backend: \"onnxruntime\"` (not `platform:`) and the `TYPE_FP32` spelling."
+    },
+    {
+      "id": "handwritten-platform-form",
+      "category": "positive",
+      "prompt": "My existing config.pbtxt uses `platform: \"onnxruntime_onnx\"`. Does that still work on Triton 26.10, or do I need to migrate?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Confirm `platform: \"onnxruntime_onnx\"` still loads",
+        "Point at docs/examples/model_repository/simple/config.pbtxt as the in-tree example",
+        "Recommend `backend: \"onnxruntime\"` for new configs"
+      ],
+      "ground_truth": "Both forms load READY and serve correctly. The modern form is `backend: \"onnxruntime\"`."
+    },
+    {
+      "id": "dynamic-batching-block",
+      "category": "positive",
+      "prompt": "I want max_batch_size 16 with a preferred batch size of 8 and 100ms queue delay. Write the config.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Write max_batch_size: 16",
+        "Add a dynamic_batching { preferred_batch_size: [8] max_queue_delay_microseconds: 100000 } block",
+        "Note: with auto-complete on, max_batch_size > 1 and no scheduler would auto-attach a dynamic_batching block with defaults; an explicit block pins the parameters"
+      ],
+      "ground_truth": "Explicit dynamic_batching block pins the parameters (preferred_batch_size, max_queue_delay). Without the block and with auto-complete on, Triton attaches a default dynamic_batching block when max_batch_size > 1."
+    },
+    {
+      "id": "gpu-placement",
+      "category": "positive",
+      "prompt": "Run my ONNX model on GPUs 0 and 1 with 2 instances each.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Write instance_group [{ count: 2, kind: KIND_GPU, gpus: [0, 1] }]",
+        "Add --gpus all to the docker run command",
+        "Point at nv_gpu_utilization and nv_gpu_memory_used_bytes metrics"
+      ],
+      "ground_truth": "instance_group with KIND_GPU and explicit gpus list. Container needs --gpus all."
+    },
+    {
+      "id": "cpu-only",
+      "category": "positive",
+      "prompt": "I don't have a GPU. Set up Triton ONNX inference on CPU.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Write instance_group [{ kind: KIND_CPU }] or omit instance_group",
+        "Drop --gpus all from docker run",
+        "Confirm auto-complete still works"
+      ],
+      "ground_truth": "KIND_CPU places on CPU; docker run without --gpus still works."
+    },
+    {
+      "id": "multi-version-latest",
+      "category": "positive",
+      "prompt": "I have versions 1, 2, and 3 of my ONNX model in the repository. Which one does Triton serve by default?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Explain default version policy serves the highest numeric version",
+        "Confirm version 3 is served",
+        "Mention `/v2/models/<model>` reports the versions array"
+      ],
+      "ground_truth": "Default policy serves version 3."
+    },
+    {
+      "id": "version-policy-specific",
+      "category": "positive",
+      "prompt": "Serve version 1 and version 3 at the same time for A/B comparison, skip version 2.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Add version_policy: { specific: { versions: [1, 3] } } to config.pbtxt",
+        "Show client code using model_version=\"1\" and model_version=\"3\"",
+        "Note that a request for version 2 returns 404 'version 2 is not found'"
+      ],
+      "ground_truth": "`version_policy: { specific: { versions: [1, 3] } }` loads both; v2 requests return HTTP 404."
+    },
+    {
+      "id": "version-policy-all",
+      "category": "positive",
+      "prompt": "I want all versions of my model to be callable by clients.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Add version_policy: { all: {} } to config.pbtxt",
+        "Explain each version appears as its own entry in /v2/repository/index"
+      ],
+      "ground_truth": "`version_policy: { all: {} }` loads every numeric version directory present."
+    },
+    {
+      "id": "default-model-filename",
+      "category": "positive",
+      "prompt": "I don't want to rename resnet.onnx to model.onnx. Can I keep the original name?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Add default_model_filename: \"resnet.onnx\" to config.pbtxt",
+        "Leave the file named resnet.onnx in the version directory",
+        "Confirm load as READY"
+      ],
+      "ground_truth": "`default_model_filename: \"resnet.onnx\"` overrides the default model.onnx name; the file loads as READY."
+    },
+    {
+      "id": "tf-style-names",
+      "category": "positive",
+      "prompt": "My ONNX file was converted from TensorFlow. The input is named 'image:0' and the output is 'resnet50/predictions/Softmax:0'. How do I handle those names in the config?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Quote the names exactly in config.pbtxt: `name: \"image:0\"` and `name: \"resnet50/predictions/Softmax:0\"`",
+        "Use the same literal names on the client side",
+        "Warn that mismatches produce `unexpected inference input` errors"
+      ],
+      "ground_truth": "Names with `:0` and `/` are valid when quoted. The client passes the exact string to InferInput and as_numpy."
+    },
+    {
+      "id": "label-filename",
+      "category": "positive",
+      "prompt": "I have a 5-class classifier. I want the client to get class names back, not raw logits.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Add `label_filename: \"labels.txt\"` to the output section",
+        "Place labels.txt next to config.pbtxt, one label per line",
+        "Show client using InferRequestedOutput with class_count=3",
+        "Explain return format `b'<probability>:<class_id>:<label>'`"
+      ],
+      "ground_truth": "Top-K classes returned as byte strings of the form `<prob>:<class_id>:<label>`."
+    },
+    {
+      "id": "string-tensors",
+      "category": "positive",
+      "prompt": "I have an ONNX text-echo model that takes strings in and out. How do I declare it in config.pbtxt and call it from Python?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Use data_type: TYPE_STRING in config.pbtxt",
+        "On the client use InferInput with datatype \"BYTES\" and np.array([...], dtype=object)",
+        "Note the output comes back as Python bytes; decode with .decode('utf-8')"
+      ],
+      "ground_truth": "TYPE_STRING in config maps to \"BYTES\" on client. Output is numpy array of bytes objects."
+    },
+    {
+      "id": "response-cache",
+      "category": "positive",
+      "prompt": "Enable response caching for my deterministic ONNX model so repeat requests don't re-run the backend.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Start the server with `--cache-config local,size=1048576`",
+        "Add `response_cache { enable: true }` to config.pbtxt",
+        "Warn that without the server flag, the model-level flag is a no-op",
+        "Point at nv_cache_num_hits_per_model, nv_cache_num_misses_per_model, nv_cache_num_lookups_per_model"
+      ],
+      "ground_truth": "Both the server --cache-config flag AND the model config response_cache block are required."
+    },
+    {
+      "id": "model-warmup",
+      "category": "positive",
+      "prompt": "Make my ONNX model run warmup inferences at load time so the first real request isn't slow.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Add a model_warmup block with batch_size: 1 and zero_data: true for each input",
+        "Explain the model won't reach READY until warmup completes",
+        "Note Triton does not log explicit 'warming up' lines"
+      ],
+      "ground_truth": "`model_warmup` block with `zero_data: true` delays READY until warmup finishes; failed warmup fails the load."
+    },
+    {
+      "id": "external-weights",
+      "category": "positive",
+      "prompt": "My ONNX model has weights stored in a separate weights.bin file alongside model.onnx. Will Triton load that?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Confirm Triton loads both files from the version directory",
+        "Explain model.onnx references the sidecar by name",
+        "No special config.pbtxt entries needed",
+        "Warn that a missing weights file surfaces as an ONNX Runtime load error"
+      ],
+      "ground_truth": "Triton loads `model.onnx` + `weights.bin` side by side without extra configuration."
+    },
+    {
+      "id": "default-batch-flag",
+      "category": "positive",
+      "prompt": "I want auto-complete to use max_batch_size 16 instead of 4 by default for all my ONNX models.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Add `--backend-config=default-max-batch-size=16` to the tritonserver command",
+        "Explain this only affects batchable graphs (dynamic leading axis)",
+        "Note fixed-shape graphs still get max_batch_size: 0"
+      ],
+      "ground_truth": "`--backend-config=default-max-batch-size=16` changes auto-complete's default for batchable graphs. Fixed-shape graphs unaffected."
+    },
+    {
+      "id": "empty-config",
+      "category": "positive",
+      "prompt": "I have an empty config.pbtxt file in my model directory. Does Triton treat it as a missing config?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Explain an empty config.pbtxt is equivalent to no config.pbtxt",
+        "Auto-complete runs normally",
+        "Model loads READY with the auto-generated configuration"
+      ],
+      "ground_truth": "Empty `config.pbtxt` loads READY via auto-complete; equivalent to omitting the file."
+    },
+    {
+      "id": "explicit-model-control",
+      "category": "positive",
+      "prompt": "Run Triton with on-demand model loading via the API, not loading everything at startup.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Start tritonserver with `--model-control-mode=explicit`",
+        "Use `POST /v2/repository/models/<model>/load` to load a model",
+        "Use `POST /v2/repository/models/<model>/unload` to unload",
+        "Explain unloaded models show state UNAVAILABLE reason 'unloaded' in the index"
+      ],
+      "ground_truth": "Explicit mode exposes `/v2/repository/models/<model>/load` and `/unload`. Returns HTTP 200."
+    },
+    {
+      "id": "poll-mode-hot-reload",
+      "category": "positive",
+      "prompt": "I want Triton to automatically pick up changes to my model repository without restarting.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Start tritonserver with `--model-control-mode=poll --repository-poll-secs=<N>`",
+        "Explain that file or config.pbtxt edits are picked up at the next poll",
+        "Note the server logs 'loading' / 'successfully loaded' / 'successfully unloaded <old>' lines"
+      ],
+      "ground_truth": "Poll mode reloads models on next poll after a file change; log shows load + unload of the old version."
+    },
+    {
+      "id": "failed-to-stat-file",
+      "category": "positive",
+      "prompt": "Triton says `Internal: failed to stat file /models/mymodel/1/model.onnx` but my file is right there. What's wrong?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Check the actual filename inside 1/",
+        "Diagnose: the file is not named exactly `model.onnx`",
+        "Offer two fixes: rename to model.onnx, or set `default_model_filename` in config.pbtxt"
+      ],
+      "ground_truth": "`failed to stat file ... model.onnx` always means the file is named something else. Fix by rename or default_model_filename."
+    },
+    {
+      "id": "silent-parse-failure",
+      "category": "positive",
+      "prompt": "My ONNX model doesn't show up in /v2/repository/index at all. Not even UNAVAILABLE. What happened?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Check the server log for `Error parsing text-format inference.ModelConfig`",
+        "Diagnose: config.pbtxt has an invalid value (common: `data_type: float32` instead of TYPE_FP32)",
+        "Fix by using the correct TYPE_* enum spelling"
+      ],
+      "ground_truth": "A protobuf parse failure makes the model invisible from the index; only the log shows the cause."
+    },
+    {
+      "id": "nonnumeric-version-dir",
+      "category": "positive",
+      "prompt": "I put my ONNX file under v1/ but Triton refuses to load my model. There's no error in the index.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Check the server log for `ignore version directory 'v1' which fails to convert to integral number`",
+        "Diagnose: version directories must be integers like 1/, 2/, 3/",
+        "Fix by renaming v1/ to 1/"
+      ],
+      "ground_truth": "Non-integer version directories are ignored; model drops out of the index with a warning in the log."
+    },
+    {
+      "id": "bad-input-name",
+      "category": "positive",
+      "prompt": "Triton reports `Invalid argument: unexpected inference input 'X', allowed inputs are: INPUT0, INPUT1`. Why?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Diagnose: the input name in config.pbtxt does not match the ONNX graph",
+        "Point at the allowed names in the error",
+        "Fix by renaming the input in config.pbtxt, or inspecting the ONNX graph for the real names"
+      ],
+      "ground_truth": "`unexpected inference input` means the config name differs from the ONNX graph. The error lists the real names."
+    },
+    {
+      "id": "bad-output-name",
+      "category": "positive",
+      "prompt": "I'm getting `Invalid argument: unexpected inference output 'WRONG_OUT', allowed outputs are: OUTPUT0`. How do I fix the config?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Diagnose: output name mismatch between config.pbtxt and the ONNX graph",
+        "Fix by renaming the output to one of the allowed names"
+      ],
+      "ground_truth": "Same pattern as input mismatch. The error lists valid output names."
+    },
+    {
+      "id": "missing-batch-dim",
+      "category": "positive",
+      "prompt": "My Python client is sending a tensor with shape [4] but Triton rejects it saying `Expected [-1,4], got [4]. NOTE: Setting a non-zero max_batch_size in the model config requires a non-trivial batch dim`. The model config says max_batch_size 4.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Diagnose: max_batch_size > 0 requires the request to include a batch dim",
+        "Fix by sending shape [1, 4] instead of [4]",
+        "Or set max_batch_size: 0 in config.pbtxt if batching is not wanted"
+      ],
+      "ground_truth": "When max_batch_size>0, the wire shape must include the batch dim; the server prepends [-1,...] to the config dims."
+    },
+    {
+      "id": "404-no-versions",
+      "category": "positive",
+      "prompt": "Client gets HTTP 404 `Request for unknown model: 'mymodel' has no available versions` but the model directory exists.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Check /v2/repository/index for the model's state",
+        "If UNAVAILABLE, read the reason and fix the load error",
+        "Confirm the model is READY before retrying the inference call"
+      ],
+      "ground_truth": "`no available versions` means the model failed to load. Diagnosis starts at the repository index."
+    },
+    {
+      "id": "version-not-found",
+      "category": "positive",
+      "prompt": "I'm trying to call version 2 of my model but the client gets `Request for unknown model: 'mymodel' version 2 is not found`.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Check version_policy in config.pbtxt",
+        "Add version 2 to the policy (or switch to `all: {}`) if it should be served",
+        "Or call a version the policy includes"
+      ],
+      "ground_truth": "A version excluded by policy returns HTTP 404 `version X is not found`. Fix by adjusting version_policy."
+    },
+    {
+      "id": "server-ready-false",
+      "category": "positive",
+      "prompt": "My client calls `is_server_ready()` and gets False, but other models are serving fine. What does ready mean here?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Explain server ready is strict: True only when every model is READY",
+        "Use `is_server_live()` for process liveness",
+        "Use `is_model_ready(\"<model>\")` for per-model routing decisions"
+      ],
+      "ground_truth": "`is_server_ready()` is a catalog-level boolean; one failed model makes it False even if others serve correctly."
+    },
+    {
+      "id": "tritonclient-http",
+      "category": "positive",
+      "prompt": "Write me a Python client that calls my Triton ONNX model over HTTP.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Use tritonclient.http.InferenceServerClient('host:8000')",
+        "Create InferInput per model input with the correct name, shape, and FP32-style datatype",
+        "Call client.infer(model_name, inputs) and read result.as_numpy('<output>')"
+      ],
+      "ground_truth": "Standard tritonclient.http recipe: InferenceServerClient \u2192 InferInput \u2192 infer \u2192 as_numpy."
+    },
+    {
+      "id": "tritonclient-grpc",
+      "category": "positive",
+      "prompt": "Same inference but over gRPC for lower latency.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Swap tritonclient.http for tritonclient.grpc",
+        "Change port 8000 to 8001",
+        "Rest of the code pattern is identical"
+      ],
+      "ground_truth": "tritonclient.grpc is a drop-in replacement; port 8001; same API."
+    },
+    {
+      "id": "rest-curl",
+      "category": "positive",
+      "prompt": "Can I call my Triton model from curl without a Python client?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Use `POST /v2/models/<model>/infer` with JSON body",
+        "Body includes `inputs: [{name, shape, datatype, data}]` and `outputs`",
+        "Note binary tensor headers (Inference-Header-Content-Length) for large tensors"
+      ],
+      "ground_truth": "REST inference via `POST /v2/models/<model>/infer` with KFServing v2 JSON body."
+    },
+    {
+      "id": "datatype-crosswalk",
+      "category": "positive",
+      "prompt": "My Python client passes 'TYPE_FP32' as the datatype and gets an error. What datatype string does InferInput want?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Explain the three different spellings: TYPE_FP32 in config.pbtxt, \"FP32\" in InferInput, np.float32 in numpy",
+        "Point at references/datatypes.md for the full table"
+      ],
+      "ground_truth": "config uses `TYPE_FP32`, client uses `\"FP32\"`, numpy uses `np.float32`. Three spellings, one dtype."
+    },
+    {
+      "id": "pytorch-torchscript",
+      "category": "negative",
+      "prompt": "I have a model.pt TorchScript file. Help me serve it on Triton.",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; this is a PyTorch skill case",
+        "If the catalog has triton-pytorch-model-repository, route there"
+      ],
+      "ground_truth": "This is out of scope for triton-onnx-model-repository. .pt requires a sibling skill."
+    },
+    {
+      "id": "tensorrt-engine",
+      "category": "negative",
+      "prompt": "Deploy my resnet.plan TensorRT engine on Triton.",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent",
+        "Route to triton-tensorrt-model-repository if present"
+      ],
+      "ground_truth": "TensorRT engines (.plan) are covered by a separate Triton TRT skill."
+    },
+    {
+      "id": "kubernetes-deployment",
+      "category": "negative",
+      "prompt": "Create a Kubernetes Deployment YAML for Triton serving my ONNX model with 3 replicas and a Service.",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; Kubernetes orchestration is out of scope",
+        "Suggest the Triton Kubernetes deployment skill (separate)"
+      ],
+      "ground_truth": "Kubernetes deployment is a different skill. This skill only covers docker-run and tritonserver direct invocation."
+    },
+    {
+      "id": "ensemble-pipeline",
+      "category": "negative",
+      "prompt": "I want to chain an ONNX preprocessing model and an ONNX inference model into a Triton ensemble.",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent",
+        "Point at a Triton ensemble skill (when it exists)"
+      ],
+      "ground_truth": "Ensembles are out of scope per Limitations."
+    },
+    {
+      "id": "dynamo-k8s",
+      "category": "negative",
+      "prompt": "Deploy NVIDIA Dynamo on my Kubernetes cluster with disaggregated workers.",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent",
+        "Route to dynamo-recipe-runner"
+      ],
+      "ground_truth": "Dynamo is a different product and has its own skill family."
+    },
+    {
+      "id": "other-nvidia-products",
+      "category": "negative",
+      "prompt": "Solve a vehicle routing problem with cuOpt.",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent",
+        "Route to the cuOpt skill if present"
+      ],
+      "ground_truth": "cuOpt is unrelated to Triton ONNX serving."
+    },
+    {
+      "id": "general-python-question",
+      "category": "negative",
+      "prompt": "How do I iterate over a dictionary in Python?",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; this is a general Python question, no ONNX, no Triton"
+      ],
+      "ground_truth": "Nothing in this prompt invokes the skill's trigger conditions."
+    },
+    {
+      "id": "onnx-training",
+      "category": "negative",
+      "prompt": "Train an ONNX model from scratch with PyTorch.",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; this skill is about inference serving, not training"
+      ],
+      "ground_truth": "Training is out of scope. The skill starts from a trained .onnx file."
+    },
+    {
+      "id": "onnxruntime-standalone",
+      "category": "negative",
+      "prompt": "Run inference on my ONNX model using the ONNX Runtime Python package directly, not Triton.",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent",
+        "Suggest the user use `onnxruntime` Python package directly, outside this skill's scope"
+      ],
+      "ground_truth": "ONNX Runtime standalone is not Triton. This skill only covers Triton serving."
+    },
+    {
+      "id": "sagemaker-deployment",
+      "category": "negative",
+      "prompt": "Deploy my ONNX model on AWS SageMaker.",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent",
+        "This is not Triton deployment"
+      ],
+      "ground_truth": "SageMaker is a different serving platform; out of scope."
+    },
+    {
+      "id": "tls-auth",
+      "category": "negative",
+      "prompt": "Set up TLS and authentication for my Triton server so only authorized clients can call it.",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent",
+        "Note this skill is dev setup only; production security is a separate concern"
+      ],
+      "ground_truth": "TLS and auth are out of scope per Limitations."
+    },
+    {
+      "id": "model-orchestrator",
+      "category": "negative",
+      "prompt": "Use the Triton Model Orchestrator to run BLS logic on my requests.",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent",
+        "Model orchestrator and BLS are out of scope"
+      ],
+      "ground_truth": "Business Logic Scripting and the Triton Model Orchestrator are not covered here."
+    },
+    {
+      "id": "onnx-vs-torchscript",
+      "category": "false_positive_adversarial",
+      "prompt": "What's the difference between ONNX and TorchScript as model formats?",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; this is a comparison question, not a Triton deployment task",
+        "The prompt mentions ONNX but does not ask to serve, deploy, or run a model"
+      ],
+      "ground_truth": "Mere mention of ONNX is not sufficient to trigger. The skill requires a serving, deployment, config, or debugging intent."
+    },
+    {
+      "id": "pytorch-to-onnx-conversion",
+      "category": "false_positive_adversarial",
+      "prompt": "How do I export my PyTorch model to ONNX format?",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; this is a conversion question, not a Triton serving task",
+        "No Triton or model-repository intent in the prompt"
+      ],
+      "ground_truth": "Conversion from PyTorch to ONNX is a pre-step. This skill starts from an existing .onnx file."
+    },
+    {
+      "id": "onnxruntime-opset-error",
+      "category": "false_positive_adversarial",
+      "prompt": "My ONNX model throws an opset version error when I load it with onnxruntime.InferenceSession. How do I downgrade the opset?",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; this is an ONNX Runtime standalone issue, not a Triton serving issue",
+        "No mention of Triton, config.pbtxt, or model repository"
+      ],
+      "ground_truth": "ONNX Runtime standalone errors are out of scope. This skill is Triton-specific."
+    },
+    {
+      "id": "optimize-onnx",
+      "category": "false_positive_adversarial",
+      "prompt": "Can you optimize my ONNX model for faster inference using quantization?",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; model optimization and quantization are not in this skill's scope",
+        "Suggest an ONNX optimization skill if one exists"
+      ],
+      "ground_truth": "Optimization and quantization live in separate skills. This one deploys an existing .onnx as-is."
+    },
+    {
+      "id": "onnx-accuracy-debug",
+      "category": "false_positive_adversarial",
+      "prompt": "Why does my ONNX model give different outputs than the original PyTorch model I exported it from?",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; this is a numerical correctness / conversion debugging question",
+        "Not a Triton deployment issue"
+      ],
+      "ground_truth": "Numerical differences from the source model are a conversion issue, out of scope."
+    },
+    {
+      "id": "onnx-visualization",
+      "category": "false_positive_adversarial",
+      "prompt": "What tool can I use to visualize the graph of my ONNX model?",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; visualization tools (Netron etc.) are not this skill's job"
+      ],
+      "ground_truth": "Visualization is unrelated to Triton deployment."
+    },
+    {
+      "id": "indirect-set-up-model-repo",
+      "category": "false_negative_adversarial",
+      "prompt": "I have a trained model file and I want to set up a model repository so my service can call it. The file ends in .onnx.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Infer that 'model repository' plus '.onnx' points at Triton ONNX serving",
+        "Run the usual 7-step recipe",
+        "Return the Output Contract"
+      ],
+      "ground_truth": "The skill must fire even when the user does not explicitly say 'Triton'. 'model repository' + '.onnx' is enough context."
+    },
+    {
+      "id": "error-only-wording",
+      "category": "false_negative_adversarial",
+      "prompt": "model.onnx shows UNAVAILABLE in /v2/repository/index with reason 'failed to stat file'. What now?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Recognize this as a Triton ONNX load failure",
+        "Diagnose as the wrong-filename case",
+        "Point at the fix in references/errors.md"
+      ],
+      "ground_truth": "A pure error-string prompt with no 'Triton' keyword still triggers because of /v2/repository/index + .onnx."
+    },
+    {
+      "id": "generate-config-indirect",
+      "category": "false_negative_adversarial",
+      "prompt": "Can you write me a config.pbtxt for an ONNX classifier with 10 output classes and class labels?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Recognize config.pbtxt + ONNX classifier + class labels as a label_filename case",
+        "Produce the config using references/config-pbtxt.md",
+        "Instruct the user on the labels.txt file placement"
+      ],
+      "ground_truth": "`config.pbtxt` is a Triton concept; combined with ONNX, this must fire."
+    },
+    {
+      "id": "unexpected-input-error",
+      "category": "false_negative_adversarial",
+      "prompt": "Why does Triton reject my model with 'unexpected inference input'?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Recognize the Triton error",
+        "Diagnose the input-name mismatch case from references/errors.md",
+        "Offer the fix"
+      ],
+      "ground_truth": "A Triton error message is a trigger even without the user saying 'ONNX'; the agent should read the graph in Step 2 to recover names."
+    },
+    {
+      "id": "product-name-plus-onnx",
+      "category": "false_negative_adversarial",
+      "prompt": "I want to deploy my ResNet50 ONNX classifier to serve 1000 requests per second.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Recognize 'deploy', 'ONNX', 'classifier' as positive triggers",
+        "Choose GPU target and dynamic batching defaults",
+        "Produce the Output Contract"
+      ],
+      "ground_truth": "Product-name-level prompts with ONNX and deploy intent trigger normally."
+    },
+    {
+      "id": "huggingface-origin",
+      "category": "false_negative_adversarial",
+      "prompt": "I just downloaded this ONNX file from HuggingFace. How do I get it running so my code can call it?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Recognize this as the minimum-viable serving case",
+        "Default target to auto-detected GPU or CPU",
+        "Run auto-complete, no config.pbtxt"
+      ],
+      "ground_truth": "The phrase 'running so my code can call it' is a serving intent even without 'Triton' keyword."
+    },
+    {
+      "id": "onnx-to-trt-then-serve",
+      "category": "ambiguous",
+      "prompt": "I have an ONNX model but I want to convert it to TensorRT and then serve it on Triton.",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; the user's end state is TensorRT serving, not ONNX serving",
+        "Route to the ONNX-to-TRT conversion skill, then triton-tensorrt-model-repository"
+      ],
+      "ground_truth": "Final serving format decides the skill. If the user wants TRT serving, this skill should not fire."
+    },
+    {
+      "id": "tensorflow-on-triton",
+      "category": "ambiguous",
+      "prompt": "Help me serve my .pb TensorFlow model on Triton Inference Server.",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; .pb is TensorFlow, routes to a Triton TensorFlow skill",
+        "Do not apply the ONNX recipe"
+      ],
+      "ground_truth": "Triton serving is generic; this skill is ONNX-specific. Other backend files need their own skill."
+    },
+    {
+      "id": "triton-generic-question",
+      "category": "ambiguous",
+      "prompt": "What is Triton Inference Server and what does it do?",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; this is a generic product overview question",
+        "No model file, no deployment intent"
+      ],
+      "ground_truth": "This skill is a hands-on recipe. Overview answers come from docs, not the skill."
+    },
+    {
+      "id": "trtllm-vs-triton",
+      "category": "ambiguous",
+      "prompt": "Should I use TensorRT-LLM or Triton to serve my Llama ONNX export?",
+      "expected_skill": null,
+      "expected_behavior": [
+        "Stay silent; this is a product-choice question, not a deployment task",
+        "LLM serving specifically has dedicated skills"
+      ],
+      "ground_truth": "LLM serving (Llama, etc.) is explicitly out of scope per this skill's description."
+    },
+    {
+      "id": "could-not-determine-backend",
+      "category": "positive",
+      "prompt": "My Triton startup log says `Could not determine backend for model 'mymodel' with no backend in model configuration. Expected model name of the form 'model.<backend_name>'`. What am I missing?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Diagnose: the version directory is empty or has no file, AND no `backend:` is set in config.pbtxt",
+        "Offer two fixes: place `model.onnx` in the version directory, or add `backend: \"onnxruntime\"` to config.pbtxt",
+        "Point at references/errors.md for the full entry"
+      ],
+      "ground_truth": "`Could not determine backend` means the version directory is empty or has no recognizable file. Fix by placing model.onnx or setting backend: in config.pbtxt."
+    },
+    {
+      "id": "autofilled-info-log",
+      "category": "positive",
+      "prompt": "Triton logged `autofilled max_batch_size to 4 for model 'mymodel' since batching is supported but no max_batch_size is specified in model configuration`. Is this an error?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Explain this is INFORMATIONAL, not an error",
+        "The server used the default of 4 because the ONNX graph has a dynamic axis and the config did not specify",
+        "To change: set `max_batch_size` explicitly in config.pbtxt, or pass `--backend-config=default-max-batch-size=<N>` at startup"
+      ],
+      "ground_truth": "The autofilled warning is informational. Fix only if 4 is wrong for the use case."
+    },
+    {
+      "id": "batcher-efficiency-metric",
+      "category": "positive",
+      "prompt": "How can I tell from the Triton metrics whether dynamic batching is actually coalescing my requests?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Scrape /metrics on the host's metrics port",
+        "Compare `nv_inference_count` to `nv_inference_exec_count`",
+        "Qualify: `nv_inference_count / nv_inference_exec_count` measures the average execution batch size. When clients send batch-1 requests, a ratio > 1 means the dynamic batcher is coalescing; when clients already send batched requests, the ratio reflects client batching too",
+        "Point at references/errors.md for the related load-time errors"
+      ],
+      "ground_truth": "`nv_inference_count / nv_inference_exec_count` is the average execution batch size. With batch-1 client requests, a value above 1.0 shows the batcher coalescing. With pre-batched client requests, the value conflates client and server batching."
+    },
+    {
+      "id": "index-entry-shapes",
+      "category": "positive",
+      "prompt": "Why do some of my models show up in /v2/repository/index with a state of READY, some with UNAVAILABLE, some with just a name field, and some are missing entirely?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Explain the three observable shapes: READY+version, UNAVAILABLE+reason, absent",
+        "Absent means either the version directory is not an integer, OR config.pbtxt failed to parse (silent parse failure)",
+        "UNAVAILABLE means the model config parsed but loading failed",
+        "Point at references/errors.md"
+      ],
+      "ground_truth": "`/v2/repository/index` shows READY+version for success, UNAVAILABLE+reason for post-parse load failures, and omits the model entirely for parse failures or non-integer version directories."
+    },
+    {
+      "id": "health-endpoints-breakdown",
+      "category": "positive",
+      "prompt": "What's the difference between /v2/health/live, /v2/health/ready, and /v2/models/<model>/ready?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "`/v2/health/live` means the server process is up; use for liveness probes",
+        "`/v2/health/ready` means every loaded model is READY; strict, False if any model failed",
+        "`/v2/models/<model>/ready` means that specific model is READY; use for routing decisions"
+      ],
+      "ground_truth": "Three endpoints, three granularities: process, catalog, individual model. Server-ready is strict."
+    },
+    {
+      "id": "review-pause-checkpoint",
+      "category": "positive",
+      "prompt": "I want you to show me the generated config.pbtxt for review before you start the Triton server.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Set `review` to `true` (or keep the default)",
+        "After Step 4 writes config.pbtxt, print the full contents and pause for user confirmation",
+        "Proceed to Step 5 only after the user approves"
+      ],
+      "ground_truth": "The `review` input gates a pause between Step 4 and Step 5 so the user can inspect the generated config.pbtxt."
+    },
+    {
+      "id": "execute-false-dry-run",
+      "category": "positive",
+      "prompt": "Don't actually run the Docker commands on my machine. Just give me the exact commands I need to run myself.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Set `execute` to `false`",
+        "Still run Step 2 (inspect the ONNX graph read-only)",
+        "Produce the model repository layout as text, not on disk",
+        "Produce the server command literally but do not invoke Docker",
+        "Produce the client snippet without executing it",
+        "Return the Output Contract with 'Not executed' for the smoke-test result"
+      ],
+      "ground_truth": "`execute: false` turns the skill into a command generator. Nothing mutates on the host; the Output Contract is complete minus the smoke-test result."
+    },
+    {
+      "id": "maximum-indirect-serving",
+      "category": "false_negative_adversarial",
+      "prompt": "Help me serve this .onnx model.",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Recognize the bare combination of `.onnx` and `serve` as sufficient trigger context",
+        "Ask for the path to the file if not supplied",
+        "Default all other inputs and run the recipe"
+      ],
+      "ground_truth": "Minimal wording with `.onnx` and `serve` is still the skill's trigger. The agent should not hesitate."
+    },
+    {
+      "id": "ort-trt-acceleration",
+      "category": "positive",
+      "prompt": "I'm serving this ONNX model on an A100. Can you make it faster?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Set `accelerator` to `tensorrt`",
+        "Append the `optimization { execution_accelerators { gpu_execution_accelerator ... } }` block to config.pbtxt with name tensorrt, precision_mode FP16, max_workspace_size_bytes 1073741824",
+        "Enable `model_warmup` so the first-load compile does not block the first request",
+        "Expect about 2x throughput and halved latency per Triton docs"
+      ],
+      "ground_truth": "ORT-TRT is the standard GPU performance path for ONNX on Triton. Published lift: ~2x throughput, ~50% latency. The compile step requires model_warmup to avoid first-request slowness."
+    },
+    {
+      "id": "ort-openvino-acceleration",
+      "category": "positive",
+      "prompt": "My ONNX model runs on Intel Xeon CPUs in production. Can I accelerate it without a GPU?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Set `accelerator` to `openvino`",
+        "Append the `optimization { execution_accelerators { cpu_execution_accelerator: [{ name: \"openvino\" }] } }` block to config.pbtxt",
+        "Note openvino is Intel CPU only; non-Intel CPUs gain nothing or fail"
+      ],
+      "ground_truth": "ORT-OpenVINO accelerates ONNX inference on Intel CPUs. Set only when the host is Intel; AMD or ARM CPUs get no benefit."
+    },
+    {
+      "id": "opset-mismatch",
+      "category": "positive",
+      "prompt": "Triton won't load my ONNX model. The log shows `[ONNXRuntimeError] : 9 : NOT_IMPLEMENTED : Could not find an implementation for <OpType>(<opset>) node with name 'X'`. What's the fix?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Diagnose: ONNX graph uses an op at an opset version the bundled ONNX Runtime does not support",
+        "Fix: re-export the model at a lower supported opset. Safe range on recent Triton",
+        "Alternative: upgrade Triton to a container with a newer ORT",
+        "Note: the exact opset threshold depends on the Triton release"
+      ],
+      "ground_truth": "`NOT_IMPLEMENTED` with an opset number means that particular op at that opset is beyond the bundled ORT."
+    },
+    {
+      "id": "unsupported-op",
+      "category": "positive",
+      "prompt": "ONNX model fails to load on CPU with `[ONNXRuntimeError] : 1 : FAIL : ... CustomOpX is not implemented for CPU`. The same model loads fine when I force GPU. What are my options?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Diagnose: the ONNX op is GPU-only in the bundled ORT",
+        "Fix 1: set `instance_group: [{ kind: KIND_GPU }]` to route the model to GPU",
+        "Fix 2: re-export the ONNX without the unsupported op",
+        "Point at references/errors.md Unsupported operator on target device"
+      ],
+      "ground_truth": "Op not implemented for the target device means the op exists in ORT only for the other device. Fix by switching instance_group or re-exporting."
+    },
+    {
+      "id": "bf16-datatype-crosswalk",
+      "category": "positive",
+      "prompt": "My ONNX model uses bfloat16 (BF16). What datatypes should I put in config.pbtxt and on the client side?",
+      "expected_skill": "triton-onnx-model-repository",
+      "expected_behavior": [
+        "Point to references/datatypes.md",
+        "Use TYPE_BF16 in config.pbtxt input and output data_type",
+        "Use \"BF16\" on the KFServing v2 client InferInput",
+        "Note numpy has no native bfloat16; suggest ml_dtypes.bfloat16 or np.uint16 wire"
+      ],
+      "ground_truth": "config.pbtxt uses TYPE_BF16. Client InferInput uses \"BF16\". numpy has no native bfloat16: ml_dtypes.bfloat16 is the practical type, or np.uint16 can carry the wire bytes."
+    }
+  ]
+}
