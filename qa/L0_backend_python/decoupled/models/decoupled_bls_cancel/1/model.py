@@ -1,4 +1,4 @@
-# Copyright 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2025-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,6 +24,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import json
+
 import numpy as np
 import triton_python_backend_utils as pb_utils
 
@@ -37,7 +39,15 @@ class TritonPythonModel:
     If the IGNORE_CANCEL is set to True, the 'response_sender_until_cancelled' model will not hornor
     the request cancellation and keep sending the output to the model.
     The number of total responses should not reach MAX_RESPONSE_COUNT.
+    The TARGET_MODEL config parameter names a different target model with the
+    same inputs and outputs.
     """
+
+    def initialize(self, args):
+        parameters = json.loads(args["model_config"]).get("parameters", {})
+        self.target_model = parameters.get("TARGET_MODEL", {}).get(
+            "string_value", "response_sender_until_cancelled"
+        )
 
     def execute(self, requests):
         max_sum = (
@@ -51,7 +61,7 @@ class TritonPythonModel:
         )
 
         infer_request = pb_utils.InferenceRequest(
-            model_name="response_sender_until_cancelled",
+            model_name=self.target_model,
             inputs=[input, max_response_count, delay, ignore_cancel],
             requested_output_names=["OUTPUT"],
         )
