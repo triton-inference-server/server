@@ -99,6 +99,7 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
     df += """
 WORKDIR /opt/tritonserver
 COPY --from=full /opt/tritonserver/LICENSE .
+COPY --from=full /opt/tritonserver/THIRD-PARTY-NOTICES.txt .
 COPY --from=full /opt/tritonserver/TRITON_VERSION .
 COPY --from=full /opt/tritonserver/NVIDIA_Deep_Learning_Container_License.pdf .
 COPY --from=full /opt/tritonserver/bin bin/
@@ -283,7 +284,7 @@ def create_argmap(images, skip_pull):
     dcgm_ver = re.search("DCGM_VERSION=([\\S]{4,}) ", vars)
     dcgm_version = ""
     if dcgm_ver is None:
-        dcgm_version = "4.7.0-2"
+        dcgm_version = "4.7.1-2"
         log(
             "WARNING: DCGM version not found from image, installing the earlierst version {}".format(
                 dcgm_version

@@ -137,7 +137,11 @@ building with Docker.
     subdirectory on the host system.
 
   * Create the final *tritonserver* Docker image that contains the
-    libraries, executables and other artifacts from the build.
+    libraries, executables and other artifacts from the build. The
+    final image is based on the same *min* image as
+    *tritonserver_buildbase*, so tools such as `trtexec` that ship with
+    the cuda-dl-base devel image remain available. Use
+    `--image=inference,<image>` to base it on a different image.
 
   * Create a *tritonserver_cibase* Docker image that contains the QA
     artifacts needed for testing, as described in [Testing

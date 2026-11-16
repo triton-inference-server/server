@@ -800,6 +800,60 @@ if  [ $TEST_WINDOWS -eq 0 ]; then
     unset TRITONSERVER_DELAY_SCHEDULER
 fi
 
+# A preserve_ordering cache hit must not stop a later request from returning.
+rm -rf cache_ordering_models && mkdir -p cache_ordering_models/preserve_ordering_cache/1
+cat > cache_ordering_models/preserve_ordering_cache/config.pbtxt <<EOF
+backend: "identity"
+max_batch_size: 4
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ 4 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ 4 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_CPU
+    count: 1
+  }
+]
+dynamic_batching {
+  preferred_batch_size: [ 1 ]
+  preserve_ordering: true
+}
+response_cache {
+  enable: true
+}
+EOF
+
+SERVER_ARGS="--model-repository=$MODELDIR/cache_ordering_models --cache-config local,size=1048576 --backend-directory=${BACKEND_DIR}"
+SERVER_LOG="./preserve_ordering_cache.server.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python preserve_ordering_cache_test.py > preserve_ordering_cache_test.log 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Preserve Ordering Cache Test Failed\n***"
+    cat preserve_ordering_cache_test.log
+    RET=1
+fi
+set -e
+
+kill_server
+
 # Test requests should be returned immediately upon timeout, without waiting for
 # the next slot to be available and then returned.
 rm -rf models && mkdir models
@@ -846,6 +900,19 @@ LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $INSTANCE_QUEUE_TEST_EXEC
 if [ $? -ne 0 ]; then
     cat $INSTANCE_QUEUE_TEST_LOG
     echo -e "\n***\n*** Instance Queue Unit Test Failed\n***"
+    RET=1
+fi
+set -e
+
+# dynamic_batch_scheduler_test: a merged payload's exec mutex must not be
+# unlocked after the payload is destroyed.
+DYNAMIC_BATCH_SCHEDULER_TEST_LOG="./dynamic_batch_scheduler_test.log"
+DYNAMIC_BATCH_SCHEDULER_TEST_EXEC=./dynamic_batch_scheduler_test
+set +e
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $DYNAMIC_BATCH_SCHEDULER_TEST_EXEC >>$DYNAMIC_BATCH_SCHEDULER_TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $DYNAMIC_BATCH_SCHEDULER_TEST_LOG
+    echo -e "\n***\n*** Dynamic Batch Scheduler Unit Test Failed\n***"
     RET=1
 fi
 set -e

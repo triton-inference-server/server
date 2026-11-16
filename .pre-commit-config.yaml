@@ -57,7 +57,7 @@ repos:
   - id: codespell
     additional_dependencies: [tomli]
     args: ["--toml", "pyproject.toml"]
-    exclude: (?x)^(.*stemmer.*|.*stop_words.*|^CHANGELOG.md$)
+    exclude: (?x)^(.*stemmer.*|.*stop_words.*|^CHANGELOG.md$|^THIRD-PARTY-NOTICES.txt$)
 # More details about these pre-commit hooks here:
 # https://pre-commit.com/hooks.html
 - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -88,4 +88,6 @@ repos:
     require_serial: true
     # GitHub issue/PR templates must start with YAML frontmatter; keep
     # license headers out of them. Workflows ARE processed.
-    exclude: ^\.github/(ISSUE_TEMPLATE/|PULL_REQUEST_TEMPLATE|pull_request_template)
+    # THIRD-PARTY-NOTICES.txt reproduces upstream notices verbatim, including
+    # NVIDIA copyright lines whose years must not be rewritten.
+    exclude: ^(\.github/(ISSUE_TEMPLATE/|PULL_REQUEST_TEMPLATE|pull_request_template)|THIRD-PARTY-NOTICES\.txt$)

@@ -30,15 +30,15 @@ import sys
 
 sys.path.append("../common")
 
-import os
-import unittest
+import os  # noqa: E402
+import unittest  # noqa: E402
 
-import infer_util as iu
-import numpy as np
-import test_util as tu
-import tritonclient.grpc as grpcclient
-import tritonclient.http as httpclient
-from tritonclient.utils import *
+import infer_util as iu  # noqa: E402
+import numpy as np  # noqa: E402
+import test_util as tu  # noqa: E402
+import tritonclient.grpc as grpcclient  # noqa: E402
+import tritonclient.http as httpclient  # noqa: E402
+from tritonclient.utils import InferenceServerException  # noqa: E402
 
 
 class ServerMetadataTest(tu.TestResultCollector):
@@ -119,7 +119,7 @@ class ServerMetadataTest(tu.TestResultCollector):
                     )
                     self.assertEqual("triton", server_metadata.name)
 
-                model_metadata = triton_client.get_model_metadata(model_name)
+                triton_client.get_model_metadata(model_name)
                 self.assertTrue(False, "expected unknown model failure")
         except InferenceServerException as ex:
             self.assertTrue(
@@ -142,9 +142,7 @@ class ServerMetadataTest(tu.TestResultCollector):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
 
-                model_metadata = triton_client.get_model_metadata(
-                    model_name, model_version="99"
-                )
+                triton_client.get_model_metadata(model_name, model_version="99")
                 self.assertTrue(False, "expected unknown model version failure")
         except InferenceServerException as ex:
             self.assertTrue(
@@ -428,7 +426,7 @@ class ServerMetadataTest(tu.TestResultCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
 
-EXPECTED_MODEL_STATS: int = 144
+EXPECTED_MODEL_STATS: int = 145
 
 
 class ModelMetadataTest(tu.TestResultCollector):

@@ -1312,6 +1312,7 @@ def generate_torch_aoti_sample_inputs(
         np.int32: torch.int32,
         np.int64: torch.int64,
         np.float16: torch.float16,
+        np_dtype_bfloat16: torch.bfloat16,
         np.float32: torch.float32,
         np.float64: torch.float64,
         np.uint8: torch.uint8,
@@ -1347,6 +1348,8 @@ def np_to_dtype(np_dtype):
         return torch.int64
     elif np_dtype == np.float16:
         return torch.float16
+    elif np_dtype == np_dtype_bfloat16:
+        return torch.bfloat16
     elif np_dtype == np.float32:
         return torch.float32
     elif np_dtype == np.float64:
@@ -2856,8 +2859,9 @@ if __name__ == "__main__":
 
         # Make multiple versions of some models for version testing
         # (they use different version policies when created above)
-        # BF16 generation: TensorRT requires SM>=8.0; ONNX has no such
-        # requirement (model generation runs on CPU; ORT decides at runtime).
+        # BF16 generation: TensorRT requires SM>=8.0; ONNX and torch_aoti have
+        # no such requirement (model generation runs on CPU; the backend decides
+        # at runtime).
         bf16_for_trt = FLAGS.tensorrt and tu.check_gpus_compute_capability(
             min_capability=8.0
         )
@@ -2865,7 +2869,7 @@ if __name__ == "__main__":
             print(
                 "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
             )
-        if bf16_for_trt or FLAGS.onnx:
+        if bf16_for_trt or FLAGS.onnx or FLAGS.torch_aoti:
             create_fixed_models(
                 FLAGS.models_dir,
                 np_dtype_bfloat16,
@@ -3152,8 +3156,9 @@ if __name__ == "__main__":
             32,
         )
 
-        # BF16 generation: TensorRT requires SM>=8.0; ONNX has no such
-        # requirement (model generation runs on CPU; ORT decides at runtime).
+        # BF16 generation: TensorRT requires SM>=8.0; ONNX and torch_aoti have
+        # no such requirement (model generation runs on CPU; the backend decides
+        # at runtime).
         bf16_for_trt = FLAGS.tensorrt and tu.check_gpus_compute_capability(
             min_capability=8.0
         )
@@ -3161,7 +3166,7 @@ if __name__ == "__main__":
             print(
                 "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
             )
-        if bf16_for_trt or FLAGS.onnx:
+        if bf16_for_trt or FLAGS.onnx or FLAGS.torch_aoti:
             create_models(
                 FLAGS.models_dir,
                 np_dtype_bfloat16,

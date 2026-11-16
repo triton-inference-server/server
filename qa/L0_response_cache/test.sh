@@ -222,6 +222,8 @@ function test_response_cache_ensemble_model {
   set +e
   python ${ENSEMBLE_CACHE_TEST_PY} ${TESTCASE} >> ${CLIENT_LOG} 2>&1
   if [ $? -ne 0 ]; then
+      cat ${CLIENT_LOG}
+      echo -e ${ERROR_MESSAGE}
       RET=1
   else
       check_test_results ${TEST_RESULT_FILE} 1
