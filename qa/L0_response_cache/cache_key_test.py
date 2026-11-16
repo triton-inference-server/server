@@ -25,10 +25,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import json
+import os
+import re
 import sys
 import time
 import unittest
+import urllib.request
 import uuid
 
 import numpy as np
@@ -52,17 +54,44 @@ class CacheKeyTest(tu.TestResultCollector):
         # Keep cases independent even when Redis contains earlier test entries.
         return np.frombuffer(uuid.uuid4().bytes, dtype=np.int32) & 0xFFFFF
 
-    def _counts(self, model):
-        stats = self.grpc.get_inference_statistics(model, client_timeout=10)
-        stats = stats.model_stats[0].inference_stats
-        return stats.cache_hit.count, stats.cache_miss.count
+    def _counts(self, model, namespace=None):
+        if namespace is None:
+            stats = self.grpc.get_inference_statistics(model, client_timeout=10)
+            stats = stats.model_stats[0].inference_stats
+            return stats.cache_hit.count, stats.cache_miss.count
 
-    def _wait_counts(self, model, expected):
+        # The statistics endpoint cannot disambiguate models named X. Metrics
+        # include the repository namespace, so check each composing model there.
+        namespace = os.path.join(os.environ["CACHE_KEY_REPOS"], namespace)
+        with urllib.request.urlopen("http://localhost:8002/metrics", timeout=10) as r:
+            metrics = r.read().decode("utf-8")
+        names = ("nv_cache_num_hits_per_model", "nv_cache_num_misses_per_model")
+        counts = {}
+        for line in metrics.splitlines():
+            sample = re.fullmatch(
+                r"(nv_cache_num_(?:hits|misses)_per_model)\{(.*)\} (\S+)", line
+            )
+            if sample is None:
+                continue
+            labels = dict(re.findall(r'(\w+)="([^"]*)"', sample[2]))
+            if (
+                labels.get("model"),
+                labels.get("namespace"),
+                labels.get("version"),
+            ) == (model, namespace, "1"):
+                self.assertNotIn(sample[1], counts)
+                counts[sample[1]] = int(float(sample[3]))
+        self.assertEqual(
+            set(counts), set(names), f"Missing cache metrics for {namespace}/{model}"
+        )
+        return tuple(counts[name] for name in names)
+
+    def _wait_counts(self, model, expected, namespace=None):
         deadline = time.monotonic() + 5
         while True:
-            actual = self._counts(model)
+            actual = self._counts(model, namespace)
             if actual == expected or time.monotonic() >= deadline:
-                self.assertEqual(actual, expected, model)
+                self.assertEqual(actual, expected, (namespace, model))
                 return
             time.sleep(0.01)
 
@@ -89,7 +118,7 @@ class CacheKeyTest(tu.TestResultCollector):
         )
         self.assertEqual(
             {o["name"] for o in response["outputs"]},
-            set(outputs) if outputs is not None else {"SUM", "MAX", "PARAMETERS"},
+            set(outputs) if outputs is not None else {"SUM", "MAX"},
         )
         batched = model == "cache_key_batched"
         maximum = data.max(axis=-1, keepdims=batched)
@@ -105,14 +134,6 @@ class CacheKeyTest(tu.TestResultCollector):
             self.assertEqual(actual.shape, expected[name].shape, name)
             self.assertEqual(actual.dtype, expected[name].dtype, name)
             np.testing.assert_array_equal(actual, expected[name])
-        if outputs is None or "PARAMETERS" in outputs:
-            actual = result.as_numpy("PARAMETERS")
-            self.assertEqual(actual.shape, (data.shape[0], 1) if batched else (1,))
-            for value in actual.flat:
-                self.assertEqual(
-                    json.dumps(json.loads(value), sort_keys=True),
-                    json.dumps(parameters or {}, sort_keys=True),
-                )
         return result
 
     def _miss_then_hit(self, api, model, data, **kwargs):
@@ -159,23 +180,35 @@ class CacheKeyTest(tu.TestResultCollector):
     def test_requested_outputs(self):
         for api in (httpclient, grpcclient):
             for model in ("cache_key", "cache_key_ensemble"):
-                data = self._data().reshape(2, 2)
-                for outputs in (["MAX"], ["SUM"], ["MAX", "SUM"], None):
-                    with self.subTest(
-                        protocol=api.__name__, model=model, outputs=outputs
-                    ):
-                        self._miss_then_hit(api, model, data, outputs=outputs)
-                for outputs in (["SUM", "MAX"], ["PARAMETERS", "SUM", "MAX"]):
-                    counts = self._counts(model)
-                    self._infer(api, model, data, outputs=outputs)
-                    self._wait_counts(model, (counts[0] + 1, counts[1]))
+                # Cover both default-all and explicit-all cache priming through
+                # production normalization, including output-order independence.
+                for all_outputs in (None, ["MAX", "SUM"]):
+                    data = self._data().reshape(2, 2)
+                    for outputs in (["MAX"], ["SUM"], all_outputs):
+                        with self.subTest(
+                            protocol=api.__name__, model=model, outputs=outputs
+                        ):
+                            self._miss_then_hit(api, model, data, outputs=outputs)
+                    for outputs in (None, ["SUM", "MAX"], ["MAX", "SUM"]):
+                        counts = self._counts(model)
+                        self._infer(api, model, data, outputs=outputs)
+                        self._wait_counts(model, (counts[0] + 1, counts[1]))
 
     def test_model_namespaces(self):
         for api in (httpclient, grpcclient):
             data = self._data().reshape(2, 2)
-            for _ in range(2):
-                self._infer(api, "ensA", data, maxima=False)
-                self._infer(api, "ensB", data, maxima=True)
+            counts = {repo: self._counts("X", repo) for repo in ("repoA", "repoB")}
+            for repeat in range(2):
+                for repo, model, maxima in (
+                    ("repoA", "ensA", False),
+                    ("repoB", "ensB", True),
+                ):
+                    with self.subTest(
+                        protocol=api.__name__, namespace=repo, repeat=repeat
+                    ):
+                        self._infer(api, model, data, maxima=maxima)
+                        hits, misses = counts[repo]
+                        self._wait_counts("X", (hits + repeat, misses + 1), repo)
 
     def test_cache_disabled(self):
         for api in (httpclient, grpcclient):

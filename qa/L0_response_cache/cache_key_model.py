@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -49,17 +48,11 @@ class TritonPythonModel:
             if self.reduction == "max":
                 total = maximum.astype(np.int64)
             total = total * int(parameters.get("scale", 1))
-            metadata = np.full(
-                (data.shape[0], 1) if self.batched else (1,),
-                json.dumps(parameters, sort_keys=True),
-                dtype=object,
-            )
             responses.append(
                 pb_utils.InferenceResponse(
                     output_tensors=[
                         pb_utils.Tensor("SUM", total),
                         pb_utils.Tensor("MAX", maximum),
-                        pb_utils.Tensor("PARAMETERS", metadata),
                     ]
                 )
             )
