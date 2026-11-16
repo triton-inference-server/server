@@ -21,7 +21,7 @@ Outputs cannot use FORWARD_ARGUMENT (`libtorch_utils.h`).
 
 ## Silent fallback
 
-If names match neither rule 1 nor rule 2, the model loads `READY` and inference maps tensors by config order with no warning.
+If names match neither rule 1 nor rule 2, the model loads `READY` and inference maps tensors by config order silently; the server log does not flag the fallback.
 
 Concrete example: a `forward(self, a, b)` model that returns `a - b`. Configured with inputs named `b_input` (position 0) and `a_input` (position 1): neither name matches `forward()` arg names (`a`, `b`), neither follows `<name>__<index>`. STRICT_CONFIG_ORDERING fires. The client sends `a_input=[5,5,5,5]` and `b_input=[2,2,2,2]` matching their intent of `a=5, b=2`, expecting `a-b = 3`. The backend assigns config position 0 (`b_input`) to forward arg `a` and position 1 (`a_input`) to forward arg `b`. The model computes `2 - 5 = -3`. The client sees `-3` and no error anywhere.
 
@@ -59,7 +59,7 @@ Sequence control and implicit-state tensors on PT2 accept either ordinal `INPUT_
 
 ## PT2 input count check
 
-The regular `input [ ... ]` count must equal the model's call-spec input count. Sequence control, implicit-state, and batch inputs are counted separately but contribute to the total expected by the model. See [`errors.md`](errors.md).
+The regular `input [ ... ]` count plus sequence control inputs, implicit-state inputs, and batch inputs together must equal the model's call-spec input count. See [`errors.md`](errors.md).
 
 ## Recommendations
 

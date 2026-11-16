@@ -36,7 +36,7 @@ sequence_batching {
     },
     {
       name: "CONTROL_SEQUENCE_CORRID__3"
-      control [ { kind: CONTROL_SEQUENCE_CORRID, data_type: TYPE_UINT64 } ]
+      control [ { kind: CONTROL_SEQUENCE_CORRID, data_type: TYPE_INT32 } ]
     }
   ]
 }
