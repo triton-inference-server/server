@@ -28,7 +28,7 @@ Trigger when the user:
 - Is debugging a Triton load or inference failure on an ONNX model.
 - Is writing a Python or REST client for a served ONNX model.
 
-Do not trigger for `.pt` (TorchScript, use triton-pytorch-model-repository), `.plan` (TensorRT engines), LLM serving on Triton, Kubernetes deployment, or ensembles.
+Do not trigger for `.pt` (TorchScript, use triton-pytorch-model-repository), `.plan` (TensorRT engines), LLM serving on Triton, Kubernetes deployment, or ensembles. Do not trigger for training, fine-tuning, or exporting a model to `.onnx` from another framework; this skill serves an already-exported `.onnx` file only. Decline the request and point to the framework's training docs.
 
 ## Purpose
 
@@ -231,6 +231,7 @@ curl -s http://localhost:8000/v2/models/add/config | jq
 ## Limitations
 
 - ONNX only. For PyTorch (`.pt`), use `triton-pytorch-model-repository`. For TensorRT (`.plan`), use `triton-tensorrt-model-repository`.
+- Serving only. Training, fine-tuning, and ONNX export from another framework (PyTorch, TensorFlow, JAX, etc.) are out of scope. Decline and point the user to the framework's training/export docs.
 - Single-model focus. Ensembles and the Triton model orchestrator are out of scope.
 - Development setup. Does not configure TLS, authentication, rate limiting, or multi-tenant isolation.
 - Does not install Docker, the NVIDIA Container Toolkit, the `onnx` Python package, or `tritonclient`. Prerequisites must already be satisfied.
