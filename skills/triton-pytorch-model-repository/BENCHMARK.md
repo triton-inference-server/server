@@ -13,8 +13,8 @@ Recommended for publication based on the completed evaluation evidence in this r
 - Evaluation date: 2026-11-17
 - Evaluator version: `1.6.9`
 - Agents: Claude Code (`aws/anthropic/bedrock-claude-opus-5-5`), Codex (`openai/openai/gpt-6.1-sol`)
-- Tasks: 12 evaluation tasks (12 positive)
-- Dataset digest: `sha256:e8dea4a558c0f17d152b0015405a05b99067398767dc1cdc646d8e1dda261dc3` (skill-evaluator-dataset-snapshot/1)
+- Tasks: 12 evaluation tasks (9 positive, 3 negative)
+- Dataset digest: `sha256:6590ed5a89d7c12a607bc2f8305ff42c176a8f43d043fd07c29d22c4781e2e9d` (skill-evaluator-dataset-snapshot/1)
 - Attempts per task: 1
 - Environment: `k8s-sandbox`
 - Tier 2 evidence: required for publication
@@ -50,12 +50,12 @@ The three-tier evaluation checks whether the skill:
 
 | Measure | Claude Code (Baseline → Skill Uplift) | Codex (Baseline → Skill Uplift) |
 |---|---:|---:|
-| Overall | 89.5% — baseline ran, but no comparable score was available; uplift unavailable | 82.0% — baseline ran, but no comparable score was available; uplift unavailable |
-| Security | 100.0% → 95.8% (-4.2 points) | 91.7% → 87.5% (-4.2 points) |
-| Correctness | 90.0% → 100.0% (+10.0 points) | 95.0% → 95.0% (±0.0 points) |
-| Discoverability | 72.1% — baseline ran, but no comparable score was available; uplift unavailable | 78.3% — baseline ran, but no comparable score was available; uplift unavailable |
-| Effectiveness | 72.2% → 96.5% (+24.3 points) | 75.0% → 79.9% (+4.9 points) |
-| Efficiency | 83.0% — baseline ran, but no comparable score was available; uplift unavailable | 69.1% — baseline ran, but no comparable score was available; uplift unavailable |
+| Overall | 93.0% — baseline ran, but no comparable score was available; uplift unavailable | 86.6% — baseline ran, but no comparable score was available; uplift unavailable |
+| Security | 100.0% → 100.0% (±0.0 points) | 87.5% → 91.7% (+4.2 points) |
+| Correctness | 83.3% → 98.3% (+15.0 points) | 96.7% → 95.0% (-1.7 points) |
+| Discoverability | 87.2% — baseline ran, but no comparable score was available; uplift unavailable | 90.6% — baseline ran, but no comparable score was available; uplift unavailable |
+| Effectiveness | 57.6% → 91.0% (+33.4 points) | 84.7% → 84.0% (-0.7 points) |
+| Efficiency | 88.5% — baseline ran, but no comparable score was available; uplift unavailable | 71.5% — baseline ran, but no comparable score was available; uplift unavailable |
 
 **How to read this table:** baseline is the same task attempted without the target skill. Scores are rounded to one decimal; threshold-adjacent values use additional precision so their displayed band matches the verdict. Uplift is derived from those displayed scores and shown in percentage points.
 
@@ -70,9 +70,9 @@ Shared-source comparisons use the same signals and weights on both conditions. T
 | Agent | Dimension | Basis | Baseline → With skill (uplift) | Explanation |
 | --- | --- | --- | --- | --- |
 | claude-code | Discoverability | Dimension comparison | N/A | Discoverability is not applicable to the no-skill baseline; there is no installed skill to discover. |
-| claude-code | Efficiency | Token-only comparison | 97.5% → 96.0% (-1.5 points) | Only Token Efficiency is comparable; the full dimension scores use different evaluator sources. |
+| claude-code | Efficiency | Token-only comparison | 97.8% → 96.2% (-1.6 points) | Only Token Efficiency is comparable; the full dimension scores use different evaluator sources. |
 | codex | Discoverability | Dimension comparison | N/A | Discoverability is not applicable to the no-skill baseline; there is no installed skill to discover. |
-| codex | Efficiency | Token-only comparison | 86.3% → 88.9% (+2.6 points) | Only Token Efficiency is comparable; the full dimension scores use different evaluator sources. |
+| codex | Efficiency | Token-only comparison | 87.0% → 88.9% (+1.9 points) | Only Token Efficiency is comparable; the full dimension scores use different evaluator sources. |
 
 ## Token Usage
 
@@ -80,33 +80,33 @@ Actual Tier 3 execution usage is reported for every observed agent/case pair and
 
 | Agent | Dataset case | With skill | Without skill | Delta | Change | Coverage |
 |---|---|---:|---:|---:|---:|---|
-| claude-code | All cases | 1,874,661 | 1,518,159 | +356,502 | +23.48% | skill 12/12; base 12/12 |
-| claude-code | deploy-pt2-gpu | 248,254 | 186,501 | +61,753 | +33.11% | skill 1/1; base 1/1 |
-| claude-code | deploy-torchscript-batched | 242,931 | 185,053 | +57,878 | +31.28% | skill 1/1; base 1/1 |
-| claude-code | error-aoti-device-mismatch | 115,823 | 71,905 | +43,918 | +61.08% | skill 1/1; base 1/1 |
-| claude-code | error-missing-file-ts | 154,114 | 71,688 | +82,426 | +114.98% | skill 1/1; base 1/1 |
-| claude-code | naming-pt2-ordinals | 115,374 | 71,778 | +43,596 | +60.74% | skill 1/1; base 1/1 |
-| claude-code | onnx-file-wrong-skill | 36,297 | 36,210 | +87 | +0.24% | skill 1/1; base 1/1 |
-| claude-code | perf-warmup | 153,381 | 106,427 | +46,954 | +44.12% | skill 1/1; base 1/1 |
-| claude-code | pt2-dynamic-batch | 154,798 | 107,053 | +47,745 | +44.60% | skill 1/1; base 1/1 |
-| claude-code | seq-batch-torchscript | 364,454 | 354,233 | +10,221 | +2.89% | skill 1/1; base 1/1 |
-| claude-code | torchscript-vs-pt2 | 35,425 | 35,171 | +254 | +0.72% | skill 1/1; base 1/1 |
-| claude-code | torchserve-not-triton | 145,575 | 107,199 | +38,376 | +35.80% | skill 1/1; base 1/1 |
-| claude-code | training-not-inference | 108,235 | 184,941 | -76,706 | -41.48% | skill 1/1; base 1/1 |
-| codex | All cases | 1,027,995 | 1,330,756 | -302,761 | -22.75% | skill 12/12; base 12/12 |
-| codex | deploy-pt2-gpu | 68,588 | 53,335 | +15,253 | +28.60% | skill 1/1; base 1/1 |
-| codex | deploy-torchscript-batched | 216,231 | 407,976 | -191,745 | -47.00% | skill 1/1; base 1/1 |
-| codex | error-aoti-device-mismatch | 50,726 | 66,561 | -15,835 | -23.79% | skill 1/1; base 1/1 |
-| codex | error-missing-file-ts | 33,574 | 17,715 | +15,859 | +89.52% | skill 1/1; base 1/1 |
-| codex | naming-pt2-ordinals | 50,091 | 30,058 | +20,033 | +66.65% | skill 1/1; base 1/1 |
-| codex | onnx-file-wrong-skill | 22,624 | 26,810 | -4,186 | -15.61% | skill 1/1; base 1/1 |
-| codex | perf-warmup | 59,281 | 35,457 | +23,824 | +67.19% | skill 1/1; base 1/1 |
-| codex | pt2-dynamic-batch | 37,778 | 31,397 | +6,381 | +20.32% | skill 1/1; base 1/1 |
-| codex | seq-batch-torchscript | 342,787 | 567,405 | -224,618 | -39.59% | skill 1/1; base 1/1 |
-| codex | torchscript-vs-pt2 | 41,921 | 21,998 | +19,923 | +90.57% | skill 1/1; base 1/1 |
-| codex | torchserve-not-triton | 62,761 | 31,298 | +31,463 | +100.53% | skill 1/1; base 1/1 |
-| codex | training-not-inference | 41,633 | 40,746 | +887 | +2.18% | skill 1/1; base 1/1 |
-| ALL AGENTS | Dataset aggregate | 2,902,656 | 2,848,915 | +53,741 | +1.89% | skill 24/24; base 24/24 |
+| claude-code | All cases | 1,827,205 | 1,326,260 | +500,945 | +37.77% | skill 12/12; base 12/12 |
+| claude-code | deploy-pt2-gpu | 204,000 | 107,253 | +96,747 | +90.20% | skill 1/1; base 1/1 |
+| claude-code | deploy-torchscript-batched | 196,151 | 187,935 | +8,216 | +4.37% | skill 1/1; base 1/1 |
+| claude-code | error-aoti-device-mismatch | 115,642 | 71,677 | +43,965 | +61.34% | skill 1/1; base 1/1 |
+| claude-code | error-missing-file-ts | 153,220 | 71,401 | +81,819 | +114.59% | skill 1/1; base 1/1 |
+| claude-code | naming-pt2-ordinals | 115,406 | 71,407 | +43,999 | +61.62% | skill 1/1; base 1/1 |
+| claude-code | onnx-file-wrong-skill | 71,824 | 36,025 | +35,799 | +99.37% | skill 1/1; base 1/1 |
+| claude-code | perf-warmup | 191,072 | 71,369 | +119,703 | +167.72% | skill 1/1; base 1/1 |
+| claude-code | pt2-dynamic-batch | 154,901 | 70,701 | +84,200 | +119.09% | skill 1/1; base 1/1 |
+| claude-code | seq-batch-torchscript | 292,385 | 350,190 | -57,805 | -16.51% | skill 1/1; base 1/1 |
+| claude-code | torchscript-vs-pt2 | 35,745 | 35,338 | +407 | +1.15% | skill 1/1; base 1/1 |
+| claude-code | torchserve-not-triton | 108,633 | 106,825 | +1,808 | +1.69% | skill 1/1; base 1/1 |
+| claude-code | training-not-inference | 188,226 | 146,139 | +42,087 | +28.80% | skill 1/1; base 1/1 |
+| codex | All cases | 960,712 | 1,603,721 | -643,009 | -40.09% | skill 12/12; base 12/12 |
+| codex | deploy-pt2-gpu | 67,612 | 66,425 | +1,187 | +1.79% | skill 1/1; base 1/1 |
+| codex | deploy-torchscript-batched | 196,009 | 210,247 | -14,238 | -6.77% | skill 1/1; base 1/1 |
+| codex | error-aoti-device-mismatch | 51,098 | 66,580 | -15,482 | -23.25% | skill 1/1; base 1/1 |
+| codex | error-missing-file-ts | 33,361 | 17,802 | +15,559 | +87.40% | skill 1/1; base 1/1 |
+| codex | naming-pt2-ordinals | 49,883 | 25,573 | +24,310 | +95.06% | skill 1/1; base 1/1 |
+| codex | onnx-file-wrong-skill | 30,191 | 22,624 | +7,567 | +33.45% | skill 1/1; base 1/1 |
+| codex | perf-warmup | 52,081 | 31,241 | +20,840 | +66.71% | skill 1/1; base 1/1 |
+| codex | pt2-dynamic-batch | 37,740 | 31,265 | +6,475 | +20.71% | skill 1/1; base 1/1 |
+| codex | seq-batch-torchscript | 298,415 | 1,019,544 | -721,129 | -70.73% | skill 1/1; base 1/1 |
+| codex | torchscript-vs-pt2 | 37,595 | 22,014 | +15,581 | +70.78% | skill 1/1; base 1/1 |
+| codex | torchserve-not-triton | 49,925 | 49,233 | +692 | +1.41% | skill 1/1; base 1/1 |
+| codex | training-not-inference | 56,802 | 41,173 | +15,629 | +37.96% | skill 1/1; base 1/1 |
+| ALL AGENTS | Dataset aggregate | 2,787,917 | 2,929,981 | -142,064 | -4.85% | skill 24/24; base 24/24 |
 
 Prompt tokens include cached reads, so total tokens are `prompt + completion` (cached is not added twice). The Efficiency score uses `(prompt - cached) + completion`. Change is `100 * (with - without) / without`; negative means fewer tokens. N/A comparisons include their reason in the coverage column; coverage is never estimated.
 
