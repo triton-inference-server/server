@@ -50,12 +50,12 @@ The three-tier evaluation checks whether the skill:
 
 | Measure | Claude Code (Baseline → Skill Uplift) | Codex (Baseline → Skill Uplift) |
 |---|---:|---:|
-| Overall | 74.2% — baseline ran, but no comparable score was available; uplift unavailable | 72.1% — baseline ran, but no comparable score was available; uplift unavailable |
-| Security | 100.0% → 90.0% (-10.0 points) | 85.0% → 95.0% (+10.0 points) |
-| Correctness | 68.0% → 86.0% (+18.0 points) | 58.0% → 80.0% (+22.0 points) |
-| Discoverability | 65.7% — baseline ran, but no comparable score was available; uplift unavailable | 75.0% — baseline ran, but no comparable score was available; uplift unavailable |
-| Effectiveness | 46.8% → 50.8% (+4.0 points) | 27.7% → 39.2% (+11.5 points) |
-| Efficiency | 78.5% — baseline ran, but no comparable score was available; uplift unavailable | 71.1% — baseline ran, but no comparable score was available; uplift unavailable |
+| Overall | 79.0% — baseline ran, but no comparable score was available; uplift unavailable | 71.6% — baseline ran, but no comparable score was available; uplift unavailable |
+| Security | 85.0% → 85.0% (±0.0 points) | 85.0% → 95.0% (+10.0 points) |
+| Correctness | 66.0% → 94.0% (+28.0 points) | 64.0% → 70.0% (+6.0 points) |
+| Discoverability | 73.6% — baseline ran, but no comparable score was available; uplift unavailable | 82.9% — baseline ran, but no comparable score was available; uplift unavailable |
+| Effectiveness | 51.0% → 56.8% (+5.8 points) | 31.8% → 39.2% (+7.4 points) |
+| Efficiency | 85.8% — baseline ran, but no comparable score was available; uplift unavailable | 71.1% — baseline ran, but no comparable score was available; uplift unavailable |
 
 **How to read this table:** baseline is the same task attempted without the target skill. Scores are rounded to one decimal; threshold-adjacent values use additional precision so their displayed band matches the verdict. Uplift is derived from those displayed scores and shown in percentage points.
 
@@ -70,9 +70,9 @@ Shared-source comparisons use the same signals and weights on both conditions. T
 | Agent | Dimension | Basis | Baseline → With skill (uplift) | Explanation |
 | --- | --- | --- | --- | --- |
 | claude-code | Discoverability | Dimension comparison | N/A | Discoverability is not applicable to the no-skill baseline; there is no installed skill to discover. |
-| claude-code | Efficiency | Token-only comparison | 96.4% → 95.0% (-1.4 points) | Only Token Efficiency is comparable; the full dimension scores use different evaluator sources. |
+| claude-code | Efficiency | Token-only comparison | 96.1% → 95.7% (-0.4 points) | Only Token Efficiency is comparable; the full dimension scores use different evaluator sources. |
 | codex | Discoverability | Dimension comparison | N/A | Discoverability is not applicable to the no-skill baseline; there is no installed skill to discover. |
-| codex | Efficiency | Token-only comparison | 88.1% → 89.5% (+1.4 points) | Only Token Efficiency is comparable; the full dimension scores use different evaluator sources. |
+| codex | Efficiency | Token-only comparison | 87.9% → 90.1% (+2.2 points) | Only Token Efficiency is comparable; the full dimension scores use different evaluator sources. |
 
 ## Token Usage
 
@@ -80,29 +80,29 @@ Actual Tier 3 execution usage is reported for every observed agent/case pair and
 
 | Agent | Dataset case | With skill | Without skill | Delta | Change | Coverage |
 |---|---|---:|---:|---:|---:|---|
-| claude-code | All cases | 1,686,545 | 1,819,329 | -132,784 | -7.30% | skill 10/10; base 10/10 |
-| claude-code | basic-fixed-shape | 159,132 | 180,980 | -21,848 | -12.07% | skill 1/1; base 1/1 |
-| claude-code | datatype-crosswalk | 35,666 | 35,392 | +274 | +0.77% | skill 1/1; base 1/1 |
-| claude-code | dynamic-batching-block | 238,050 | 107,352 | +130,698 | +121.75% | skill 1/1; base 1/1 |
-| claude-code | ensemble-pipeline | 117,354 | 148,051 | -30,697 | -20.73% | skill 1/1; base 1/1 |
-| claude-code | gpu-placement | 201,067 | 106,859 | +94,208 | +88.16% | skill 1/1; base 1/1 |
-| claude-code | multi-version-latest | 70,952 | 70,803 | +149 | +0.21% | skill 1/1; base 1/1 |
-| claude-code | onnx-training | 385,552 | 840,347 | -454,795 | -54.12% | skill 1/1; base 1/1 |
-| claude-code | pytorch-torchscript | 108,867 | 71,895 | +36,972 | +51.42% | skill 1/1; base 1/1 |
-| claude-code | tritonclient-grpc | 185,100 | 106,560 | +78,540 | +73.70% | skill 1/1; base 1/1 |
-| claude-code | tritonclient-http | 184,805 | 151,090 | +33,715 | +22.31% | skill 1/1; base 1/1 |
-| codex | All cases | 1,520,046 | 1,462,429 | +57,617 | +3.94% | skill 10/10; base 10/10 |
-| codex | basic-fixed-shape | 46,950 | 255,374 | -208,424 | -81.62% | skill 1/1; base 1/1 |
-| codex | datatype-crosswalk | 17,453 | 17,117 | +336 | +1.96% | skill 1/1; base 1/1 |
-| codex | dynamic-batching-block | 17,464 | 17,530 | -66 | -0.38% | skill 1/1; base 1/1 |
-| codex | ensemble-pipeline | 51,317 | 31,308 | +20,009 | +63.91% | skill 1/1; base 1/1 |
-| codex | gpu-placement | 69,572 | 41,311 | +28,261 | +68.41% | skill 1/1; base 1/1 |
-| codex | multi-version-latest | 34,270 | 44,705 | -10,435 | -23.34% | skill 1/1; base 1/1 |
-| codex | onnx-training | 829,512 | 819,155 | +10,357 | +1.26% | skill 1/1; base 1/1 |
-| codex | pytorch-torchscript | 31,687 | 27,332 | +4,355 | +15.93% | skill 1/1; base 1/1 |
-| codex | tritonclient-grpc | 48,637 | 27,182 | +21,455 | +78.93% | skill 1/1; base 1/1 |
-| codex | tritonclient-http | 373,184 | 181,415 | +191,769 | +105.71% | skill 1/1; base 1/1 |
-| ALL AGENTS | Dataset aggregate | 3,206,591 | 3,281,758 | -75,167 | -2.29% | skill 20/20; base 20/20 |
+| claude-code | All cases | 1,821,378 | 1,868,980 | -47,602 | -2.55% | skill 10/10; base 10/10 |
+| claude-code | basic-fixed-shape | 117,994 | 144,915 | -26,921 | -18.58% | skill 1/1; base 1/1 |
+| claude-code | datatype-crosswalk | 35,661 | 35,308 | +353 | +1.00% | skill 1/1; base 1/1 |
+| claude-code | dynamic-batching-block | 202,614 | 107,266 | +95,348 | +88.89% | skill 1/1; base 1/1 |
+| claude-code | ensemble-pipeline | 160,739 | 107,861 | +52,878 | +49.02% | skill 1/1; base 1/1 |
+| claude-code | gpu-placement | 200,785 | 142,553 | +58,232 | +40.85% | skill 1/1; base 1/1 |
+| claude-code | multi-version-latest | 71,254 | 70,734 | +520 | +0.74% | skill 1/1; base 1/1 |
+| claude-code | onnx-training | 558,792 | 932,814 | -374,022 | -40.10% | skill 1/1; base 1/1 |
+| claude-code | pytorch-torchscript | 108,628 | 71,607 | +37,021 | +51.70% | skill 1/1; base 1/1 |
+| claude-code | tritonclient-grpc | 114,452 | 107,405 | +7,047 | +6.56% | skill 1/1; base 1/1 |
+| claude-code | tritonclient-http | 250,459 | 148,517 | +101,942 | +68.64% | skill 1/1; base 1/1 |
+| codex | All cases | 623,144 | 1,381,797 | -758,653 | -54.90% | skill 10/10; base 10/10 |
+| codex | basic-fixed-shape | 51,596 | 172,299 | -120,703 | -70.05% | skill 1/1; base 1/1 |
+| codex | datatype-crosswalk | 17,356 | 57,677 | -40,321 | -69.91% | skill 1/1; base 1/1 |
+| codex | dynamic-batching-block | 34,131 | 17,655 | +16,476 | +93.32% | skill 1/1; base 1/1 |
+| codex | ensemble-pipeline | 76,627 | 31,141 | +45,486 | +146.06% | skill 1/1; base 1/1 |
+| codex | gpu-placement | 48,230 | 45,152 | +3,078 | +6.82% | skill 1/1; base 1/1 |
+| codex | multi-version-latest | 34,303 | 44,769 | -10,466 | -23.38% | skill 1/1; base 1/1 |
+| codex | onnx-training | 27,306 | 733,192 | -705,886 | -96.28% | skill 1/1; base 1/1 |
+| codex | pytorch-torchscript | 31,745 | 62,672 | -30,927 | -49.35% | skill 1/1; base 1/1 |
+| codex | tritonclient-grpc | 48,498 | 26,968 | +21,530 | +79.84% | skill 1/1; base 1/1 |
+| codex | tritonclient-http | 253,352 | 190,272 | +63,080 | +33.15% | skill 1/1; base 1/1 |
+| ALL AGENTS | Dataset aggregate | 2,444,522 | 3,250,777 | -806,255 | -24.80% | skill 20/20; base 20/20 |
 
 Prompt tokens include cached reads, so total tokens are `prompt + completion` (cached is not added twice). The Efficiency score uses `(prompt - cached) + completion`. Change is `100 * (with - without) / without`; negative means fewer tokens. N/A comparisons include their reason in the coverage column; coverage is never estimated.
 
