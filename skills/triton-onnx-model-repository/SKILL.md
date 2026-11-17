@@ -189,7 +189,7 @@ r = c.infer("<model_name>", inp)
 print(r.as_numpy("<output_name>"))
 ```
 
-For gRPC, swap `tritonclient.http` for `tritonclient.grpc` and change the port from 8000 to 8001. `InferInput`, `set_data_from_numpy`, `infer`, and `as_numpy` are identical. Both frontends are started every time `tritonserver` boots (`src/main.cc:268,280`), so every model is reachable over both.
+For gRPC, swap `tritonclient.http` for `tritonclient.grpc` and use `<grpc_port>` (default 8001) in place of `<http_port>` (default 8000). `InferInput`, `set_data_from_numpy`, `infer`, and `as_numpy` are identical. Both frontends are started every time `tritonserver` boots (`src/main.cc:268,280`), so every model is reachable over both.
 
 Use the KFServing v2 datatype spelling (`"FP32"`, not `TYPE_FP32`) on the client side. See `references/datatypes.md`.
 
