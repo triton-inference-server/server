@@ -37,7 +37,7 @@ Turn a user's `.onnx` file into a running Triton Inference Server endpoint the u
 ## Prerequisites
 
 - Read access to the `.onnx` file.
-- Docker installed. For GPU targets, the NVIDIA Container Toolkit set up so `docker run --gpus all nvidia-smi` prints a device.
+- Docker installed. For GPU targets, the NVIDIA Container Toolkit set up so `docker run --rm --gpus all nvcr.io/nvidia/tritonserver:26.10-py3 nvidia-smi -L` prints a device.
 - Python 3.10+ with the `onnx` package.
 - Either `tritonclient` or `curl` for the smoke test.
 - Host ports 8000, 8001, 8002 free, or overrides supplied in `ports`.
