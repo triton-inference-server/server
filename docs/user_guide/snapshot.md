@@ -30,11 +30,9 @@
 
 NVIDIA's [Dynamo Snapshot](https://github.com/ai-dynamo/snapshot) supports Triton Inference Server.
 
+### What Does Snapshot Provide?
+
 Snapshot provides the checkpoint and restore primitives for GPU pods.
-Orchestration (which pods to checkpoint, when, and how the checkpoints are restored) is left to the systems that integrate it.
-
-## What Does Snapshot Provide?
-
 In inference serving, a replica cannot answer a single request until it is fully initialized: model weights loaded into GPU memory, CUDA and runtime libraries initialized, execution kernels warmed up, and computation graphs compiled.
 For large models, this cold start takes minutes.
 This cost is paid over and over.
@@ -43,6 +41,7 @@ Snapshot checkpoints a fully initialized pod once and restores it on demand, so 
 
 > [!NOTE]
 > Whereas Triton Server is hosting environment agnostic, Snapshot is intended for use in Kubernetes clusters and requires supported NVIDIA hardware and software packages.
+> See [Snapshot's prerequisites](https://github.com/ai-dynamo/snapshot#prerequisites) for details.
 
 ## Triton Inference Server and Dynamo Snapshot
 
@@ -50,7 +49,7 @@ Using Snapshot to accelerate your deployment of Triton Server requires the follo
 
 1. [Start Triton Server](#start-triton-server)
 2. [Isolate Triton Server](#isolate-triton-server)
-3. [Checkpoint and Restoration](#checkpoint-and-restoration)
+3. [Snapshot checkpoint and restoration](#checkpoint-and-restoration)
 
 ### Start Triton Server
 
@@ -58,9 +57,9 @@ In order to successfully create and/or restore a checkpoint using Snapshot, the 
 This is due to a known issue related to [NVIDIA Management Library (NVML)](https://developer.nvidia.com/management-library-nvml) state capture and restoration.
 To disable GPU metrics collection, the `--allow-gpu-metric=false` option must be provided when starting Triton Server.
 
-> [!IMPORTANT]
-> Any Triton Server process must be initialized with the `--allow-gpu-metrics=false` option to provided;
-> otherwise, attempts to use Snapshot to checkpoint or restore will fail.
+> [!WARNING]
+> Any Triton Server process intended to have a checkpoint created using Snapshot, must be initialized with the `--allow-gpu-metrics=false` option to provided;
+> otherwise, attempts to create and/or restore the checkpoint will fail.
 
 ```bash
 # Start Triton Server with GPU metrics collection disabled.
@@ -81,6 +80,7 @@ For models which benefit from warm-up requests, we recommend limiting all infere
 
 ### Checkpoint and Restoration
 
-To checkpoint the Triton Server pod, follow the Snapshot documentation on how to [Checkpoint a Pod](https://github.com/ai-dynamo/snapshot/blob/main/docs/using-snapshot/checkpoint.md). Similarly, use the documentation on how to [Restore a Checkpoint](https://github.com/ai-dynamo/snapshot/blob/main/docs/using-snapshot/restore.md) provided by Snapshot.
+To checkpoint the Triton Server pod, follow the Snapshot documentation on how to [Checkpoint a Pod](https://github.com/ai-dynamo/snapshot/blob/main/docs/using-snapshot/checkpoint.md).
+Similarly, use the documentation on how to [Restore a Checkpoint](https://github.com/ai-dynamo/snapshot/blob/main/docs/using-snapshot/restore.md) provided by Snapshot.
 
 Once a Triton Server checkpoint has been restored, the server should be immediately available to serve inference request traffic.
