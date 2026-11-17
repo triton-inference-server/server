@@ -163,7 +163,7 @@ The rate limiter operates across all models loaded in Triton to allow cross-mode
 
 #### Model Warmup
 
-For Backends which utilize just-in-time (JIT) model compilation (check [Additional Resources](README.md#resources)), some or all of initialization is deferred until the first inference request is received.
+For backends which utilize just-in-time (JIT) model compilation (check [Additional Resources](README.md#resources)), some or all of initialization is deferred until the first inference request is received.
 The benefit is resource conservation comes with the downside of the initial requests getting processed slower than expected.
 Users can pre-"warm up" the model by instructing Triton to initialize the model.
 [Learn more](user_guide/model_configuration.md#model-warmup).
