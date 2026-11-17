@@ -28,6 +28,7 @@
 # https://github.com/vllm-project/vllm/blob/main/vllm/entrypoints/openai/tool_parsers/__init__.py
 # Copyright 2024 The vLLM team.
 
+from .hermes_tool_call_parser import HermesToolParser
 from .llama_tool_call_parser import Llama3JsonToolParser
 from .mistral_tool_call_parser import MistralToolParser
 from .tool_call_parser import ToolCallParser, ToolParserManager
@@ -35,6 +36,7 @@ from .tool_call_parser import ToolCallParser, ToolParserManager
 __all__ = [
     "ToolCallParser",
     "ToolParserManager",
+    "HermesToolParser",
     "Llama3JsonToolParser",
     "MistralToolParser",
 ]
