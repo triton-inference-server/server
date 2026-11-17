@@ -44,6 +44,8 @@ sequence_batching {
 instance_group [ { kind: KIND_CPU, count: 1 } ]
 ```
 
+A fourth optional control, `CONTROL_SEQUENCE_READY`, is available for the Oldest scheduling strategy.
+
 With implicit state the config adds a `state` block. Every name in it must also follow `<name>__<index>` including `initial_state.name`:
 
 ```
