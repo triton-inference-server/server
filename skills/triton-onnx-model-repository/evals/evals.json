@@ -497,9 +497,11 @@
       "prompt": "Train an ONNX model from scratch with PyTorch.",
       "expected_skill": null,
       "expected_behavior": [
-        "Stay silent; this skill is about inference serving, not training"
+        "Decline the training request",
+        "Explain this skill handles ONNX inference serving on Triton, not training",
+        "Recommend PyTorch training docs or a dedicated training skill"
       ],
-      "ground_truth": "Training is out of scope. The skill starts from a trained .onnx file."
+      "ground_truth": "Training is out of scope. The skill serves an already-trained .onnx file."
     },
     {
       "id": "onnxruntime-standalone",
@@ -584,10 +586,11 @@
       "prompt": "Can you optimize my ONNX model for faster inference using quantization?",
       "expected_skill": null,
       "expected_behavior": [
-        "Stay silent; model optimization and quantization are not in this skill's scope",
-        "Suggest an ONNX optimization skill if one exists"
+        "Decline the optimization request",
+        "Explain this skill deploys an existing .onnx file as-is on Triton",
+        "Suggest a separate optimization or quantization skill if the user needs that"
       ],
-      "ground_truth": "Optimization and quantization live in separate skills. This one deploys an existing .onnx as-is."
+      "ground_truth": "Optimization and quantization live in separate skills. This one serves an existing .onnx."
     },
     {
       "id": "onnx-accuracy-debug",
@@ -688,10 +691,11 @@
       "prompt": "I have an ONNX model but I want to convert it to TensorRT and then serve it on Triton.",
       "expected_skill": null,
       "expected_behavior": [
-        "Stay silent; the user's end state is TensorRT serving, not ONNX serving",
-        "Route to the ONNX-to-TRT conversion skill, then triton-tensorrt-model-repository"
+        "Point out that the final serving format is TensorRT, not ONNX",
+        "Recommend converting ONNX to a TensorRT engine first",
+        "Route to triton-tensorrt-model-repository for serving the engine"
       ],
-      "ground_truth": "Final serving format decides the skill. If the user wants TRT serving, this skill should not fire."
+      "ground_truth": "The final serving format decides the skill. The user wants TRT serving, so route to the TensorRT skill."
     },
     {
       "id": "tensorflow-on-triton",
