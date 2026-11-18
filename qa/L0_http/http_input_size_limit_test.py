@@ -49,6 +49,7 @@ BYTES_PER_INT64 = (
 )
 DEFAULT_LIMIT_BYTES = 64 * MIB  # 64MB default limit
 INCREASED_LIMIT_BYTES = 128 * MIB  # 128MB increased limit
+DECREASED_LIMIT_BYTES = 2**16  # 64KB decreased limit
 
 # Calculate element counts for size limits
 DEFAULT_LIMIT_ELEMENTS = DEFAULT_LIMIT_BYTES // BYTES_PER_FP32  # 16,777,216 elements
@@ -63,6 +64,23 @@ OFFSET_ELEMENTS = 32
 class InferSizeLimitTest(TestResultCollector):
     def _get_infer_url(self, model_name):
         return f"http://localhost:8000/v2/models/{model_name}/infer"
+
+    def _assert_parsed_size_error(self, response, json_size, limit):
+        """Verify the error for a JSON request of json_size bytes that takes
+        more than limit bytes of memory to parse."""
+        self.assertEqual(
+            400,
+            response.status_code,
+            "Expected error code for JSON request over the limit when parsed, got: {} ({!r})".format(
+                response.status_code, response.content[:200]
+            ),
+        )
+        self.assertIn(
+            f"request JSON of {json_size} bytes exceeds the maximum allowed "
+            f"input size of {limit} bytes when parsed. "
+            "Use --http-max-input-size to increase the limit.",
+            response.content.decode(),
+        )
 
     def test_json_dtype_size_expansion_exceeds_limit_error(self):
         """
@@ -294,12 +312,11 @@ class InferSizeLimitTest(TestResultCollector):
             error_msg,
         )
 
-        # Test case 2: Input just under the 64MB limit (should succeed)
-        # The test creates a JSON payload with data, which adds overhead compared
-        # to raw binary format. We adjust the shape size to ensure the final
-        # JSON payload is under the size limit. An element is roughly 5
-        # bytes in JSON, compared to 4 bytes as a raw FP32.
-        shape_size = (DEFAULT_LIMIT_ELEMENTS - OFFSET_ELEMENTS) * 4 // 5
+        # Test case 2: Input under the 64MB limit (should succeed)
+        # The limit also applies to the memory used to parse the JSON payload,
+        # which is more than the size of the payload. Parsing 750,000
+        # elements takes up to 43MB, depending on the platform.
+        shape_size = 750000
 
         payload = {
             "inputs": [
@@ -335,6 +352,47 @@ class InferSizeLimitTest(TestResultCollector):
             shape_size,
             result["outputs"][0]["shape"][1],
             f"Expected shape {[1, shape_size]}, got {result['outputs'][0]['shape']}",
+        )
+
+        # Test case 3: JSON payload just under the 64MB limit that takes more
+        # than 64MB of memory to parse (should fail)
+        # An element is roughly 5 bytes in JSON, compared to 4 bytes as a raw
+        # FP32. We adjust the shape size to ensure the final JSON payload is
+        # under the size limit.
+        large_shape_size = (DEFAULT_LIMIT_ELEMENTS - OFFSET_ELEMENTS) * 4 // 5
+
+        large_json = json.dumps(
+            {
+                "inputs": [
+                    {
+                        "name": "INPUT0",
+                        "datatype": "FP32",
+                        "shape": [1, large_shape_size],
+                        "data": [1.0] * large_shape_size,
+                    }
+                ]
+            }
+        ).encode("utf-8")
+        # Verify we're actually under the 64MB limit
+        self.assertLess(len(large_json), DEFAULT_LIMIT_BYTES)
+
+        response = requests.post(
+            self._get_infer_url(model), headers=headers, data=large_json
+        )
+
+        # Should fail with 400 bad request with default limit
+        self._assert_parsed_size_error(response, len(large_json), DEFAULT_LIMIT_BYTES)
+
+        # The request of test case 2 should still succeed
+        response = requests.post(
+            self._get_infer_url(model), headers=headers, json=payload
+        )
+        self.assertEqual(
+            200,
+            response.status_code,
+            "Expected success code for JSON request within size limit, got: {}".format(
+                response.status_code
+            ),
         )
 
     def test_large_input_raw_binary(self):
@@ -458,12 +516,11 @@ class InferSizeLimitTest(TestResultCollector):
             error_msg,
         )
 
-        # Test case 2: Input just under the 128MB configured limit (should succeed)
-        # The test creates a JSON payload with data, which adds overhead compared
-        # to raw binary format. We adjust the shape size to ensure the final
-        # JSON payload is under the size limit. An element is roughly 5
-        # bytes in JSON, compared to 4 bytes as a raw FP32.
-        shape_size = (INCREASED_LIMIT_ELEMENTS - OFFSET_ELEMENTS) * 4 // 5
+        # Test case 2: Input under the 128MB configured limit (should succeed)
+        # The limit also applies to the memory used to parse the JSON payload,
+        # which is more than the size of the payload. Parsing 1,500,000
+        # elements takes up to 86MB, depending on the platform.
+        shape_size = 1500000
 
         payload = {
             "inputs": [
@@ -501,6 +558,33 @@ class InferSizeLimitTest(TestResultCollector):
             f"Expected shape {[1, shape_size]}, got {result['outputs'][0]['shape']}",
         )
 
+        # Test case 3: JSON payload under the 128MB configured limit that
+        # takes more than 128MB of memory to parse (should fail)
+        # Parsing 6,000,000 elements takes at least 183MB.
+        large_shape_size = 6000000
+
+        large_json = json.dumps(
+            {
+                "inputs": [
+                    {
+                        "name": "INPUT0",
+                        "datatype": "FP32",
+                        "shape": [1, large_shape_size],
+                        "data": [1.0] * large_shape_size,
+                    }
+                ]
+            }
+        ).encode("utf-8")
+        # Verify we're actually under the 128MB limit
+        self.assertLess(len(large_json), INCREASED_LIMIT_BYTES)
+
+        response = requests.post(
+            self._get_infer_url(model), headers=headers, data=large_json
+        )
+
+        # Should fail with 400 bad request with our increased limit
+        self._assert_parsed_size_error(response, len(large_json), INCREASED_LIMIT_BYTES)
+
     def _build_payload_of_json_size(self, target_size):
         """Build an inference request payload whose JSON serialization is exactly target_size bytes."""
         payload = {
@@ -520,6 +604,27 @@ class InferSizeLimitTest(TestResultCollector):
         self.assertEqual(len(json.dumps(payload)), target_size)
         return payload
 
+    def _build_padded_json_of_size(self, target_size, string_size):
+        """Build an inference request JSON of exactly target_size bytes that holds a string of string_size bytes."""
+        payload = {
+            "inputs": [
+                {
+                    "name": "INPUT0",
+                    "datatype": "BYTES",
+                    "shape": [1, 1],
+                    "data": ["A" * string_size],
+                }
+            ]
+        }
+        json_str = json.dumps(payload)
+
+        # Pad with whitespace to reach target size (whitespace before closing brace is valid JSON)
+        padding_needed = target_size - len(json_str)
+        self.assertGreaterEqual(padding_needed, 0, "target_size smaller than payload")
+        padded_json = json_str[:-1] + (" " * padding_needed) + json_str[-1]
+        self.assertEqual(len(padded_json), target_size)
+        return padded_json.encode("utf-8")
+
     def test_large_string_in_json(self):
         """Verify the server's JSON size limit at the byte boundary."""
         model = "simple_identity"
@@ -538,8 +643,16 @@ class InferSizeLimitTest(TestResultCollector):
         self.assertIn(" bytes exceeds the maximum allowed input size of ", error_msg)
         self.assertIn("Use --http-max-input-size to increase the limit.", error_msg)
 
-        payload_at = self._build_payload_of_json_size(DEFAULT_LIMIT_BYTES)
-        response = requests.post(self._get_infer_url(model), json=payload_at)
+        # The limit also applies to the memory used to parse the JSON, and
+        # parsing a string takes more than twice its size. The body of exactly
+        # DEFAULT_LIMIT_BYTES is a 16MB string, which takes about 37MB to
+        # parse, followed by whitespace.
+        json_at = self._build_padded_json_of_size(DEFAULT_LIMIT_BYTES, 16 * MIB)
+        response = requests.post(
+            self._get_infer_url(model),
+            headers={"Content-Type": "application/json"},
+            data=json_at,
+        )
         self.assertEqual(
             200,
             response.status_code,
@@ -547,6 +660,12 @@ class InferSizeLimitTest(TestResultCollector):
                 response.status_code, response.content[:200]
             ),
         )
+
+        # A 48MB string is under the size limit, but takes more than 64MB of
+        # memory to parse.
+        payload_parsed = self._build_payload_of_json_size(48 * MIB)
+        response = requests.post(self._get_infer_url(model), json=payload_parsed)
+        self._assert_parsed_size_error(response, 48 * MIB, DEFAULT_LIMIT_BYTES)
 
     def _create_compressed_payload(self, target_size):
         """Helper to create a gzip-compressed JSON payload of specified decompressed size."""
@@ -813,6 +932,9 @@ class InferSizeLimitTest(TestResultCollector):
         big = [1] * elements_per_input
 
         # INPUT0 at the top level, INPUT1 inside the nested 'parameters' object.
+        # With the default limit, this request is already over the limit when
+        # its JSON is parsed. test_decreased_limit_json covers the cumulative
+        # size of the inputs with a limit that the parsed JSON stays under.
         bypass_payload = {"INPUT0": big, "parameters": {"INPUT1": big}}
         response = requests.post(url, headers=headers, json=bypass_payload)
 
@@ -840,6 +962,184 @@ class InferSizeLimitTest(TestResultCollector):
             "A small nested-parameters request should be accepted "
             "(got {}): {!r}".format(response.status_code, response.content[:200]),
         )
+
+    def _build_infer_json_of_zeros(self, element_count):
+        """Build an inference request JSON whose input is element_count zeros."""
+        return (
+            '{"inputs":[{"name":"INPUT0","datatype":"FP32","shape":[1,%d],"data":[%s]}]}'
+            % (element_count, ",".join(["0"] * element_count))
+        ).encode("utf-8")
+
+    def _check_parsed_json_limit(self, large_element_count, small_element_count, limit):
+        """Verify that JSON requests with large_element_count elements are over
+        the limit when parsed, and that an inference request with
+        small_element_count elements succeeds."""
+        model = "onnx_zero_1_float32"
+        headers = {"Content-Type": "application/json"}
+        zeros = ",".join(["0"] * large_element_count)
+
+        # The limit applies to every endpoint that takes a JSON request
+        large_requests = [
+            (
+                self._get_infer_url(model),
+                self._build_infer_json_of_zeros(large_element_count),
+            ),
+            (
+                f"http://localhost:8000/v2/models/{model}/generate",
+                ('{"INPUT0":[%s]}' % zeros).encode("utf-8"),
+            ),
+            (
+                f"http://localhost:8000/v2/models/{model}/generate_stream",
+                ('{"INPUT0":[%s]}' % zeros).encode("utf-8"),
+            ),
+            (
+                "http://localhost:8000/v2/repository/index",
+                ('{"ready":[%s]}' % zeros).encode("utf-8"),
+            ),
+        ]
+        for url, large_json in large_requests:
+            # Verify the JSON itself is under the limit
+            self.assertLess(len(large_json), limit)
+
+            response = requests.post(url, headers=headers, data=large_json)
+            self._assert_parsed_size_error(response, len(large_json), limit)
+
+        # The server should still accept a request that is under the limit
+        # when parsed
+        small_json = self._build_infer_json_of_zeros(small_element_count)
+        response = requests.post(
+            self._get_infer_url(model), headers=headers, data=small_json
+        )
+        self.assertEqual(
+            200,
+            response.status_code,
+            "Expected success code for JSON request under the limit when parsed, got: {} ({!r})".format(
+                response.status_code, response.content[:200]
+            ),
+        )
+        result = response.json()
+        self.assertIn("outputs", result, "Response missing outputs field")
+        self.assertEqual([1, small_element_count], result["outputs"][0]["shape"])
+
+    def test_default_limit_parsed_json(self):
+        """Test the memory used to parse JSON requests with default limit.
+
+        The limit also applies to the memory used to parse a JSON request,
+        which is more than the size of the request.
+        """
+        # 4,000,000 elements are 8MB of JSON and take at least 122MB to parse.
+        # 750,000 elements take up to 43MB to parse, depending on the platform.
+        self._check_parsed_json_limit(4000000, 750000, DEFAULT_LIMIT_BYTES)
+
+    def test_large_input_parsed_json(self):
+        """Test the memory used to parse JSON requests with custom limit set"""
+        # 6,000,000 elements are 12MB of JSON and take at least 183MB to parse.
+        # 1,500,000 elements take up to 86MB to parse, depending on the
+        # platform.
+        self._check_parsed_json_limit(6000000, 1500000, INCREASED_LIMIT_BYTES)
+
+        # The limit on the memory used to parse a request follows the
+        # configured limit. A 40MB string takes about 87MB to parse, which is
+        # over the default limit and under the configured limit.
+        payload = self._build_payload_of_json_size(40 * MIB)
+        response = requests.post(self._get_infer_url("simple_identity"), json=payload)
+        self.assertEqual(
+            200,
+            response.status_code,
+            "Expected success code for JSON request under the increased limit when parsed, got: {} ({!r})".format(
+                response.status_code, response.content[:200]
+            ),
+        )
+
+    def test_decreased_limit_json(self):
+        """Test JSON inputs with custom limit set under 1MB.
+
+        The memory used to parse a JSON request is then limited to 1MB, so
+        that small requests can still be parsed. The size of the request and
+        of its inputs is limited to the configured limit.
+        """
+        model = "onnx_int32_int32_int32"  # two INT32 inputs: INPUT0, INPUT1
+        url = f"http://localhost:8000/v2/models/{model}/generate"
+        headers = {"Content-Type": "application/json"}
+        bytes_per_int32 = 4
+
+        # INPUT0 at the top level, INPUT1 inside the nested 'parameters' object.
+        small = [1] * 16
+        small_json = json.dumps({"INPUT0": small, "parameters": {"INPUT1": small}})
+
+        def pad_json(json_str, target_size):
+            # Pad with whitespace to reach target size (whitespace before closing brace is valid JSON)
+            padding_needed = target_size - len(json_str)
+            return (json_str[:-1] + (" " * padding_needed) + json_str[-1]).encode(
+                "utf-8"
+            )
+
+        # Test case 1: JSON payload just over the 64KB configured limit (should fail)
+        json_over = pad_json(small_json, DECREASED_LIMIT_BYTES + 1)
+        response = requests.post(url, headers=headers, data=json_over)
+        self.assertEqual(
+            400,
+            response.status_code,
+            "Expected 400 for body of DECREASED_LIMIT_BYTES + 1, got: {} ({!r})".format(
+                response.status_code, response.content[:200]
+            ),
+        )
+        error_msg = response.content.decode()
+        self.assertIn("request JSON size of ", error_msg)
+        self.assertIn(" bytes exceeds the maximum allowed input size of ", error_msg)
+        self.assertIn("Use --http-max-input-size to increase the limit.", error_msg)
+
+        # Test case 2: JSON payload of exactly the 64KB configured limit (should succeed)
+        json_at = pad_json(small_json, DECREASED_LIMIT_BYTES)
+        response = requests.post(url, headers=headers, data=json_at)
+        self.assertEqual(
+            200,
+            response.status_code,
+            "Expected 200 for body of exactly DECREASED_LIMIT_BYTES, got: {} ({!r})".format(
+                response.status_code, response.content[:200]
+            ),
+        )
+
+        # Test case 3: JSON payload of exactly the 64KB configured limit that
+        # takes more than 1MB of memory to parse (should fail)
+        # The error shows the 1MB limit on the memory used to parse the JSON.
+        nesting_depth = DECREASED_LIMIT_BYTES // 2
+        nested_json = ("[" * nesting_depth + "]" * nesting_depth).encode("utf-8")
+        self.assertEqual(len(nested_json), DECREASED_LIMIT_BYTES)
+
+        response = requests.post(url, headers=headers, data=nested_json)
+        self._assert_parsed_size_error(response, len(nested_json), MIB)
+
+        # Test case 4: Inputs that are each under the 64KB configured limit,
+        # but together over it (should fail)
+        # The JSON payload is under the configured limit and takes less than
+        # 1MB to parse, so the request is rejected for the cumulative size of
+        # its inputs.
+        elements_per_input = (
+            DECREASED_LIMIT_BYTES // bytes_per_int32 // 2 + OFFSET_ELEMENTS
+        )
+        self.assertLess(elements_per_input * bytes_per_int32, DECREASED_LIMIT_BYTES)
+        self.assertGreater(
+            2 * elements_per_input * bytes_per_int32, DECREASED_LIMIT_BYTES
+        )
+        big = [1] * elements_per_input
+        large_json = json.dumps({"INPUT0": big, "parameters": {"INPUT1": big}}).encode(
+            "utf-8"
+        )
+        self.assertLess(len(large_json), DECREASED_LIMIT_BYTES)
+
+        response = requests.post(url, headers=headers, data=large_json)
+        self.assertEqual(
+            400,
+            response.status_code,
+            "Expected 400 for inputs over the cumulative size limit, got: {} ({!r})".format(
+                response.status_code, response.content[:200]
+            ),
+        )
+        error_msg = response.content.decode()
+        self.assertIn("request size of ", error_msg)
+        self.assertIn(" bytes exceeds the maximum allowed input size of ", error_msg)
+        self.assertIn("Use --http-max-input-size to increase the limit.", error_msg)
 
 
 if __name__ == "__main__":
