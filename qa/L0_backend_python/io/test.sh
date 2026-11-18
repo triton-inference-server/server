@@ -211,6 +211,45 @@ done
 kill $SERVER_PID
 wait $SERVER_PID
 
+# IOTest.test_as_numpy_*
+rm -rf models && mkdir models
+mkdir -p models/as_numpy/1/
+cp ../../python_models/as_numpy/model.py ./models/as_numpy/1/
+cp ../../python_models/as_numpy/config.pbtxt ./models/as_numpy/
+mkdir -p models/dlpack_io_identity_1/1/
+cp ../../python_models/dlpack_io_identity/model.py ./models/dlpack_io_identity_1/1/
+cp ../../python_models/dlpack_io_identity/config.pbtxt ./models/dlpack_io_identity_1/
+(cd models/dlpack_io_identity_1 && \
+          sed -i "s/^name:.*/name: \"dlpack_io_identity_1\"/" config.pbtxt)
+mkdir -p models/dlpack_io_identity_decoupled/1/
+cp ../../python_models/dlpack_io_identity_decoupled/model.py ./models/dlpack_io_identity_decoupled/1/
+cp ../../python_models/dlpack_io_identity_decoupled/config.pbtxt ./models/dlpack_io_identity_decoupled/
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+SUBTESTS="test_as_numpy_view test_as_numpy_new_view_per_call \
+          test_as_numpy_write_visible_to_bls test_as_numpy_views_kept_after_request \
+          test_as_numpy_dtypes test_as_numpy_zero_size test_as_numpy_bls_output \
+          test_as_numpy_bls_decoupled_output test_as_numpy_gpu_bls_output"
+for SUBTEST in $SUBTESTS; do
+    set +e
+    python3 -m pytest --junitxml=${SUBTEST}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** IOTest.${SUBTEST} FAILED. \n***"
+        cat $CLIENT_LOG.${SUBTEST}
+        RET=1
+    fi
+    set -e
+done
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 # IOTest.test_requested_output_decoupled_prior_crash
 rm -rf models && mkdir models
 mkdir -p models/llm/1/

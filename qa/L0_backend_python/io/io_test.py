@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,6 +36,7 @@ import queue
 import unittest
 from functools import partial
 
+import ml_dtypes
 import numpy as np
 import shm_util
 import tritonclient.grpc as grpcclient
@@ -258,6 +259,152 @@ class IOTest(unittest.TestCase):
             self.assertTrue(np.allclose(input0_data, output0_data))
             self.assertTrue(np.allclose(gpu_output_data[1:], next_gpu_output_data))
         self.assertTrue(user_data._completed_requests.empty())
+
+    def _infer_as_numpy(self, test, inputs=None, outputs=None):
+        """Run one check of the as_numpy model and return the result."""
+        test_input = grpcclient.InferInput("TEST", [1], "BYTES")
+        test_input.set_data_from_numpy(np.array([test.encode()], dtype=np.object_))
+        request_inputs = [test_input]
+        for name, data, datatype in inputs or []:
+            request_input = grpcclient.InferInput(name, data.shape, datatype)
+            request_input.set_data_from_numpy(data)
+            request_inputs.append(request_input)
+        requested_outputs = None
+        if outputs is not None:
+            requested_outputs = [grpcclient.InferRequestedOutput(o) for o in outputs]
+        return self._client.infer("as_numpy", request_inputs, outputs=requested_outputs)
+
+    def _infer_as_numpy_input0(self, test, input0):
+        result = self._infer_as_numpy(test, [("INPUT0", input0, "FP32")], ["OUTPUT0"])
+        return result.as_numpy("OUTPUT0")
+
+    # as_numpy() of a CPU tensor received from shared memory returns a writeable
+    # view of that memory, not a copy.
+    def test_as_numpy_view(self):
+        input0 = np.arange(16, dtype=np.float32)
+        with self._shm_leak_detector.Probe():
+            output0 = self._infer_as_numpy_input0("view", input0)
+        np.testing.assert_array_equal(output0, input0)
+
+    def test_as_numpy_new_view_per_call(self):
+        input0 = np.arange(16, dtype=np.float32)
+        with self._shm_leak_detector.Probe():
+            output0 = self._infer_as_numpy_input0("new_view_per_call", input0)
+        np.testing.assert_array_equal(output0, input0)
+
+    # A BLS request that reuses a written input tensor sends the written data.
+    def test_as_numpy_write_visible_to_bls(self):
+        input0 = np.arange(16, dtype=np.float32)
+        with self._shm_leak_detector.Probe():
+            output0 = self._infer_as_numpy_input0("write_to_bls", input0)
+        np.testing.assert_array_equal(output0, input0 + 1.0)
+
+    # Inputs whose names have every length from 1 to 16 get aligned views, and
+    # a write through a view is visible to to_dlpack(). The arrays, kept after
+    # their request is released, stay valid while later requests reuse the
+    # shared memory and grow it.
+    def test_as_numpy_views_kept_after_request(self):
+        inputs = []
+        expected = []
+        for length in range(1, 17):
+            data = np.full(length + 2, length, dtype=np.float64)
+            inputs.append(("N" * length, data, "FP64"))
+            # The model negates the first element.
+            expected.append(data.sum() - 2 * data[0])
+        expected = np.array(expected, dtype=np.float32)
+        with self._shm_leak_detector.Probe():
+            try:
+                result = self._infer_as_numpy("keep_views", inputs, ["OUTPUT0"])
+                np.testing.assert_array_equal(result.as_numpy("OUTPUT0"), expected)
+                for i in range(16):
+                    other = np.full(1024, -1.0 - i, dtype=np.float32)
+                    np.testing.assert_array_equal(
+                        self._infer_as_numpy_input0("view", other), other
+                    )
+                # Larger than the default shared-memory region, so the region
+                # grows.
+                large = np.ones(1024 * 1024, dtype=np.float32)
+                np.testing.assert_array_equal(
+                    self._infer_as_numpy_input0("view", large), large
+                )
+                result = self._infer_as_numpy("check_kept", outputs=["OUTPUT0"])
+                np.testing.assert_array_equal(result.as_numpy("OUTPUT0"), expected)
+            finally:
+                self._infer_as_numpy("release_kept")
+
+    def _as_numpy_dtype_inputs(self, shape):
+        rng = np.random.default_rng(0)
+        inputs = {}
+        for dtype, np_dtype in [
+            ("UINT8", np.uint8),
+            ("UINT16", np.uint16),
+            ("UINT32", np.uint32),
+            ("UINT64", np.uint64),
+            ("INT8", np.int8),
+            ("INT16", np.int16),
+            ("INT32", np.int32),
+            ("INT64", np.int64),
+        ]:
+            info = np.iinfo(np_dtype)
+            inputs[dtype] = rng.integers(
+                info.min, info.max, shape, dtype=np_dtype, endpoint=True
+            )
+        for dtype, np_dtype in [
+            ("FP16", np.float16),
+            ("FP32", np.float32),
+            ("FP64", np.float64),
+            ("BF16", ml_dtypes.bfloat16),
+        ]:
+            inputs[dtype] = rng.standard_normal(shape).astype(np_dtype)
+        inputs["BOOL"] = rng.integers(0, 2, shape).astype(np.bool_)
+        inputs["BYTES"] = np.array(
+            [str(i).encode() * (i % 3) for i in range(int(np.prod(shape)))],
+            dtype=np.object_,
+        ).reshape(shape)
+        return inputs
+
+    def _test_as_numpy_dtypes(self, shape):
+        inputs = self._as_numpy_dtype_inputs(shape)
+        with self._shm_leak_detector.Probe():
+            result = self._infer_as_numpy(
+                "dtypes",
+                [("INPUT_" + dtype, data, dtype) for dtype, data in inputs.items()],
+                ["OUTPUT_" + dtype for dtype in inputs],
+            )
+        for dtype, data in inputs.items():
+            output = result.as_numpy("OUTPUT_" + dtype)
+            self.assertEqual(output.dtype, data.dtype, dtype)
+            self.assertEqual(output.shape, data.shape, dtype)
+            if dtype == "BYTES":
+                self.assertEqual(output.tolist(), data.tolist(), dtype)
+            else:
+                np.testing.assert_array_equal(output, data, err_msg=dtype)
+
+    def test_as_numpy_dtypes(self):
+        self._test_as_numpy_dtypes([3, 5])
+
+    def test_as_numpy_zero_size(self):
+        self._test_as_numpy_dtypes([0, 4])
+
+    # The array of a BLS output stays valid after its response is released.
+    def test_as_numpy_bls_output(self):
+        input0 = np.arange(16, dtype=np.float32)
+        with self._shm_leak_detector.Probe():
+            output0 = self._infer_as_numpy_input0("bls_output", input0)
+        np.testing.assert_array_equal(output0, input0)
+
+    def test_as_numpy_bls_decoupled_output(self):
+        input0 = np.arange(16, dtype=np.float32)
+        with self._shm_leak_detector.Probe():
+            output0 = self._infer_as_numpy_input0("bls_decoupled_output", input0)
+        np.testing.assert_array_equal(output0, np.concatenate([input0, input0]))
+
+    # as_numpy() of a GPU tensor still raises.
+    def test_as_numpy_gpu_bls_output(self):
+        input0 = np.arange(16, dtype=np.float32)
+        with self._shm_leak_detector.Probe():
+            output0 = self._infer_as_numpy_input0("gpu_bls_output", input0)
+        np.testing.assert_array_equal(output0, input0)
 
     # Assert a prior crash is fixed regarding requested output on a decoupled model.
     def test_requested_output_decoupled_prior_crash(self):
