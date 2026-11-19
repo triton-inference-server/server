@@ -258,20 +258,13 @@ class TritonPythonModel:
         return [pb_utils.Tensor("OUTPUT0", kept.reshape(-1))]
 
     def _test_bls_decoupled_output(self, request):
-        # Keep the arrays of every response of a decoupled BLS request.
+        # Keep the arrays of every response of a decoupled BLS request after
+        # the responses are released, then run another decoupled BLS request
+        # that can reuse the memory.
         data = input_tensor(request, "INPUT0").as_numpy().copy()
-        kept = []
-        for response in self._bls(
-            "dlpack_io_identity_decoupled",
-            pb_utils.Tensor("INPUT0", data),
-            decoupled=True,
-        ):
-            if response.has_error():
-                raise pb_utils.TritonModelException(response.error().message())
-            output = pb_utils.get_output_tensor_by_name(response, "OUTPUT0")
-            if output is not None:
-                kept.append(output.as_numpy())
+        kept = self._bls_decoupled_outputs(data)
         gc.collect()
+        self._bls_decoupled_outputs(data + 100.0)
         assert len(kept) == 2, f"expected 2 responses, got {len(kept)}"
         for array in kept:
             assert_view(array)
@@ -302,6 +295,22 @@ class TritonPythonModel:
             inputs=[tensor, pb_utils.Tensor("GPU_OUTPUT", np.array([gpu_output]))],
             requested_output_names=["OUTPUT0"],
         ).exec(decoupled=decoupled)
+
+    def _bls_decoupled_outputs(self, data):
+        # The OUTPUT0 arrays of every response. The tensors and responses are
+        # released on return.
+        arrays = []
+        for response in self._bls(
+            "dlpack_io_identity_decoupled",
+            pb_utils.Tensor("INPUT0", data),
+            decoupled=True,
+        ):
+            if response.has_error():
+                raise pb_utils.TritonModelException(response.error().message())
+            output = pb_utils.get_output_tensor_by_name(response, "OUTPUT0")
+            if output is not None:
+                arrays.append(output.as_numpy())
+        return arrays
 
     def _bls_identity(self, tensor, gpu_output=False):
         response = self._bls("dlpack_io_identity_1", tensor, gpu_output)
