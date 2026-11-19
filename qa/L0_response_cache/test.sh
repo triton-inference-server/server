@@ -358,66 +358,7 @@ stop_redis
 
 # Verify that request metadata and model namespaces separate cache entries.
 CACHE_KEY_REPOS=$(mktemp -d "${PWD}/cache_key_models.XXXXXX")
-python3 - "$CACHE_KEY_REPOS" <<'PYMODELS'
-from pathlib import Path
-import shutil
-import sys
-
-root = Path(sys.argv[1])
-config = '''name: "cache_key"
-backend: "python"
-max_batch_size: 0
-input [{ name: "INPUT" data_type: TYPE_INT32 dims: [-1, -1] }]
-output [
-  { name: "SUM" data_type: TYPE_INT64 dims: [-1] },
-  { name: "MAX" data_type: TYPE_INT32 dims: [-1] }
-]
-instance_group [{ kind: KIND_CPU }]
-response_cache { enable: true }
-'''
-
-
-def model(repository, name, batched=False, enabled=True, maxima=False):
-    target = root / repository / name
-    (target / "1").mkdir(parents=True)
-    shutil.copyfile("cache_key_model.py", target / "1/model.py")
-    text = config.replace('name: "cache_key"', f'name: "{name}"')
-    if batched:
-        text = text.replace("max_batch_size: 0", "max_batch_size: 8")
-        text = text.replace("dims: [-1]", "dims: [1]")
-        text = text.replace("dims: [-1, -1]", "dims: [-1]")
-    if not enabled:
-        text = text.replace("enable: true", "enable: false")
-    if maxima:
-        text += 'parameters { key: "reduction" value { string_value: "max" } }\n'
-    (target / "config.pbtxt").write_text(text)
-
-
-def ensemble(repository, name, component, enabled=True):
-    target = root / repository / name
-    (target / "1").mkdir(parents=True)
-    text = config.replace('name: "cache_key"', f'name: "{name}"')
-    text = text.replace('backend: "python"', 'platform: "ensemble"')
-    text = text.replace("instance_group [{ kind: KIND_CPU }]", "")
-    if not enabled:
-        text = text.replace("enable: true", "enable: false")
-    text += 'ensemble_scheduling { step [{ model_name: "' + component + '" '
-    text += 'model_version: -1 input_map { key: "INPUT" value: "INPUT" } '
-    for output in ("SUM", "MAX"):
-        text += f'output_map {{ key: "{output}" value: "{output}" }} '
-    text += '}] }\n'
-    (target / "config.pbtxt").write_text(text)
-
-
-model("repoA", "cache_key")
-model("repoA", "cache_key_batched", batched=True)
-model("repoA", "cache_key_uncached", enabled=False)
-ensemble("repoA", "cache_key_ensemble", "cache_key_uncached")
-model("repoA", "X")
-model("repoB", "X", maxima=True)
-ensemble("repoA", "ensA", "X", enabled=False)
-ensemble("repoB", "ensB", "X", enabled=False)
-PYMODELS
+python3 generate_cache_key_models.py "$CACHE_KEY_REPOS"
 
 CACHE_KEY_SAVED_SERVER_LOG=$SERVER_LOG
 for CACHE_BACKEND in local redis; do
