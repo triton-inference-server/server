@@ -139,11 +139,15 @@ class TritonPythonModel:
         return [pb_utils.Tensor("OUTPUT0", first)]
 
     def _test_write_to_bls(self, request):
-        # A BLS request that reuses the input tensor sends the written data.
+        # A BLS request that reuses the input tensor sends the written data, and
+        # so does a response built from a new view of the input.
         tensor = input_tensor(request, "INPUT0")
         tensor.as_numpy()[:] += 1.0
-        output = self._bls_identity(tensor)
-        return [pb_utils.Tensor("OUTPUT0", output.as_numpy().reshape(-1))]
+        output = self._bls_identity(tensor).as_numpy().reshape(-1)
+        assert np.array_equal(
+            output, tensor.as_numpy()
+        ), "the BLS request did not send the write through as_numpy()"
+        return [pb_utils.Tensor("OUTPUT0", tensor.as_numpy())]
 
     def _test_keep_views(self, request):
         # For every name length: the view is aligned, and a write through it
@@ -164,10 +168,10 @@ class TritonPythonModel:
                 assert np.array_equal(
                     readback, array
                 ), "the write through as_numpy() is not visible to to_dlpack()"
+                kept.append(array)
+                sums.append(readback.sum())
             except AssertionError as e:
                 raise AssertionError(f"{name}: {e}") from None
-            kept.append(array)
-            sums.append(readback.sum())
         # Keep the arrays only once every check passed, so a failure pins no
         # shared memory.
         self._kept = kept
@@ -188,7 +192,29 @@ class TritonPythonModel:
         self._kept = None
         self._kept_expected = None
         gc.collect()
-        return []
+        return [pb_utils.Tensor("OUTPUT0", np.zeros(0, dtype=np.float32))]
+
+    def _test_non_view_tensors(self, request):
+        # Tensors that are not views of received shared memory keep their own
+        # arrays: a model-created tensor returns the array it was created from,
+        # a CPU from_dlpack() tensor a copy, and a received BYTES tensor the same
+        # deserialized array on every call.
+        array = np.arange(8, dtype=np.float32)
+        assert (
+            pb_utils.Tensor("CREATED", array).as_numpy() is array
+        ), "a model-created tensor did not return its own array"
+        tensor = input_tensor(request, "INPUT0")
+        copy = pb_utils.Tensor.from_dlpack("CREATED", tensor.to_dlpack()).as_numpy()
+        assert not np.shares_memory(
+            copy, tensor.as_numpy()
+        ), "a CPU from_dlpack() tensor shares the producer's memory"
+        received = input_tensor(request, "INPUT_BYTES")
+        deserialized = received.as_numpy()
+        assert deserialized.dtype == np.object_, f"BYTES as {deserialized.dtype}"
+        assert (
+            received.as_numpy() is deserialized
+        ), "a BYTES tensor returned a new array"
+        return [pb_utils.Tensor("OUTPUT0", copy)]
 
     def _test_dtypes(self, request):
         outputs = []
@@ -250,6 +276,9 @@ class TritonPythonModel:
         for array in kept:
             assert_view(array)
             assert np.array_equal(array, data), "a kept decoupled BLS output changed"
+        # The decoupled model sends the same response object twice. Each
+        # response still gets its own memory.
+        assert not np.shares_memory(kept[0], kept[1]), "decoupled responses alias"
         return [pb_utils.Tensor("OUTPUT0", np.concatenate(kept))]
 
     def _test_gpu_bls_output(self, request):

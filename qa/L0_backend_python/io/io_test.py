@@ -292,7 +292,8 @@ class IOTest(unittest.TestCase):
             output0 = self._infer_as_numpy_input0("new_view_per_call", input0)
         np.testing.assert_array_equal(output0, input0)
 
-    # A BLS request that reuses a written input tensor sends the written data.
+    # A BLS request that reuses a written input tensor sends the written data,
+    # and so does the model's response.
     def test_as_numpy_write_visible_to_bls(self):
         input0 = np.arange(16, dtype=np.float32)
         with self._shm_leak_detector.Probe():
@@ -321,8 +322,8 @@ class IOTest(unittest.TestCase):
                     np.testing.assert_array_equal(
                         self._infer_as_numpy_input0("view", other), other
                     )
-                # Larger than the default shared-memory region, so the region
-                # grows.
+                # Larger than the 2 MiB shared-memory region that test.sh
+                # configures, so the region grows.
                 large = np.ones(1024 * 1024, dtype=np.float32)
                 np.testing.assert_array_equal(
                     self._infer_as_numpy_input0("view", large), large
@@ -330,7 +331,20 @@ class IOTest(unittest.TestCase):
                 result = self._infer_as_numpy("check_kept", outputs=["OUTPUT0"])
                 np.testing.assert_array_equal(result.as_numpy("OUTPUT0"), expected)
             finally:
-                self._infer_as_numpy("release_kept")
+                self._infer_as_numpy("release_kept", outputs=["OUTPUT0"])
+
+    # Tensors that are not views of received shared memory: model-created
+    # tensors (from an array or from_dlpack()) and received BYTES tensors.
+    def test_as_numpy_non_view_tensors(self):
+        input0 = np.arange(16, dtype=np.float32)
+        input_bytes = np.array([[b"a", b"bc"]], dtype=np.object_)
+        with self._shm_leak_detector.Probe():
+            result = self._infer_as_numpy(
+                "non_view_tensors",
+                [("INPUT0", input0, "FP32"), ("INPUT_BYTES", input_bytes, "BYTES")],
+                ["OUTPUT0"],
+            )
+        np.testing.assert_array_equal(result.as_numpy("OUTPUT0"), input0)
 
     def _as_numpy_dtype_inputs(self, shape):
         rng = np.random.default_rng(0)

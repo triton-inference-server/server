@@ -225,17 +225,26 @@ mkdir -p models/dlpack_io_identity_decoupled/1/
 cp ../../python_models/dlpack_io_identity_decoupled/model.py ./models/dlpack_io_identity_decoupled/1/
 cp ../../python_models/dlpack_io_identity_decoupled/config.pbtxt ./models/dlpack_io_identity_decoupled/
 
+# A 2 MiB shared-memory region, which test_as_numpy_views_kept_after_request
+# grows. The size differs from the default so the log check below shows that
+# the setting took effect.
+SERVER_ARGS="${SAVED_SERVER_ARGS} --backend-config=python,shm-default-byte-size=2097152"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     RET=1
 fi
+if ! grep -q "shm-default-byte-size=2097152," $SERVER_LOG; then
+    echo -e "\n***\n*** Expected a 2 MiB shared-memory region. \n***"
+    RET=1
+fi
 
 SUBTESTS="test_as_numpy_view test_as_numpy_new_view_per_call \
           test_as_numpy_write_visible_to_bls test_as_numpy_views_kept_after_request \
-          test_as_numpy_dtypes test_as_numpy_zero_size test_as_numpy_bls_output \
-          test_as_numpy_bls_decoupled_output test_as_numpy_gpu_bls_output"
+          test_as_numpy_non_view_tensors test_as_numpy_dtypes test_as_numpy_zero_size \
+          test_as_numpy_bls_output test_as_numpy_bls_decoupled_output \
+          test_as_numpy_gpu_bls_output"
 for SUBTEST in $SUBTESTS; do
     set +e
     python3 -m pytest --junitxml=${SUBTEST}.report.xml ${UNITTEST_PY}::IOTest::${SUBTEST} > ${CLIENT_LOG}.${SUBTEST}
@@ -249,6 +258,7 @@ done
 
 kill $SERVER_PID
 wait $SERVER_PID
+SERVER_ARGS="${SAVED_SERVER_ARGS}"
 
 # IOTest.test_requested_output_decoupled_prior_crash
 rm -rf models && mkdir models
