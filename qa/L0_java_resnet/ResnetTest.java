@@ -1,4 +1,4 @@
-// Copyright 2022-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -175,7 +175,10 @@ public class ResnetTest {
     public void call(
         TRITONSERVER_InferenceRequest request, int flags, Pointer userp)
     {
-      // We reuse the request so we don't delete it here.
+      // The request is deleted by its owner once this future completes.
+      if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+        release_futures.get(userp).complete(null);
+      }
     }
   }
 
@@ -194,6 +197,8 @@ public class ResnetTest {
 
   static ConcurrentHashMap<
       Pointer, CompletableFuture<TRITONSERVER_InferenceResponse>> futures =
+      new ConcurrentHashMap<>();
+  static ConcurrentHashMap<Pointer, CompletableFuture<Void>> release_futures =
       new ConcurrentHashMap<>();
   static ResponseAlloc responseAlloc = new ResponseAlloc();
   static ResponseRelease responseRelease = new ResponseRelease();
@@ -388,7 +393,7 @@ public class ResnetTest {
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestSetReleaseCallback(
-            irequest, inferRequestComplete, null /* request_release_userp */),
+            irequest, inferRequestComplete, irequest),
         "setting request release callback");
 
 
@@ -448,6 +453,8 @@ public class ResnetTest {
       CompletableFuture<TRITONSERVER_InferenceResponse> completed =
           new CompletableFuture<>();
       futures.put(irequest, completed);
+      CompletableFuture<Void> released = new CompletableFuture<>();
+      release_futures.put(irequest, released);
 
       FAIL_IF_ERR(
           TRITONSERVER_InferenceRequestSetResponseCallback(
@@ -474,6 +481,11 @@ public class ResnetTest {
       FAIL_IF_ERR(
           TRITONSERVER_InferenceResponseDelete(completed_response),
           "deleting inference response");
+
+      // The final response may be delivered before the request is released,
+      // so wait for the release before reusing or deleting the request.
+      released.get();
+      release_futures.remove(irequest);
     }
 
     FAIL_IF_ERR(
