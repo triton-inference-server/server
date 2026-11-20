@@ -1,4 +1,4 @@
-// Copyright 2020-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -250,8 +250,10 @@ void
 InferRequestRelease(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
-  std::promise<void>* barrier = reinterpret_cast<std::promise<void>*>(userp);
-  barrier->set_value();
+  if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
+    std::promise<void>* barrier = reinterpret_cast<std::promise<void>*>(userp);
+    barrier->set_value();
+  }
 }
 
 void

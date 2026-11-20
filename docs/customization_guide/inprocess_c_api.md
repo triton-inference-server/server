@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -145,14 +145,19 @@ following steps.
 
   To correctly manage the lifecycle of the inference request, you must
   use `TRITONSERVER_InferenceRequestSetReleaseCallback` to set a
-  callback into a function in your application. This callback will be
-  invoke by Triton to return ownership of the
-  `TRITONSERVER_InferenceRequest` object. Typically, in this callback
-  you will just delete the `TRITONSERVER_InferenceRequest` object by
-  using `TRITONSERVER_InferenceRequestDelete`. But you may also
-  implement a different lifecycle management; for example, if you are
-  reusing inference request objects you would want to make the object
-  available for reuse.
+  callback into a function in your application. Triton invokes this
+  callback when it releases the request. When the
+  `TRITONSERVER_REQUEST_RELEASE_ALL` flag is set, ownership of the
+  `TRITONSERVER_InferenceRequest` object returns to your application,
+  so check for this flag before taking ownership. Rather than deleting
+  the object in this callback, use the callback to signal the code
+  that owns the request, for example by setting a `std::promise`. That
+  code then reuses the request or deletes it using
+  `TRITONSERVER_InferenceRequestDelete`. The signal tells that code
+  when Triton no longer accesses the request or its input buffers, so
+  it can safely reuse the request or free those buffers. In
+  [simple.cc](https://github.com/triton-inference-server/server/blob/main/src/simple.cc)
+  this callback is `InferRequestRelease`.
 
   You can optionally use `TRITONSERVER_InferenceRequestSetId` to set a
   user-defined ID on the request. This ID is not used by Triton but
@@ -177,6 +182,12 @@ following steps.
   not access that object in any way until Triton returns ownership to
   you via the callback you registered with
   `TRITONSERVER_InferenceRequestSetReleaseCallback`.
+
+  Receiving the final response (`TRITONSERVER_RESPONSE_COMPLETE_FINAL`)
+  does not mean that Triton has returned ownership of the request. The
+  release callback may be invoked after the final response, so wait
+  for the release callback, not the response, before you reuse or
+  delete the request.
 
 * Process the inference response. The inference response is returned
   to the callback function you registered with
