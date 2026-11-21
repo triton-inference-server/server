@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -163,10 +163,15 @@ based on the information included in `values.yaml`.
 2. Install the [prometheus-adapter](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-adapter) helm chart, allowing the Horizontal Pod Autoscaler to scale
 based on custom metrics from prometheus.
 
-The included configuration will scale Triton pods based on the average queue time,
-as described in [this blog post](https://developer.nvidia.com/blog/deploying-nvidia-triton-at-scale-with-mig-and-kubernetes/#:~:text=Query%20NVIDIA%20Triton%20metrics%20using%20Prometheus). To customize this,
+The included configuration scales Triton pods based on a request-weighted average
+queue time over 30 seconds, so idle models do not lower a pod's value. For details,
+see [this blog post](https://developer.nvidia.com/blog/deploying-nvidia-triton-at-scale-with-mig-and-kubernetes/#:~:text=Query%20NVIDIA%20Triton%20metrics%20using%20Prometheus). To customize this,
 you may replace or add to the list of custom rules in `values.yaml`. If you change
 the custom metric, be sure to change the values in autoscaling.metrics.
+
+Run `python3 deploy/test_k8s_onprem_metrics_query.py` from the repository root to
+check the query with Prometheus `promtool`. The check requires PyYAML and
+`promtool` in `PATH`.
 
 If autoscaling is disabled, the number of Triton server pods is set to the minReplicas
 variable in `values.yaml`.
