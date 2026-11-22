@@ -41,6 +41,7 @@
    Multimodal model <../tutorials/Popular_Models_Guide/Qwen2.5-VL/qwen2_5_vl_trtllm_guide.md>
    Stable diffusion <../tutorials/Popular_Models_Guide/StableDiffusion/README.md>
    HSTU (Generative Recommenders) <../tutorials/Popular_Models_Guide/HSTU/README.md>
+   Dynamo Snapshot <user_guide/snapshot.md>
 
 .. toctree::
    :hidden:
