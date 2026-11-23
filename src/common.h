@@ -78,7 +78,7 @@ constexpr size_t HTTP_DEFAULT_MAX_INPUT_SIZE = 1 << 26;
 
 // Minimum limit on the memory used to parse the JSON of an HTTP request in
 // bytes (1MB), so that small requests can be parsed with any input size limit
-constexpr size_t HTTP_MIN_JSON_PARSE_MEMORY_LIMIT = 1 << 20;
+constexpr size_t HTTP_JSON_PARSE_SIZE_MIN = 1 << 20;
 
 /// Reserved parameter keys for Triton usage (also HTTP/gRPC header forward).
 /// Other locations:

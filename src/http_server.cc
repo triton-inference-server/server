@@ -3275,7 +3275,7 @@ HTTPAPIServer::EVBufferToJson(
   // The parsed JSON uses more memory than the request body, so the maximum
   // input size also limits the memory used to parse it.
   const size_t parse_memory_limit =
-      std::max(max_input_size_, HTTP_MIN_JSON_PARSE_MEMORY_LIMIT);
+      std::max(max_input_size_, HTTP_JSON_PARSE_SIZE_MIN);
   bool limit_exceeded = false;
   TRITONSERVER_Error* err = document->ParseWithMemoryLimit(
       json_base, length, parse_memory_limit, &limit_exceeded);
