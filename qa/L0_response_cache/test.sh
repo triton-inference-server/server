@@ -356,6 +356,43 @@ unset TRITONCACHE_REDIS_PASSWORD
 unset_redis_auth
 stop_redis
 
+# Verify that request metadata and model namespaces separate cache entries.
+CACHE_KEY_REPOS=$(mktemp -d "${PWD}/cache_key_models.XXXXXX")
+python3 generate_cache_key_models.py "$CACHE_KEY_REPOS"
+
+CACHE_KEY_SAVED_SERVER_LOG=$SERVER_LOG
+for CACHE_BACKEND in local redis; do
+    if [ "$CACHE_BACKEND" == "local" ]; then
+        CACHE_KEY_ARGS="--cache-config=local,size=16777216"
+    else
+        start_redis
+        CACHE_KEY_ARGS="${REDIS_ENDPOINT}"
+    fi
+    SERVER_LOG="./cache_key.${CACHE_BACKEND}.server.log"
+    SERVER_ARGS="--model-repository=${CACHE_KEY_REPOS}/repoA --model-repository=${CACHE_KEY_REPOS}/repoB --model-namespacing=true --model-control-mode=explicit --load-model=* ${CACHE_KEY_ARGS}"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        cat "$SERVER_LOG"
+        RET=1
+    else
+        rm -f "$TEST_RESULT_FILE"
+        if ! CACHE_KEY_REPOS="$CACHE_KEY_REPOS" python3 cache_key_test.py > "cache_key.${CACHE_BACKEND}.client.log" 2>&1; then
+            cat "cache_key.${CACHE_BACKEND}.client.log"
+            RET=1
+        elif ! check_test_results "$TEST_RESULT_FILE" 5; then
+            cat "cache_key.${CACHE_BACKEND}.client.log"
+            RET=1
+        fi
+        kill "$SERVER_PID"
+        wait "$SERVER_PID"
+    fi
+    if [ "$CACHE_BACKEND" == "redis" ]; then
+        stop_redis
+    fi
+done
+SERVER_LOG=$CACHE_KEY_SAVED_SERVER_LOG
+rm -rf "$CACHE_KEY_REPOS"
+
 # Test ensemble model with cache and decoupled mode enabled
 check_server_failure_decoupled_model ${ENSEMBLE_CACHE_DECOUPLED} ${ENSEMBLE_MODEL}
 
