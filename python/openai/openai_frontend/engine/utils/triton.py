@@ -586,7 +586,7 @@ def _validate_triton_responses_non_streaming(
 ):
     num_responses = len(responses)
     if 1 <= num_responses <= 2:
-        if responses[-1].final != True:
+        if not responses[-1].final:
             raise ServerError("Unexpected internal error with incorrect response flags")
     else:
         raise ServerError(
@@ -706,7 +706,7 @@ def _parse_lora_configs(
             except Exception:
                 # Model directory or model.json is malformed?
                 return None
-            if is_lora_enabled != True:
+            if not is_lora_enabled:
                 continue
         else:
             # TRT-LLM backend does not use model.json
@@ -729,7 +729,7 @@ def _parse_lora_configs(
                         lora_task_id += 1
         except ServerError as e:
             raise e
-        except Exception as e:
+        except Exception:
             # LoRA is enabled but its list is not provided or malformed?
             print(traceback.format_exc())
             return None
