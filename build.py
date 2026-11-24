@@ -1824,8 +1824,10 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         # Passed by name rather than as NAME=value, so the contents, which carry
         # a credential, stay out of this script, which CI publishes as a build
         # artifact.
-        if os.environ.get(GIT_CONFIG_CONTENT_ENV):
-            runargs += ["-e", GIT_CONFIG_CONTENT_ENV]
+        # The ONNX Runtime mirror URL (onnxruntime_backend) is handled alike.
+        for var in (GIT_CONFIG_CONTENT_ENV, "TRITON_MS_ONNXRUNTIME_GIT_REPOSITORY"):
+            if os.environ.get(var):
+                runargs += ["-e", var]
 
         if "TRITON_RELEASE_VERSION" in os.environ:
             runargs += [
