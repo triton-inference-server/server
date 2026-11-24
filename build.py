@@ -1049,7 +1049,7 @@ RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
           auditwheel \\
           build \\
-          cmake==4.0.3 \\
+          cmake==4.4.5 \\
           docker \\
           patchelf==0.17.2 \\
           scons \\
@@ -1167,7 +1167,7 @@ RUN pip3 install --upgrade \\
           docker \\
           virtualenv \\
           patchelf==0.17.2 \\
-          cmake==4.0.3 \\
+          cmake==4.4.5 \\
           pybind11[global]
 """
 
