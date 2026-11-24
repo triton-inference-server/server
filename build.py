@@ -821,8 +821,10 @@ RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/
 """
     else:
         install = r"""
-RUN curl -o /tmp/cuda-keyring.deb \
-          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/@ARCH@/cuda-keyring_1.1-1_all.deb \
+RUN . /etc/os-release \
+      && REPO="ubuntu${VERSION_ID%%.*}${VERSION_ID#*.}" \
+      && curl -o /tmp/cuda-keyring.deb \
+          https://developer.download.nvidia.com/compute/cuda/repos/${REPO}/@ARCH@/cuda-keyring_1.1-1_all.deb \
       && apt install /tmp/cuda-keyring.deb \
       && rm /tmp/cuda-keyring.deb \
       && apt update -qq \
