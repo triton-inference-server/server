@@ -1,4 +1,4 @@
-// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -189,8 +189,10 @@ void
 InferRequestComplete(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
+  // The request is deleted by its owner once this barrier is signaled.
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
-    TRITONSERVER_InferenceRequestDelete(request);
+    std::promise<void>* barrier = reinterpret_cast<std::promise<void>*>(userp);
+    barrier->set_value();
   }
 }
 
@@ -665,9 +667,11 @@ main(int argc, char** argv)
       TRITONSERVER_InferenceRequestSetId(irequest, "123"),
       "setting ID for the request");
 
+  std::promise<void> barrier;
+  std::future<void> request_release_future = barrier.get_future();
   FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestSetReleaseCallback(
-          irequest, InferRequestComplete, nullptr /* request_release_userp */),
+          irequest, InferRequestComplete, reinterpret_cast<void*>(&barrier)),
       "setting request release callback");
 
   // Create 0 data that shouldn't be selected and used to test host policy
@@ -959,6 +963,13 @@ main(int argc, char** argv)
   FAIL_IF_ERR(
       TRITONSERVER_InferenceResponseDelete(response),
       "deleting inference response");
+
+  // The final response may be delivered before the request is released, so
+  // wait for the release before deleting the request.
+  request_release_future.get();
+  FAIL_IF_ERR(
+      TRITONSERVER_InferenceRequestDelete(irequest),
+      "deleting inference request");
 
   FAIL_IF_ERR(
       TRITONSERVER_ResponseAllocatorDelete(allocator),
