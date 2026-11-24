@@ -88,6 +88,7 @@ SKIP_PATHS = (
     "qa/L0_trt_dla_jetson/trt_dla_model_store",
     "qa/openvino_models/dynamic_batch",
     "qa/openvino_models/fixed_batch",
+    "skills",
     "CITATION.cff",
     "TRITON_VERSION",
     ".github/ISSUE_TEMPLATE",
