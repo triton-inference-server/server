@@ -74,10 +74,10 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.75.0dev",
-    "triton_container_version": "26.11dev",
-    "upstream_container_version": "26.10",
-    "cuda_dl_base_version": "26.10-cuda13.4",
+    "release_version": "2.76.0dev",
+    "triton_container_version": "26.12dev",
+    "upstream_container_version": "26.11",
+    "cuda_dl_base_version": "26.11-cuda13.5",
     "ort_version": "1.31.1",
     "ort_openvino_version": "2026.4.1",
     "standalone_openvino_version": "2026.4.1",
@@ -2001,6 +2001,7 @@ def core_build(
     )
 
     cmake_script.cp(os.path.join(repo_dir, "LICENSE"), install_dir)
+    cmake_script.cp(os.path.join(repo_dir, "THIRD-PARTY-NOTICES.txt"), install_dir)
     cmake_script.cp(os.path.join(repo_dir, "TRITON_VERSION"), install_dir)
 
     # If requested, package the source code for all OSS used to build.

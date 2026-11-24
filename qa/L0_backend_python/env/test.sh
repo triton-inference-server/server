@@ -185,8 +185,9 @@ BUCKET_URL_SLASH="${BUCKET_URL}/"
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 
 rm $SERVER_LOG
-# Occasionally needs more time to load
-SERVER_TIMEOUT=420
+# Loading the ~5.5 GiB conda-pack archive from S3 takes up to ~400s in CI;
+# leave headroom for both S3 loads below.
+SERVER_TIMEOUT=900
 
 SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
 run_server
