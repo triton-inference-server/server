@@ -29,8 +29,10 @@ import pytest
 
 # The vLLM backend sends one dict per generated token. vLLM inserts the
 # sampled token first, with its rank in the vocabulary, and then the top-k
-# tokens. Here the first token was the most likely one, but the second was
-# sampled from rank 3, so " dog" and " the" outrank it.
+# tokens. Here the first and third tokens were the most likely ones, but the
+# second was sampled from rank 3, so " elephant" and " the" outrank it. The
+# rank 1 token is longer than the sampled one, so building the third offset
+# from the wrong token changes it.
 VLLM_LOGPROBS = [
     {
         "9906": {"logprob": -0.1, "rank": 1, "decoded_token": "Hello"},
@@ -38,8 +40,12 @@ VLLM_LOGPROBS = [
     },
     {
         "8415": {"logprob": -3.0, "rank": 3, "decoded_token": " cat"},
-        "5679": {"logprob": -0.5, "rank": 1, "decoded_token": " dog"},
+        "46840": {"logprob": -0.5, "rank": 1, "decoded_token": " elephant"},
         "279": {"logprob": -1.2, "rank": 2, "decoded_token": " the"},
+    },
+    {
+        "7731": {"logprob": -0.3, "rank": 1, "decoded_token": " sat"},
+        "10837": {"logprob": -1.8, "rank": 2, "decoded_token": " ran"},
     },
 ]
 
@@ -54,11 +60,11 @@ def vllm_logprobs(monkeypatch):
 def test_chat_logprobs_report_sampled_token(vllm_logprobs):
     content = triton_utils._get_openai_chat_format_logprobs_from_vllm_response(None)
 
-    assert [c.token for c in content] == ["Hello", " cat"]
-    assert [c.logprob for c in content] == [-0.1, -3.0]
+    assert [c.token for c in content] == ["Hello", " cat", " sat"]
+    assert [c.logprob for c in content] == [-0.1, -3.0, -0.3]
     assert content[1].bytes == list(" cat".encode("utf-8"))
     # top_logprobs stay ordered from most to least likely
-    assert [t.token for t in content[1].top_logprobs] == [" dog", " the", " cat"]
+    assert [t.token for t in content[1].top_logprobs] == [" elephant", " the", " cat"]
 
 
 def test_completion_logprobs_report_sampled_token(vllm_logprobs):
@@ -66,7 +72,7 @@ def test_completion_logprobs_report_sampled_token(vllm_logprobs):
         None
     )
 
-    assert logprobs.tokens == ["Hello", " cat"]
-    assert logprobs.token_logprobs == [-0.1, -3.0]
-    assert logprobs.text_offset == [0, len("Hello")]
-    assert logprobs.top_logprobs[1] == {" dog": -0.5, " the": -1.2, " cat": -3.0}
+    assert logprobs.tokens == ["Hello", " cat", " sat"]
+    assert logprobs.token_logprobs == [-0.1, -3.0, -0.3]
+    assert logprobs.text_offset == [0, len("Hello"), len("Hello cat")]
+    assert logprobs.top_logprobs[1] == {" elephant": -0.5, " the": -1.2, " cat": -3.0}
