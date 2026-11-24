@@ -1520,7 +1520,8 @@ RUN apt-get update \\
             python3-setuptools \\
             libpython3-dev \\
       && pip3 install --upgrade \\
-            \"numpy<2\" \\
+            \"numpy<2; python_version < '3.13'\" \\
+            \"numpy; python_version >= '3.13'\" \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
 """

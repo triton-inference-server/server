@@ -226,7 +226,11 @@ COPY qa/images/mug.jpg images/mug.jpg
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
-RUN pip3 install --upgrade "numpy<2" pillow attrdict
+# numpy 1.x has no wheels for Python 3.13+.
+RUN pip3 install --upgrade \
+        "numpy<2; python_version < '3.13'" \
+        "numpy; python_version >= '3.13'" \
+        pillow attrdict
 
 RUN --mount=type=secret,id=triton_ci_pip_extra_values,env=TRITON_CI_PYPI_EXTRA_VALUES \
     if [ -n "${TRITON_CI_PYPI_EXTRA_VALUES}" ]; then \
