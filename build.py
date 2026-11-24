@@ -1161,7 +1161,11 @@ RUN apt-get update \\
             wget \\
       && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --upgrade \\
+# Ubuntu 26.04 apt-installs python3-packaging, which pip cannot uninstall
+# when a dependency needs a newer version. Install a pip-managed copy first
+# so the upgrade below never touches the Debian one.
+RUN pip3 install --ignore-installed packaging \\
+      && pip3 install --upgrade \\
           auditwheel \\
           build \\
           docker \\
@@ -1519,6 +1523,7 @@ RUN apt-get update \\
             python3-wheel \\
             python3-setuptools \\
             libpython3-dev \\
+      && pip3 install --ignore-installed packaging \\
       && pip3 install --upgrade \\
             \"numpy<2; python_version < '3.13'\" \\
             \"numpy; python_version >= '3.13'\" \\
