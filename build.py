@@ -1515,6 +1515,9 @@ RUN pip3 install --upgrade pip \\
         else:
             df += """
 # python3, python3-pip and some pip installs required for the python backend
+# Ubuntu 26.04 apt-installs python3-packaging and python3-typing-extensions,
+# which pip cannot uninstall; install pip-managed copies so later upgrades
+# (e.g. pydantic via tritonfrontend[all]) never touch the Debian ones.
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
             python3 \\
@@ -1523,7 +1526,7 @@ RUN apt-get update \\
             python3-wheel \\
             python3-setuptools \\
             libpython3-dev \\
-      && pip3 install --ignore-installed packaging \\
+      && pip3 install --ignore-installed packaging typing_extensions \\
       && pip3 install --upgrade \\
             \"numpy<2; python_version < '3.13'\" \\
             \"numpy; python_version >= '3.13'\" \\
