@@ -146,6 +146,6 @@ The answers to the above should inform what you submit. If you find that this is
 - Your model configuration file.
 - The error received, plus any logs.
     - If your issue involves the server crashing, a backtrace of the dump would be helpful.
-    - Please enable verbose logging (--verbose-log=1) to get the most detailed logs.
+    - Please enable verbose logging (--log-verbose=1) to get the most detailed logs.
 - If this issue is unique to your model, your model or a toy model that reproduces the issue.
 - Anything else that would expedite our investigation.
