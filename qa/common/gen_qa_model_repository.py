@@ -76,7 +76,7 @@ import shutil
 import subprocess
 import sys
 
-from check_tensorrt_target import UNSUPPORTED_TARGET_MARKER
+from check_tensorrt_target import UNSUPPORTED_TARGET_MARKERS
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 
@@ -788,7 +788,9 @@ def render_step_wrapper(ctx):
         '  if [ "${status}" -eq 0 ]; then',
         "    return 0",
         "  fi",
-        '  if grep -qF "' + UNSUPPORTED_TARGET_MARKER + '" "${TRITON_STEP_LOG}"; then',
+        "  if grep -qF "
+        + " ".join("-e " + shlex.quote(m) for m in UNSUPPORTED_TARGET_MARKERS)
+        + ' "${TRITON_STEP_LOG}"; then',
         '    echo -e "'
         + SH_COLOR_WARNING
         + "[WARNING]"

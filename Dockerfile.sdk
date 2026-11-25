@@ -41,7 +41,7 @@ ARG TRITON_ENABLE_GPU=ON
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
 ARG JAVA_BINDINGS_MAVEN_URL=https://archive.apache.org/dist/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz
 # DCGM version to install for Model Analyzer
-ARG DCGM_VERSION=4.7.1-2
+ARG DCGM_VERSION=4.8.0-1
 
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown
@@ -86,7 +86,7 @@ RUN apt-get update && \
             software-properties-common \
             vim \
             wget && \
-    pip3 install --upgrade setuptools build "grpcio-tools==1.81.1" cmake==4.0.3 auditwheel
+    pip3 install --upgrade setuptools build "grpcio-tools==1.85.4" cmake==4.4.5 auditwheel
 
 ENV CMAKE_POLICY_MINIMUM_REQUIRED=3.5
 
@@ -193,7 +193,7 @@ RUN --mount=type=secret,id=apt_sources,target=/etc/apt/sources.list.d/nvidia-art
             vim \
             wget && \
     pip3 install --upgrade setuptools && \
-    pip3 install "grpcio==1.81.1" "grpcio-tools==1.81.1" && \
+    pip3 install "grpcio==1.85.4" "grpcio-tools==1.85.4" && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*;
 
@@ -226,7 +226,11 @@ COPY qa/images/mug.jpg images/mug.jpg
 # Install the dependencies needed to run the client examples. These
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
-RUN pip3 install --upgrade "numpy<2" pillow attrdict
+# numpy 1.x has no wheels for Python 3.13+.
+RUN pip3 install --upgrade \
+        "numpy<2; python_version < '3.13'" \
+        "numpy; python_version >= '3.13'" \
+        pillow attrdict
 
 RUN --mount=type=secret,id=triton_ci_pip_extra_values,env=TRITON_CI_PYPI_EXTRA_VALUES \
     if [ -n "${TRITON_CI_PYPI_EXTRA_VALUES}" ]; then \
@@ -248,8 +252,10 @@ RUN --mount=type=secret,id=triton_ci_pip_extra_values,env=TRITON_CI_PYPI_EXTRA_V
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         [ "$(uname -m)" != "x86_64" ] && arch="sbsa" || arch="x86_64" && \
+        . /etc/os-release && \
+        repo="ubuntu${VERSION_ID%%.*}${VERSION_ID#*.}" && \
         curl -o /tmp/cuda-keyring.deb \
-        "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/${arch}/cuda-keyring_1.1-1_all.deb" \
+        "https://developer.download.nvidia.com/compute/cuda/repos/${repo}/${arch}/cuda-keyring_1.1-1_all.deb" \
         && apt -y install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
         apt update && \
         V=1:${DCGM_VERSION} && \

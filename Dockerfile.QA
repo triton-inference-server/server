@@ -323,14 +323,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # install platform specific packages
 RUN --mount=type=secret,id=apt_sources,target=/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list,required=false \
-    if grep -qE '^VERSION_ID="(18\.04|20\.04|22\.04|24\.04)' /etc/os-release; then \
+    if grep -qE '^VERSION_ID="(18\.04|20\.04|22\.04|24\.04|26\.04)' /etc/os-release; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
                 libpng-dev && \
         apt-get clean && \
         rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*; \
     else \
-        echo "Ubuntu version must be either 18.04, 20.04, 22.04 or 24.04" && \
+        echo "Ubuntu version must be either 18.04, 20.04, 22.04, 24.04 or 26.04" && \
         exit 1; \
     fi
 
@@ -362,8 +362,10 @@ RUN --mount=type=secret,id=apt_sources,target=/etc/apt/sources.list.d/nvidia-art
 RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-RUN pip3 install --upgrade "numpy<2" pillow attrdict future "grpcio==1.81.1" requests gsutil \
-                           "awscli<=1.36.40" six "grpcio-channelz==1.81.1" prettytable virtualenv \
+# numpy 1.x has no wheels for Python 3.13+ (Ubuntu 26.04 ships 3.14).
+RUN pip3 install --upgrade "numpy<2; python_version < '3.13'" \
+                           "numpy; python_version >= '3.13'" pillow attrdict future "grpcio==1.85.4" requests gsutil \
+                           "awscli<=1.36.40" six "grpcio-channelz==1.85.4" prettytable virtualenv \
                            check-jsonschema
 
 # go needed for example go client test.

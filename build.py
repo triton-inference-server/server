@@ -81,7 +81,7 @@ DEFAULT_TRITON_VERSION_MAP = {
     "ort_version": "1.31.1",
     "ort_openvino_version": "2026.4.1",
     "standalone_openvino_version": "2026.4.1",
-    "dcgm_version": "4.7.1-2",
+    "dcgm_version": "4.8.0-1",
 }
 
 CORE_BACKENDS = ["ensemble"]
@@ -821,8 +821,10 @@ RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/
 """
     else:
         install = r"""
-RUN curl -o /tmp/cuda-keyring.deb \
-          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/@ARCH@/cuda-keyring_1.1-1_all.deb \
+RUN . /etc/os-release \
+      && REPO="ubuntu${VERSION_ID%%.*}${VERSION_ID#*.}" \
+      && curl -o /tmp/cuda-keyring.deb \
+          https://developer.download.nvidia.com/compute/cuda/repos/${REPO}/@ARCH@/cuda-keyring_1.1-1_all.deb \
       && apt install /tmp/cuda-keyring.deb \
       && rm /tmp/cuda-keyring.deb \
       && apt update -qq \
@@ -1047,7 +1049,7 @@ RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
           auditwheel \\
           build \\
-          cmake==4.0.3 \\
+          cmake==4.4.5 \\
           docker \\
           patchelf==0.17.2 \\
           scons \\
@@ -1159,13 +1161,17 @@ RUN apt-get update \\
             wget \\
       && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --upgrade \\
+# Ubuntu 26.04 apt-installs python3-packaging, which pip cannot uninstall
+# when a dependency needs a newer version. Install a pip-managed copy first
+# so the upgrade below never touches the Debian one.
+RUN pip3 install --ignore-installed packaging \\
+      && pip3 install --upgrade \\
           auditwheel \\
           build \\
           docker \\
           virtualenv \\
           patchelf==0.17.2 \\
-          cmake==4.0.3 \\
+          cmake==4.4.5 \\
           pybind11[global]
 """
 
@@ -1509,6 +1515,9 @@ RUN pip3 install --upgrade pip \\
         else:
             df += """
 # python3, python3-pip and some pip installs required for the python backend
+# Ubuntu 26.04 apt-installs python3-packaging and python3-typing-extensions,
+# which pip cannot uninstall; install pip-managed copies so later upgrades
+# (e.g. pydantic via tritonfrontend[all]) never touch the Debian ones.
 RUN apt-get update \\
       && apt-get install -y --no-install-recommends \\
             python3 \\
@@ -1517,8 +1526,10 @@ RUN apt-get update \\
             python3-wheel \\
             python3-setuptools \\
             libpython3-dev \\
+      && pip3 install --ignore-installed packaging typing_extensions \\
       && pip3 install --upgrade \\
-            \"numpy<2\" \\
+            \"numpy<2; python_version < '3.13'\" \\
+            \"numpy; python_version >= '3.13'\" \\
             virtualenv \\
       && rm -rf /var/lib/apt/lists/*
 """
