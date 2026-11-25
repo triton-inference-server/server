@@ -71,6 +71,14 @@ mkdir -p models/execute_return_error/1/
 cp ../../python_models/execute_return_error/model.py ./models/execute_return_error/1/
 cp ../../python_models/execute_return_error/config.pbtxt ./models/execute_return_error/
 
+mkdir -p models/execute_error_after_final/1/
+cp ../../python_models/execute_error_after_final/model.py ./models/execute_error_after_final/1/
+cp ../../python_models/execute_error_after_final/config.pbtxt ./models/execute_error_after_final/
+
+mkdir -p models/execute_unresponsive/1/
+cp ../../python_models/execute_unresponsive/model.py ./models/execute_unresponsive/1/
+cp ../../python_models/execute_unresponsive/config.pbtxt ./models/execute_unresponsive/
+
 mkdir -p models/wrong_model/1/
 cp ../../python_models/wrong_model/model.py ./models/wrong_model/1/
 cp ../../python_models/wrong_model/config.pbtxt ./models/wrong_model/
@@ -110,6 +118,16 @@ if [ $current_num_pages -ne $prev_num_pages ]; then
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
     RET=1
+fi
+
+# Requests that failed must not keep the models from unloading.
+if [[ ${TEST_WINDOWS} == 0 ]]; then
+    for model in execute_unresponsive execute_error_after_final wrong_model; do
+        if ! grep -q "successfully unloaded '${model}' version 1" $SERVER_LOG; then
+            echo -e "\n***\n*** Test Failed. ${model} was not unloaded.\n***"
+            RET=1
+        fi
+    done
 fi
 
 # These models have errors in the initialization and finalization
