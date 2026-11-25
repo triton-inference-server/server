@@ -729,6 +729,7 @@ class TritonLLMEngine(LLMEngine):
         )
 
         previous_text = ""
+        is_first_delta = True
         tool_parse_truncated = False
         include_usage = request.stream_options and request.stream_options.include_usage
         usage_accumulator = _StreamingUsageAccumulator(backend)
@@ -772,8 +773,10 @@ class TritonLLMEngine(LLMEngine):
                 tool_call_parser=tool_call_parser,
                 backend=backend,
                 is_final_response=response.final,
+                is_first_delta=is_first_delta,
             )
             previous_text = current_text
+            is_first_delta = False
 
             # Parse logprobs for this chunk if requested
             chunk_logprobs = None
@@ -851,6 +854,7 @@ class TritonLLMEngine(LLMEngine):
         tool_call_parser: ToolCallParser,
         backend: str,
         is_final_response: bool,
+        is_first_delta: bool,
     ) -> Tuple[
         Optional[ChatCompletionStreamResponseDelta],
         Optional[ChatCompletionFinishReason],
@@ -859,14 +863,16 @@ class TritonLLMEngine(LLMEngine):
         response_delta: Optional[ChatCompletionStreamResponseDelta]
         current_text = ""
         if tool_function_name:
+            # Stream the function name only once. Clients concatenate the
+            # string fields of tool call deltas across chunks.
+            function = (
+                Function2(name=tool_function_name, arguments=delta_text)
+                if is_first_delta
+                else Function2(arguments=delta_text)
+            )
             response_delta = ChatCompletionStreamResponseDelta(
                 tool_calls=[
-                    ChatCompletionMessageToolCallChunk(
-                        index=0,
-                        function=Function2(
-                            name=tool_function_name, arguments=delta_text
-                        ),
-                    )
+                    ChatCompletionMessageToolCallChunk(index=0, function=function)
                 ]
             )
         elif tool_choice_auto:
