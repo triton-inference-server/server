@@ -53,6 +53,19 @@ COLOR_RESET = "\033[0m"
 # is not supported by this TensorRT release."
 UNSUPPORTED_TARGET_MARKER = "is not supported by this TensorRT release"
 
+# The same condition seen from deeper in the builder: on SM 10.7 with TensorRT
+# 11.5.0.54, Myelin rejects the GPU while compiling a Resize and the build
+# fails with only "Called with invalid sm" and no mention of the release.
+MYELIN_UNSUPPORTED_SM_MARKER = "Called with invalid sm"
+
+# Every wording the per-step wrapper treats as "TensorRT cannot target this
+# GPU". Keep each entry specific: anything listed here turns a failed
+# generator into a skipped one.
+UNSUPPORTED_TARGET_MARKERS = (
+    UNSUPPORTED_TARGET_MARKER,
+    MYELIN_UNSUPPORTED_SM_MARKER,
+)
+
 
 def warn(message):
     print(
