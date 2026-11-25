@@ -76,6 +76,10 @@ constexpr int32_t HTTP_MAX_JSON_NESTING_DEPTH = 100;
 // Default maximum allowed HTTP request input size in bytes (64MB)
 constexpr size_t HTTP_DEFAULT_MAX_INPUT_SIZE = 1 << 26;
 
+// Minimum limit on the memory used to parse the JSON of an HTTP request in
+// bytes (1MB), so that small requests can be parsed with any input size limit
+constexpr size_t HTTP_JSON_PARSE_SIZE_MIN = 1 << 20;
+
 /// Reserved parameter keys for Triton usage (also HTTP/gRPC header forward).
 /// Other locations:
 /// - client/src/python/library/tritonclient/utils/__init__.py
