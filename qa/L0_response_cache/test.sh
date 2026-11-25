@@ -437,7 +437,8 @@ RANDOM_DATA_JSON="`pwd`/random_inputs.json"
 RANDOM_DATA_GENERATOR="generate_random_data.py"
 
 LEAKCHECK_ARGS="--tool=massif --time-unit=B --massif-out-file=$MASSIF_LOG --max-threads=3000 --log-file=$LEAKCHECK_LOG"
-SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --load-model=${MODEL} --cache-config=local,size=10485760" # 10MB cache
+# GPU metrics are disabled because each DCGM poll briefly allocates a 4 MiB buffer that massif can mistake for growth.
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --load-model=${MODEL} --allow-gpu-metrics=false --cache-config=local,size=10485760" # 10MB cache
 
 set +e
 # Generate random data for perf_analyzer requests to fill the cache and maximize cache misses
