@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -56,6 +56,15 @@ echo "model_transaction_policy { decoupled: True }" >> ./models/execute_cancel/c
 mkdir -p models/response_sender_until_cancelled/1/
 cp ../../python_models/response_sender_until_cancelled/model.py ./models/response_sender_until_cancelled/1/
 cp ../../python_models/response_sender_until_cancelled/config.pbtxt ./models/response_sender_until_cancelled/
+
+mkdir -p models/response_sender_until_cancelled_async/1/
+cp ../../python_models/response_sender_until_cancelled_async/model.py ./models/response_sender_until_cancelled_async/1/
+cp ../../python_models/response_sender_until_cancelled_async/config.pbtxt ./models/response_sender_until_cancelled_async/
+
+# The BLS cancel model, pointed at the async target, whose request Triton has
+# already released when the cancellation arrives.
+mkdir -p models/decoupled_bls_cancel_after_release/1/
+cp models/decoupled_bls_cancel/1/model.py models/decoupled_bls_cancel_after_release/1/
 
 rm -fr python_backend
 git clone ${TRITON_REPO_ORGANIZATION}/python_backend -b $PYTHON_BACKEND_REPO_TAG
