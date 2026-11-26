@@ -206,7 +206,12 @@ def parse_args():
         nargs=3,
         metavar=("APIs", "Restricted Key", "Restricted Value"),
         action="append",
-        help="Restrict access to specific OpenAI API endpoints. Format: '<API_1>,<API_2>,... <restricted-key> <restricted-value>' (e.g., 'inference,model-repository admin-key admin-value'). If not specified, all endpoints are allowed.",
+        help=(
+            "Restrict access to specific OpenAI API endpoints. Pass the comma-separated "
+            "API list, header name, and header value as three separate arguments. "
+            "If omitted, all endpoints are allowed. Example arguments are "
+            "inference,metrics apikey examplevalue"
+        ),
     )
     openai_group.add_argument(
         "--http-max-input-size",
