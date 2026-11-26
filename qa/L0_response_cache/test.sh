@@ -393,6 +393,34 @@ done
 SERVER_LOG=$CACHE_KEY_SAVED_SERVER_LOG
 rm -rf "$CACHE_KEY_REPOS"
 
+# Verify that a Redis entry whose recorded buffer size does not match its
+# stored data is treated as a cache miss.
+REDIS_ENTRY_SAVED_SERVER_LOG=$SERVER_LOG
+SERVER_LOG="./redis_cache_entry.server.log"
+REDIS_ENTRY_CLIENT_LOG="./redis_cache_entry.client.log"
+start_redis
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat "$SERVER_LOG"
+    RET=1
+else
+    rm -f "$TEST_RESULT_FILE"
+    if ! python3 redis_cache_entry_test.py > "$REDIS_ENTRY_CLIENT_LOG" 2>&1; then
+        cat "$REDIS_ENTRY_CLIENT_LOG"
+        RET=1
+    elif ! check_test_results "$TEST_RESULT_FILE" 2; then
+        cat "$REDIS_ENTRY_CLIENT_LOG"
+        RET=1
+    fi
+    # The server may already have exited. Keep going so Redis is stopped.
+    kill "$SERVER_PID" || RET=1
+    wait "$SERVER_PID" || RET=1
+fi
+stop_redis
+SERVER_LOG=$REDIS_ENTRY_SAVED_SERVER_LOG
+
 # Test ensemble model with cache and decoupled mode enabled
 check_server_failure_decoupled_model ${ENSEMBLE_CACHE_DECOUPLED} ${ENSEMBLE_MODEL}
 
