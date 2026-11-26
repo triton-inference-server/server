@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,10 +40,14 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
+DATADIR=/data/inferenceserver/${REPO_VERSION}
+
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
+CANCEL_LOG_LINE="Cancellation notification received for "
 
 RET=0
+rm -f *.log
 
 #
 # Unit tests
@@ -66,7 +70,7 @@ if [ $? -ne 0 ]; then
 fi
 
 #
-# gRPC cancellation tests
+# Python gRPC cancellation tests
 #
 rm -rf models && mkdir models
 mkdir -p models/custom_identity_int32/1 && (cd models/custom_identity_int32 && \
@@ -121,7 +125,7 @@ for TEST_CASE in "test_grpc_async_infer" \
         RET=1
     fi
 
-    count=$(grep -o "Cancellation notification received for" $SERVER_LOG | wc -l)
+    count=$(grep -o "$CANCEL_LOG_LINE" $SERVER_LOG | wc -l)
     if [ $count == 0 ]; then
         echo -e "\n***\n*** Cancellation not received by server on $TEST_CASE\n***"
         cat $SERVER_LOG
@@ -171,6 +175,80 @@ for TEST_CASE in "test_grpc_async_infer" \
 done
 
 #
+# C++ gRPC cancellation tests
+#
+# allow_timeout_override disables queue prefetching, keeping requests queued
+# long enough for the "Queued" cancellation tests to cancel them before
+# forwarding to the rate limiter. This saves overall test time.
+cat >> models/custom_identity_int32/config.pbtxt <<'EOF'
+dynamic_batching {
+  default_queue_policy {
+    allow_timeout_override: true
+  }
+}
+EOF
+
+GRPC_CANCELLATION_TEST_CPP=../clients/grpc_cancellation_test
+
+for ENTRY in "TestGrpcAsyncInferCancelExecutingRequest 1" \
+             "TestGrpcAsyncInferCancelQueuedRequest 2" \
+             "TestGrpcAsyncInferCancelAfterCompletionIsNoOp 0" \
+             "TestGrpcAsyncInferWithoutContextStillCompletes 0" \
+             "TestGrpcAsyncInferMultiCancelExecutingRequests 2" \
+             "TestGrpcAsyncInferMultiCancelQueuedRequest 2" \
+             "TestGrpcStreamInferCancelExecutingRequest 1" \
+             "TestGrpcStreamInferCancelQueuedRequest 1" \
+             "TestGrpcStreamCancelWithoutInfer 1" \
+             "TestGrpcStreamCancelThenRestart 1"; do
+    read -r TEST_CASE EXPECTED_CANCEL_COUNT <<< "$ENTRY"
+
+    TEST_LOG="./grpc_cancellation_test_cpp.$TEST_CASE.log"
+    SERVER_LOG="./grpc_cancellation_test_cpp.$TEST_CASE.server.log"
+
+    # AsyncInferMulti fans out N concurrent requests; bump to 3 CPU instances
+    # so each can execute in parallel. Every other test uses the default
+    # single-instance config.
+    if [ "$TEST_CASE" == "TestGrpcAsyncInferMultiCancelExecutingRequests" ]; then
+        sed -i 's|instance_group .*|instance_group [{ count: 3, kind: KIND_CPU }]|' \
+            models/custom_identity_int32/config.pbtxt
+    fi
+
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+    LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH \
+        $GRPC_CANCELLATION_TEST_CPP \
+            --gtest_filter="GrpcCancellationTest.$TEST_CASE" > $TEST_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** C++ gRPC Cancellation Tests Failed on $TEST_CASE\n***"
+        cat $TEST_LOG
+        RET=1
+    fi
+
+    cancel_count=$(grep -c "$CANCEL_LOG_LINE" $SERVER_LOG || true)
+    if [ $cancel_count -ne $EXPECTED_CANCEL_COUNT ]; then
+        echo -e "\n***\n*** Unexpected cancellation count on $TEST_CASE. Expected $EXPECTED_CANCEL_COUNT but received $cancel_count.\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    if [ "$TEST_CASE" == "TestGrpcAsyncInferMultiCancelExecutingRequests" ]; then
+        sed -i 's|instance_group .*|instance_group [{ kind: KIND_CPU }]|' \
+            models/custom_identity_int32/config.pbtxt
+    fi
+done
+
+#
 # End-to-end scheduler tests
 #
 rm -rf models && mkdir models
@@ -199,7 +277,24 @@ mkdir -p models/sequence_oldest/1 && (cd models/sequence_oldest && \
     echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
     echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
-    echo -e 'sequence_batching { oldest { max_candidate_sequences: 1 } \n max_sequence_idle_microseconds: 6000000 }' >> config.pbtxt && \
+    echo -e 'sequence_batching { oldest { max_candidate_sequences: 3 } \n max_sequence_idle_microseconds: 6000000 }' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
+mkdir -p models/no_batching/1 && (cd models/no_batching && \
+    echo 'name: "no_batching"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
+mkdir -p models/no_batching_cache/1 && (cd models/no_batching_cache && \
+    echo 'name: "no_batching_cache"' >> config.pbtxt && \
+    echo 'backend: "identity"' >> config.pbtxt && \
+    echo 'max_batch_size: 1' >> config.pbtxt && \
+    echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+    echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU }]' >> config.pbtxt && \
+    echo -e 'response_cache { enable: true }' >> config.pbtxt && \
     echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
 mkdir -p models/ensemble_model/1 && (cd models/ensemble_model && \
     echo 'name: "ensemble_model"' >> config.pbtxt && \
@@ -215,7 +310,8 @@ mkdir -p models/ensemble_model/1 && (cd models/ensemble_model && \
 TEST_LOG="scheduler_test.log"
 SERVER_LOG="./scheduler_test.server.log"
 
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2"
+# Cache required by the 'no_batching_cache' model
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2 --cache-config=local,size=1048576"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -224,7 +320,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python scheduler_test.py > $TEST_LOG 2>&1
+SERVER_LOG=$SERVER_LOG python scheduler_test.py > $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Scheduler Tests Failed\n***"
     cat $TEST_LOG
@@ -234,6 +330,86 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+#
+# TensorRT cancellation while waiting in the rate limiter
+#
+# 'resource_holder' is slow and holds the global resource both models need, so
+# the TensorRT request stays queued on the rate limiter long enough to cancel.
+#
+TRT_MODEL_SRC=$DATADIR/qa_model_repository/plan_float32_float32_float32
+
+rm -rf models && mkdir models
+cp -r $TRT_MODEL_SRC models/plan_no_batching
+rm -rf models/plan_no_batching/2 models/plan_no_batching/3
+
+set +e
+python3 - <<'PYEOF'
+from google.protobuf import text_format
+import tritonclient.grpc.model_config_pb2 as model_config_pb2
+
+path = "models/plan_no_batching/config.pbtxt"
+with open(path) as config_file:
+    config = text_format.Parse(config_file.read(), model_config_pb2.ModelConfig())
+
+config.name = "plan_no_batching"
+config.ClearField("version_policy")
+config.ClearField("instance_group")
+config.ClearField("dynamic_batching")
+config.ClearField("sequence_batching")
+config.ClearField("ensemble_scheduling")
+
+instance_group = config.instance_group.add()
+instance_group.count = 1
+instance_group.kind = model_config_pb2.ModelInstanceGroup.KIND_GPU
+resource = instance_group.rate_limiter.resources.add()
+resource.name = "SHARED"
+setattr(resource, "global", True)
+resource.count = 1
+
+with open(path, "w") as config_file:
+    config_file.write(text_format.MessageToString(config))
+PYEOF
+TRT_CONFIG_RC=$?
+set -e
+
+if [ $TRT_CONFIG_RC -ne 0 ]; then
+    echo -e "\n***\n*** Failed to prepare the TensorRT model config\n***"
+    RET=1
+else
+
+    mkdir -p models/resource_holder/1 && (cd models/resource_holder && \
+        echo 'name: "resource_holder"' >> config.pbtxt && \
+        echo 'backend: "identity"' >> config.pbtxt && \
+        echo 'max_batch_size: 1' >> config.pbtxt && \
+        echo -e 'input [{ name: "INPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+        echo -e 'output [{ name: "OUTPUT0" \n data_type: TYPE_FP32 \n dims: [ -1 ] }]' >> config.pbtxt && \
+        echo -e 'instance_group [{ count: 1 \n kind: KIND_CPU \n rate_limiter { resources [{ name: "SHARED" \n global: true \n count: 1 }] } }]' >> config.pbtxt && \
+        echo -e 'parameters [{ key: "execute_delay_ms" \n value: { string_value: "6000" } }]' >> config.pbtxt)
+
+    TEST_LOG="trt_cancellation_test.log"
+    SERVER_LOG="./trt_cancellation_test.server.log"
+
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=2 --rate-limit=execution_count"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+    SERVER_LOG=$SERVER_LOG python trt_cancellation_test.py > $TEST_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** TensorRT Cancellation Tests Failed\n***"
+        cat $TEST_LOG
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+fi
 
 #
 # Implicit state tests

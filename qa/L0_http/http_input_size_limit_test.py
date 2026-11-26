@@ -25,6 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Local test modules are imported after adjusting sys.path for ../common.
+# flake8: noqa: E402
 import sys
 
 sys.path.append("../common")
@@ -37,7 +39,7 @@ import unittest
 
 import numpy as np
 import requests
-from test_util import GIB, MIB, TestResultCollector, get_server_process_from_env
+from test_util import MIB, TestResultCollector, get_server_process_from_env
 
 # Constants for size calculations
 # Each FP32 value is 4 bytes, so we need to divide target byte sizes by 4 to get element counts
@@ -499,53 +501,51 @@ class InferSizeLimitTest(TestResultCollector):
             f"Expected shape {[1, shape_size]}, got {result['outputs'][0]['shape']}",
         )
 
-    def test_large_string_in_json(self):
-        """Test JSON request with large string input"""
-        model = "simple_identity"
-
-        # Create a string that is larger (large payload about 2GB) than the default limit of 64MB
-        # (2^31 + 64) elements * 1 bytes = 2GB + 64 bytes = 2,147,483,712 bytes
-        large_string_size = 2 * GIB + 64
-        large_string = "A" * large_string_size
-
+    def _build_payload_of_json_size(self, target_size):
+        """Build an inference request payload whose JSON serialization is exactly target_size bytes."""
         payload = {
             "inputs": [
                 {
                     "name": "INPUT0",
                     "datatype": "BYTES",
                     "shape": [1, 1],
-                    "data": [large_string],
+                    "data": [""],
                 }
             ]
         }
+        overhead = len(json.dumps(payload))
+        pad = target_size - overhead
+        self.assertGreaterEqual(pad, 0, "target_size smaller than payload overhead")
+        payload["inputs"][0]["data"] = ["A" * pad]
+        self.assertEqual(len(json.dumps(payload)), target_size)
+        return payload
 
-        headers = {"Content-Type": "application/json"}
-        response = requests.post(
-            self._get_infer_url(model), headers=headers, json=payload
-        )
+    def test_large_string_in_json(self):
+        """Verify the server's JSON size limit at the byte boundary."""
+        model = "simple_identity"
 
-        # Should fail with 400 bad request
+        payload_over = self._build_payload_of_json_size(DEFAULT_LIMIT_BYTES + 1)
+        response = requests.post(self._get_infer_url(model), json=payload_over)
         self.assertEqual(
             400,
             response.status_code,
-            "Expected error code for oversized JSON request, got: {}".format(
-                response.status_code
+            "Expected 400 for body of DEFAULT_LIMIT_BYTES + 1, got: {} ({!r})".format(
+                response.status_code, response.content[:200]
             ),
         )
-
-        # Verify error message
         error_msg = response.content.decode()
-        self.assertIn(
-            "request JSON size of ",
-            error_msg,
-        )
-        self.assertIn(
-            " bytes exceeds the maximum allowed input size of ",
-            error_msg,
-        )
-        self.assertIn(
-            "Use --http-max-input-size to increase the limit.",
-            error_msg,
+        self.assertIn("request JSON size of ", error_msg)
+        self.assertIn(" bytes exceeds the maximum allowed input size of ", error_msg)
+        self.assertIn("Use --http-max-input-size to increase the limit.", error_msg)
+
+        payload_at = self._build_payload_of_json_size(DEFAULT_LIMIT_BYTES)
+        response = requests.post(self._get_infer_url(model), json=payload_at)
+        self.assertEqual(
+            200,
+            response.status_code,
+            "Expected 200 for body of exactly DEFAULT_LIMIT_BYTES, got: {} ({!r})".format(
+                response.status_code, response.content[:200]
+            ),
         )
 
     def _create_compressed_payload(self, target_size):
@@ -789,6 +789,56 @@ class InferSizeLimitTest(TestResultCollector):
             f"Server RSS grew by {growth / MIB:.1f} MIB after "
             f"{leak_request_count} malformed compressed requests "
             f"(limit {max_rss_growth_bytes / MIB:.0f} MIB).",
+        )
+
+    def test_nested_parameters_bypass_input_size_limit(self):
+        """Regression: inputs split across the top-level object and the nested
+        'parameters' object of a /generate request must count toward a single
+        cumulative input-size total. The running total used to reset when the
+        parser recursed into 'parameters', so two inputs each under
+        --http-max-input-size could smuggle a combined payload over the limit.
+        """
+        model = "onnx_int32_int32_int32"  # two INT32 inputs: INPUT0, INPUT1
+        url = f"http://localhost:8000/v2/models/{model}/generate"
+        headers = {"Content-Type": "application/json"}
+        bytes_per_int32 = 4
+
+        # Each input is ~half the 64MB limit (+offset): individually under the
+        # cap, but the two together exceed it.
+        elements_per_input = DEFAULT_LIMIT_ELEMENTS // 2 + OFFSET_ELEMENTS
+        self.assertLess(elements_per_input * bytes_per_int32, DEFAULT_LIMIT_BYTES)
+        self.assertGreater(
+            2 * elements_per_input * bytes_per_int32, DEFAULT_LIMIT_BYTES
+        )
+        big = [1] * elements_per_input
+
+        # INPUT0 at the top level, INPUT1 inside the nested 'parameters' object.
+        bypass_payload = {"INPUT0": big, "parameters": {"INPUT1": big}}
+        response = requests.post(url, headers=headers, json=bypass_payload)
+
+        self.assertEqual(
+            400,
+            response.status_code,
+            "Inputs split across top-level and nested 'parameters' bypassed the "
+            "cumulative size limit (got {}): {!r}".format(
+                response.status_code, response.content[:200]
+            ),
+        )
+        error_msg = response.content.decode()
+        self.assertIn(" bytes exceeds the maximum allowed input size of ", error_msg)
+        self.assertIn("Use --http-max-input-size to increase the limit.", error_msg)
+
+        # Control: the same split shape with small inputs must be accepted, so
+        # the fix does not over-block legitimate nested parameters. A plain 200
+        # (not just the absence of the size error) proves the request succeeds.
+        small = [1] * 16
+        ok_payload = {"INPUT0": small, "parameters": {"INPUT1": small}}
+        response = requests.post(url, headers=headers, json=ok_payload)
+        self.assertEqual(
+            200,
+            response.status_code,
+            "A small nested-parameters request should be accepted "
+            "(got {}): {!r}".format(response.status_code, response.content[:200]),
         )
 
 

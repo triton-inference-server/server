@@ -33,7 +33,7 @@ import sys
 FLAGS = None
 
 
-#### helper functions
+# helper functions
 def log(msg, force=False):
     if force or not FLAGS.quiet:
         try:
@@ -98,12 +98,13 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
     # Copy over files
     df += """
 WORKDIR /opt/tritonserver
-COPY --chown=1000:1000 --from=full /opt/tritonserver/LICENSE .
-COPY --chown=1000:1000 --from=full /opt/tritonserver/TRITON_VERSION .
-COPY --chown=1000:1000 --from=full /opt/tritonserver/NVIDIA_Deep_Learning_Container_License.pdf .
-COPY --chown=1000:1000 --from=full /opt/tritonserver/bin bin/
-COPY --chown=1000:1000 --from=full /opt/tritonserver/lib lib/
-COPY --chown=1000:1000 --from=full /opt/tritonserver/include include/
+COPY --from=full /opt/tritonserver/LICENSE .
+COPY --from=full /opt/tritonserver/THIRD-PARTY-NOTICES.txt .
+COPY --from=full /opt/tritonserver/TRITON_VERSION .
+COPY --from=full /opt/tritonserver/NVIDIA_Deep_Learning_Container_License.pdf .
+COPY --from=full /opt/tritonserver/bin bin/
+COPY --from=full /opt/tritonserver/lib lib/
+COPY --from=full /opt/tritonserver/include include/
 """
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -112,15 +113,10 @@ COPY --chown=1000:1000 --from=full /opt/tritonserver/include include/
 def add_requested_backends(ddir, dockerfile_name, backends):
     df = "# Copying over backends \n"
     for backend in backends:
-        df += """COPY --chown=1000:1000 --from=full /opt/tritonserver/backends/{} /opt/tritonserver/backends/{}
+        df += """COPY --from=full /opt/tritonserver/backends/{} /opt/tritonserver/backends/{}
 """.format(
             backend, backend
         )
-    if len(backends) > 0:
-        df += """
-# Top-level /opt/tritonserver/backends not copied so need to explicitly set permissions here
-RUN chown triton-server:triton-server /opt/tritonserver/backends
-"""
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
 
@@ -128,15 +124,10 @@ RUN chown triton-server:triton-server /opt/tritonserver/backends
 def add_requested_repoagents(ddir, dockerfile_name, repoagents):
     df = "#  Copying over repoagents \n"
     for ra in repoagents:
-        df += """COPY --chown=1000:1000 --from=full /opt/tritonserver/repoagents/{} /opt/tritonserver/repoagents/{}
+        df += """COPY --from=full /opt/tritonserver/repoagents/{} /opt/tritonserver/repoagents/{}
 """.format(
             ra, ra
         )
-    if len(repoagents) > 0:
-        df += """
-# Top-level /opt/tritonserver/repoagents not copied so need to explicitly set permissions here
-RUN chown triton-server:triton-server /opt/tritonserver/repoagents
-"""
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
 
@@ -144,15 +135,10 @@ RUN chown triton-server:triton-server /opt/tritonserver/repoagents
 def add_requested_caches(ddir, dockerfile_name, caches):
     df = "#  Copying over caches \n"
     for cache in caches:
-        df += """COPY --chown=1000:1000 --from=full /opt/tritonserver/caches/{} /opt/tritonserver/caches/{}
+        df += """COPY --from=full /opt/tritonserver/caches/{} /opt/tritonserver/caches/{}
 """.format(
             cache, cache
         )
-    if len(caches) > 0:
-        df += """
-# Top-level /opt/tritonserver/caches not copied so need to explicitly set permissions here
-RUN chown triton-server:triton-server /opt/tritonserver/caches
-"""
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
 
@@ -163,7 +149,7 @@ def end_dockerfile(ddir, dockerfile_name, argmap):
     if argmap["SAGEMAKER_ENDPOINT"]:
         df += """
 LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
-COPY --chown=1000:1000 --from=full /usr/bin/serve /usr/bin/.
+COPY --from=full /usr/bin/serve /usr/bin/.
 """
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
@@ -270,12 +256,12 @@ def create_argmap(images, skip_pull):
     vars = p_path.stdout
     log_verbose("inspect args: {}".format(vars))
 
-    e0 = re.search("TRITON_SERVER_GPU_ENABLED=([\S]{1,}) ", vars)
+    e0 = re.search("TRITON_SERVER_GPU_ENABLED=([\\S]{1,}) ", vars)
     e1 = re.search("CUDA_VERSION", vars)
     gpu_enabled = False
-    if e0 != None:
+    if e0 is not None:
         gpu_enabled = e0.group(1) == "1"
-    elif e1 != None:
+    elif e1 is not None:
         gpu_enabled = True
     fail_if(
         gpu_enabled != enable_gpu,
@@ -283,22 +269,22 @@ def create_argmap(images, skip_pull):
         "'TRITON_SERVER_GPU_ENABLED' as {} and you are composing container"
         "with 'TRITON_SERVER_GPU_ENABLED' as {}".format(gpu_enabled, enable_gpu),
     )
-    e = re.search("TRITON_SERVER_VERSION=([\S]{6,}) ", vars)
+    e = re.search("TRITON_SERVER_VERSION=([\\S]{6,}) ", vars)
     version = "" if e is None else e.group(1)
     fail_if(
         len(version) == 0,
         "docker inspect to find triton server version failed, {}".format(p_path.stderr),
     )
-    e = re.search("NVIDIA_TRITON_SERVER_VERSION=([\S]{5,}) ", vars)
+    e = re.search("NVIDIA_TRITON_SERVER_VERSION=([\\S]{5,}) ", vars)
     container_version = "" if e is None else e.group(1)
     fail_if(
         len(container_version) == 0,
         "docker inspect to find triton container version failed, {}".format(vars),
     )
-    dcgm_ver = re.search("DCGM_VERSION=([\S]{4,}) ", vars)
+    dcgm_ver = re.search("DCGM_VERSION=([\\S]{4,}) ", vars)
     dcgm_version = ""
     if dcgm_ver is None:
-        dcgm_version = "4.5.3-1"
+        dcgm_version = "4.7.1-2"
         log(
             "WARNING: DCGM version not found from image, installing the earlierst version {}".format(
                 dcgm_version
@@ -395,6 +381,16 @@ if __name__ == "__main__":
         "repository branch.",
     )
     parser.add_argument(
+        "--cuda-dl-base-version",
+        type=str,
+        required=False,
+        help="The cuda-dl-base container train and its CUDA version, as a matched "
+        "pair (e.g. 26.09-cuda13.4), used for the 'min' container. If not "
+        "specified the value from build.py's version map is used, which "
+        "corresponds to the branch compose.py is on rather than to "
+        "--container-version.",
+    )
+    parser.add_argument(
         "--image",
         action="append",
         required=False,
@@ -480,14 +476,32 @@ if __name__ == "__main__":
             log('image "{}": "{}"'.format(parts[0], parts[1]))
             images[parts[0]] = parts[1]
     else:
+        container_version_specified = FLAGS.container_version is not None
         get_container_version_if_not_specified()
         if FLAGS.enable_gpu:
+            import build
+
+            # cuda-dl-base couples its train to a CUDA version, so it cannot be
+            # derived from --container-version. Warn rather than silently pairing
+            # a requested `full` with a `min` from a different release.
+            if FLAGS.cuda_dl_base_version is None:
+                FLAGS.cuda_dl_base_version = build.DEFAULT_TRITON_VERSION_MAP[
+                    "cuda_dl_base_version"
+                ]
+                if container_version_specified:
+                    log(
+                        "warning: --container-version was specified but "
+                        "--cuda-dl-base-version was not, so the 'min' container "
+                        "will use {} and may not match the 'full' container".format(
+                            FLAGS.cuda_dl_base_version
+                        )
+                    )
             images = {
                 "full": "nvcr.io/nvidia/tritonserver:{}-py3".format(
                     FLAGS.container_version
                 ),
-                "min": "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
-                    FLAGS.container_version
+                "min": "nvcr.io/nvidia/cuda-dl-base:{}-inference-runtime-ubuntu24.04".format(
+                    FLAGS.cuda_dl_base_version
                 ),
             }
         else:

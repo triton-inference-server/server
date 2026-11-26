@@ -30,21 +30,25 @@ import argparse
 import os
 import sys
 from builtins import range
+from typing import List, Tuple
 
 import gen_ensemble_model_utils as emu
+import gen_manifest
 import numpy as np
 from gen_common import (
+    create_general_modelconfig,
     np_dtype_bfloat16,
     np_to_model_dtype,
     np_to_onnx_dtype,
     np_to_torch_dtype,
     np_to_trt_dtype,
     openvino_save_model,
+    trt_cast_tensor,
+    trt_set_dynamic_range,
 )
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
-from typing import List, Tuple
 
 _color_blue = "\033[94m"
 _color_cyan = "\033[36m"
@@ -95,11 +99,11 @@ def create_plan_dynamic_rf_modelfile(
     # FIXME: Remove support check when jetson supports TRT 8.5 (DLIS-4256)
     if tu.support_trt_uint8():
         if trt_input_dtype == trt.uint8:
-            in0_cast = network.add_identity(in0)
-            in0_cast.set_output_type(0, trt.float32)
+            # TensorRT 11 removed set_output_type on identity layers; the
+            # equivalent on TRT 8.5+ is add_cast.
+            in0_cast = trt_cast_tensor(network, in0, trt.float32)
             in0 = in0_cast.get_output(0)
-            in1_cast = network.add_identity(in1)
-            in1_cast.set_output_type(0, trt.float32)
+            in1_cast = trt_cast_tensor(network, in1, trt.float32)
             in1 = in1_cast.get_output(0)
 
     add = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUM)
@@ -107,23 +111,19 @@ def create_plan_dynamic_rf_modelfile(
     out0 = add if not swap else sub
     out1 = sub if not swap else add
 
-    # uint8 conversion after operations
-    # FIXME: Remove support check when jetson supports TRT 8.5 (DLIS-4256)
-    if tu.support_trt_uint8():
-        if trt_output0_dtype == trt.uint8:
-            out0 = network.add_identity(out0.get_output(0))
-            out0.set_output_type(0, trt.uint8)
-        if trt_output1_dtype == trt.uint8:
-            out1 = network.add_identity(out1.get_output(0))
-            out1.set_output_type(0, trt.uint8)
+    # TRT 11 strongly-typed networks: ITensor.dtype setter no longer coerces
+    # output dtype, so insert an explicit cast whenever the elementwise op's
+    # natural output dtype differs from the declared output dtype. Covers
+    # both float<->float and uint8 cases.
+    if out0.get_output(0).dtype != trt_output0_dtype:
+        out0 = trt_cast_tensor(network, out0.get_output(0), trt_output0_dtype)
+    if out1.get_output(0).dtype != trt_output1_dtype:
+        out1 = trt_cast_tensor(network, out1.get_output(0), trt_output1_dtype)
 
     out0.get_output(0).name = "OUTPUT0"
     out1.get_output(0).name = "OUTPUT1"
     network.mark_output(out0.get_output(0))
     network.mark_output(out1.get_output(0))
-
-    out0.get_output(0).dtype = trt_output0_dtype
-    out1.get_output(0).dtype = trt_output1_dtype
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     in1.allowed_formats = 1 << int(trt_memory_format)
@@ -131,13 +131,12 @@ def create_plan_dynamic_rf_modelfile(
     out1.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
     if trt_input_dtype == trt.int8:
-        in0.dynamic_range = (-128.0, 127.0)
-        in1.dynamic_range = (-128.0, 127.0)
+        trt_set_dynamic_range(in0, -128.0, 127.0)
+        trt_set_dynamic_range(in1, -128.0, 127.0)
     if trt_output0_dtype == trt.int8:
-        out0.get_output(0).dynamic_range = (-128.0, 127.0)
+        trt_set_dynamic_range(out0.get_output(0), -128.0, 127.0)
     if trt_output1_dtype == trt.int8:
-        out1.get_output(0).dynamic_range = (-128.0, 127.0)
-
+        trt_set_dynamic_range(out1.get_output(0), -128.0, 127.0)
     min_shape = []
     opt_shape = []
     max_shape = []
@@ -159,15 +158,19 @@ def create_plan_dynamic_rf_modelfile(
     profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
     profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
 
-    flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    # TensorRT 11 removed PREFER_PRECISION_CONSTRAINTS / INT8 / FP16
+    # BuilderFlags (strongly-typed networks). Older TRT still has them.
+    flags = 0
+    if hasattr(trt.BuilderFlag, "PREFER_PRECISION_CONSTRAINTS"):
+        flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
     if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
         flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
     datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
     for dt in datatype_set:
-        if dt == trt.int8:
+        if dt == trt.int8 and hasattr(trt.BuilderFlag, "INT8"):
             flags |= 1 << int(trt.BuilderFlag.INT8)
-        elif dt == trt.float16:
+        elif dt == trt.float16 and hasattr(trt.BuilderFlag, "FP16"):
             flags |= 1 << int(trt.BuilderFlag.FP16)
     config = builder.create_builder_config()
     config.flags = flags
@@ -216,8 +219,6 @@ def create_plan_dynamic_modelfile(
     max_dim,
 ):
     trt_input_dtype = np_to_trt_dtype(input_dtype)
-    trt_output0_dtype = np_to_trt_dtype(output0_dtype)
-    trt_output1_dtype = np_to_trt_dtype(output1_dtype)
 
     # Create the model
     TRT_LOGGER = (
@@ -411,13 +412,18 @@ def create_plan_fixed_rf_modelfile(
     out0 = add if not swap else sub
     out1 = sub if not swap else add
 
+    # TRT 11 strongly-typed networks: ITensor.dtype setter no longer coerces
+    # output dtype, so insert an explicit cast whenever the elementwise op's
+    # natural output dtype differs from the declared output dtype.
+    if out0.get_output(0).dtype != trt_output0_dtype:
+        out0 = trt_cast_tensor(network, out0.get_output(0), trt_output0_dtype)
+    if out1.get_output(0).dtype != trt_output1_dtype:
+        out1 = trt_cast_tensor(network, out1.get_output(0), trt_output1_dtype)
+
     out0.get_output(0).name = "OUTPUT0"
     out1.get_output(0).name = "OUTPUT1"
     network.mark_output(out0.get_output(0))
     network.mark_output(out1.get_output(0))
-
-    out0.get_output(0).dtype = trt_output0_dtype
-    out1.get_output(0).dtype = trt_output1_dtype
 
     in0.allowed_formats = 1 << int(trt_memory_format)
     in1.allowed_formats = 1 << int(trt_memory_format)
@@ -425,13 +431,12 @@ def create_plan_fixed_rf_modelfile(
     out1.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
     if trt_input_dtype == trt.int8:
-        in0.dynamic_range = (-128.0, 127.0)
-        in1.dynamic_range = (-128.0, 127.0)
+        trt_set_dynamic_range(in0, -128.0, 127.0)
+        trt_set_dynamic_range(in1, -128.0, 127.0)
     if trt_output0_dtype == trt.int8:
-        out0.get_output(0).dynamic_range = (-128.0, 127.0)
+        trt_set_dynamic_range(out0.get_output(0), -128.0, 127.0)
     if trt_output1_dtype == trt.int8:
-        out1.get_output(0).dynamic_range = (-128.0, 127.0)
-
+        trt_set_dynamic_range(out1.get_output(0), -128.0, 127.0)
     config = builder.create_builder_config()
 
     min_shape = []
@@ -450,15 +455,19 @@ def create_plan_fixed_rf_modelfile(
     profile.set_shape("INPUT0", min_shape, opt_shape, max_shape)
     profile.set_shape("INPUT1", min_shape, opt_shape, max_shape)
 
-    flags = 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    # TensorRT 11 removed PREFER_PRECISION_CONSTRAINTS / INT8 / FP16
+    # BuilderFlags (strongly-typed networks). Older TRT still has them.
+    flags = 0
+    if hasattr(trt.BuilderFlag, "PREFER_PRECISION_CONSTRAINTS"):
+        flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
     if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
         flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
 
     datatype_set = set([trt_input_dtype, trt_output0_dtype, trt_output1_dtype])
     for dt in datatype_set:
-        if dt == trt.int8:
+        if dt == trt.int8 and hasattr(trt.BuilderFlag, "INT8"):
             flags |= 1 << int(trt.BuilderFlag.INT8)
-        elif dt == trt.float16:
+        elif dt == trt.float16 and hasattr(trt.BuilderFlag, "FP16"):
             flags |= 1 << int(trt.BuilderFlag.FP16)
 
     config = builder.create_builder_config()
@@ -504,8 +513,6 @@ def create_plan_fixed_modelfile(
     swap,
 ):
     trt_input_dtype = np_to_trt_dtype(input_dtype)
-    trt_output0_dtype = np_to_trt_dtype(output0_dtype)
-    trt_output1_dtype = np_to_trt_dtype(output1_dtype)
 
     # Create the model
     TRT_LOGGER = (
@@ -847,8 +854,8 @@ output [
         cfile.write(config)
 
     with open(config_dir + "/output0_labels.txt", "w") as lfile:
-        for l in range(output0_label_cnt):
-            lfile.write("label" + str(l) + "\n")
+        for label_idx in range(output0_label_cnt):
+            lfile.write("label" + str(label_idx) + "\n")
 
 
 def create_onnx_modelfile(
@@ -992,9 +999,8 @@ def create_onnx_modelconfig(
 
     config_dir = models_dir + "/" + model_name
 
-    # [TODO] move create_general_modelconfig() out of emu as it is general
     # enough for all backends to use
-    config = emu.create_general_modelconfig(
+    config = create_general_modelconfig(
         model_name,
         "onnxruntime_onnx",
         max_batch,
@@ -1018,8 +1024,8 @@ def create_onnx_modelconfig(
         file.write(config)
 
     with open(config_dir + "/output0_labels.txt", "w") as file:
-        for l in range(output0_label_cnt):
-            file.write("label" + str(l) + "\n")
+        for label_idx in range(output0_label_cnt):
+            file.write("label" + str(label_idx) + "\n")
 
 
 def create_libtorch_modelfile(
@@ -1306,6 +1312,7 @@ def generate_torch_aoti_sample_inputs(
         np.int32: torch.int32,
         np.int64: torch.int64,
         np.float16: torch.float16,
+        np_dtype_bfloat16: torch.bfloat16,
         np.float32: torch.float32,
         np.float64: torch.float64,
         np.uint8: torch.uint8,
@@ -1341,6 +1348,8 @@ def np_to_dtype(np_dtype):
         return torch.int64
     elif np_dtype == np.float16:
         return torch.float16
+    elif np_dtype == np_dtype_bfloat16:
+        return torch.bfloat16
     elif np_dtype == np.float32:
         return torch.float32
     elif np_dtype == np.float64:
@@ -1362,6 +1371,7 @@ def np_to_dtype(np_dtype):
 
 def create_torch_aoti_model_file(
     models_dir,
+    max_batch,
     model_version,
     input_shape,
     input_dtype,
@@ -1430,15 +1440,39 @@ def create_torch_aoti_model_file(
     model.to(device)
     model = model.eval()
 
-    sample_inputs = generate_torch_aoti_sample_inputs(input_shape, input_dtype, device)
+    # When batching is enabled, the AOTI artifact must be compiled with a
+    # dynamic first (batch) dimension. Otherwise the compiled model specializes
+    # to a static shape and rejects any batch size other than the one used at
+    # export time. We export with a representative batch > 1 and declare dim 0
+    # of each input as dynamic over [1, max_batch].
+    if max_batch > 0:
+        export_input_shape = [2] + list(input_shape)
+    else:
+        export_input_shape = list(input_shape)
+
+    sample_inputs = generate_torch_aoti_sample_inputs(
+        export_input_shape, input_dtype, device
+    )
+
+    dynamic_shapes = None
+    if max_batch > 0:
+        batch_dim = torch.export.Dim("batch", min=1, max=max_batch)
+        # One spec per positional argument of AddSubNet.forward(INPUT0, INPUT1).
+        dynamic_shapes = ({0: batch_dim}, {0: batch_dim})
+
     package_path = os.path.join(model_version_dir, "model.pt2")
 
     try:
-        exported_model = torch.export.export(model, sample_inputs)
+        exported_model = torch.export.export(
+            model, sample_inputs, dynamic_shapes=dynamic_shapes
+        )
         torch._inductor.aoti_compile_and_package(
             exported_model,
             package_path=package_path,
         )
+        # Load the package back to verify it was generated correctly and
+        # targets a valid device.
+        torch._inductor.aoti_load_package(package_path)
     except Exception as e:
         print(
             f"{_color_red}error: Failed to create model {model_name}{_color_reset}",
@@ -1619,15 +1653,22 @@ def create_torchvision_aoti_model_file(
     model = model.to(device)
     model = model.eval()
 
-    SHAPE = (max_batch, 3, 224, 224)
+    # When batching is enabled, export with a dynamic first (batch) dimension so
+    # the AOTI artifact accepts any batch size in [1, max_batch]. A batch>=2
+    # sample is used to avoid 0/1 specialization.
+    if max_batch > 0:
+        SHAPE = (2, 3, 224, 224)
+        dynamic_shapes = ({0: torch.export.Dim("batch", min=1, max=max_batch)},)
+    else:
+        SHAPE = (1, 3, 224, 224)
+        dynamic_shapes = None
 
-    # Example input tensor with batch size 1 and 3 color channels (RGB), height and width of 224
     sample_inputs = (torch.zeros(SHAPE, dtype=torch.float32, device=device),)
 
     package_path = os.path.join(model_version_dir, "model.pt2")
 
     try:
-        ep = torch.export.export(model, sample_inputs)
+        ep = torch.export.export(model, sample_inputs, dynamic_shapes=dynamic_shapes)
         torch._inductor.aoti_compile_and_package(ep, package_path=package_path)
     except Exception as e:
         print(
@@ -1731,13 +1772,14 @@ output [
         print(f"Created {config_path}")
 
     with open(f"{config_dir}/{label_filename}", "w") as file:
-        for l in range(output0_label_cnt):
-            file.write("label" + str(l) + "\n")
+        for label_idx in range(output0_label_cnt):
+            file.write("label" + str(label_idx) + "\n")
         print(f"Created {config_dir}/{label_filename}")
 
 
 def create_torch_aoti_model_config(
     models_dir,
+    max_batch,
     input_shape,
     output_shape,
     input_dtype,
@@ -1756,7 +1798,6 @@ def create_torch_aoti_model_config(
         else:
             version_policy_str = "{ all { }}"
 
-    # Use a different model name for the non-batching variant
     model_name = tu.get_model_name(
         "torch_aoti",
         input_dtype,
@@ -1772,7 +1813,12 @@ def create_torch_aoti_model_config(
 backend: "pytorch"
 name: "{model_name}"
 platform: "torch_aoti"
+max_batch_size: {max_batch}
 version_policy: {version_policy_str}
+dynamic_batching {{
+  preferred_batch_size: [ 4, 8 ]
+  max_queue_delay_microseconds: 1000
+}}
 input [
   {{
     name: "ARGS[0]"
@@ -1810,9 +1856,115 @@ instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU
     label_path = os.path.join(config_dir, label_filename)
 
     with open(label_path, "w") as file:
-        for l in range(output_label_cnt):
-            file.write(f"label{l}\n")
+        for label_idx in range(output_label_cnt):
+            file.write(f"label{label_idx}\n")
         print(f"Created {label_path}")
+
+
+def create_torch_aoti_variable_model(models_dir, max_batch=8):
+    # AOTI add model exported with two dynamic dimensions (batch + feature) so
+    # batching can be exercised on a model whose non-batch shape is variable
+    # (dims: [-1]). Float32 only.
+    model_name = "torch_aoti_variable_float32"
+    model_version_dir = os.path.join(models_dir, model_name, "1")
+    try:
+        os.makedirs(model_version_dir)
+    except OSError:
+        pass  # ignore existing dir
+
+    print(f"{_color_green}Creating model {model_name}{_color_reset}")
+
+    class AddNet(nn.Module):
+        def forward(self, INPUT0, INPUT1):
+            return INPUT0 + INPUT1
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = AddNet().to(device).eval()
+
+    # Sample uses batch>=2 and feature>=2 to avoid 0/1 specialization.
+    sample = (
+        torch.zeros(2, 4, dtype=torch.float32, device=device),
+        torch.zeros(2, 4, dtype=torch.float32, device=device),
+    )
+    batch = torch.export.Dim("batch", min=1, max=max_batch)
+    feature = torch.export.Dim("feature", min=1, max=512)
+    dynamic_shapes = (
+        {0: batch, 1: feature},
+        {0: batch, 1: feature},
+    )
+    try:
+        ep = torch.export.export(model, sample, dynamic_shapes=dynamic_shapes)
+        torch._inductor.aoti_compile_and_package(
+            ep, package_path=os.path.join(model_version_dir, "model.pt2")
+        )
+    except Exception as e:
+        print(
+            f"{_color_red}error: Failed to create model {model_name}: {e}{_color_reset}",
+            file=sys.stderr,
+        )
+        return
+
+    config = f"""
+backend: "pytorch"
+name: "{model_name}"
+platform: "torch_aoti"
+max_batch_size: {max_batch}
+dynamic_batching {{ max_queue_delay_microseconds: 1000 }}
+input [
+  {{ name: "ARGS[0]" data_type: TYPE_FP32 dims: [ -1 ] }},
+  {{ name: "ARGS[1]" data_type: TYPE_FP32 dims: [ -1 ] }}
+]
+output [
+  {{ name: "RESULT" data_type: TYPE_FP32 dims: [ -1 ] }}
+]
+instance_group [{{ kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"} }}]
+"""
+    with open(os.path.join(models_dir, model_name, "config.pbtxt"), "w") as f:
+        f.write(config)
+    print(f"Created config for {model_name}")
+
+
+def create_torch_aoti_multi_instance_model(models_dir, max_batch=8):
+    # Config-only variant that reuses the float32 add model artifact but runs
+    # with two instances, to exercise batching across multiple model instances.
+    import shutil
+
+    src_name = tu.get_model_name("torch_aoti", np.float32, np.float32, None)
+    src_pt2 = os.path.join(models_dir, src_name, "1", "model.pt2")
+    if not os.path.exists(src_pt2):
+        print(
+            f"{_color_yellow}warning: {src_pt2} not found; skipping multi-instance "
+            f"model{_color_reset}"
+        )
+        return
+
+    model_name = "torch_aoti_multi_instance_float32"
+    model_version_dir = os.path.join(models_dir, model_name, "1")
+    try:
+        os.makedirs(model_version_dir)
+    except OSError:
+        pass  # ignore existing dir
+    shutil.copy(src_pt2, os.path.join(model_version_dir, "model.pt2"))
+
+    print(f"{_color_green}Creating model {model_name}{_color_reset}")
+    config = f"""
+backend: "pytorch"
+name: "{model_name}"
+platform: "torch_aoti"
+max_batch_size: {max_batch}
+dynamic_batching {{ max_queue_delay_microseconds: 1000 }}
+input [
+  {{ name: "ARGS[0]" data_type: TYPE_FP32 dims: [ 16 ] }},
+  {{ name: "ARGS[1]" data_type: TYPE_FP32 dims: [ 16 ] }}
+]
+output [
+  {{ name: "RESULT" data_type: TYPE_FP32 dims: [ 16 ] }}
+]
+instance_group [{{ count: 2 kind: {"KIND_GPU" if torch.cuda.is_available() else "KIND_CPU"} }}]
+"""
+    with open(os.path.join(models_dir, model_name, "config.pbtxt"), "w") as f:
+        f.write(config)
+    print(f"Created config for {model_name}")
 
 
 def create_torch_aoti_complex_model_config(
@@ -2166,8 +2318,8 @@ output [
         cfile.write(config)
 
     with open(config_dir + "/output0_labels.txt", "w") as lfile:
-        for l in range(output0_label_cnt):
-            lfile.write("label" + str(l) + "\n")
+        for label_idx in range(output0_label_cnt):
+            lfile.write("label" + str(label_idx) + "\n")
 
 
 def create_models(
@@ -2384,6 +2536,7 @@ def create_models(
             # max-batch 8
             if create_torch_aoti_model_file(
                 models_dir,
+                8,
                 model_version,
                 input_shape,
                 input_dtype,
@@ -2391,6 +2544,7 @@ def create_models(
             ):
                 create_torch_aoti_model_config(
                     models_dir,
+                    8,
                     input_shape,
                     output0_shape,
                     input_dtype,
@@ -2623,6 +2777,10 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     if FLAGS.tensorrt:
         import tensorrt as trt
     if FLAGS.onnx:
@@ -2633,9 +2791,9 @@ if __name__ == "__main__":
         import torch
         from torch import nn
     if FLAGS.torchvision_aoti:
-        import shutil
+        import shutil  # noqa: F811  (this branch is reachable on its own)
 
-        import torch
+        import torch  # noqa: F811  (this branch is reachable on its own)
         import torchvision.models as models
 
         RESNET50_LABEL_FILE = "resnet50_labels.txt"
@@ -2701,19 +2859,25 @@ if __name__ == "__main__":
 
         # Make multiple versions of some models for version testing
         # (they use different version policies when created above)
-        if FLAGS.tensorrt:
-            if tu.check_gpus_compute_capability(min_capability=8.0):
-                create_fixed_models(
-                    FLAGS.models_dir,
-                    np_dtype_bfloat16,
-                    np_dtype_bfloat16,
-                    np_dtype_bfloat16,
-                )
-            else:
-                print(
-                    "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
-                )
+        # BF16 generation: TensorRT requires SM>=8.0; ONNX and torch_aoti have
+        # no such requirement (model generation runs on CPU; the backend decides
+        # at runtime).
+        bf16_for_trt = FLAGS.tensorrt and tu.check_gpus_compute_capability(
+            min_capability=8.0
+        )
+        if FLAGS.tensorrt and not bf16_for_trt:
+            print(
+                "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
+            )
+        if bf16_for_trt or FLAGS.onnx or FLAGS.torch_aoti:
+            create_fixed_models(
+                FLAGS.models_dir,
+                np_dtype_bfloat16,
+                np_dtype_bfloat16,
+                np_dtype_bfloat16,
+            )
 
+        if FLAGS.tensorrt:
             for vt in [np.float32, np.float16, np.int32, np.uint8]:
                 create_plan_modelfile(
                     FLAGS.models_dir, 8, 2, (16,), (16,), (16,), vt, vt, vt, swap=True
@@ -2992,22 +3156,27 @@ if __name__ == "__main__":
             32,
         )
 
-        if FLAGS.tensorrt:
-            if tu.check_gpus_compute_capability(min_capability=8.0):
-                create_models(
-                    FLAGS.models_dir,
-                    np_dtype_bfloat16,
-                    np_dtype_bfloat16,
-                    np_dtype_bfloat16,
-                    (-1, -1),
-                    (-1, -1),
-                    (-1, -1),
-                    0,
-                )
-            else:
-                print(
-                    "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
-                )
+        # BF16 generation: TensorRT requires SM>=8.0; ONNX and torch_aoti have
+        # no such requirement (model generation runs on CPU; the backend decides
+        # at runtime).
+        bf16_for_trt = FLAGS.tensorrt and tu.check_gpus_compute_capability(
+            min_capability=8.0
+        )
+        if FLAGS.tensorrt and not bf16_for_trt:
+            print(
+                "Skipping the generation of TensorRT PLAN models for the BF16 datatype!"
+            )
+        if bf16_for_trt or FLAGS.onnx or FLAGS.torch_aoti:
+            create_models(
+                FLAGS.models_dir,
+                np_dtype_bfloat16,
+                np_dtype_bfloat16,
+                np_dtype_bfloat16,
+                (-1, -1),
+                (-1, -1),
+                (-1, -1),
+                0,
+            )
 
     if FLAGS.ensemble:
         # Create utility models used in ensemble
@@ -3031,9 +3200,17 @@ if __name__ == "__main__":
         )
         if create_torch_aoti_complex_model_file(FLAGS.models_dir):
             create_torch_aoti_complex_model_config(FLAGS.models_dir)
+        # Batching coverage models: variable non-batch dim, and a multi-instance
+        # variant that reuses the float32 add model artifact.
+        create_torch_aoti_variable_model(FLAGS.models_dir)
+        create_torch_aoti_multi_instance_model(FLAGS.models_dir)
 
     if FLAGS.torchvision_aoti:
-        # TODO: Add support for variable batch size and version policy for torchvision AOTI models.
         print(f"{_color_blue}TorchVision AOTI model generation requested{_color_reset}")
-        if create_torchvision_aoti_model_file(FLAGS.models_dir, 1):
-            create_torchvision_aoti_model_config(FLAGS.models_dir, 1)
+        # Export with a dynamic batch dimension (max_batch_size 8) to exercise
+        # batching of a real, higher-rank ([N,3,224,224]) model.
+        if create_torchvision_aoti_model_file(FLAGS.models_dir, 8):
+            create_torchvision_aoti_model_config(FLAGS.models_dir, 8)
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

@@ -32,36 +32,72 @@
 
 [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM)
 (TRT-LLM) is an open-source library designed to accelerate and optimize the
-inference performance of large language models (LLMs) on NVIDIA GPUs. TRT-LLM
-offers users an easy-to-use Python API to build TensorRT engines for LLMs,
-incorporating state-of-the-art optimizations to ensure efficient inference on
-NVIDIA GPUs.
+inference performance of large language models (LLMs) on NVIDIA GPUs. Built on
+PyTorch, TRT-LLM offers an easy-to-use Python
+[LLM API](https://nvidia.github.io/TensorRT-LLM/llm-api/) that lets you serve
+any HuggingFace model directly, incorporating state-of-the-art optimizations to
+ensure efficient inference on NVIDIA GPUs.
 
-## How to run TRT-LLM models with Triton Server via TensorRT-LLM backend
+## How to run TRT-LLM models with Triton Server via the TensorRT-LLM backend
 
 The
 [TensorRT-LLM Backend](https://github.com/triton-inference-server/tensorrtllm_backend)
-lets you serve TensorRT-LLM models with Triton Inference Server. Check out the
-[Getting Started](https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#getting-started)
-section in the TensorRT-LLM Backend repo to learn how to utlize the
-[NGC Triton TRT-LLM container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
-to prepare engines for your LLM models and serve them with Triton.
+lets you serve TensorRT-LLM models with Triton Inference Server. With the
+PyTorch backend (LLM API) you can serve any HuggingFace model directly — no
+engine compilation required. The steps below get you from an empty container to
+a running server in a few minutes.
 
-## How to use your custom TRT-LLM model
+### Launch the container
 
-All the supported models can be found in the
-[examples](https://github.com/NVIDIA/TensorRT-LLM/tree/main/examples/models/core) folder in
-the TRT-LLM repo. Follow the examples to convert your models to TensorRT
-engines.
+```bash
+docker run --rm -it --net host --shm-size=2g --ulimit memlock=-1 --gpus all \
+    -v ~/.cache/huggingface:/root/.cache/huggingface \
+    nvcr.io/nvidia/tritonserver:25.12-trtllm-python-py3 bash
+```
 
-After the engine is built, [prepare the model repository](https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#prepare-the-model-repository)
-for Triton, and
-[modify the model configuration](https://github.com/triton-inference-server/tensorrtllm_backend?tab=readme-ov-file#modify-the-model-configuration).
+Replace `25.12` with the latest tag from
+[NGC](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver/tags).
 
-Only the *mandatory parameters* need to be set in the model config file. Feel free
-to modify the optional parameters as needed. To learn more about the
-parameters, model inputs, and outputs, see the
-[model config documentation](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/model_config.md) for more details.
+### Clone TRT-LLM and set your model
+
+```bash
+git clone https://github.com/NVIDIA/TensorRT-LLM.git
+```
+
+Edit `TensorRT-LLM/triton_backend/all_models/llmapi/tensorrt_llm/1/model.yaml`
+and set `model:` to any HuggingFace model ID or local path, for example:
+
+```yaml
+model: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+```
+
+All keys in `model.yaml` map directly to
+[`LLM()` constructor arguments](https://nvidia.github.io/TensorRT-LLM/llm-api/).
+This is where you configure KV cache, quantization, parallelism, and more. For
+gated models (e.g. Llama), set your token first: `export HF_TOKEN=hf_...`
+
+### Launch and test
+
+Run the launch script from the parent of `TensorRT-LLM/` (running it from inside
+the cloned folder causes `ModuleNotFoundError: No module named
+'tensorrt_llm.bindings'`):
+
+```bash
+python3 TensorRT-LLM/triton_backend/scripts/launch_triton_server.py \
+    --model_repo=TensorRT-LLM/triton_backend/all_models/llmapi/
+```
+
+Once the server is up, send a request:
+
+```bash
+curl -X POST localhost:8000/v2/models/tensorrt_llm/generate \
+    -d '{"text_input": "The future of AI is", "sampling_param_max_tokens": 50}' | jq
+```
+
+For multi-GPU, multi-node, and the full set of configuration and deployment
+options, see the
+[TensorRT-LLM Backend README](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/README.md)
+and the [LLM API guide](https://github.com/triton-inference-server/tensorrtllm_backend/blob/main/docs/llmapi.md).
 
 ## Advanced Configuration Options and Deployment Strategies
 
@@ -71,7 +107,7 @@ and run Triton with your TRT-LLM models effectively:
 - [Model Deployment](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#model-deployment): Techniques for efficiently deploying and managing your models in various environments.
 - [Multi-Instance GPU (MIG) Support](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#mig-support): Run Triton and TRT-LLM models with MIG to optimize GPU resource management.
 - [Scheduling](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#scheduling): Configure scheduling policies to control how requests are managed and executed.
-- [Key-Value Cache](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#key-value-cache): Utlizte KV cache and KV cache reuse to optimize memory usage and improve performance.
+- [Key-Value Cache](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#key-value-cache): Utilize KV cache and KV cache reuse to optimize memory usage and improve performance.
 - [Decoding](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#decoding): Advanced methods for generating text, including top-k, top-p, top-k top-p, beam search, Medusa, and speculative decoding.
 - [Chunked Context](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#chunked-context): Splitting the context into several chunks and batching them during generation phase to increase overall throughput.
 - [Quantization](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main?tab=readme-ov-file#quantization): Apply quantization techniques to reduce model size and enhance inference speed.

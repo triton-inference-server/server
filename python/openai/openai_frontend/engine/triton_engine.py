@@ -30,18 +30,20 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 import time
 import uuid
 from dataclasses import dataclass
 from typing import (
     Any,
-    AsyncIterable,
+    AsyncGenerator,
     AsyncIterator,
     Callable,
     Dict,
     List,
     Literal,
     Optional,
+    Protocol,
     Tuple,
     Union,
 )
@@ -52,6 +54,7 @@ from engine.engine import LLMEngine
 from engine.utils.chat import load_chat_template, parse_chat_messages
 from engine.utils.tokenizer import get_tokenizer
 from engine.utils.tool_call_parsers import ToolCallParser, ToolParserManager
+from engine.utils.tool_call_parsers.utils import DEFAULT_MAX_TOOL_CALL_PARSE_BYTES
 from engine.utils.triton import (
     RequestKind,
     TritonLoraConfig,
@@ -96,6 +99,24 @@ from schemas.openai import (
 )
 from utils.utils import ClientError, ServerError
 
+logger = logging.getLogger(__name__)
+
+
+class TritonAsyncResponseIterator(Protocol):
+    """Interface used to consume and cancel asynchronous Triton responses."""
+
+    def __aiter__(self) -> TritonAsyncResponseIterator:
+        """Return this object as an asynchronous iterator."""
+        pass
+
+    async def __anext__(self) -> tritonserver.InferenceResponse:
+        """Wait for and return the next inference response."""
+        pass
+
+    def cancel(self) -> None:
+        """Request cancellation of the underlying inference request."""
+        pass
+
 
 # TODO: Improve type hints
 @dataclass
@@ -129,6 +150,7 @@ class TritonLLMEngine(LLMEngine):
         lora_separator: Optional[str] = None,
         tool_call_parser: Optional[str] = None,
         chat_template: Optional[str] = None,
+        max_tool_call_parse_bytes: int = DEFAULT_MAX_TOOL_CALL_PARSE_BYTES,
     ):
         # Assume an already configured and started server
         self.server = server
@@ -137,6 +159,7 @@ class TritonLLMEngine(LLMEngine):
         self.backend = backend
         self.lora_separator = lora_separator
         self.default_max_tokens = default_max_tokens
+        self.max_tool_call_parse_bytes = max_tool_call_parse_bytes
 
         self.model_metadata = self._get_model_metadata()
         self._metadata_lock = asyncio.Lock()
@@ -146,6 +169,12 @@ class TritonLLMEngine(LLMEngine):
             else None
         )
         self.chat_template = load_chat_template(chat_template)
+
+        if self.tool_call_parser is not None:
+            print(
+                f"[INFO] Streaming tool-call parse buffer limit set to "
+                f"{self.max_tool_call_parse_bytes} bytes"
+            )
 
     def ready(self) -> bool:
         return self.server.ready()
@@ -229,7 +258,7 @@ class TritonLLMEngine(LLMEngine):
         )
 
         if request.stream:
-            return self._streaming_chat_iterator(
+            stream = self._streaming_chat_iterator(
                 request_id,
                 metadata.backend,
                 created,
@@ -237,6 +266,9 @@ class TritonLLMEngine(LLMEngine):
                 role,
                 tool_call_parser,
                 responses,
+            )
+            return self._stream_with_inference_cancellation(
+                stream, responses, request_id
             )
 
         # Response validation with decoupled models in mind
@@ -358,8 +390,11 @@ class TritonLLMEngine(LLMEngine):
         request_id = f"cmpl-{uuid.uuid1()}"
         created = int(time.time())
         if request.stream:
-            return self._streaming_completion_iterator(
+            stream = self._streaming_completion_iterator(
                 request_id, created, request, responses, metadata.backend
+            )
+            return self._stream_with_inference_cancellation(
+                stream, responses, request_id
             )
 
         # Response validation with decoupled models in mind
@@ -636,6 +671,42 @@ class TritonLLMEngine(LLMEngine):
         )
         return chunk
 
+    @staticmethod
+    def _cancel_inference(
+        responses: TritonAsyncResponseIterator, request_id: str, reason: str
+    ) -> None:
+        """Request best-effort cancellation of an in-flight Triton request."""
+        try:
+            responses.cancel()
+        except Exception:
+            logger.exception(
+                f"Failed to cancel Triton inference request {request_id}, reason: {reason}",
+            )
+
+    async def _stream_with_inference_cancellation(
+        self,
+        stream: AsyncGenerator[str, None],
+        responses: TritonAsyncResponseIterator,
+        request_id: str,
+    ) -> AsyncGenerator[str, None]:
+        """Cancel backend work if a consumer abandons the frontend stream."""
+        completed = False
+        try:
+            async for chunk in stream:
+                yield chunk
+            completed = True
+        finally:
+            if not completed:
+                self._cancel_inference(
+                    responses, request_id, "response stream closed before completion"
+                )
+                try:
+                    await stream.aclose()
+                except Exception:
+                    logger.exception(
+                        f"Failed to close frontend response stream request {request_id}",
+                    )
+
     async def _streaming_chat_iterator(
         self,
         request_id: str,
@@ -644,8 +715,8 @@ class TritonLLMEngine(LLMEngine):
         request: CreateChatCompletionRequest,
         role: str,
         tool_call_parser: ToolCallParser,
-        responses: AsyncIterable,
-    ) -> AsyncIterator[str]:
+        responses: TritonAsyncResponseIterator,
+    ) -> AsyncGenerator[str, None]:
         model = request.model
 
         tool_function_name = self._get_named_function_name(request=request)
@@ -658,6 +729,7 @@ class TritonLLMEngine(LLMEngine):
         )
 
         previous_text = ""
+        tool_parse_truncated = False
         include_usage = request.stream_options and request.stream_options.include_usage
         usage_accumulator = _StreamingUsageAccumulator(backend)
 
@@ -670,6 +742,23 @@ class TritonLLMEngine(LLMEngine):
             delta_text = _get_output(response)
             if include_usage:
                 usage_accumulator.update(response)
+
+            # The auto-tool parser re-parses the full accumulated text on
+            # every chunk. Cap the buffer and cancel the backend to bound
+            # per-request CPU and memory.
+            if (
+                tool_choice_auto
+                and len(previous_text) + len(delta_text)
+                > self.max_tool_call_parse_bytes
+            ):
+                print(
+                    f"[WARNING] Streaming tool-call parse buffer exceeded "
+                    f"{self.max_tool_call_parse_bytes} bytes (request "
+                    f"{request_id}); truncating response and cancelling "
+                    f"backend inference."
+                )
+                tool_parse_truncated = True
+                break
 
             (
                 response_delta,
@@ -712,6 +801,25 @@ class TritonLLMEngine(LLMEngine):
                 finish_reason=finish_reason,
             )
 
+            chunk = self._get_streaming_chat_response_chunk(
+                choice, request_id, created, model, usage=None
+            )
+            yield f"data: {chunk.model_dump_json(exclude_unset=True)}\n\n"
+
+        # On truncation, cancel the backend to stop it from populating the response
+        # queue. Otherwise, abandoned streams may continue to consume memory.
+        # The final chunk is sent with finish_reason="length" to explicitly
+        # indicate to the client that a cutoff has occurred.
+        if tool_parse_truncated:
+            self._cancel_inference(
+                responses, request_id, "tool-call parse buffer exceeded"
+            )
+            choice = ChatCompletionStreamingResponseChoice(
+                index=0,
+                delta=ChatCompletionStreamResponseDelta(content=""),
+                logprobs=None,
+                finish_reason=ChatCompletionFinishReason.length,
+            )
             chunk = self._get_streaming_chat_response_chunk(
                 choice, request_id, created, model, usage=None
             )
@@ -943,9 +1051,9 @@ class TritonLLMEngine(LLMEngine):
         request_id: str,
         created: int,
         request: CreateCompletionRequest,
-        responses: AsyncIterable,
+        responses: TritonAsyncResponseIterator,
         backend: str,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncGenerator[str, None]:
         model = request.model
         include_usage = request.stream_options and request.stream_options.include_usage
         usage_accumulator = _StreamingUsageAccumulator(backend)

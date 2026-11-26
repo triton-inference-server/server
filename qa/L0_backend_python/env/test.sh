@@ -41,10 +41,9 @@ rm -rf *.tar.gz
 install_build_deps
 install_conda
 
-# Test conda env without custom Python backend stub This environment should
-# always use the default Python version shipped in the container. For Ubuntu
-# 24.04 it is Python 3.12, for Ubuntu 22.04 is Python 3.10 and for Ubuntu 20.04
-# is 3.8.
+# Test conda env without custom Python backend stub. This environment should
+# always use the default Python version shipped in the container, which is
+# 3.12 -- nothing below that is supported.
 path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python_3_12_environment.tar.gz'
 create_conda_env "3.12" "python-3-12"
 conda install -c conda-forge libstdcxx-ng=14 -y
@@ -186,8 +185,9 @@ BUCKET_URL_SLASH="${BUCKET_URL}/"
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 
 rm $SERVER_LOG
-# Occasionally needs more time to load
-SERVER_TIMEOUT=420
+# Loading the ~5.5 GiB conda-pack archive from S3 takes up to ~400s in CI;
+# leave headroom for both S3 loads below.
+SERVER_TIMEOUT=900
 
 SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
 run_server
@@ -245,6 +245,63 @@ set -e
 # Clean up bucket contents and delete bucket
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 aws s3 rb "${BUCKET_URL}"
+
+# EXECUTION_ENV_PATH path-traversal regression test. For each
+# traversal vector, load a Python-backend model with archive is malicious
+# and assert: (a) Triton refuses to start, (b) no file was written outside
+# the extraction directory, (c) the server log contains the libarchive
+# rejection. See zipslip_test.py for the archive layout.
+ZIPSLIP_REPO="`pwd`/zipslip_models"
+ZIPSLIP_EXECUTION_ENV_PATH='$$TRITON_MODEL_DIRECTORY/malicious_env.tar.gz'
+
+ZIPSLIP_CASES=(
+    "relative:Path contains '..'"
+    "absolute:Path is absolute"
+)
+
+for case in "${ZIPSLIP_CASES[@]}"; do
+    mode="${case%%:*}"
+    expected_msg="${case#*:}"
+    model="zipslip_${mode}"
+    marker="/tmp/zipslip_${mode}_marker_$$"
+    SERVER_LOG="./zipslip_${mode}_server.log"
+
+    rm -rf "${marker}" "${SERVER_LOG}" "${ZIPSLIP_REPO}"
+    mkdir -p "${ZIPSLIP_REPO}/${model}/1"
+
+    cp ../../python_models/identity_fp32/config.pbtxt "${ZIPSLIP_REPO}/${model}/config.pbtxt"
+    cp ../../python_models/identity_fp32/model.py     "${ZIPSLIP_REPO}/${model}/1/model.py"
+    (cd "${ZIPSLIP_REPO}/${model}" && \
+        sed -i "s/^name:.*/name: \"${model}\"/" config.pbtxt && \
+        echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$ZIPSLIP_EXECUTION_ENV_PATH\"}}" >> config.pbtxt)
+    python3 ./zipslip_test.py \
+        --mode   "${mode}" \
+        --output "${ZIPSLIP_REPO}/${model}/malicious_env.tar.gz" \
+        --marker "${marker}"
+
+    SERVER_ARGS="--model-repository=${ZIPSLIP_REPO} --log-verbose=1"
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        kill_server
+        echo -e "\n***\n*** Zip Slip (mode=${mode}): tritonserver started despite malicious EXECUTION_ENV_PATH archive.\n***"
+        RET=1
+    fi
+
+    set +e
+    if [ -e "${marker}" ]; then
+        ls -la "${marker}"
+        echo -e "\n***\n*** Zip Slip (mode=${mode}): marker file written outside extraction directory.\n***"
+        RET=1
+    fi
+    if ! grep -q "${expected_msg}" "${SERVER_LOG}"; then
+        cat "${SERVER_LOG}"
+        echo -e "\n***\n*** Zip Slip (mode=${mode}): expected '${expected_msg}' not found in server log.\n***"
+        RET=1
+    fi
+    set -e
+
+    rm -f "${marker}"
+done
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Env Manager Test PASSED.\n***"

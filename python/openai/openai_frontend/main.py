@@ -33,7 +33,9 @@ from functools import partial
 
 import tritonserver
 from engine.triton_engine import TritonLLMEngine
+from engine.utils.tool_call_parsers.utils import DEFAULT_MAX_TOOL_CALL_PARSE_BYTES
 from frontend.fastapi_frontend import FastApiFrontend
+from utils.utils import HTTP_DEFAULT_MAX_INPUT_SIZE, validate_positive_int
 
 
 def signal_handler(
@@ -133,6 +135,15 @@ def parse_args():
         default=None,
         help="Specify the parser for handling tool calling related response text. Options include: 'llama3' and 'mistral'.",
     )
+    triton_group.add_argument(
+        "--max-tool-call-parse-bytes",
+        type=int,
+        default=DEFAULT_MAX_TOOL_CALL_PARSE_BYTES,
+        help="Maximum accumulated output (in bytes) that the streaming tool-call parser will process per request. "
+        "Once this limit is reached, the stream is truncated with finish_reason='length' and backend inference is cancelled. "
+        "This prevents unbounded memory growth caused by excessively large tool-call arguments. "
+        f"Default: {DEFAULT_MAX_TOOL_CALL_PARSE_BYTES}.",
+    )
     # Allows the user to try a different chat template to craft better prompts and receive more targeted tool-calling responses from the model.
     # Some Mistral models have a separate chat template file, in addition to the tokenizer_config.json,
     # such as mistralai/Mistral-Small-3.1-24B-Instruct-2503.
@@ -197,6 +208,14 @@ def parse_args():
         action="append",
         help="Restrict access to specific OpenAI API endpoints. Format: '<API_1>,<API_2>,... <restricted-key> <restricted-value>' (e.g., 'inference,model-repository admin-key admin-value'). If not specified, all endpoints are allowed.",
     )
+    openai_group.add_argument(
+        "--http-max-input-size",
+        type=validate_positive_int,
+        default=HTTP_DEFAULT_MAX_INPUT_SIZE,
+        help=f"Maximum allowed HTTP request input size in bytes for the OpenAI "
+        f"frontend (default: {HTTP_DEFAULT_MAX_INPUT_SIZE}, i.e. 64 MiB). "
+        "Requests exceeding this limit will be rejected.",
+    )
 
     # KServe Predict v2 Frontend
     kserve_group = parser.add_argument_group("Triton KServe Frontend")
@@ -257,6 +276,7 @@ def main():
         backend=args.backend,
         lora_separator=args.lora_separator,
         tool_call_parser=args.tool_call_parser,
+        max_tool_call_parse_bytes=args.max_tool_call_parse_bytes,
         chat_template=args.chat_template,
         default_max_tokens=args.default_max_tokens,
     )
@@ -269,6 +289,7 @@ def main():
             port=args.openai_port,
             log_level=args.uvicorn_log_level,
             restricted_apis=args.openai_restricted_api,
+            http_max_input_size=args.http_max_input_size,
         )
     except ValueError as e:
         print(

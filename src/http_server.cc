@@ -281,6 +281,10 @@ HTTPServer::StopCallback(evutil_socket_t sock, short events, void* arg)
 void
 HTTPServer::Dispatch(evhtp_request_t* req, void* arg)
 {
+  // A parser hook may have replied before the buffered request body finishes.
+  if ((req->flags & EVHTP_REQ_FLAG_FINISHED) != 0) {
+    return;
+  }
   (static_cast<HTTPServer*>(arg))->Handle(req);
 }
 
@@ -317,6 +321,13 @@ HTTPServer::ChunkCountIncrement(
     return EVHTP_RES_OK;
   }
   if (++req->chunk_count > kMaxChunkedChunks) {
+    // Release the accumulated body before allocating the error response. The
+    // parser can still consume bytes from its current read buffer after reads
+    // are disabled, so discard those body fragments instead of retaining them.
+    evbuffer_drain(req->buffer_in, evbuffer_get_length(req->buffer_in));
+    evhtp_request_set_hook(
+        req, evhtp_hook_on_read,
+        (evhtp_hook)(void*)HTTPServer::DiscardRequestBody, nullptr);
     AddContentTypeHeader(req, "application/json");
     const std::string msg =
         std::string("Chunked request body exceeds maximum of ") +
@@ -333,6 +344,16 @@ HTTPServer::ChunkCountIncrement(
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     return EVHTP_RES_OK;
   }
+  return EVHTP_RES_OK;
+}
+
+evhtp_res
+HTTPServer::DiscardRequestBody(
+    evhtp_request_t* req, evbuffer* buffer, void* arg)
+{
+  (void)req;
+  (void)arg;
+  evbuffer_drain(buffer, evbuffer_get_length(buffer));
   return EVHTP_RES_OK;
 }
 
@@ -2238,6 +2259,14 @@ HTTPAPIServer::HandleSystemSharedMemory(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
   }
 
+  // No shared memory manager (e.g. in-process Python frontend).
+  if (shm_manager_ == nullptr) {
+    RETURN_AND_RESPOND_IF_ERR(
+        req, TRITONSERVER_ErrorNew(
+                 TRITONSERVER_ERROR_UNAVAILABLE,
+                 kSharedMemoryManagerUnavailableErrorStr));
+  }
+
   TRITONSERVER_Error* err = nullptr;
   if (action == "status") {
     triton::common::TritonJson::Value shm_status(
@@ -2331,6 +2360,14 @@ HTTPAPIServer::HandleCudaSharedMemory(
   } else if ((action != "status") && (req->method != htp_method_POST)) {
     RETURN_AND_RESPOND_WITH_ERR(
         req, EVHTP_RES_METHNALLOWED, "Method Not Allowed");
+  }
+
+  // No shared memory manager (e.g. in-process Python frontend).
+  if (shm_manager_ == nullptr) {
+    RETURN_AND_RESPOND_IF_ERR(
+        req, TRITONSERVER_ErrorNew(
+                 TRITONSERVER_ERROR_UNAVAILABLE,
+                 kSharedMemoryManagerUnavailableErrorStr));
   }
 
   TRITONSERVER_Error* err = nullptr;
@@ -2440,7 +2477,7 @@ HTTPAPIServer::GetContentLength(
         evhtp_kv_find(req->headers_in, kContentLengthHeader);
     if (content_length_c_str != nullptr) {
       try {
-        lcontent_length = std::atoi(content_length_c_str);
+        lcontent_length = std::stoi(content_length_c_str);
       }
       catch (const std::invalid_argument& ia) {
         err = TRITONSERVER_ErrorNew(
@@ -2484,7 +2521,7 @@ HTTPAPIServer::GetInferenceHeaderLength(
   if (header_length_c_str != NULL) {
     int parsed_value;
     try {
-      parsed_value = std::atoi(header_length_c_str);
+      parsed_value = std::stoi(header_length_c_str);
     }
     catch (const std::invalid_argument& ia) {
       return TRITONSERVER_ErrorNew(
@@ -2492,6 +2529,16 @@ HTTPAPIServer::GetInferenceHeaderLength(
                                            kInferHeaderContentLengthHTTPHeader +
                                            ", got: " + header_length_c_str)
                                               .c_str());
+    }
+    catch (const std::out_of_range& oor) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          (std::string("Unable to parse ") +
+           kInferHeaderContentLengthHTTPHeader + ", value is out of range [ " +
+           std::to_string(std::numeric_limits<std::int32_t>::min()) + ", " +
+           std::to_string(std::numeric_limits<std::int32_t>::max()) +
+           " ], got: " + header_length_c_str)
+              .c_str());
     }
 
     // Check if the content length is in proper range
@@ -2647,6 +2694,12 @@ HTTPAPIServer::ParseJsonTritonIO(
           request_input, &use_shm, &shm_region, &shm_offset,
           reinterpret_cast<uint64_t*>(&byte_size)));
       if (use_shm) {
+        // No shared memory manager (e.g. in-process Python frontend).
+        if (shm_manager_ == nullptr) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNAVAILABLE,
+              kSharedMemoryManagerUnavailableErrorStr);
+        }
         void* base;
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
@@ -2811,6 +2864,12 @@ HTTPAPIServer::ParseJsonTritonIO(
       // ValidateOutputParameter ensures that both shm and
       // classification cannot be true.
       if (use_shm) {
+        // No shared memory manager (e.g. in-process Python frontend).
+        if (shm_manager_ == nullptr) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNAVAILABLE,
+              kSharedMemoryManagerUnavailableErrorStr);
+        }
         void* base;
         TRITONSERVER_MemoryType memory_type;
         int64_t memory_type_id;
@@ -3509,9 +3568,11 @@ HTTPAPIServer::HandleGenerate(
   RETURN_AND_CALLBACK_IF_ERR(
       ParseJsonTritonRequestID(request, irequest), error_callback);
 
+  size_t consumed_input_size{0};
   RETURN_AND_CALLBACK_IF_ERR(
       generate_request->ConvertGenerateRequest(
-          input_metadata, generate_request->RequestSchema(), request),
+          input_metadata, generate_request->RequestSchema(), request,
+          consumed_input_size),
       error_callback);
 
   auto request_release_payload =
@@ -3592,13 +3653,12 @@ TRITONSERVER_Error*
 HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
     std::map<std::string, triton::common::TritonJson::Value>& input_metadata,
     const MappingSchema* schema,
-    triton::common::TritonJson::Value& generate_request)
+    triton::common::TritonJson::Value& generate_request,
+    size_t& consumed_input_size)
 {
   // First find all top-level keys in JSON
   std::vector<std::string> members;
   RETURN_IF_ERR(generate_request.Members(&members));
-
-  size_t consumed_input_size{0};
 
   for (const auto& m : members) {
     auto it = schema->children_.find(m);
@@ -3627,7 +3687,8 @@ HTTPAPIServer::GenerateRequestClass::ConvertGenerateRequest(
               "Expected JSON object for keyword: '" + m + "'");
           RETURN_MSG_IF_ERR(
               ConvertGenerateRequest(
-                  input_metadata, it->second.get(), nested_generate_request),
+                  input_metadata, it->second.get(), nested_generate_request,
+                  consumed_input_size),
               "Converting keyword: '" + m + "'");
           break;
         }

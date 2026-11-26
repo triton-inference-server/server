@@ -52,7 +52,8 @@ ARG IGPU_BUILD
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && \
+RUN --mount=type=secret,id=apt_sources,target=/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list,required=false \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
             build-essential \
             libarchive-dev \
@@ -144,9 +145,12 @@ RUN mkdir -p qa/common && \
     cp bin/response_cache_test qa/L0_response_cache/. && \
     cp bin/request_cancellation_test qa/L0_request_cancellation/. && \
     cp bin/triton_json_test qa/L0_json/. && \
+    cp bin/logging_test qa/L0_logging/. && \
     cp bin/backend_output_detail_test qa/L0_backend_output_detail/. && \
     cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/. && \
-    cp bin/input_byte_size_test qa/L0_input_validation/.
+    cp bin/input_byte_size_test qa/L0_input_validation/. && \
+    cp bin/instance_queue_test qa/L0_batcher/. && \
+    cp bin/dynamic_batch_scheduler_test qa/L0_batcher/.
 
 RUN mkdir -p qa/pkgs && \
     cp python/triton*.whl qa/pkgs/. && \
@@ -175,7 +179,9 @@ RUN mkdir -p qa/custom_models/custom_sequence_int32/1 && \
 
 # L0_lifecycle needs No-GPU build of identity backend.
 WORKDIR  /workspace/tritonbuild/identity
-RUN rm -rf install build && mkdir build && cd build && \
+RUN --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=false \
+    export GIT_CONFIG_GLOBAL=/run/secrets/gitconfig && \
+    rm -rf install build && mkdir build && cd build && \
     cmake -DTRITON_ENABLE_GPU=OFF \
         -DCMAKE_INSTALL_PREFIX:PATH=/workspace/tritonbuild/identity/install \
         -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
@@ -188,7 +194,9 @@ RUN rm -rf install build && mkdir build && cd build && \
 # L0_backend_python test require triton_shm_monitor
 ARG TRITON_BOOST_URL="https://archives.boost.io/release/1.80.0/source/boost_1_80_0.tar.gz"
 WORKDIR /workspace/tritonbuild/python
-RUN rm -rf install build && mkdir build && cd build && \
+RUN --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=false \
+    export GIT_CONFIG_GLOBAL=/run/secrets/gitconfig && \
+    rm -rf install build && mkdir build && cd build && \
     cmake -DCMAKE_INSTALL_PREFIX:PATH=/workspace/tritonbuild/python/install \
         -DTRITON_REPO_ORGANIZATION:STRING=${TRITON_REPO_ORGANIZATION} \
         -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
@@ -314,7 +322,8 @@ ARG TARGETPLATFORM
 ENV DEBIAN_FRONTEND=noninteractive
 
 # install platform specific packages
-RUN if grep -qE '^VERSION_ID="(18\.04|20\.04|22\.04|24\.04)' /etc/os-release; then \
+RUN --mount=type=secret,id=apt_sources,target=/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list,required=false \
+    if grep -qE '^VERSION_ID="(18\.04|20\.04|22\.04|24\.04)' /etc/os-release; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
                 libpng-dev && \
@@ -327,7 +336,8 @@ RUN if grep -qE '^VERSION_ID="(18\.04|20\.04|22\.04|24\.04)' /etc/os-release; th
 
 # CI/QA for memcheck requires valgrind
 # libarchive-dev is required by Python backend
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN --mount=type=secret,id=apt_sources,target=/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list,required=false \
+    apt-get update && apt-get install -y --no-install-recommends \
                               curl \
                               gdb \
                               libarchive-dev \
@@ -352,8 +362,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-RUN pip3 install --upgrade "numpy<2" pillow attrdict future "grpcio<1.68" requests gsutil \
-                           "awscli<=1.36.40" six "grpcio-channelz<1.68" prettytable virtualenv \
+RUN pip3 install --upgrade "numpy<2" pillow attrdict future "grpcio==1.81.1" requests gsutil \
+                           "awscli<=1.36.40" six "grpcio-channelz==1.81.1" prettytable virtualenv \
                            check-jsonschema
 
 # go needed for example go client test.

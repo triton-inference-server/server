@@ -79,12 +79,20 @@ VertexAiAPIServer::GetInferenceHeaderLength(
       int32_t parsed_value;
       try {
         parsed_value =
-            std::atoi(content_type_c_str + binary_mime_type_.length());
+            std::stoi(content_type_c_str + binary_mime_type_.length());
       }
       catch (const std::invalid_argument& ia) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             (std::string("Unable to parse inference header size, got: ") +
+             (content_type_c_str + binary_mime_type_.length()))
+                .c_str());
+      }
+      catch (const std::out_of_range& oor) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string("Unable to parse inference header size, value is out "
+                         "of range, got: ") +
              (content_type_c_str + binary_mime_type_.length()))
                 .c_str());
       }

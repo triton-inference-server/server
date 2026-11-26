@@ -37,6 +37,8 @@ fi
 if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
+export SERVER_LAUNCH_MODE=${SERVER_LAUNCH_MODE:="triton"}
+echo "========== SERVER_LAUNCH_MODE=$SERVER_LAUNCH_MODE =========="
 
 ldconfig || true
 
@@ -71,9 +73,9 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
 fi
 
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
-    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="33"}
+    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="38"}
 else
-    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="46"}
+    EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="51"}
 fi
 
 TEST_JETSON=${TEST_JETSON:=0}
@@ -114,7 +116,14 @@ if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 
 fi
 SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
 SERVER_LOG_BASE="./inference_server"
-source ../common/util.sh
+
+if [ "$SERVER_LAUNCH_MODE" == "dynamo" ]; then
+    # Remove after TRI-1450 is fixed
+    export DYN_DISCOVERY_BACKEND=etcd
+    source ../common/dynamo_util.sh
+else
+    source ../common/util.sh
+fi
 
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
@@ -163,6 +172,9 @@ function generate_model_repository() {
         # Types that need to use SubAdd instead of AddSub
         swap_types="float32 int32 int16 int8"
         for onnx_model in $onnx_models; do
+          # Skip BF16 models: Not yet supported by Python backend
+          [[ "$onnx_model" == *bf16* ]] && continue
+
           if [ "$BACKEND" == "python_dlpack" ]; then
             python_model=`echo $onnx_model | sed 's/onnx/python_dlpack/g' | sed 's,'"$DATADIR/qa_model_repository/"',,g'`
           else
@@ -215,6 +227,10 @@ function generate_model_repository() {
       else
         cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
           models/.
+        # Remove ONNX BF16 models from CPU models
+        if [ "$BACKEND" == "onnx" ] && [ "$TARGET" == "cpu" ]; then
+          rm -rf models/onnx_*bf16*
+        fi
       fi
     done
 
@@ -253,20 +269,24 @@ function generate_model_repository() {
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in $BACKENDS; do
-      if [ "$FW" == "onnx" ] && [ "$TEST_VALGRIND" -eq 1 ]; then
-        # Reduce the instance count to make loading onnx models faster
-        for MC in `ls models/${FW}*/config.pbtxt`; do
-            echo "instance_group [ { kind: ${KIND} count: 1 }]" >> $MC
-        done
-      elif [ "$FW" != "plan" ] && [ "$FW" != "python" ] && [ "$FW" != "python_dlpack" ] && [ "$FW" != "openvino" ];then
-        for MC in `ls models/${FW}*/config.pbtxt`; do
-            echo "instance_group [ { kind: ${KIND} }]" >> $MC
-        done
-      elif [ "$FW" == "python" ] || [ "$FW" == "python_dlpack" ] || [ "$FW" == "openvino" ]; then
-        for MC in `ls models/${FW}*/config.pbtxt`; do
-            echo "instance_group [ { kind: KIND_CPU }]" >> $MC
-        done
-      fi
+      [ "$FW" == "plan" ] && continue
+      for MC in `ls models/${FW}*/config.pbtxt`; do
+        # BF16 models: ORT CPU has no BF16 kernels, force GPU
+        if [ "$FW" == "onnx" ] && [ "$MC" == *bf16* ]; then
+          MC_KIND="KIND_GPU"
+        else
+          MC_KIND=${KIND}
+        fi
+
+        if [ "$FW" == "onnx" ] && [ "$TEST_VALGRIND" -eq 1 ]; then
+          # Reduce the instance count to make loading onnx models faster
+          echo "instance_group [ { kind: ${MC_KIND} count: 1 }]" >> $MC
+        elif [ "$FW" == "python" ] || [ "$FW" == "python_dlpack" ] || [ "$FW" == "openvino" ]; then
+          echo "instance_group [ { kind: KIND_CPU }]" >> $MC
+        else
+          echo "instance_group [ { kind: ${KIND} }]" >> $MC
+        fi
+      done
     done
 
     # Modify custom_zero_1_float32 and custom_nobatch_zero_1_float32 for relevant ensembles
@@ -287,6 +307,20 @@ function generate_model_repository() {
 
 }
 
+copy_torch_aoti_models() {
+    local dest_dir=$1
+    for m in torch_aoti_int8_int8 torch_aoti_int32_int32 \
+             torch_aoti_float16_float16 torch_aoti_bf16_bf16 \
+             torch_aoti_float32_float32; do
+        src="${DATADIR}/qa_model_repository/${m}"
+        if [ ! -d "${src}" ]; then
+            echo -e "\n***\n*** Missing AOTI model: ${src}\n***"
+            exit 1
+        fi
+        cp -r "${src}" "${dest_dir}/."
+    done
+}
+
 for TARGET in cpu gpu; do
     if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
         if [ "$TARGET" == "gpu" ]; then
@@ -299,6 +333,10 @@ for TARGET in cpu gpu; do
     CLIENT_LOG=$CLIENT_LOG_BASE.${TARGET}.log
 
     generate_model_repository
+
+    if [ "$TARGET" == "gpu" ]; then
+        copy_torch_aoti_models models
+    fi
 
     # Check if running a memory leak check
     if [ "$TEST_VALGRIND" -eq 1 ]; then
@@ -352,7 +390,9 @@ done
 # separately to reduce the loading time.
 if [ "$TEST_VALGRIND" -eq 1 ]; then
   TESTING_BACKENDS="python python_dlpack onnx"
-  EXPECTED_NUM_TESTS=36
+  # VALGRIND_TESTS=1 omits version/ensemble methods, so this phase cannot
+  # share EXPECTED_NUM_TESTS with the first loop (51, or the GitLab pin).
+  EXPECTED_NUM_VALGRIND_BACKEND_TESTS=${EXPECTED_NUM_VALGRIND_BACKEND_TESTS:="41"}
   if [[ "aarch64" != $(uname -m) ]] ; then
       pip3 install torch==2.3.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
   else
@@ -371,6 +411,10 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
         # These two models are required by test_ensemble_mix_batch_nobatch test case.
         cp -fr ./models/onnx_float32_float32_float32 ./nobatch_models/.
         cp -fr ./models/custom_zero_1_float32 ./nobatch_models/.
+      fi
+      if [ "$TARGET" == "gpu" ]; then
+        copy_torch_aoti_models models
+        copy_torch_aoti_models nobatch_models
       fi
 
       for BATCHING_MODE in batch nobatch; do
@@ -416,7 +460,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
             cat $CLIENT_LOG
             RET=1
         else
-            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_VALGRIND_BACKEND_TESTS
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
                 cat $TEST_RESULT_FILE

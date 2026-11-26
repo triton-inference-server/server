@@ -1,4 +1,4 @@
-// Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -24,6 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
+
+#include <atomic>
 
 #include "infer_handler.h"
 
@@ -116,12 +118,25 @@ class ModelStreamInferHandler
       void* userp);
   static void StateWriteResponse(InferHandler::State* state);
   bool Finish(State* state);
+  // Posts one RequestModelStreamInfer accept request.
+  void PostAcceptRequest();
 
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
   TRITONSERVER_ResponseAllocator* allocator_;
 
   grpc_compression_level compression_level_;
+
+  // An accept request is a RequestModelStreamInfer call posted to gRPC. gRPC
+  // hands each new stream to one of them; a stream left unmatched longer than
+  // gRPC's unrequested-call limit (30 s by default) is cancelled before Triton
+  // sees it. Keeping several outstanding lets a burst of new streams be
+  // matched even while this handler's thread is busy. 16 matched bursts of up
+  // to 40 new streams in the L0_simple_ensemble backpressure ensemble.
+  static constexpr int kAcceptPrefetch = 16;
+  // Whether the accept requests have been posted. Atomic so they are posted
+  // exactly once, even if StartNewRequest() is ever called from another thread.
+  std::atomic<bool> accept_prefetch_posted_{false};
 };
 
 }}}  // namespace triton::server::grpc

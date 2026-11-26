@@ -31,6 +31,7 @@ from typing import Dict, List, Optional
 
 import pytest
 import requests
+from frontend.fastapi.middleware.api_restriction import RestrictedFeatures
 from tests.utils import OpenAIServer
 
 
@@ -50,6 +51,43 @@ def assert_response_unauthorized(
     assert (
         response.status_code == expected_status
     ), f"{description} should be unauthorized with {expected_status}, got {response.status_code} {response.text}"
+
+
+def test_restricted_feature_summary_omits_header_values():
+    restricted = RestrictedFeatures(
+        [["inference", "synthetic-header", "synthetic-secret-value"]]
+    )
+
+    assert restricted.RestrictionSummary() == {"inference": "synthetic-header"}
+    assert "synthetic-secret-value" not in str(restricted.RestrictionSummary())
+
+
+def test_startup_log_does_not_leak_restriction_header_values(capsys):
+    """Regression test for the startup log line that announces enabled API
+    restrictions. The line must not contain configured header values, but
+    must still surface the API group names and header names so operators can
+    verify the configuration that was applied."""
+    from frontend.fastapi_frontend import FastApiFrontend
+
+    secret_value = "do-not-log-this-restriction-value-XYZ"
+    FastApiFrontend(
+        engine=None,
+        restricted_apis=[["inference", "x-syn-key", secret_value]],
+    )
+
+    captured = capsys.readouterr().out
+    assert (
+        secret_value not in captured
+    ), "Startup log leaks the configured restriction header value"
+    assert (
+        "API restrictions enabled" in captured
+    ), "Startup log line is missing entirely"
+    assert (
+        "inference" in captured
+    ), "Startup log should still surface the API group name"
+    assert (
+        "x-syn-key" in captured
+    ), "Startup log should still surface the configured header name"
 
 
 def make_get_request(

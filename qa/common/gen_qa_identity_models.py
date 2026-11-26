@@ -29,19 +29,22 @@
 import argparse
 import os
 from builtins import range
+from typing import List, Tuple
 
 import gen_ensemble_model_utils as emu
+import gen_manifest
 import numpy as np
 from gen_common import (
+    create_general_modelconfig,
     np_to_model_dtype,
     np_to_onnx_dtype,
     np_to_trt_dtype,
     openvino_save_model,
+    trt_set_dynamic_range,
 )
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
-from typing import List, Tuple
 
 
 def create_ensemble_modelfile(
@@ -143,7 +146,7 @@ def create_onnx_modelconfig(models_dir, io_cnt, max_batch, dtype, shape):
     )
     config_dir = os.path.join(models_dir, model_name)
 
-    config = emu.create_general_modelconfig(
+    config = create_general_modelconfig(
         model_name,
         "onnxruntime_onnx",
         max_batch,
@@ -552,14 +555,18 @@ def create_plan_dynamic_rf_modelfile(
         out_node = network.add_identity(in_node)
 
         out_node.get_output(0).name = "OUTPUT{}".format(io_num)
-        out_node.get_output(0).dtype = trt_dtype
+        # Identity preserves input dtype; the ITensor.dtype setter was
+        # removed in TensorRT 11. Older TRT versions still accept it.
+        try:
+            out_node.get_output(0).dtype = trt_dtype
+        except AttributeError:
+            pass  # ITensor.dtype setter removed in TensorRT 11+
         network.mark_output(out_node.get_output(0))
         out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
         if trt_dtype == trt.int8:
-            in_node.dynamic_range = (-128.0, 127.0)
-            out_node.get_output(0).dynamic_range = (-128.0, 127.0)
-
+            trt_set_dynamic_range(in_node, -128.0, 127.0)
+            trt_set_dynamic_range(out_node.get_output(0), -128.0, 127.0)
     min_shape = []
     opt_shape = []
     max_shape = []
@@ -583,14 +590,17 @@ def create_plan_dynamic_rf_modelfile(
         profile.set_shape("INPUT{}".format(io_num), min_shape, opt_shape, max_shape)
 
     flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
-    flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    # TensorRT 11 removed PREFER_PRECISION_CONSTRAINTS / INT8 / FP16
+    # BuilderFlags (strongly-typed networks). Older TRT still has them.
+    if hasattr(trt.BuilderFlag, "PREFER_PRECISION_CONSTRAINTS"):
+        flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
     if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
         flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
     datatype_set = set([trt_dtype])
     for dt in datatype_set:
-        if dt == trt.int8:
+        if dt == trt.int8 and hasattr(trt.BuilderFlag, "INT8"):
             flags |= 1 << int(trt.BuilderFlag.INT8)
-        elif dt == trt.float16:
+        elif dt == trt.float16 and hasattr(trt.BuilderFlag, "FP16"):
             flags |= 1 << int(trt.BuilderFlag.FP16)
     config = builder.create_builder_config()
     config.flags = flags
@@ -668,18 +678,26 @@ def create_plan_shape_tensor_modelfile(
 
         dummy_out_node.name = "DUMMY_OUTPUT{}".format(io_num)
 
-        dummy_out_node.dtype = trt_dtype
+        # The ITensor.dtype setter was removed in TensorRT 11; resize and
+        # shape layers already produce the correct dtype, so suppress the
+        # AttributeError instead of changing the older-TRT behavior.
+        try:
+            dummy_out_node.dtype = trt_dtype
+        except AttributeError:
+            pass  # ITensor.dtype setter removed in TensorRT 11+
         network.mark_output(dummy_out_node)
         dummy_out_node.allowed_formats = 1 << int(trt_memory_format)
 
-        out_node.get_output(0).dtype = trt.int64
+        try:
+            out_node.get_output(0).dtype = trt.int64
+        except AttributeError:
+            pass  # ITensor.dtype setter removed in TensorRT 11+
         network.mark_output_for_shapes(out_node.get_output(0))
         out_node.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
         if trt_dtype == trt.int8:
-            in_node.dynamic_range = (-128.0, 127.0)
-            out_node.get_output(0).dynamic_range = (-128.0, 127.0)
-
+            trt_set_dynamic_range(in_node, -128.0, 127.0)
+            trt_set_dynamic_range(out_node.get_output(0), -128.0, 127.0)
     config = builder.create_builder_config()
 
     min_prefix = []
@@ -707,14 +725,17 @@ def create_plan_shape_tensor_modelfile(
     config.add_optimization_profile(profile)
 
     flags = 1 << int(trt.BuilderFlag.DIRECT_IO)
-    flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
+    # TensorRT 11 removed PREFER_PRECISION_CONSTRAINTS / INT8 / FP16
+    # BuilderFlags (strongly-typed networks). Older TRT still has them.
+    if hasattr(trt.BuilderFlag, "PREFER_PRECISION_CONSTRAINTS"):
+        flags |= 1 << int(trt.BuilderFlag.PREFER_PRECISION_CONSTRAINTS)
     if hasattr(trt.BuilderFlag, "REJECT_EMPTY_ALGORITHMS"):
         flags |= 1 << int(trt.BuilderFlag.REJECT_EMPTY_ALGORITHMS)
     datatype_set = set([trt_dtype])
     for dt in datatype_set:
-        if dt == trt.int8:
+        if dt == trt.int8 and hasattr(trt.BuilderFlag, "INT8"):
             flags |= 1 << int(trt.BuilderFlag.INT8)
-        elif dt == trt.float16:
+        elif dt == trt.float16 and hasattr(trt.BuilderFlag, "FP16"):
             flags |= 1 << int(trt.BuilderFlag.FP16)
     config.flags = flags
 
@@ -1091,6 +1112,10 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     if FLAGS.onnx:
         import onnx
     if FLAGS.libtorch:
@@ -1136,3 +1161,6 @@ if __name__ == "__main__":
         model_version = 1
         create_libtorch_linalg_modelconfig(FLAGS.models_dir)
         create_libtorch_linalg_modelfile(FLAGS.models_dir, model_version)
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

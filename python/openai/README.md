@@ -46,7 +46,7 @@
 docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
-  nvcr.io/nvidia/tritonserver:26.04-vllm-python-py3
+  nvcr.io/nvidia/tritonserver:26.11-vllm-python-py3
 ```
 
 2. Launch the OpenAI-compatible Triton Inference Server:
@@ -355,7 +355,7 @@ Currently, OpenAI-Compatible Frontend supports loading embedding models and embe
 docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
-  nvcr.io/nvidia/tritonserver:26.04-vllm-python-py3
+  nvcr.io/nvidia/tritonserver:26.11-vllm-python-py3
 ```
 
 2. Launch the OpenAI-compatible Triton Inference Server:
@@ -451,7 +451,7 @@ docker run -it --net=host --gpus all --rm \
   -v ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   -e HF_TOKEN \
   -e TRTLLM_ORCHESTRATOR=1 \
-  nvcr.io/nvidia/tritonserver:26.04-trtllm-python-py3
+  nvcr.io/nvidia/tritonserver:26.11-trtllm-python-py3
 ```
 
 2. Install dependencies inside the container:
@@ -686,6 +686,17 @@ python3 openai_frontend/main.py \
   --model-repository tests/vllm_models \
   --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
   --tool-call-parser llama3
+```
+
+During streaming, the tool-call parser re-parses the entire accumulated output with each new chunk. This means that very large tool-call arguments can significantly increase per-request CPU and memory usage. The `--max-tool-call-parse-bytes` flag sets a limit on the maximum number of bytes the streaming tool parser will process per request. If a streamed response exceeds this limit, the stream is truncated with finish_reason="length" and backend inference is cancelled.
+The default limit is 128 KiB (131,072 bytes). Increase this value if you expect larger tool-call payloads.
+Example usage:
+```
+python3 openai_frontend/main.py \
+  --model-repository tests/vllm_models \
+  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
+  --tool-call-parser llama3 \
+  --max-tool-call-parse-bytes 131072
 ```
 
 Example for making a tool calling request:
@@ -948,4 +959,29 @@ curl -H "api-key: my-secret-key" \
 
 # Multiple APIs in single argument with shared authentication
 --openai-restricted-api "inference,model-repository shared-key shared-secret"
+```
+
+## HTTP Request Body Size Limit
+
+The frontend enforces a maximum request body size prior to JSON parsing. Requests that exceed this limit are rejected with an error response.
+
+Use `--http-max-input-size` to configure the limit (default: `67108864` bytes / 64 MiB):
+
+```bash
+python3 openai_frontend/main.py \
+  --model-repository /path/to/models \
+  --tokenizer meta-llama/Meta-Llama-3.1-8B-Instruct \
+  --http-max-input-size 67108864
+```
+
+The limit applies to all endpoints. Example error response:
+
+```json
+{
+  "error": {
+    "message": "Request content size exceeds the maximum allowed input size of 67108864 bytes. Use --http-max-input-size to increase the limit.",
+    "type": "invalid_request_error",
+    "code": "content_too_large"
+  }
+}
 ```

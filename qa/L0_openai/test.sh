@@ -123,12 +123,13 @@ function pre_test() {
 function run_test() {
     pushd openai/
     TEST_LOG="test_openai.log"
+    TEST_XML="test_openai.xml"
+    TEST_LOG_MISTRAL="test_openai_mistral.log"
+    TEST_XML_MISTRAL="test_openai_mistral.xml"
 
-    # Capture error code without exiting to allow log collection
     set +e
-    pytest -s -v --junitxml=test_openai.xml tests/ 2>&1 > ${TEST_LOG}
-    if [ $? -ne 0 ]; then
-        cat ${TEST_LOG}
+    pytest -s -v --junitxml=${TEST_XML} tests/ 2>&1 | tee ${TEST_LOG}
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
@@ -137,9 +138,9 @@ function run_test() {
     if [ "$RET" == "0" ]; then
         # rerun the tool calling tests with mistral model to cover the mistral tool call parser
         set +e
-        TEST_TOOL_CALL_PARSER="mistral" TEST_TOKENIZER="mistralai/Mistral-Nemo-Instruct-2407" pytest -s -v --junitxml=test_openai.xml tests/test_tool_calling.py 2>&1 > ${TEST_LOG}
-        if [ $? -ne 0 ]; then
-            cat ${TEST_LOG}
+        TEST_TOOL_CALL_PARSER="mistral" TEST_TOKENIZER="mistralai/Mistral-Nemo-Instruct-2407" \
+            pytest -s -v --junitxml=${TEST_XML_MISTRAL} tests/test_tool_calling.py 2>&1 | tee ${TEST_LOG_MISTRAL}
+        if [ ${PIPESTATUS[0]} -ne 0 ]; then
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         fi

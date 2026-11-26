@@ -49,7 +49,7 @@ rm -f *.log
 rm -f *.out
 
 CLIENT_TEST_SCRIPT=vertex_ai_test.py
-UNIT_TEST_COUNT=8
+UNIT_TEST_COUNT=9
 CLIENT_LOG="./client.log"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}

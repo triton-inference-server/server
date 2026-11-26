@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -363,7 +363,16 @@ function kill_server () {
     else
         # Non-windows...
         kill $SERVER_PID
-        wait $SERVER_PID
+        wait $SERVER_PID || true
+    fi
+
+    # Fail the suite when the Python backend logged a stub crash signal.
+    if [[ -n "${SERVER_LOG:-}" && -f "$SERVER_LOG" ]] &&
+       grep -q "exited on signal " "$SERVER_LOG"; then
+        echo -e "\n***\n*** FAILED: Python backend stub exited on signal.\n***"
+        cat $SERVER_LOG
+        # exit, not return: callers often run under `set +e` and ignore $?.
+        exit 1
     fi
 }
 

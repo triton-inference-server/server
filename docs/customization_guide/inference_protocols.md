@@ -32,7 +32,9 @@ Clients can communicate with Triton using either an [HTTP/REST
 protocol](#httprest-and-grpc-protocols), a [GRPC
 protocol](#httprest-and-grpc-protocols), or by an [in-process C
 API](inprocess_c_api.md) or its
-[C++ wrapper](https://github.com/triton-inference-server/developer_tools/tree/main/server).
+[C++ wrapper](https://github.com/triton-inference-server/developer_tools/tree/main/server)
+(**deprecated** — no longer built or tested; use the [in-process C
+API](inprocess_c_api.md) directly).
 
 ## HTTP/REST and GRPC Protocols
 

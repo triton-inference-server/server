@@ -30,13 +30,14 @@ import json
 import os
 import unittest
 
+import ml_dtypes
 import numpy as np
 
 _last_request_id = 0
 
 # Numpy does not support the BF16 datatype natively.
-# We use this dummy dtype as a representative for BF16.
-np_dtype_bfloat16 = np.dtype([("bf16", object)])
+# We use ml_dtypes.bfloat16 for BF16.
+np_dtype_bfloat16 = ml_dtypes.bfloat16
 
 MIB = 2**20  # 1 MIB = 1,048,576 bytes
 GIB = 2**30  # 1 GIB = 1,073,741,824 bytes
@@ -136,6 +137,12 @@ def validate_for_trt_model(
     # FIXME: Remove this check when jetson supports TRT 8.5 (DLIS-4256)
     if not support_trt_uint8():
         supported_datatypes.remove(np.uint8)
+    # TRT 11+ removed the implicit-precision INT8 path (BuilderFlag.INT8
+    # + dynamic_range); strongly-typed networks require explicit QDQ which
+    # the QA generators don't emit. Exclude int8 plan models on TRT 11+.
+    if not support_trt_int8_implicit_precision():
+        if np.int8 in supported_datatypes:
+            supported_datatypes.remove(np.int8)
     if not input_dtype in supported_datatypes:
         return False
     if not output0_dtype in supported_datatypes:
@@ -352,6 +359,17 @@ def support_trt_uint8():
         return not bool(int(os.environ.get("TEST_JETSON", 0)))
     # tensorrt library is found, return if uint8 is defined
     return hasattr(trt, "uint8")
+
+
+def support_trt_int8_implicit_precision():
+    """Return True if the installed TensorRT supports the implicit-precision
+    INT8 path (BuilderFlag.INT8 + per-tensor dynamic_range). Removed in
+    TensorRT 11+ where strongly-typed networks are mandatory."""
+    try:
+        import tensorrt as trt
+    except ImportError:
+        return False
+    return hasattr(trt.BuilderFlag, "INT8")
 
 
 def check_gpus_compute_capability(min_capability):

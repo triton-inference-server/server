@@ -411,6 +411,12 @@ InferGRPCToInput(
     char* cuda_ipc_handle = nullptr;
 
     if (has_shared_memory) {
+      // No shared memory manager (e.g. in-process Python frontend).
+      if (shm_manager == nullptr) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_UNAVAILABLE,
+            kSharedMemoryManagerUnavailableErrorStr);
+      }
       if (io.has_contents()) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,

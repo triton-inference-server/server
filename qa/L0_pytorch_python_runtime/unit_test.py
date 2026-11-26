@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,7 +26,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
+import shutil
 import sys
+import tempfile
 import unittest
 
 import torch
@@ -34,7 +37,11 @@ import torch
 # satisfy Python runtime import requirements
 sys.modules["triton_python_backend_utils"] = unittest.mock.MagicMock()
 # import modules from Python runtime to be tested
-from py_runtime import _gather_torch_tensors, _scatter_torch_tensors
+from py_runtime import (  # noqa: E402
+    _gather_torch_tensors,
+    _get_model_path,
+    _scatter_torch_tensors,
+)
 
 
 class PyTorchPythonBackendRuntimeUnittest(unittest.TestCase):
@@ -148,6 +155,42 @@ class PyTorchPythonBackendRuntimeUnittest(unittest.TestCase):
                     tensor = tensors[j]
                     self.assertIsInstance(tensor, torch.Tensor)
                     self.assertTrue(torch.equal(tensor, expected_tensor))
+
+
+class PyTorchPythonRuntimeModelPathTest(unittest.TestCase):
+    """For a Python-class model, 'model.py' must be selected over a
+    sibling weights file 'model.pt' unless the user explicitly requests the
+    weights file via default_model_filename."""
+
+    def setUp(self):
+        self._model_dir = tempfile.mkdtemp()
+        pb_utils = sys.modules["triton_python_backend_utils"]
+        pb_utils.get_model_dir.return_value = self._model_dir
+
+    def tearDown(self):
+        shutil.rmtree(self._model_dir)
+
+    def _touch(self, filename):
+        path = os.path.join(self._model_dir, filename)
+        open(path, "w").close()
+        return path
+
+    def test_model_py_preferred_over_sibling_weights(self):
+        expected = self._touch("model.py")
+        self._touch("model.pt")
+        config = {"default_model_filename": ""}
+        self.assertEqual(_get_model_path(config), expected)
+
+    def test_explicit_default_model_filename_wins(self):
+        self._touch("model.py")
+        expected = self._touch("model.pt")
+        config = {"default_model_filename": "model.pt"}
+        self.assertEqual(_get_model_path(config), expected)
+
+    def test_torchscript_only_model(self):
+        expected = self._touch("model.pt")
+        config = {"default_model_filename": ""}
+        self.assertEqual(_get_model_path(config), expected)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -652,6 +652,17 @@ if [ `grep -c -P "E$LOG_REGEX" $SERVER_ERROR_LOG` == "0" ]; then
 fi
 
 unset $SERVER_ERROR_LOG
+set -e
+
+# Triton common log-callback test.
+set +e
+UNIT_TEST_LOG="./log_callback_test.log"
+./logging_test --gtest_output=xml:logging.report.xml >> $UNIT_TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $UNIT_TEST_LOG
+    echo -e "\n***\n*** Logging Callback Unit Test Failed\n***"
+    RET=1
+fi
 set -e
 
 if [ $RET -eq 0 ]; then

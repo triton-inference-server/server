@@ -110,6 +110,22 @@ StreamOutputBufferAttributes(
 void
 ModelStreamInferHandler::StartNewRequest()
 {
+  // Post all kAcceptPrefetch accept requests on the first call. After that,
+  // each accepted stream posts exactly one replacement, so at most
+  // kAcceptPrefetch are outstanding.
+  int count = 1;
+  if (!accept_prefetch_posted_.exchange(true)) {
+    count = kAcceptPrefetch;
+    LOG_VERBOSE(1) << Name() << " outstanding accept requests: " << count;
+  }
+  for (int i = 0; i < count; ++i) {
+    PostAcceptRequest();
+  }
+}
+
+void
+ModelStreamInferHandler::PostAcceptRequest()
+{
   auto context = std::make_shared<State::Context>(cq_, NEXT_UNIQUE_ID);
   context->SetCompressionLevel(compression_level_);
   State* state = StateNew(tritonserver_.get(), context);

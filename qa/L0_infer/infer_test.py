@@ -26,17 +26,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# flake8: noqa: E402,F403,F405
 import sys
 
 sys.path.append("../common")
 
-import os
-import unittest
+import os  # noqa: E402
+import unittest  # noqa: E402
 
-import infer_util as iu
-import numpy as np
-import test_util as tu
-from tritonclient.utils import *
+import infer_util as iu  # noqa: E402
+import ml_dtypes  # noqa: E402
+import numpy as np  # noqa: E402
+import test_util as tu  # noqa: E402
+import tritonclient.grpc as grpcclient  # noqa: E402
+from tritonclient.utils import InferenceServerException  # noqa: E402
 
 TEST_SYSTEM_SHARED_MEMORY = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get("TEST_CUDA_SHARED_MEMORY", 0)))
@@ -44,8 +47,27 @@ CPU_ONLY = os.environ.get("TRITON_SERVER_CPU_ONLY") is not None
 TEST_VALGRIND = bool(int(os.environ.get("TEST_VALGRIND", 0)))
 VALGRIND_TESTS = bool(int(os.environ.get("VALGRIND_TESTS", 0)))
 
+# Dynamo's KServe gRPC tensor path does not yet cover every Triton/KServe
+# feature, so the cases that exercise an unsupported path are skipped in dynamo
+# mode (see the Dynamo Triton backend "Known limitations"). Gate every such
+# divergence on this flag.
+DYNAMO = os.environ.get("SERVER_LAUNCH_MODE") == "dynamo"
+
+# Reasons the corresponding tests are skipped under Dynamo.
+DYNAMO_SKIP_FP16 = (
+    "FP16/BF16 tensors: Dynamo tensor DataType has no half-precision variant"
+)
+DYNAMO_SKIP_VERSION = "model version selection: Dynamo routes by model name only, serving the default version"
+
 USE_GRPC = os.environ.get("USE_GRPC", 1) != "0"
 USE_HTTP = os.environ.get("USE_HTTP", 1) != "0"
+# The Dynamo frontend exposes only the KServe gRPC endpoint, not HTTP/REST.
+# Dynamo images ship gRPC-only tritonclient (no gevent). Match infer_util.
+if DYNAMO:
+    USE_HTTP = False
+    httpclient = None
+else:
+    import tritonclient.http as httpclient  # noqa: E402
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
 BACKENDS = os.environ.get(
@@ -59,6 +81,8 @@ np_dtype_string = np.dtype(object)
 
 # 60 sec is the default value
 NETWORK_TIMEOUT = 300.0 if TEST_VALGRIND else 60.0
+# Same override infer_util uses (DoD / non-localhost server).
+TRITONSERVER_IPADDR = os.environ.get("TRITONSERVER_IPADDR", "localhost")
 
 
 class InferTest(tu.TestResultCollector):
@@ -334,6 +358,7 @@ class InferTest(tu.TestResultCollector):
             np.int64, np.int64, np.int64, output0_raw=True, output1_raw=True, swap=False
         )
 
+    @unittest.skipIf(DYNAMO, DYNAMO_SKIP_FP16)
     def test_raw_hhh(self):
         self._full_exact(
             np.float16,
@@ -354,6 +379,7 @@ class InferTest(tu.TestResultCollector):
             swap=True,
         )
 
+    @unittest.skipIf(DYNAMO, DYNAMO_SKIP_FP16)
     def test_raw_hff(self):
         self._full_exact(
             np.float16,
@@ -399,6 +425,7 @@ class InferTest(tu.TestResultCollector):
             swap=False,
         )
 
+    @unittest.skipIf(DYNAMO, DYNAMO_SKIP_FP16)
     def test_raw_fuh(self):
         self._full_exact(
             np.float32,
@@ -429,6 +456,7 @@ class InferTest(tu.TestResultCollector):
             swap=False,
         )
 
+    @unittest.skipIf(DYNAMO, DYNAMO_SKIP_FP16)
     def test_raw_ihs(self):
         self._full_exact(
             np.int32,
@@ -507,6 +535,133 @@ class InferTest(tu.TestResultCollector):
             output0_raw=True,
             output1_raw=True,
             swap=False,
+        )
+
+    def _infer_torch_aoti(self, model_name, input0, input1, expected, dtype_str):
+        # AOTI add models: ARGS[0]/ARGS[1] -> RESULT. Not libtorch-shaped.
+        def _is_ready_http():
+            with httpclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8000"
+            ) as client:
+                return client.is_model_ready(model_name)
+
+        def _is_ready_grpc():
+            with grpcclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8001"
+            ) as client:
+                return client.is_model_ready(model_name)
+
+        ready = False
+        if USE_HTTP:
+            ready = _is_ready_http()
+        elif USE_GRPC:
+            ready = _is_ready_grpc()
+        if not ready:
+            self.skipTest(f"{model_name} not loaded in this L0_infer phase")
+
+        if USE_HTTP:
+            with httpclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8000"
+            ) as client:
+                inputs = [
+                    httpclient.InferInput("ARGS[0]", input0.shape, dtype_str),
+                    httpclient.InferInput("ARGS[1]", input1.shape, dtype_str),
+                ]
+                inputs[0].set_data_from_numpy(input0)
+                inputs[1].set_data_from_numpy(input1)
+                result = client.infer(
+                    model_name,
+                    inputs,
+                    outputs=[httpclient.InferRequestedOutput("RESULT")],
+                )
+                got = result.as_numpy("RESULT")
+                want = expected
+                if expected.dtype == ml_dtypes.bfloat16:
+                    # numpy has no native BF16; check the dtype, then compare
+                    # in float32 without rebinding 'expected' so the other
+                    # protocol's check below still sees BF16.
+                    self.assertEqual(got.dtype, ml_dtypes.bfloat16)
+                    got = got.astype(np.float32)
+                    want = expected.astype(np.float32)
+                if np.issubdtype(want.dtype, np.floating):
+                    self.assertTrue(
+                        np.allclose(got, want),
+                        f"{model_name} HTTP RESULT mismatch",
+                    )
+                else:
+                    self.assertTrue(
+                        np.array_equal(got, want),
+                        f"{model_name} HTTP RESULT mismatch",
+                    )
+
+        if USE_GRPC:
+            with grpcclient.InferenceServerClient(
+                f"{TRITONSERVER_IPADDR}:8001"
+            ) as client:
+                inputs = [
+                    grpcclient.InferInput("ARGS[0]", input0.shape, dtype_str),
+                    grpcclient.InferInput("ARGS[1]", input1.shape, dtype_str),
+                ]
+                inputs[0].set_data_from_numpy(input0)
+                inputs[1].set_data_from_numpy(input1)
+                result = client.infer(
+                    model_name,
+                    inputs,
+                    outputs=[grpcclient.InferRequestedOutput("RESULT")],
+                )
+                got = result.as_numpy("RESULT")
+                want = expected
+                if expected.dtype == ml_dtypes.bfloat16:
+                    # numpy has no native BF16; check the dtype, then compare
+                    # in float32 without rebinding 'expected' so the other
+                    # protocol's check below still sees BF16.
+                    self.assertEqual(got.dtype, ml_dtypes.bfloat16)
+                    got = got.astype(np.float32)
+                    want = expected.astype(np.float32)
+                if np.issubdtype(want.dtype, np.floating):
+                    self.assertTrue(
+                        np.allclose(got, want),
+                        f"{model_name} gRPC RESULT mismatch",
+                    )
+                else:
+                    self.assertTrue(
+                        np.array_equal(got, want),
+                        f"{model_name} gRPC RESULT mismatch",
+                    )
+
+    def test_torch_aoti_int8(self):
+        input0 = np.ones((1, 16), dtype=np.int8)
+        input1 = np.full((1, 16), 2, dtype=np.int8)
+        self._infer_torch_aoti(
+            "torch_aoti_int8_int8", input0, input1, input0 + input1, "INT8"
+        )
+
+    def test_torch_aoti_int32(self):
+        input0 = np.ones((1, 16), dtype=np.int32)
+        input1 = np.full((1, 16), 2, dtype=np.int32)
+        self._infer_torch_aoti(
+            "torch_aoti_int32_int32", input0, input1, input0 + input1, "INT32"
+        )
+
+    def test_torch_aoti_float16(self):
+        input0 = np.ones((1, 16), dtype=np.float16)
+        input1 = np.full((1, 16), 2.0, dtype=np.float16)
+        self._infer_torch_aoti(
+            "torch_aoti_float16_float16", input0, input1, input0 + input1, "FP16"
+        )
+
+    def test_torch_aoti_bfloat16(self):
+        input0 = np.ones((1, 16), dtype=ml_dtypes.bfloat16)
+        input1 = np.full((1, 16), 2.0, dtype=ml_dtypes.bfloat16)
+        self._infer_torch_aoti(
+            "torch_aoti_bf16_bf16", input0, input1, input0 + input1, "BF16"
+        )
+
+    def test_torch_aoti_float32(self):
+        input0 = np.ones((1, 16), dtype=np.float32)
+        input1 = np.full((1, 16), 2.0, dtype=np.float32)
+        self._infer_torch_aoti(
+            "torch_aoti_float32_float32", input0, input1, input0 + input1, "FP32"
         )
 
     # shared memory does not support class output
@@ -634,6 +789,7 @@ class InferTest(tu.TestResultCollector):
 
     if not VALGRIND_TESTS:
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_VERSION)
         def test_raw_version_latest_1(self):
             input_size = 16
             tensor_shape = (1, input_size)
@@ -701,6 +857,7 @@ class InferTest(tu.TestResultCollector):
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                 )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_VERSION)
         def test_raw_version_latest_2(self):
             input_size = 16
             tensor_shape = (1, input_size)
@@ -762,6 +919,7 @@ class InferTest(tu.TestResultCollector):
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                 )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_VERSION)
         def test_raw_version_all(self):
             input_size = 16
             tensor_shape = (1, input_size)
@@ -817,6 +975,7 @@ class InferTest(tu.TestResultCollector):
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                 )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_VERSION)
         def test_raw_version_specific_1(self):
             input_size = 16
             tensor_shape = (1, input_size)
@@ -884,6 +1043,7 @@ class InferTest(tu.TestResultCollector):
                         ex.message().startswith("Request for unknown model")
                     )
 
+        @unittest.skipIf(DYNAMO, DYNAMO_SKIP_VERSION)
         def test_raw_version_specific_1_3(self):
             input_size = 16
 
