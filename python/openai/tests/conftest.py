@@ -25,11 +25,12 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import sys
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
-from tests.utils import OpenAIServer, setup_fastapi_app, setup_server
+
+sys.path.append(str(Path(__file__).resolve().parent.parent / "openai_frontend"))
 
 
 def pytest_configure(config):
@@ -140,6 +141,8 @@ def input(prompt):
 def server(
     model_repository: str, tokenizer_model: str, backend: str, tool_call_parser: str
 ):
+    from tests.utils import OpenAIServer
+
     args = [
         "--model-repository",
         model_repository,
@@ -167,6 +170,9 @@ def server(
 def fastapi_client_class_scope(
     model_repository: str, tokenizer_model: str, backend: str
 ):
+    from fastapi.testclient import TestClient
+    from tests.utils import setup_fastapi_app, setup_server
+
     server = setup_server(model_repository=model_repository)
     app = setup_fastapi_app(tokenizer=tokenizer_model, server=server, backend=backend)
     with TestClient(app) as test_client:

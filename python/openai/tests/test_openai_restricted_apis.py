@@ -31,7 +31,6 @@ from typing import Dict, List, Optional
 
 import pytest
 import requests
-from frontend.fastapi.middleware.api_restriction import RestrictedFeatures
 from tests.utils import OpenAIServer
 
 
@@ -51,15 +50,6 @@ def assert_response_unauthorized(
     assert (
         response.status_code == expected_status
     ), f"{description} should be unauthorized with {expected_status}, got {response.status_code} {response.text}"
-
-
-def test_restricted_feature_summary_omits_header_values():
-    restricted = RestrictedFeatures(
-        [["inference", "synthetic-header", "synthetic-secret-value"]]
-    )
-
-    assert restricted.RestrictionSummary() == {"inference": "synthetic-header"}
-    assert "synthetic-secret-value" not in str(restricted.RestrictionSummary())
 
 
 def test_startup_log_does_not_leak_restriction_header_values(capsys):

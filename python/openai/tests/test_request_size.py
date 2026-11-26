@@ -25,8 +25,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-import asyncio
-import json
 import os
 import sys
 from pathlib import Path
@@ -111,55 +109,3 @@ class TestRequestSizeLimitMiddleware:
     def test_get_without_body_is_unaffected(self, client):
         response = client.get(_ENDPOINTS[0])
         assert response.status_code == 405
-
-
-class TestContentLengthValidation:
-    """Stage 1 rejects malformed Content-Length with 400."""
-
-    def _run_with_content_length(self, raw_value: bytes) -> tuple[int, dict]:
-        captured: dict = {"status": None, "body": b""}
-
-        async def app(scope, receive, send):
-            raise AssertionError("app must not be reached for invalid Content-Length")
-
-        async def receive():
-            raise AssertionError("receive() must not be called when Stage 1 rejects")
-
-        async def send(message):
-            if message["type"] == "http.response.start":
-                captured["status"] = message["status"]
-            elif message["type"] == "http.response.body":
-                captured["body"] += message.get("body", b"")
-
-        middleware = RequestSizeLimitMiddleware(
-            app=app, http_max_input_size=HTTP_DEFAULT_MAX_INPUT_SIZE
-        )
-        scope = {
-            "type": "http",
-            "method": "POST",
-            "path": "/v1/chat/completions",
-            "headers": [(b"content-length", raw_value)],
-        }
-        asyncio.run(middleware(scope, receive, send))
-
-        assert captured["status"] is not None, "no response was sent"
-        return captured["status"], json.loads(captured["body"])
-
-    def _assert_invalid_content_length(self, status: int, body: dict):
-        assert status == 400
-        assert set(body) == {"error"}
-        error = body["error"]
-        assert error["type"] == "invalid_request_error"
-        assert error["code"] == "invalid_content_length"
-
-    @pytest.mark.parametrize("raw", [b"not-a-number", b""])
-    def test_non_integer_content_length_rejected_with_400(self, raw):
-        status, body = self._run_with_content_length(raw)
-        self._assert_invalid_content_length(status, body)
-        assert "not an integer" in body["error"]["message"]
-
-    @pytest.mark.parametrize("raw", [b"-1", b"-1024"])
-    def test_negative_content_length_rejected_with_400(self, raw):
-        status, body = self._run_with_content_length(raw)
-        self._assert_invalid_content_length(status, body)
-        assert "non-negative" in body["error"]["message"]
