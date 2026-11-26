@@ -414,8 +414,9 @@ else
         cat "$REDIS_ENTRY_CLIENT_LOG"
         RET=1
     fi
-    kill "$SERVER_PID"
-    wait "$SERVER_PID"
+    # The server may already have exited. Keep going so Redis is stopped.
+    kill "$SERVER_PID" || RET=1
+    wait "$SERVER_PID" || RET=1
 fi
 stop_redis
 SERVER_LOG=$REDIS_ENTRY_SAVED_SERVER_LOG
