@@ -912,17 +912,16 @@ The OpenAI-compatible server supports restricting access to specific API endpoin
 
 ### Configuration
 
-Use the `--openai-restricted-api` command-line argument to configure endpoint restrictions:
+Pass the API list, header name, and header value as three separate arguments to `--openai-restricted-api`.
 
 ```
 --openai-restricted-api <API_1>,<API_2>,... <restricted-key> <restricted-value>
 ```
 
 - **`API`**: A comma-separated list of APIs to be included in this group. Note that currently a given API is not allowed to be included in multiple groups. The following protocols / APIs are recognized:
-  - **inference**: Chat completions and text completions endpoints
+  - **inference**: Chat completions, text completions, and embeddings
     - `POST /v1/chat/completions`
     - `POST /v1/completions`
-  - **embedding**: Embedding endpoint
     - `POST /v1/embeddings`
   - **model-repository**: Model listing, information, and dynamic load/unload endpoints
     - `GET /v1/models`
@@ -941,7 +940,7 @@ Use the `--openai-restricted-api` command-line argument to configure endpoint re
 
 #### Restrict Inference API Endpoints Only
 ```bash
---openai-restricted-api "inference api-key my-secret-key"
+--openai-restricted-api inference api-key my-secret-key
 ```
 
 Clients must include the header:
@@ -954,11 +953,11 @@ curl -H "api-key: my-secret-key" \
 #### Restrict Multiple API Endpoints
 ```bash
 # Different authentication for different APIs
---openai-restricted-api "inference user-key user-secret" \
---openai-restricted-api "model-repository admin-key admin-secret"
+--openai-restricted-api inference user-key user-secret \
+--openai-restricted-api model-repository admin-key admin-secret
 
-# Multiple APIs in single argument with shared authentication
---openai-restricted-api "inference,model-repository shared-key shared-secret"
+# Use the same header for both API groups
+--openai-restricted-api inference,model-repository shared-key shared-secret
 ```
 
 ## HTTP Request Body Size Limit
