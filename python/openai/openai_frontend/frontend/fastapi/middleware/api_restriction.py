@@ -221,11 +221,12 @@ class APIRestrictionMiddleware(BaseHTTPMiddleware):
         # Get the actual header value from the request
         actual_value = request.headers.get(expected_key)
 
-        # Validate the header value matches the expected value. Use
-        # hmac.compare_digest so the compare runs in time that does not
-        # depend on the position of the first differing byte. The short
-        # circuit on `not actual_value` keeps None and empty values out.
-        if not actual_value or not hmac.compare_digest(actual_value, expected_value):
+        # Compare bytes without a content-dependent early exit. The configured
+        # value can contain surrogate escapes from the command line.
+        if not actual_value or not hmac.compare_digest(
+            actual_value.encode("utf-8"),
+            expected_value.encode("utf-8", errors="surrogatepass"),
+        ):
             return {
                 "valid": False,
                 "message": f"This API is restricted, expecting header '{expected_key}' with valid value",
