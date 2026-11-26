@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -146,17 +146,22 @@ for POOL_SIZE in 1 25 50 default; do
   fi
 done
 
-prev_mem=0
-prev_size=""
-for size in default 50 25 1; do
-  current_mem=${MEMORY_USAGE[$size]}
-  if [[ -n "$prev_size" && "$prev_mem" -ne 0 && "$current_mem" -ge "$prev_mem" ]]; then
-    echo -e "\n***\n*** FAILED - Memory $current_mem KB with pool=$size >= $prev_mem KB (with pool=$prev_size)\n***"
+check_memory_less_than() {
+  local size=$1
+  local bound_size=$2
+  local current_mem=${MEMORY_USAGE[$size]}
+  local bound_mem=${MEMORY_USAGE[$bound_size]}
+  if [[ "$bound_mem" -ne 0 && "$current_mem" -ge "$bound_mem" ]]; then
+    echo -e "\n***\n*** FAILED - Memory $current_mem KB with pool=$size >= $bound_mem KB (with pool=$bound_size)\n***"
     RET=1
   fi
-  prev_mem=$current_mem
-  prev_size=$size
-done
+}
+
+check_memory_less_than 50 default
+check_memory_less_than 25 50
+# Peak memory with pool=1 varies between runs (0.8 GB to 5.6 GB) and can come
+# close to pool=25, so compare it against pool=50 (about 2x pool=25).
+check_memory_less_than 1 50
 
 
 if [ $RET -eq 0 ]; then
