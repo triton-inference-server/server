@@ -233,6 +233,14 @@ pip install -r requirements-test.txt
 pytest -v tests/
 ```
 
+From `python/openai`, the following commands install the middleware test
+dependencies and run the checks on a CPU machine without a Triton server or model.
+
+```bash
+python -m pip install -c requirements.txt -r requirements-test.txt fastapi httpx
+python -m pytest -q -o "python_files=test_*middleware.py" tests
+```
+
 ### LoRA Adapters
 
 If the command line argument `--lora-separator=<separator_string>` is provided
