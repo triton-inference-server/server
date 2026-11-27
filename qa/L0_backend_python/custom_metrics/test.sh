@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -61,11 +61,14 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-python3 -m pytest --junitxml="custom_metrics_reload.report.xml" custom_metrics_reload_test.py >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** 'Custom Metrics Reload' test FAILED. \n***"
-    cat $CLIENT_LOG
-    RET=1
+# Reload needs model load/unload, which is excluded on Windows
+if [[ ${TEST_WINDOWS} == 0 ]]; then
+    python3 -m pytest --junitxml="custom_metrics_reload.report.xml" custom_metrics_reload_test.py >> $CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** 'Custom Metrics Reload' test FAILED. \n***"
+        cat $CLIENT_LOG
+        RET=1
+    fi
 fi
 
 set -e
