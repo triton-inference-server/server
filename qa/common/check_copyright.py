@@ -88,10 +88,12 @@ SKIP_PATHS = (
     "qa/L0_trt_dla_jetson/trt_dla_model_store",
     "qa/openvino_models/dynamic_batch",
     "qa/openvino_models/fixed_batch",
+    "skills",
     "CITATION.cff",
     "TRITON_VERSION",
     ".github/ISSUE_TEMPLATE",
     ".github/PULL_REQUEST_TEMPLATE",
+    "THIRD-PARTY-NOTICES.txt",
 )
 
 COPYRIGHT_YEAR_RE = "Copyright( \\(c\\))? 20[1-9][0-9](-(20)?[1-9][0-9])?(,((20[2-9][0-9](-(20)?[2-9][0-9])?)|([2-9][0-9](-[2-9][0-9])?)))*,? NVIDIA CORPORATION( & AFFILIATES)?. All rights reserved."

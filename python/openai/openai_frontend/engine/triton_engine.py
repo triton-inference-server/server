@@ -36,13 +36,14 @@ import uuid
 from dataclasses import dataclass
 from typing import (
     Any,
-    AsyncIterable,
+    AsyncGenerator,
     AsyncIterator,
     Callable,
     Dict,
     List,
     Literal,
     Optional,
+    Protocol,
     Tuple,
     Union,
 )
@@ -99,6 +100,22 @@ from schemas.openai import (
 from utils.utils import ClientError, ServerError
 
 logger = logging.getLogger(__name__)
+
+
+class TritonAsyncResponseIterator(Protocol):
+    """Interface used to consume and cancel asynchronous Triton responses."""
+
+    def __aiter__(self) -> TritonAsyncResponseIterator:
+        """Return this object as an asynchronous iterator."""
+        pass
+
+    async def __anext__(self) -> tritonserver.InferenceResponse:
+        """Wait for and return the next inference response."""
+        pass
+
+    def cancel(self) -> None:
+        """Request cancellation of the underlying inference request."""
+        pass
 
 
 # TODO: Improve type hints
@@ -241,7 +258,7 @@ class TritonLLMEngine(LLMEngine):
         )
 
         if request.stream:
-            return self._streaming_chat_iterator(
+            stream = self._streaming_chat_iterator(
                 request_id,
                 metadata.backend,
                 created,
@@ -249,6 +266,9 @@ class TritonLLMEngine(LLMEngine):
                 role,
                 tool_call_parser,
                 responses,
+            )
+            return self._stream_with_inference_cancellation(
+                stream, responses, request_id
             )
 
         # Response validation with decoupled models in mind
@@ -370,8 +390,11 @@ class TritonLLMEngine(LLMEngine):
         request_id = f"cmpl-{uuid.uuid1()}"
         created = int(time.time())
         if request.stream:
-            return self._streaming_completion_iterator(
+            stream = self._streaming_completion_iterator(
                 request_id, created, request, responses, metadata.backend
+            )
+            return self._stream_with_inference_cancellation(
+                stream, responses, request_id
             )
 
         # Response validation with decoupled models in mind
@@ -648,6 +671,42 @@ class TritonLLMEngine(LLMEngine):
         )
         return chunk
 
+    @staticmethod
+    def _cancel_inference(
+        responses: TritonAsyncResponseIterator, request_id: str, reason: str
+    ) -> None:
+        """Request best-effort cancellation of an in-flight Triton request."""
+        try:
+            responses.cancel()
+        except Exception:
+            logger.exception(
+                f"Failed to cancel Triton inference request {request_id}, reason: {reason}",
+            )
+
+    async def _stream_with_inference_cancellation(
+        self,
+        stream: AsyncGenerator[str, None],
+        responses: TritonAsyncResponseIterator,
+        request_id: str,
+    ) -> AsyncGenerator[str, None]:
+        """Cancel backend work if a consumer abandons the frontend stream."""
+        completed = False
+        try:
+            async for chunk in stream:
+                yield chunk
+            completed = True
+        finally:
+            if not completed:
+                self._cancel_inference(
+                    responses, request_id, "response stream closed before completion"
+                )
+                try:
+                    await stream.aclose()
+                except Exception:
+                    logger.exception(
+                        f"Failed to close frontend response stream request {request_id}",
+                    )
+
     async def _streaming_chat_iterator(
         self,
         request_id: str,
@@ -656,8 +715,8 @@ class TritonLLMEngine(LLMEngine):
         request: CreateChatCompletionRequest,
         role: str,
         tool_call_parser: ToolCallParser,
-        responses: AsyncIterable,
-    ) -> AsyncIterator[str]:
+        responses: TritonAsyncResponseIterator,
+    ) -> AsyncGenerator[str, None]:
         model = request.model
 
         tool_function_name = self._get_named_function_name(request=request)
@@ -752,15 +811,9 @@ class TritonLLMEngine(LLMEngine):
         # The final chunk is sent with finish_reason="length" to explicitly
         # indicate to the client that a cutoff has occurred.
         if tool_parse_truncated:
-            try:
-                responses.cancel()
-            except Exception:
-                logger.debug(
-                    "Failed to cancel inference after tool-call parse "
-                    "truncation (request %s)",
-                    request_id,
-                    exc_info=True,
-                )
+            self._cancel_inference(
+                responses, request_id, "tool-call parse buffer exceeded"
+            )
             choice = ChatCompletionStreamingResponseChoice(
                 index=0,
                 delta=ChatCompletionStreamResponseDelta(content=""),
@@ -998,9 +1051,9 @@ class TritonLLMEngine(LLMEngine):
         request_id: str,
         created: int,
         request: CreateCompletionRequest,
-        responses: AsyncIterable,
+        responses: TritonAsyncResponseIterator,
         backend: str,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncGenerator[str, None]:
         model = request.model
         include_usage = request.stream_options and request.stream_options.include_usage
         usage_accumulator = _StreamingUsageAccumulator(backend)

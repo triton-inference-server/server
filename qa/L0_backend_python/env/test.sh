@@ -41,10 +41,9 @@ rm -rf *.tar.gz
 install_build_deps
 install_conda
 
-# Test conda env without custom Python backend stub This environment should
-# always use the default Python version shipped in the container. For Ubuntu
-# 24.04 it is Python 3.12, for Ubuntu 22.04 is Python 3.10 and for Ubuntu 20.04
-# is 3.8.
+# Test conda env without custom Python backend stub. This environment should
+# always use the default Python version shipped in the container, which is
+# 3.12 -- nothing below that is supported.
 path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python_3_12_environment.tar.gz'
 create_conda_env "3.12" "python-3-12"
 conda install -c conda-forge libstdcxx-ng=14 -y
@@ -186,8 +185,9 @@ BUCKET_URL_SLASH="${BUCKET_URL}/"
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 
 rm $SERVER_LOG
-# Occasionally needs more time to load
-SERVER_TIMEOUT=420
+# Loading the ~5.5 GiB conda-pack archive from S3 takes up to ~400s in CI;
+# leave headroom for both S3 loads below.
+SERVER_TIMEOUT=900
 
 SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
 run_server

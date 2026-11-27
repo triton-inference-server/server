@@ -1,6 +1,29 @@
 #!/usr/bin/env python3
-# SPDX-FileCopyrightText: Copyright (c) 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: BSD-3-Clause
+# Copyright 2020-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
 import importlib.util
@@ -36,6 +59,8 @@ import requests
 #   triton version ->
 #     (triton container version,
 #      upstream container version,
+#      cuda-dl-base version (container train and its CUDA version, which
+#        cuda-dl-base publishes as a matched pair and must be bumped together),
 #      ORT version,
 #      ORT OpenVINO version (use None to disable OpenVINO in ORT),
 #      Standalone OpenVINO version,
@@ -49,14 +74,14 @@ import requests
 #
 
 DEFAULT_TRITON_VERSION_MAP = {
-    "release_version": "2.72.0dev",
-    "triton_container_version": "26.08dev",
-    "upstream_container_version": "26.06",
-    "ort_version": "1.27.0",
-    "ort_openvino_version": "2026.2.0",
-    "standalone_openvino_version": "2026.2.0",
-    "dcgm_version": "4.5.3-1",
-    "rhel_py_version": "3.12.3",
+    "release_version": "2.76.0dev",
+    "triton_container_version": "26.12dev",
+    "upstream_container_version": "26.11",
+    "cuda_dl_base_version": "26.11-cuda13.5",
+    "ort_version": "1.31.1",
+    "ort_openvino_version": "2026.4.1",
+    "standalone_openvino_version": "2026.4.1",
+    "dcgm_version": "4.7.1-2",
 }
 
 CORE_BACKENDS = ["ensemble"]
@@ -164,6 +189,18 @@ def target_machine():
     if FLAGS and FLAGS.target_machine is not None:
         return FLAGS.target_machine
     return platform.machine().lower()
+
+
+def default_build_container_image():
+    """Image the compile toolchain runs in.
+
+    Always CUDA-capable: the ONNX Runtime and OpenVINO backends build in this
+    container and need the CUDA toolchain even when Triton itself is being
+    built CPU-only.
+    """
+    return "nvcr.io/nvidia/cuda-dl-base:{}-devel-ubuntu24.04".format(
+        FLAGS.cuda_dl_base_version
+    )
 
 
 def container_versions(version, container_version, upstream_container_version):
@@ -298,7 +335,7 @@ class BuildScript:
             self.cmd("fi")
             self.cwd(subdir)
             self.cmd(f"git fetch origin {tag}:tritonbuildref", check_exitcode=True)
-            self.cmd(f"git checkout tritonbuildref", check_exitcode=True)
+            self.cmd("git checkout tritonbuildref", check_exitcode=True)
         else:
             self.cmd(
                 f"  git clone --recursive --single-branch --depth=1 -b {tag} {org}/{repo}.git {subdir}; git --git-dir {subdir}/.git log --oneline -1",
@@ -531,8 +568,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = onnxruntime_cmake_args(images, library_paths)
     elif be == "openvino":
         args = openvino_cmake_args()
-    elif be == "python":
-        args = python_cmake_args()
     elif be == "dali":
         args = dali_cmake_args()
     elif be == "pytorch":
@@ -591,18 +626,6 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     return cargs
 
 
-def python_cmake_args():
-    cargs = []
-    if target_platform() == "rhel":
-        cargs.append(
-            cmake_backend_arg(
-                "python", "PYBIND11_PYTHON_VERSION", "STRING", FLAGS.rhel_py_version
-            )
-        )
-
-    return cargs
-
-
 def pytorch_cmake_args(images):
     if "pytorch" in images:
         image = images["pytorch"]
@@ -653,21 +676,14 @@ def onnxruntime_cmake_args(images, library_paths):
                 )
             )
 
-    if "base" in images:
-        cargs.append(
-            cmake_backend_arg(
-                "onnxruntime", "TRITON_BUILD_CONTAINER", None, images["base"]
-            )
+    cargs.append(
+        cmake_backend_arg(
+            "onnxruntime",
+            "TRITON_BUILD_CONTAINER",
+            None,
+            images.get("base", default_build_container_image()),
         )
-    else:
-        cargs.append(
-            cmake_backend_arg(
-                "onnxruntime",
-                "TRITON_BUILD_CONTAINER_VERSION",
-                None,
-                FLAGS.upstream_container_version,
-            )
-        )
+    )
 
     # TODO: TPRD-333 OpenVino extension is not currently supported by our manylinux build
     if (
@@ -711,21 +727,14 @@ def openvino_cmake_args():
             FLAGS.standalone_openvino_version,
         )
     ]
-    if "base" in images:
-        cargs.append(
-            cmake_backend_arg(
-                "openvino", "TRITON_BUILD_CONTAINER", None, images["base"]
-            )
+    cargs.append(
+        cmake_backend_arg(
+            "openvino",
+            "TRITON_BUILD_CONTAINER",
+            None,
+            images.get("base", default_build_container_image()),
         )
-    else:
-        cargs.append(
-            cmake_backend_arg(
-                "openvino",
-                "TRITON_BUILD_CONTAINER_VERSION",
-                None,
-                FLAGS.upstream_container_version,
-            )
-        )
+    )
     return cargs
 
 
@@ -793,66 +802,161 @@ def install_dcgm_libraries(dcgm_version, target_machine):
             )
         )
         return ""
+
+    # The -core package pins every sub-package (libdcgm, modules, ...) to its
+    # own exact version, so they are discovered from its metadata rather than
+    # listed by name, which differs between DCGM releases.
+    if target_platform() == "rhel":
+        install = r"""
+RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/@ARCH@/cuda-rhel8.repo \
+    && dnf clean expire-cache \
+    && dnf makecache --refresh \
+    && V=1:$DCGM_VERSION \
+    && DEPS=$(dnf -q repoquery --requires datacenter-gpu-manager-4-core-$V \
+              | awk -v v="= $V" 'index($0, v) {print $1"-"$3}') \
+    && dnf install --assumeyes \
+              datacenter-gpu-manager-4-core-$V \
+              datacenter-gpu-manager-4-devel-$V \
+              $DEPS
+"""
     else:
-        # RHEL has the same install instructions for both aarch64 and x86
-        if target_platform() == "rhel":
-            if target_machine == "aarch64":
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/sbsa/cuda-rhel8.repo \\
-    && dnf clean expire-cache \\
-    && dnf makecache --refresh \\
-    && dnf install --assumeyes \\
-                 datacenter-gpu-manager-4-core-1:{} \\
-                 datacenter-gpu-manager-4-devel-1:{}
-""".format(
-                    dcgm_version, dcgm_version, dcgm_version
-                )
-            else:
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo \\
-    && dnf clean expire-cache \\
-    && dnf makecache --refresh \\
-    && dnf install --assumeyes \\
-                 datacenter-gpu-manager-4-core-1:{} \\
-                 datacenter-gpu-manager-4-devel-1:{}
-""".format(
-                    dcgm_version, dcgm_version, dcgm_version
-                )
-        else:
-            if target_machine == "aarch64":
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \\
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/sbsa/cuda-keyring_1.1-1_all.deb \\
-      && apt install /tmp/cuda-keyring.deb \\
-      && rm /tmp/cuda-keyring.deb \\
-      && apt update -qq \\
-      && apt install --yes --no-install-recommends \\
-                  datacenter-gpu-manager-4-core=1:{} \\
-                  datacenter-gpu-manager-4-dev=1:{}
-""".format(
-                    dcgm_version, dcgm_version, dcgm_version
-                )
-            else:
-                return """
-ENV DCGM_VERSION {}
-# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \\
-          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb \\
-      && apt install /tmp/cuda-keyring.deb \\
-      && rm /tmp/cuda-keyring.deb \\
-      && apt update -qq \\
-      && apt install --yes --no-install-recommends \\
-                   datacenter-gpu-manager-4-core=1:{} \\
-                   datacenter-gpu-manager-4-dev=1:{}
-""".format(
-                    dcgm_version, dcgm_version, dcgm_version
-                )
+        install = r"""
+RUN curl -o /tmp/cuda-keyring.deb \
+          https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/@ARCH@/cuda-keyring_1.1-1_all.deb \
+      && apt install /tmp/cuda-keyring.deb \
+      && rm /tmp/cuda-keyring.deb \
+      && apt update -qq \
+      && V=1:$DCGM_VERSION \
+      && DEPS=$(apt-cache show datacenter-gpu-manager-4-core=$V \
+                | sed -n 's/^Depends: //p' | tr ',' '\n' \
+                | awk -v v="(= $V)" -v V="$V" 'index($0, v) {print $1"="V}') \
+      && apt install --yes --no-install-recommends \
+                datacenter-gpu-manager-4-core=$V \
+                datacenter-gpu-manager-4-dev=$V \
+                $DEPS
+"""
+    arch = "sbsa" if target_machine == "aarch64" else "x86_64"
+    return (
+        "\nENV DCGM_VERSION {}\n".format(dcgm_version)
+        + "# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads"
+        + install.replace("@ARCH@", arch)
+    )
+
+
+# Keys that 'docker build --secret' accepts. A spec may also carry keys that
+# only the Dockerfile side understands ('target', 'required', 'mode', ...);
+# passing those to the build command is an error, so they are filtered out.
+DOCKER_BUILD_SECRET_KEYS = ("id", "src", "source", "env", "type")
+
+# Id whose secret is mounted over the apt source list, and where it lands when
+# the spec does not say.
+APT_SOURCES_SECRET_ID = "apt_sources"
+APT_SOURCES_DEFAULT_TARGET = "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list"
+
+# Variable holding a git config, and where the build container writes it out.
+# The container is handed the contents rather than the file because docker
+# resolves a bind mount source on the daemon, which need not share a filesystem
+# with this script, and silently mounts a directory when it finds nothing there.
+GIT_CONFIG_CONTENT_ENV = "TRITON_GITCONFIG"
+GIT_CONFIG_CONTAINER_PATH = "/tmp/gitconfig"
+
+
+def parse_secret_spec(spec):
+    """Split a Docker secret spec into ordered (key, value) pairs.
+
+    Docker does not require any particular field order, so callers look up
+    keys by name rather than by position.
+    """
+    fields = []
+    for field in spec.split(","):
+        key, _, value = field.partition("=")
+        key = key.strip()
+        if key:
+            fields.append((key, value.strip()))
+    return fields
+
+
+def secret_spec_value(spec, name):
+    """Return the value of one field of a secret spec, or "" when unset."""
+    for key, value in parse_secret_spec(spec):
+        if key == name:
+            return value
+    return ""
+
+
+def secret_spec_id(spec):
+    """Return the 'id' of a Docker secret spec, or "" when it has none."""
+    return secret_spec_value(spec, "id")
+
+
+def declared_secret_specs():
+    """Every --docker-build-secret spec, in the order it was given."""
+    return [spec for spec in getattr(FLAGS, "docker_build_secret", None) or [] if spec]
+
+
+def declared_secret_ids():
+    """Ids of every secret supplied with --docker-build-secret."""
+    return {i for i in (secret_spec_id(s) for s in declared_secret_specs()) if i}
+
+
+def secret_build_args():
+    """Return the '--secret' arguments to forward to 'docker build'.
+
+    Only the keys the build command understands are forwarded. Keys that
+    belong to the Dockerfile mount are dropped here and applied where the
+    Dockerfile is generated instead.
+    """
+    args = []
+    for spec in declared_secret_specs():
+        fields = [
+            "{}={}".format(key, value)
+            for key, value in parse_secret_spec(spec)
+            if key in DOCKER_BUILD_SECRET_KEYS
+        ]
+        if fields:
+            args.append("--secret {}".format(",".join(fields)))
+    return args
+
+
+def apt_sources_secret_mount():
+    """Return the RUN mount flag that overlays the apt source list, or an
+    empty string when no such secret was requested.
+
+    The mount point comes from the spec's 'target' when it has one, so
+    '--docker-build-secret id=apt_sources,src=<path>,target=<path>' controls
+    where the list lands. Without a 'target' it defaults to the NVIDIA
+    Artifactory source list. When the secret is absent this returns "" and the
+    generated Dockerfiles are byte-identical to a build without this feature.
+    """
+    for spec in declared_secret_specs():
+        if secret_spec_id(spec) != APT_SOURCES_SECRET_ID:
+            continue
+        target = secret_spec_value(spec, "target") or APT_SOURCES_DEFAULT_TARGET
+        return "--mount=type=secret,id={},target={},required=false ".format(
+            APT_SOURCES_SECRET_ID, target
+        )
+    return ""
+
+
+def mount_apt_sources_secret(df):
+    """Prefix every 'RUN apt-get update' in df with the apt source list mount.
+
+    A secret mount is scoped to a single RUN instruction, so every apt step
+    that should resolve through the mirror needs its own.
+
+    The first step of the build base is included even though it is the step
+    that installs ca-certificates. On a base image that already carries them
+    the step resolves through the mirror like any other. On one that does not,
+    apt reports the failed TLS handshake, still exits 0, and installs from the
+    distribution repositories, so the step behaves as it did before the mount
+    was added.
+    """
+    mount = apt_sources_secret_mount()
+    if not mount:
+        return df
+
+    marker = "RUN apt-get update"
+    return df.replace(marker, "RUN " + mount + "apt-get update")
 
 
 def create_dockerfile_buildbase_rhel(ddir, dockerfile_name, argmap):
@@ -902,9 +1006,6 @@ RUN yum install -y \\
             numactl-devel \\
             openssl-devel \\
             pkg-config \\
-            python3-pip \\
-            python3-scons \\
-            python3-setuptools \\
             rapidjson-devel \\
             re2-devel \\
             readline-devel \\
@@ -938,20 +1039,21 @@ RUN ccache -p
 """.format(
             os.getenv("CCACHE_REMOTE_STORAGE")
         )
-    # Requires openssl-devel to be installed first for pyenv build to be successful
-    df += change_default_python_version_rhel(FLAGS.rhel_py_version)
+    df += set_python_location_to_manylinux_for_rhel()
+    df += restore_embeddable_python_lib_rhel()
     df += """
 
 RUN pip3 install --upgrade pip \\
       && pip3 install --upgrade \\
           auditwheel \\
           build \\
-          wheel \\
-          setuptools \\
+          cmake==4.0.3 \\
           docker \\
-          virtualenv \\
           patchelf==0.17.2 \\
-          cmake==4.0.3
+          scons \\
+          setuptools \\
+          virtualenv \\
+          wheel
 """
     df += f"""
 # Install boost version >= 1.78 for boost::span
@@ -1108,6 +1210,8 @@ COPY . .
 ENTRYPOINT []
 """
 
+    df = mount_apt_sources_secret(df)
+
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -1226,8 +1330,9 @@ COPY docker/sagemaker/serve /usr/bin/.
     # This is required since libcublasLt.so is not present during the build
     # stage of the PyTorch backend
     if not FLAGS.enable_gpu and ("pytorch" in backends):
-        df += """
-RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.13 backends/pytorch/libtorch_cuda.so
+        cuda_arch = "sbsa" if target_machine() == "aarch64" else "x86_64"
+        df += f"""
+RUN patchelf --add-needed /usr/local/cuda/targets/{cuda_arch}-linux/lib/libcublasLt.so.13 backends/pytorch/libtorch_cuda.so
 """
     if "tensorrtllm" in backends:
         df += """
@@ -1236,6 +1341,8 @@ RUN ldconfig && \\
     ldconfig
 
 """
+    df = mount_apt_sources_secret(df)
+
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
 
@@ -1312,9 +1419,10 @@ RUN yum install -y \\
         libb64-devel \\
         gperftools-devel \\
         wget \\
-        python3.12-pip \\
         numactl-devel
-
+"""
+        df += set_python_location_to_manylinux_for_rhel()
+        df += """
 RUN pip3 install patchelf==0.17.2
 
 """
@@ -1389,8 +1497,7 @@ RUN yum install -y \\
         openssl-devel \\
         readline-devel
 """
-            # Requires openssl-devel to be installed first for pyenv build to be successful
-            df += change_default_python_version_rhel(FLAGS.rhel_py_version)
+            df += set_python_location_to_manylinux_for_rhel()
             df += """
 RUN pip3 install --upgrade pip \\
     && pip3 install --upgrade \\
@@ -1485,8 +1592,6 @@ COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusolver.so /usr/local/cuda/lib64/stubs/libcusolver.so.12
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcurand.so /usr/local/cuda/lib64/stubs/libcurand.so.10
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cuda/lib64/stubs/libcufft.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.13
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.13
 
 RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
 COPY --from=min_container /usr/local/cuda/lib64/libcudart.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
@@ -1496,6 +1601,8 @@ COPY --from=min_container /usr/local/cuda/lib64/libcufile.so.0 /usr/local/cuda/t
 COPY --from=min_container /usr/local/cuda/lib64/libnvrtc.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libcusparseLt.so.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda/lib64/libnvshmem_host.so.3 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libcublasLt.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda/lib64/libcublas.so.13 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
 COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1
@@ -1531,28 +1638,28 @@ COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{
     return df
 
 
-def change_default_python_version_rhel(version):
-    df = f"""
-# The python library version available for install via 'yum install python3.X-devel' does not
-# match the version of python inside the RHEL base container. This means that python packages
-# installed within the container will not be picked up by the python backend stub process pybind
-# bindings. It must instead must be installed via pyenv.
-ENV PYENV_ROOT=/opt/pyenv_build
-RUN curl https://pyenv.run | bash
-ENV PATH="${{PYENV_ROOT}}/bin:$PATH"
-RUN eval "$(pyenv init -)"
-RUN CONFIGURE_OPTS=\"--with-openssl=/usr/lib64\" && pyenv install {version} \\
-    && cp ${{PYENV_ROOT}}/versions/{version}/lib/libpython3* /usr/lib64/
-
-# RHEL image has several python versions. It's important
-# to set the correct version, otherwise, packages that are
-# pip installed will not be found during testing.
-ENV PYVER={version} PYTHONPATH=/opt/python/v
-RUN ln -sf ${{PYENV_ROOT}}/versions/${{PYVER}}* ${{PYTHONPATH}}
-ENV PYBIN=${{PYTHONPATH}}/bin
-ENV PYTHON_BIN_PATH=${{PYBIN}}/python${{PYVER}} PATH=${{PYBIN}}:${{PATH}}
+def set_python_location_to_manylinux_for_rhel():
+    df = """
+ENV PATH="/opt/_internal/pipx/shared/bin:$PATH"
 """
     return df
+
+
+def restore_embeddable_python_lib_rhel():
+    # The manylinux base container configures CPython with --disable-shared,
+    # so no libpython*.so is ever built, and its finalize.sh then compresses
+    # every libpython*.a into static-libs-for-embedding-only.tar.xz and drops
+    # the originals. triton_python_backend_stub links pybind11::embed and so
+    # needs that archive. Restore it in place -- the path it unpacks to is
+    # exactly the LIBDIR the interpreter's sysconfig reports, which is where
+    # pybind11's FindPythonLibsNew looks.
+    #
+    # This deliberately fails the build if the archive is absent: without it
+    # the stub link fails much later with an unresolvable -lpython<ver>.
+    return """
+RUN tar -xvf /opt/_internal/static-libs-for-embedding-only.tar.xz \\
+        -C /opt/_internal
+"""
 
 
 def create_build_dockerfiles(
@@ -1567,16 +1674,15 @@ def create_build_dockerfiles(
     elif target_platform() == "rhel":
         raise KeyError("A base image must be specified when targeting RHEL")
     elif FLAGS.enable_gpu:
-        base_image = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
-            FLAGS.upstream_container_version
-        )
+        base_image = default_build_container_image()
     else:
         base_image = "ubuntu:24.04"
 
-    if "inference" in images:
-        inference_image = images["inference"]
-    else:
-        inference_image = None
+    # Unless --image=inference is given, the runtime image is the build image.
+    # The cuda-dl-base inference-runtime image lacks libnvinfer-bin, so
+    # shipping on it drops trtexec from the tritonserver image and from every
+    # image built on top of it, such as the QA image.
+    inference_image = images.get("inference")
 
     dockerfileargmap = {
         "NVIDIA_BUILD_REF": "" if FLAGS.build_sha is None else FLAGS.build_sha,
@@ -1660,6 +1766,8 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
 
         baseargs += ["--cache-from={}".format(k) for k in cachefrommap]
 
+        baseargs += secret_build_args()
+
         baseargs += ["."]
 
         docker_script.cwd(THIS_SCRIPT_DIR)
@@ -1706,6 +1814,21 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
         # or explicit --release-version). Dev / pre-release builds leave it
         # unset so build_wheel.py reads the in-tree TRITON_VERSION file and
         # takes the PEP 817 variant path.
+        # Authenticate the GitHub clones cmake_build performs in this container.
+        # It runs the build rather than an image build, so a build secret cannot
+        # reach it, and a bind mount cannot either: docker resolves the source
+        # path on the daemon, which need not share the filesystem this script
+        # runs on, and silently creates a directory when it does not find it.
+        # Hand the container the contents instead and let it write the file.
+        #
+        # Passed by name rather than as NAME=value, so the contents, which carry
+        # a credential, stay out of this script, which CI publishes as a build
+        # artifact.
+        # The ONNX Runtime mirror URL (onnxruntime_backend) is handled alike.
+        for var in (GIT_CONFIG_CONTENT_ENV, "TRITON_MS_ONNXRUNTIME_GIT_REPOSITORY"):
+            if os.environ.get(var):
+                runargs += ["-e", var]
+
         if "TRITON_RELEASE_VERSION" in os.environ:
             runargs += [
                 "-e",
@@ -1722,7 +1845,23 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
 
         runargs += ["tritonserver_buildbase"]
 
-        runargs += ["./cmake_build"]
+        # Write the git config out inside the container, where the contents
+        # arrived as an environment variable, and point git at it for the build
+        # only. Single quoted so the outer shell leaves the expansion to the
+        # container, whose environment is the one holding the value.
+        if os.environ.get(GIT_CONFIG_CONTENT_ENV):
+            runargs += [
+                "bash",
+                "-c",
+                '\'printf "%s" "${}" > {} && export GIT_CONFIG_GLOBAL={} && '
+                "./cmake_build'".format(
+                    GIT_CONFIG_CONTENT_ENV,
+                    GIT_CONFIG_CONTAINER_PATH,
+                    GIT_CONFIG_CONTAINER_PATH,
+                ),
+            ]
+        else:
+            runargs += ["./cmake_build"]
 
         # Remove existing tritonserver_builder container...
         docker_script._file.write(
@@ -1762,14 +1901,7 @@ def create_docker_build_script(script_name, container_install_dir, container_ci_
             "docker",
             "build",
         ]
-        if secrets:
-            finalargs += [
-                f"--secret id=req,src={requirements}",
-                f"--secret id=VLLM_INDEX_URL",
-                f"--secret id=PYTORCH_TRITON_URL",
-                f"--secret id=NVPL_SLIM_URL",
-                f"--build-arg BUILD_PUBLIC_VLLM={build_public_vllm}",
-            ]
+        finalargs += secret_build_args()
         finalargs += [
             "-t",
             "tritonserver",
@@ -1871,6 +2003,7 @@ def core_build(
     )
 
     cmake_script.cp(os.path.join(repo_dir, "LICENSE"), install_dir)
+    cmake_script.cp(os.path.join(repo_dir, "THIRD-PARTY-NOTICES.txt"), install_dir)
     cmake_script.cp(os.path.join(repo_dir, "TRITON_VERSION"), install_dir)
 
     # If requested, package the source code for all OSS used to build.
@@ -1963,17 +2096,6 @@ def backend_build(
 
     cmake_script.mkdir(os.path.join(install_dir, "backends"))
     cmake_script.rmdir(os.path.join(install_dir, "backends", be))
-
-    # The python library version available for install via 'yum install python3.X-devel' does not
-    # match the version of python inside the RHEL base container. This means that python packages
-    # installed within the container will not be picked up by the python backend stub process pybind
-    # bindings. It must instead must be installed via pyenv. We package it here for better usability.
-    if target_platform() == "rhel" and be == "python":
-        major_minor_version = ".".join((FLAGS.rhel_py_version).split(".")[:2])
-        version_matched_files = "/usr/lib64/libpython" + major_minor_version + "*"
-        cmake_script.cp(
-            version_matched_files, os.path.join(repo_install_dir, "backends", be)
-        )
 
     cmake_script.cpdir(
         os.path.join(repo_install_dir, "backends", be),
@@ -2402,7 +2524,7 @@ if __name__ == "__main__":
         "--image",
         action="append",
         required=False,
-        help='Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", or "pytorch".',
+        help='Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", "pytorch", or "inference".',
     )
 
     parser.add_argument(
@@ -2570,6 +2692,12 @@ if __name__ == "__main__":
         help="This flag sets the upstream container version for Triton Inference Server to be built. Default: the latest released version.",
     )
     parser.add_argument(
+        "--cuda-dl-base-version",
+        required=False,
+        default=DEFAULT_TRITON_VERSION_MAP["cuda_dl_base_version"],
+        help="This flag sets the cuda-dl-base container train and its CUDA version, as a matched pair, used for the default build base image. Default: the latest supported version.",
+    )
+    parser.add_argument(
         "--ort-version",
         required=False,
         default=DEFAULT_TRITON_VERSION_MAP["ort_version"],
@@ -2594,21 +2722,25 @@ if __name__ == "__main__":
         help="This flag sets the DCGM version for Triton Inference Server to be built. Default: the latest supported version.",
     )
     parser.add_argument(
-        "--rhel-py-version",
-        required=False,
-        default=DEFAULT_TRITON_VERSION_MAP["rhel_py_version"],
-        help="This flag sets the Python version for RHEL platform of Triton Inference Server to be built. Default: the latest supported version.",
-    )
-    parser.add_argument(
-        "--build-secret",
+        "--docker-build-secret",
         action="append",
         required=False,
-        nargs=2,
-        metavar=("key", "value"),
-        help="Add build secrets in the form of <key> <value>. These secrets are used during the build process for vllm. The secrets are passed to the Docker build step as `--secret id=<key>`. The following keys are expected and their purposes are described below:\n\n"
-        "  - 'req': A file containing a list of dependencies for pip (e.g., requirements.txt).\n"
-        "  - 'build_public_vllm': A flag (default is 'true') indicating whether to build the public VLLM version.\n\n"
-        "Ensure that the required environment variables for these secrets are set before running the build.",
+        metavar="spec",
+        help="Pass a build secret to 'docker build' using Docker's own syntax. The spec is forwarded "
+        "unchanged, so every form 'docker build --secret' accepts is supported:\n\n"
+        "  - 'id=<id>,src=<path>'  read the secret from a file (source= is an accepted alias)\n"
+        "  - 'id=<id>,env=<var>'   read the secret from an environment variable\n"
+        "  - 'id=<id>'             read the environment variable of the same name\n\n"
+        "May be repeated. The secret is available to a Dockerfile step that mounts it with "
+        "'RUN --mount=type=secret,id=<id>', and never becomes part of an image layer.\n\n"
+        "A spec may additionally carry 'target=<path>'. Docker rejects that key on the command line "
+        "because it belongs to the Dockerfile mount, so it is stripped from the build command and "
+        "applied where the Dockerfile is generated.\n\n"
+        "The id 'apt_sources' carries extra meaning: it is also mounted for the duration of each apt step "
+        "in the generated Dockerfile and Dockerfile.buildbase, so package installs resolve through a "
+        "package mirror. It lands on 'target' when the spec sets one, and on "
+        "/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list otherwise. When the secret is omitted the "
+        "generated Dockerfiles are unchanged and apt uses the distribution repositories.",
     )
     parser.add_argument(
         "--triton-wheels-dependencies-group",
@@ -2643,8 +2775,8 @@ if __name__ == "__main__":
         FLAGS.override_backend_cmake_arg = []
     if FLAGS.extra_backend_cmake_arg is None:
         FLAGS.extra_backend_cmake_arg = []
-    if FLAGS.build_secret is None:
-        FLAGS.build_secret = []
+    if FLAGS.docker_build_secret is None:
+        FLAGS.docker_build_secret = []
 
     FLAGS.boost_url = os.getenv(
         "TRITON_BOOST_URL",
@@ -2753,12 +2885,6 @@ if __name__ == "__main__":
                 )
             )
             backends["python"] = backends["vllm"]
-
-    secrets = dict(getattr(FLAGS, "build_secret", []))
-    if secrets:
-        requirements = secrets.get("req", "")
-        build_public_vllm = secrets.get("build_public_vllm", "true")
-        log('Build Arg for BUILD_PUBLIC_VLLM: "{}"'.format(build_public_vllm))
 
     # Initialize map of repo agents to build and repo-tag for each.
     repoagents = {}

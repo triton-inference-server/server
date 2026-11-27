@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -52,6 +52,29 @@ This will create multiple model repositories in /tmp/\<version\>/qa_*
 will be created for the GPU on the system that CUDA considers device 0
 (zero). If you have multiple GPUs on your system see the documentation
 in the scripts for how to target a specific GPU.
+
+A Python driver covering the same work is available beside it:
+
+```
+$ cd qa/common
+$ ./gen_qa_model_repository.py
+```
+
+It adds per-framework selection, so a change to one backend does not cost a
+full corpus rebuild:
+
+```
+$ ./gen_qa_model_repository.py --onnx --pytorch
+```
+
+Its output layout differs — models land in a `models/` directory inside the
+build directory rather than in `/tmp/<version>/`, and `--output-dir` chooses
+where that is copied to. It also selects GPUs with `--nvidia-visible-devices`,
+which takes the container toolkit's values (`all` by default, or an index or
+UUID for a specific device) rather than assuming device 0.
+
+See [qa/common/README.md](../../qa/common/README.md) for the full flag set, the
+manifests written alongside each model, and archiving.
 
 ## Build SDK Image
 

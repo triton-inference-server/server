@@ -83,12 +83,17 @@ def get_tokenizer(
             raise ValueError("Cannot use the fast tokenizer in slow tokenizer mode.")
         kwargs["use_fast"] = False
 
+    # Only forward tokenizer_revision when set. Some backends, such as
+    # MistralCommonBackend, reject unrecognized kwargs instead of ignoring
+    # them, so passing tokenizer_revision=None fails for those models.
+    if tokenizer_revision is not None:
+        kwargs["tokenizer_revision"] = tokenizer_revision
+
     try:
         tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_name,
             *args,
             trust_remote_code=trust_remote_code,
-            tokenizer_revision=tokenizer_revision,
             **kwargs,
         )
     except ValueError as e:

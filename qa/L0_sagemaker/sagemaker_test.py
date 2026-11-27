@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,6 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Local test modules are imported after adjusting sys.path for ../common.
+# flake8: noqa: E402
 import sys
 
 sys.path.append("../common")
@@ -380,6 +382,42 @@ class SageMakerTest(tu.TestResultCollector):
             "Expected error code {} returned for the request; got: {}".format(
                 400, r.status_code
             ),
+        )
+
+    def test_malformed_binary_header_out_of_range(self):
+        """json-header-size value exceeding INT_MAX triggers std::out_of_range
+        in std::stoi. Before the fix this crashed the server process via
+        std::terminate(); now it must return 400 and leave the server alive."""
+        inputs = []
+        outputs = []
+        inputs.append(httpclient.InferInput("INPUT0", [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput("INPUT1", [1, 16], "INT32"))
+        input_data = np.array(self.input_data_, dtype=np.int32)
+        input_data = np.expand_dims(input_data, axis=0)
+        inputs[0].set_data_from_numpy(input_data, binary_data=True)
+        inputs[1].set_data_from_numpy(input_data, binary_data=False)
+        outputs.append(httpclient.InferRequestedOutput("OUTPUT0", binary_data=False))
+        outputs.append(httpclient.InferRequestedOutput("OUTPUT1", binary_data=False))
+        (request_body, _) = httpclient.InferenceServerClient.generate_request_body(
+            inputs, outputs=outputs
+        )
+        headers = {
+            "Content-Type": "application/vnd.sagemaker-triton.binary+json;json-header-size=99999999999"
+        }
+        r = requests.post(self.url_, data=request_body, headers=headers)
+        self.assertEqual(
+            400,
+            r.status_code,
+            "Expected 400 for out-of-range json-header-size; got: {}".format(
+                r.status_code
+            ),
+        )
+        # Server must still be alive — a crash would make this fail.
+        health = requests.get(self.url_.replace("/invocations", "/ping"))
+        self.assertEqual(
+            200,
+            health.status_code,
+            "Server is not live after out-of-range json-header-size request",
         )
 
 

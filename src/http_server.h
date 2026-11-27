@@ -108,6 +108,8 @@ class HTTPServer {
   // Transfer-Encoding: chunked — increment count per non-empty chunk (capped).
   static evhtp_res ChunkCountIncrement(
       evhtp_request_t* req, uint64_t chunk_len, void* arg);
+  static evhtp_res DiscardRequestBody(
+      evhtp_request_t* req, evbuffer* buffer, void* arg);
 
   static evhtp_res NewConnection(evhtp_connection_t* conn, void* arg);
   static evhtp_res EndConnection(evhtp_connection_t* conn, void* arg);
@@ -428,7 +430,8 @@ class HTTPAPIServer : public HTTPServer {
         std::map<std::string, triton::common::TritonJson::Value>&
             input_metadata,
         const MappingSchema* schema,
-        triton::common::TritonJson::Value& generate_request);
+        triton::common::TritonJson::Value& generate_request,
+        size_t& consumed_input_size);
 
     const MappingSchema* RequestSchema() { return request_schema_; }
     const MappingSchema* ResponseSchema() { return response_schema_; }

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2023-2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023-2026, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -54,6 +54,27 @@ rm -f $FRONTEND_TEST_LOG
 python -m pytest --junitxml=test_kserve.xml test_kserve.py > $FRONTEND_TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $FRONTEND_TEST_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+# Shared-memory requests must not crash a tritonfrontend-launched
+# server (null SharedMemoryManager). Runs the server in a subprocess so a
+# regression segfaults only the child, not this test process.
+SHM_FRONTEND_TEST_LOG="./python_shared_memory_frontend.log"
+rm -f $SHM_FRONTEND_TEST_LOG
+python -m pytest --junitxml=test_shared_memory_frontend_report.xml test_shared_memory_frontend.py > $SHM_FRONTEND_TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $SHM_FRONTEND_TEST_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+LOG_CALLBACK_TEST_LOG="./python_logging_callback.log"
+rm -f $LOG_CALLBACK_TEST_LOG
+python -m pytest --junitxml=test_logging_callback_report.xml test_logging_callback.py > $LOG_CALLBACK_TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $LOG_CALLBACK_TEST_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi

@@ -30,8 +30,8 @@ project(tritonserver LANGUAGES C CXX)
 
 include(CMakeDependentOption)
 
-# Use C++17 standard as Triton's minimum required.
-set(TRITON_MIN_CXX_STANDARD 17 CACHE STRING "The minimum C++ standard which features are requested to build this target.")
+# Use C++20 standard as Triton's minimum required.
+set(TRITON_MIN_CXX_STANDARD 20 CACHE STRING "The minimum C++ standard which features are requested to build this target.")
 
 set(TRITON_VERSION "0.0.0" CACHE STRING "The version of the Triton shared library" )
 
@@ -167,6 +167,7 @@ if (OPENSSL_ROOT_DIR)
 endif()
 
 set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/${LIB_DIR}/cmake/protobuf")
+set(_FINDPACKAGE_UTF8_RANGE_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/${LIB_DIR}/cmake/utf8_range")
 
 set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/opentelemetry-cpp/${LIB_DIR}/cmake/opentelemetry-cpp")
 
@@ -199,6 +200,7 @@ ExternalProject_Add(triton-server
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/triton-server"
   CMAKE_CACHE_ARGS
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
+    -Dutf8_range_DIR:PATH=${_FINDPACKAGE_UTF8_RANGE_CONFIG_DIR}
     ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}

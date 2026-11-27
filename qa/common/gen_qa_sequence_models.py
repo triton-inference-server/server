@@ -30,8 +30,10 @@ import argparse
 import os
 
 import gen_ensemble_model_utils as emu
+import gen_manifest
 import numpy as np
 from gen_common import (
+    create_general_modelconfig,
     np_to_model_dtype,
     np_to_onnx_dtype,
     np_to_torch_dtype,
@@ -721,9 +723,8 @@ instance_group [
 ]
 """
 
-    # [TODO] move create_general_modelconfig() out of emu as it is general
     # enough for all backends to use
-    config = emu.create_general_modelconfig(
+    config = create_general_modelconfig(
         model_name,
         "onnxruntime_onnx",
         max_batch,
@@ -1150,6 +1151,10 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     if FLAGS.tensorrt or FLAGS.tensorrt_shape_io:
         import tensorrt as trt
     if FLAGS.onnx:
@@ -1253,3 +1258,6 @@ if __name__ == "__main__":
                     emu.create_nop_modelconfig(
                         FLAGS.models_dir, model_shape, model_dtype
                     )
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

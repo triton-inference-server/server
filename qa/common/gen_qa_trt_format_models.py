@@ -29,6 +29,7 @@
 import argparse
 import os
 
+import gen_manifest
 import numpy as np
 import tensorrt as trt
 import test_util as tu
@@ -397,6 +398,10 @@ if __name__ == "__main__":
     )
     FLAGS, unparsed = parser.parse_known_args()
 
+    # Fingerprint the tree first, so emit_manifests() below stamps only the
+    # models this script creates rather than relabelling every other stage's.
+    manifest_baseline = gen_manifest.snapshot_model_dirs(FLAGS.models_dir)
+
     # reformat-free input
     # Fixed shape
     create_plan_model(
@@ -456,3 +461,6 @@ if __name__ == "__main__":
 
     # reformat-free output
     # reformat-free I/O
+
+    # Record what produced these models, beside each config.pbtxt.
+    gen_manifest.emit_manifests(FLAGS.models_dir, manifest_baseline)

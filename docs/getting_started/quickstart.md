@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2024, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2026, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -73,10 +73,10 @@ for Docker to recognize the GPU(s). The --gpus=1 flag indicates that 1
 system GPU should be made available to Triton for inferencing.
 
 ```
-$ docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:<xx.yy>-py3 tritonserver --model-repository=/models
+$ docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:<YY.MM>-py3 tritonserver --model-repository=/models
 ```
 
-Where \<xx.yy\> is the version of Triton that you want to use (and
+Where \<YY.MM\> is the version of Triton that you want to use (and
 pulled above). After you start Triton you will see output on the
 console showing the server starting up and loading the model. When you
 see output like the following, Triton is ready to accept inference
@@ -106,7 +106,7 @@ On a system without GPUs, Triton should be run without using the
 above.
 
 ```
-$ docker run --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:<xx.yy>-py3 tritonserver --model-repository=/models
+$ docker run --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:<YY.MM>-py3 tritonserver --model-repository=/models
 ```
 
 Because the --gpus flag is not used, a GPU is not available and Triton
@@ -136,17 +136,17 @@ Use docker pull to get the client libraries and examples image
 from NGC.
 
 ```
-$ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3-sdk
+$ docker pull nvcr.io/nvidia/tritonserver:<YY.MM>-py3-sdk
 ```
 
-Where \<xx.yy\> is the version that you want to pull. Run the client
+Where \<YY.MM\> is the version that you want to pull. Run the client
 image.
 
 ```
-$ docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:<xx.yy>-py3-sdk
+$ docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:<YY.MM>-py3-sdk
 ```
 
-From within the nvcr.io/nvidia/tritonserver:<xx.yy>-py3-sdk
+From within the nvcr.io/nvidia/tritonserver:<YY.MM>-py3-sdk
 image, run the example image-client application to perform image
 classification using the example densenet_onnx model.
 

@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:26.06-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/cuda-dl-base:26.11-cuda13.5-inference-runtime-ubuntu24.04
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_REPO_ORGANIZATION=http://github.com/triton-inference-server
@@ -38,13 +38,18 @@ ARG TRITON_CORE_REPO_TAG=main
 ARG TRITON_CLIENT_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_ENABLE_GPU=ON
-ARG JAVA_BINDINGS_MAVEN_VERSION=3.9.9
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
+ARG JAVA_BINDINGS_MAVEN_URL=https://archive.apache.org/dist/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz
 # DCGM version to install for Model Analyzer
-ARG DCGM_VERSION=4.5.3-1
+ARG DCGM_VERSION=4.7.1-2
 
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown
+
+# Parallelism for the client/gRPC compile. gRPC C++ translation units peak at
+# 1-2+ GB RAM each, so keep this low to avoid the OOM killer on memory-limited
+# builders. Override with --build-arg TRITON_CLIENT_BUILD_PARALLEL=N.
+ARG TRITON_CLIENT_BUILD_PARALLEL=4
 
 ############################################################################
 ##  Build image
@@ -75,26 +80,25 @@ RUN apt-get update && \
             pkg-config \
             python3 \
             python3-dev \
-            python3-pdfkit \
             python3-pip \
-            python3-setuptools \
             python3-wheel \
             rapidjson-dev \
             software-properties-common \
             vim \
             wget && \
-    pip3 install --upgrade grpcio-tools cmake==4.0.3 auditwheel
+    pip3 install --upgrade setuptools build "grpcio-tools==1.81.1" cmake==4.0.3 auditwheel
 
 ENV CMAKE_POLICY_MINIMUM_REQUIRED=3.5
 
 # Install Maven 3.9+ manually -- the distro-provided maven is too old to
 # honor the MAVEN_ARGS environment variable (added in Maven 3.9.0, MNG-7038).
-ARG JAVA_BINDINGS_MAVEN_VERSION
-RUN wget -nv -O /tmp/maven.tar.gz \
-        https://archive.apache.org/dist/maven/maven-3/${JAVA_BINDINGS_MAVEN_VERSION}/binaries/apache-maven-${JAVA_BINDINGS_MAVEN_VERSION}-bin.tar.gz && \
+ARG JAVA_BINDINGS_MAVEN_URL
+RUN --mount=type=secret,id=maven_url,env=MAVEN_URL,required=false \
+    [ -n "${MAVEN_URL}" ] || MAVEN_URL="${JAVA_BINDINGS_MAVEN_URL}"; \
+    curl -fSLk --retry 3 -o /tmp/maven.tar.gz "${MAVEN_URL}" && \
     tar -xzf /tmp/maven.tar.gz -C /opt && \
-    ln -s /opt/apache-maven-${JAVA_BINDINGS_MAVEN_VERSION} /opt/maven && \
-    rm /tmp/maven.tar.gz
+    find /opt -maxdepth 1 -name "apache-maven-*" -type d -exec ln -s {} /opt/maven \; && \
+    rm /tmp/maven.tar.gz && /opt/maven/bin/mvn --version
 ENV PATH="/opt/maven/bin:${PATH}"
 
 # Build expects "python" executable (not python3).
@@ -112,13 +116,16 @@ ARG TRITON_ENABLE_GPU
 ARG JAVA_BINDINGS_MAVEN_VERSION
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG
 ARG TARGETPLATFORM
+ARG TRITON_CLIENT_BUILD_PARALLEL
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
 COPY ${TRITON_CLIENT_REPO_SUBDIR} client
 
 WORKDIR /workspace/client_build
-RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
+RUN --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=false \
+    export GIT_CONFIG_GLOBAL=/run/secrets/gitconfig && \
+    cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
           -DTRITON_REPO_ORGANIZATION=${TRITON_REPO_ORGANIZATION} \
           -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
@@ -131,11 +138,15 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
 RUN --mount=type=secret,id=maven_settings,target=/run/secrets/maven_settings,required=false \
+    --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=false \
+    export GIT_CONFIG_GLOBAL=/run/secrets/gitconfig && \
     if [ -f /run/secrets/maven_settings ]; then export MAVEN_ARGS="--settings /run/secrets/maven_settings"; fi && \
-    cmake --build . -v --parallel --target cc-clients java-clients python-clients
+    cmake --build . -v --parallel ${TRITON_CLIENT_BUILD_PARALLEL} --target cc-clients java-clients python-clients
 
 # Install Java API Bindings
 RUN --mount=type=secret,id=maven_settings,target=/run/secrets/maven_settings,required=false \
+    --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=false \
+    export GIT_CONFIG_GLOBAL=/run/secrets/gitconfig && \
     if [ -f /run/secrets/maven_settings ]; then export MAVEN_ARGS="--settings /run/secrets/maven_settings"; fi && \
     if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         source /workspace/client/src/java-api-bindings/scripts/install_dependencies_and_build.sh \
@@ -160,7 +171,8 @@ ARG TRITON_CORE_REPO_TAG
 ARG TARGETPLATFORM
 ARG TRITON_ENABLE_GPU
 
-RUN apt-get update && \
+RUN --mount=type=secret,id=apt_sources,target=/etc/apt/sources.list.d/nvidia-artifactory-ubuntu.list,required=false \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
             curl \
             default-jdk \
@@ -176,24 +188,26 @@ RUN apt-get update && \
             perl \
             python3 \
             python3-dev \
-            python3-pdfkit \
             python3-pip \
-            python3-setuptools \
             python3-wheel \
             vim \
             wget && \
-    pip3 install "grpcio>=1.81.1" grpcio-tools && \
+    pip3 install --upgrade setuptools && \
+    pip3 install "grpcio==1.81.1" "grpcio-tools==1.81.1" && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*;
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
 COPY NVIDIA_Deep_Learning_Container_License.pdf .
+COPY THIRD-PARTY-NOTICES.txt .
+COPY LICENSE .
 COPY --from=sdk_build /workspace/client/ client/
 COPY --from=sdk_build /workspace/install/ install/
 WORKDIR /workspace/install
 RUN export VERSION=`cat /workspace/TRITON_VERSION` && \
-    tar zcf /workspace/v"$VERSION".clients.tar.gz ./*
+    tar zcf /workspace/v"$VERSION".clients.tar.gz ./* ../THIRD-PARTY-NOTICES.txt ../LICENSE && \
+    tar tzf /workspace/v"$VERSION".clients.tar.gz | grep -q 'THIRD-PARTY-NOTICES.txt$'
 
 WORKDIR /workspace
 
@@ -238,9 +252,14 @@ RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/${arch}/cuda-keyring_1.1-1_all.deb" \
         && apt -y install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
         apt update && \
+        V=1:${DCGM_VERSION} && \
+        DEPS=$(apt-cache show datacenter-gpu-manager-4-core=${V} \
+               | sed -n 's/^Depends: //p' | tr ',' '\n' \
+               | awk -v v="(= ${V})" -v V="${V}" 'index($0, v) {print $1"="V}') && \
         apt install --yes --no-install-recommends \
-               datacenter-gpu-manager-4-core=1:${DCGM_VERSION} \
-               datacenter-gpu-manager-4-dev=1:${DCGM_VERSION}; \
+               datacenter-gpu-manager-4-core=${V} \
+               datacenter-gpu-manager-4-dev=${V} \
+               ${DEPS}; \
     fi
 
 # Build expects "python" executable (not python3).
@@ -250,7 +269,9 @@ RUN rm -f /usr/bin/python && \
 # Install Model Analyzer
 ARG TRITON_MODEL_ANALYZER_REPO_TAG
 ARG TRITON_MODEL_ANALYZER_REPO="${TRITON_REPO_ORGANIZATION}/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
-RUN pip3 install "git+${TRITON_MODEL_ANALYZER_REPO}"
+RUN --mount=type=secret,id=gitconfig,target=/run/secrets/gitconfig,required=false \
+    export GIT_CONFIG_GLOBAL=/run/secrets/gitconfig && \
+    pip3 install "git+${TRITON_MODEL_ANALYZER_REPO}"
 
 # Entrypoint Banner
 ENV NVIDIA_PRODUCT_NAME="Triton Server SDK"
