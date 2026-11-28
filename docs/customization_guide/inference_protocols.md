@@ -72,7 +72,7 @@ Triton provides the following configuration options for server-client network tr
 
 #### Compression
 
-Triton allows the on-wire compression of request/response on HTTP through its clients. See [HTTP Compression](../client/README.md#compression) for more details.
+Triton allows the on-wire compression of request/response on HTTP through its clients. See [HTTP Compression](https://github.com/triton-inference-server/client/blob/main/README.md#compression) for more details.
 
 #### Mapping Triton Server Error Codes to HTTP Status Codes
 
